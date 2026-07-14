@@ -1,0 +1,9 @@
+comparison	gene	direction_in_paper	log2FC_here	score_here	pvalue_adj_here
+Core_vs_Healthy	HLA-A	UP_in_Oligo_2_3_2	6.958995	101.148384	0.0
+Core_vs_Healthy	ALDOA	UP_in_Oligo_2_3_2	3.9249456	50.849106	0.0
+Core_vs_Healthy	TIMP1	UP_in_Oligo_2_3_2	6.055512	64.20983	0.0
+Periphery_vs_Healthy	HLA-A	UP_in_Oligo_2_3_2	4.367228	55.57432	0.0
+Core_vs_Periphery	HLA-A	UP_in_Oligo_2_3_2	3.468577	117.18447	0.0
+Core_vs_Periphery	CLU	UP_in_Oligo_2_3_2	3.0925741	60.61114	0.0
+Core_vs_Periphery	ALDOA	UP_in_Oligo_2_3_2	2.8861494	72.00086	0.0
+Core_vs_Periphery	TIMP1	UP_in_Oligo_2_3_2	4.5904245	99.16378	0.0

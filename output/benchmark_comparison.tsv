@@ -1,0 +1,5 @@
+Method	Accuracy	Macro F1	Weighted F1	Macro Precision	Macro Recall	Macro AUC (OvR)	Params	Best Test Acc
+Logistic Regression (Classical)	0.6983	0.6981	0.6981	0.6982	0.6983	0.8624	0	0.6983
+Random Forest (Classical)	0.7260	0.7248	0.7248	0.7274	0.7260	0.8735	0	0.7260
+Transformer (Deep Learning)	0.5067	0.4846	0.4846	0.4853	0.5067	0.6885	80,323	0.5093
+Hybrid (LR-prior Transformer)	0.5073	0.4959	0.4959	0.5115	0.5073	0.6807	80,323	0.5073

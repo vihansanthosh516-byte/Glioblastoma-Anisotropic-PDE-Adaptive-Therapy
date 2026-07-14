@@ -33,16 +33,16 @@ PNG_CM       = os.path.join(OUT_DIR, "method2_confusion.png")
 PNG_LOSS     = os.path.join(OUT_DIR, "method2_training_loss.png")
 
 # Hyperparameters - CPU friendly
-N_GENES      = 500       # use top 500 HVGs only (faster)
+N_GENES      = 100       # use top 100 HVGs only
 N_CLASSES    = 3
 EMBED_DIM    = 64
 N_HEADS      = 4
 N_LAYERS     = 2
 FF_DIM       = 128
 DROPOUT      = 0.2
-BATCH_SIZE   = 128
+BATCH_SIZE   = 256
 LR           = 1e-3
-EPOCHS       = 15
+EPOCHS       = 5
 WEIGHT_DECAY = 1e-4
 DEVICE       = "cuda" if torch.cuda.is_available() else "cpu"
 
