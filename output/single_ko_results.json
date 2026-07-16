@@ -1,0 +1,1002 @@
+[
+  {
+    "gene": "S100B",
+    "gene_idx": 28,
+    "n_targets": 25,
+    "knockout_strength": 2.755105972290039,
+    "collapse_score": 0.9512352407740768,
+    "mean_shift": -0.5194210058894947,
+    "var_ratio": 0.04876475686418761,
+    "n_periphery_cells": 5000
+  },
+  {
+    "gene": "APOD",
+    "gene_idx": 38,
+    "n_targets": 25,
+    "knockout_strength": 3.033205032348633,
+    "collapse_score": 0.9508172349847577,
+    "mean_shift": -0.5194633757491786,
+    "var_ratio": 0.04918276265350675,
+    "n_periphery_cells": 5000
+  },
+  {
+    "gene": "MT3",
+    "gene_idx": 40,
+    "n_targets": 22,
+    "knockout_strength": 2.1478357315063477,
+    "collapse_score": 0.9504548398491802,
+    "mean_shift": -0.5195293960388543,
+    "var_ratio": 0.049545157789084186,
+    "n_periphery_cells": 5000
+  },
+  {
+    "gene": "S100A8",
+    "gene_idx": 8,
+    "n_targets": 19,
+    "knockout_strength": 1.2856559753417969,
+    "collapse_score": 0.8637468320241204,
+    "mean_shift": -0.4174363715301189,
+    "var_ratio": 0.13625316561414402,
+    "n_periphery_cells": 5000
+  },
+  {
+    "gene": "IFITM2",
+    "gene_idx": 3,
+    "n_targets": 17,
+    "knockout_strength": 1.193735122680664,
+    "collapse_score": 0.8282249243034581,
+    "mean_shift": -0.38722967677660164,
+    "var_ratio": 0.1717750733348063,
+    "n_periphery_cells": 5000
+  },
+  {
+    "gene": "S100A9",
+    "gene_idx": 18,
+    "n_targets": 16,
+    "knockout_strength": 1.0381965637207031,
+    "collapse_score": 0.7578961754994935,
+    "mean_shift": -0.3367791781165706,
+    "var_ratio": 0.24210382213877094,
+    "n_periphery_cells": 5000
+  },
+  {
+    "gene": "FCER1G",
+    "gene_idx": 7,
+    "n_targets": 13,
+    "knockout_strength": 0.8395013809204102,
+    "collapse_score": 0.6542509787699111,
+    "mean_shift": -0.27229400962542155,
+    "var_ratio": 0.34574901886835335,
+    "n_periphery_cells": 5000
+  },
+  {
+    "gene": "CCL3L1",
+    "gene_idx": 1,
+    "n_targets": 13,
+    "knockout_strength": 0.7991476058959961,
+    "collapse_score": 0.6322108231370502,
+    "mean_shift": -0.2591238544251842,
+    "var_ratio": 0.3677891745012141,
+    "n_periphery_cells": 5000
+  },
+  {
+    "gene": "CSF3R",
+    "gene_idx": 21,
+    "n_targets": 12,
+    "knockout_strength": 0.62310791015625,
+    "collapse_score": 0.5182464815695536,
+    "mean_shift": -0.20133025176625813,
+    "var_ratio": 0.48175351606871086,
+    "n_periphery_cells": 5000
+  },
+  {
+    "gene": "CST3",
+    "gene_idx": 6,
+    "n_targets": 10,
+    "knockout_strength": 0.5380859375,
+    "collapse_score": 0.45510397716161366,
+    "mean_shift": -0.17447748495244736,
+    "var_ratio": 0.5448960204766508,
+    "n_periphery_cells": 5000
+  },
+  {
+    "gene": "S100A11",
+    "gene_idx": 5,
+    "n_targets": 11,
+    "knockout_strength": 0.5313014984130859,
+    "collapse_score": 0.4538412930808613,
+    "mean_shift": -0.17205093897286367,
+    "var_ratio": 0.5461587045574031,
+    "n_periphery_cells": 5000
+  },
+  {
+    "gene": "SPI1",
+    "gene_idx": 22,
+    "n_targets": 10,
+    "knockout_strength": 0.4582347869873047,
+    "collapse_score": 0.4006249668798145,
+    "mean_shift": -0.1495782592046242,
+    "var_ratio": 0.5993750307584499,
+    "n_periphery_cells": 5000
+  },
+  {
+    "gene": "FPR1",
+    "gene_idx": 20,
+    "n_targets": 10,
+    "knockout_strength": 0.45021915435791016,
+    "collapse_score": 0.38886848902333004,
+    "mean_shift": -0.14582558518728506,
+    "var_ratio": 0.6111315086149344,
+    "n_periphery_cells": 5000
+  },
+  {
+    "gene": "SMAP2",
+    "gene_idx": 10,
+    "n_targets": 9,
+    "knockout_strength": 0.37435245513916016,
+    "collapse_score": 0.3314695050368103,
+    "mean_shift": -0.1218100158609221,
+    "var_ratio": 0.668530492601454,
+    "n_periphery_cells": 5000
+  },
+  {
+    "gene": "S100A6",
+    "gene_idx": 73,
+    "n_targets": 6,
+    "knockout_strength": 0.23308181762695312,
+    "collapse_score": 0.21190185143900986,
+    "mean_shift": -0.07621872068674584,
+    "var_ratio": 0.7880981461992544,
+    "n_periphery_cells": 5000
+  },
+  {
+    "gene": "LYN",
+    "gene_idx": 48,
+    "n_targets": 7,
+    "knockout_strength": 0.21801185607910156,
+    "collapse_score": 0.19792615042305972,
+    "mean_shift": -0.07037911880677206,
+    "var_ratio": 0.8020738472152047,
+    "n_periphery_cells": 5000
+  },
+  {
+    "gene": "C5AR1",
+    "gene_idx": 34,
+    "n_targets": 6,
+    "knockout_strength": 0.18819332122802734,
+    "collapse_score": 0.17100844211686683,
+    "mean_shift": -0.059727558238368283,
+    "var_ratio": 0.8289915555213976,
+    "n_periphery_cells": 5000
+  },
+  {
+    "gene": "ARHGDIB",
+    "gene_idx": 19,
+    "n_targets": 5,
+    "knockout_strength": 0.1763153076171875,
+    "collapse_score": 0.1619166065686095,
+    "mean_shift": -0.057953481453242306,
+    "var_ratio": 0.8380833910696549,
+    "n_periphery_cells": 5000
+  },
+  {
+    "gene": "CD69",
+    "gene_idx": 9,
+    "n_targets": 6,
+    "knockout_strength": 0.18381309509277344,
+    "collapse_score": 0.1612274727432521,
+    "mean_shift": -0.05903329139782776,
+    "var_ratio": 0.8387725248950123,
+    "n_periphery_cells": 5000
+  },
+  {
+    "gene": "PILRA",
+    "gene_idx": 83,
+    "n_targets": 7,
+    "knockout_strength": 0.1743755340576172,
+    "collapse_score": 0.1548527680194871,
+    "mean_shift": -0.05603091056697218,
+    "var_ratio": 0.8451472296187773,
+    "n_periphery_cells": 5000
+  },
+  {
+    "gene": "LST1",
+    "gene_idx": 51,
+    "n_targets": 6,
+    "knockout_strength": 0.16201496124267578,
+    "collapse_score": 0.14974283139935995,
+    "mean_shift": -0.05287457673880347,
+    "var_ratio": 0.8502571662389045,
+    "n_periphery_cells": 5000
+  },
+  {
+    "gene": "HCK",
+    "gene_idx": 88,
+    "n_targets": 5,
+    "knockout_strength": 0.12274169921875,
+    "collapse_score": 0.10932815287780895,
+    "mean_shift": -0.04020371918298238,
+    "var_ratio": 0.8906718447604555,
+    "n_periphery_cells": 5000
+  },
+  {
+    "gene": "PLEK",
+    "gene_idx": 31,
+    "n_targets": 6,
+    "knockout_strength": 0.12209701538085938,
+    "collapse_score": 0.10886282639923073,
+    "mean_shift": -0.041153236148903094,
+    "var_ratio": 0.8911371712390337,
+    "n_periphery_cells": 5000
+  },
+  {
+    "gene": "CXCL8",
+    "gene_idx": 4,
+    "n_targets": 4,
+    "knockout_strength": 0.11512279510498047,
+    "collapse_score": 0.09685637877367004,
+    "mean_shift": -0.03795789247552028,
+    "var_ratio": 0.9031436188645943,
+    "n_periphery_cells": 5000
+  },
+  {
+    "gene": "SLC25A37",
+    "gene_idx": 12,
+    "n_targets": 4,
+    "knockout_strength": 0.07725715637207031,
+    "collapse_score": 0.07364885788126863,
+    "mean_shift": -0.02382606177192159,
+    "var_ratio": 0.9263511397569957,
+    "n_periphery_cells": 5000
+  },
+  {
+    "gene": "SERPINA1",
+    "gene_idx": 69,
+    "n_targets": 5,
+    "knockout_strength": 0.079132080078125,
+    "collapse_score": 0.06676552161832405,
+    "mean_shift": -0.0251019310474202,
+    "var_ratio": 0.9332344760199404,
+    "n_periphery_cells": 5000
+  },
+  {
+    "gene": "EVI2B",
+    "gene_idx": 41,
+    "n_targets": 4,
+    "knockout_strength": 0.07094001770019531,
+    "collapse_score": 0.059523236563458815,
+    "mean_shift": -0.023552250848856482,
+    "var_ratio": 0.9404767610748056,
+    "n_periphery_cells": 5000
+  },
+  {
+    "gene": "TALDO1",
+    "gene_idx": 33,
+    "n_targets": 3,
+    "knockout_strength": 0.07898712158203125,
+    "collapse_score": 0.05774312388682279,
+    "mean_shift": -0.02616688984218607,
+    "var_ratio": 0.9422568737514415,
+    "n_periphery_cells": 5000
+  },
+  {
+    "gene": "WAS",
+    "gene_idx": 66,
+    "n_targets": 2,
+    "knockout_strength": 0.05900764465332031,
+    "collapse_score": 0.052348812710357406,
+    "mean_shift": -0.019950093687707615,
+    "var_ratio": 0.9476511849279069,
+    "n_periphery_cells": 5000
+  },
+  {
+    "gene": "LCP1",
+    "gene_idx": 29,
+    "n_targets": 2,
+    "knockout_strength": 0.05080413818359375,
+    "collapse_score": 0.04496397830663412,
+    "mean_shift": -0.016026388606454,
+    "var_ratio": 0.9550360193316302,
+    "n_periphery_cells": 5000
+  },
+  {
+    "gene": "BCL2A1",
+    "gene_idx": 47,
+    "n_targets": 3,
+    "knockout_strength": 0.06302261352539062,
+    "collapse_score": 0.044168418230162154,
+    "mean_shift": -0.020919896378078895,
+    "var_ratio": 0.9558315794081021,
+    "n_periphery_cells": 5000
+  },
+  {
+    "gene": "TNFRSF1B",
+    "gene_idx": 67,
+    "n_targets": 4,
+    "knockout_strength": 0.063385009765625,
+    "collapse_score": 0.0416021821272442,
+    "mean_shift": -0.02184023249482847,
+    "var_ratio": 0.9583978155110202,
+    "n_periphery_cells": 5000
+  },
+  {
+    "gene": "GCA",
+    "gene_idx": 74,
+    "n_targets": 2,
+    "knockout_strength": 0.042888641357421875,
+    "collapse_score": 0.03829878275746312,
+    "mean_shift": -0.013907697824424137,
+    "var_ratio": 0.9617012148808013,
+    "n_periphery_cells": 5000
+  },
+  {
+    "gene": "PLAUR",
+    "gene_idx": 57,
+    "n_targets": 3,
+    "knockout_strength": 0.04947853088378906,
+    "collapse_score": 0.037419973649189586,
+    "mean_shift": -0.014652812804150872,
+    "var_ratio": 0.9625800239890748,
+    "n_periphery_cells": 5000
+  },
+  {
+    "gene": "GMFG",
+    "gene_idx": 39,
+    "n_targets": 2,
+    "knockout_strength": 0.04470634460449219,
+    "collapse_score": 0.03602134468754703,
+    "mean_shift": -0.013592809225423497,
+    "var_ratio": 0.9639786529507174,
+    "n_periphery_cells": 5000
+  },
+  {
+    "gene": "GPSM3",
+    "gene_idx": 54,
+    "n_targets": 2,
+    "knockout_strength": 0.03990364074707031,
+    "collapse_score": 0.02951570501509404,
+    "mean_shift": -0.013007193565875097,
+    "var_ratio": 0.9704842926231704,
+    "n_periphery_cells": 5000
+  },
+  {
+    "gene": "BASP1",
+    "gene_idx": 71,
+    "n_targets": 2,
+    "knockout_strength": 0.035798072814941406,
+    "collapse_score": 0.02227835205444506,
+    "mean_shift": -0.012885443422722354,
+    "var_ratio": 0.9777216455838192,
+    "n_periphery_cells": 5000
+  },
+  {
+    "gene": "ICAM1",
+    "gene_idx": 85,
+    "n_targets": 2,
+    "knockout_strength": 0.030710220336914062,
+    "collapse_score": 0.02085805500077831,
+    "mean_shift": -0.010340075136636262,
+    "var_ratio": 0.9791419426374861,
+    "n_periphery_cells": 5000
+  },
+  {
+    "gene": "NCF1",
+    "gene_idx": 58,
+    "n_targets": 2,
+    "knockout_strength": 0.026719093322753906,
+    "collapse_score": 0.020055829722948615,
+    "mean_shift": -0.009309040138021585,
+    "var_ratio": 0.9799441679153158,
+    "n_periphery_cells": 5000
+  },
+  {
+    "gene": "TAGLN2",
+    "gene_idx": 49,
+    "n_targets": 2,
+    "knockout_strength": 0.026480674743652344,
+    "collapse_score": 0.016294697031764116,
+    "mean_shift": -0.008012226806629719,
+    "var_ratio": 0.9837053006065003,
+    "n_periphery_cells": 5000
+  },
+  {
+    "gene": "EFHD2",
+    "gene_idx": 65,
+    "n_targets": 3,
+    "knockout_strength": 0.0260467529296875,
+    "collapse_score": 0.010995265151898637,
+    "mean_shift": -0.009860400835282945,
+    "var_ratio": 0.9890047324863658,
+    "n_periphery_cells": 5000
+  },
+  {
+    "gene": "NAMPT",
+    "gene_idx": 37,
+    "n_targets": 2,
+    "knockout_strength": 0.025732994079589844,
+    "collapse_score": 0.009158851307627724,
+    "mean_shift": -0.008953258774614725,
+    "var_ratio": 0.9908411463306367,
+    "n_periphery_cells": 5000
+  },
+  {
+    "gene": "SIPA1",
+    "gene_idx": 99,
+    "n_targets": 1,
+    "knockout_strength": 0.008696556091308594,
+    "collapse_score": 0.008841006831115883,
+    "mean_shift": -0.0007386315138868671,
+    "var_ratio": 0.9911589908071484,
+    "n_periphery_cells": 5000
+  },
+  {
+    "gene": "SOD2",
+    "gene_idx": 14,
+    "n_targets": 1,
+    "knockout_strength": 0.012243270874023438,
+    "collapse_score": 0.0022002417306323796,
+    "mean_shift": -0.004584174773812788,
+    "var_ratio": 0.9977997559076319,
+    "n_periphery_cells": 5000
+  },
+  {
+    "gene": "IFITM3",
+    "gene_idx": 52,
+    "n_targets": 1,
+    "knockout_strength": 0.007515907287597656,
+    "collapse_score": 0.0016405787516111658,
+    "mean_shift": -0.0012038186658174244,
+    "var_ratio": 0.9983594188866532,
+    "n_periphery_cells": 5000
+  },
+  {
+    "gene": "CSK",
+    "gene_idx": 96,
+    "n_targets": 1,
+    "knockout_strength": 0.005779266357421875,
+    "collapse_score": 0.0015068887093279137,
+    "mean_shift": -0.0012812598525432373,
+    "var_ratio": 0.9984931089289365,
+    "n_periphery_cells": 5000
+  },
+  {
+    "gene": "PPP1R18",
+    "gene_idx": 97,
+    "n_targets": 1,
+    "knockout_strength": 0.018271446228027344,
+    "collapse_score": 0.0014028164815991229,
+    "mean_shift": -0.00851076095570047,
+    "var_ratio": 0.9985971811566653,
+    "n_periphery_cells": 5000
+  },
+  {
+    "gene": "MT2A",
+    "gene_idx": 92,
+    "n_targets": 1,
+    "knockout_strength": 0.011313438415527344,
+    "collapse_score": 0.0005361823758888162,
+    "mean_shift": -0.003544392611963487,
+    "var_ratio": 0.9994638152623755,
+    "n_periphery_cells": 5000
+  },
+  {
+    "gene": "HSPA1A",
+    "gene_idx": 0,
+    "n_targets": 0,
+    "knockout_strength": 0.0,
+    "collapse_score": 0.0,
+    "mean_shift": -0.00039826090739769615,
+    "var_ratio": 1.0080288440245193,
+    "n_periphery_cells": 5000
+  },
+  {
+    "gene": "HSPA1B",
+    "gene_idx": 2,
+    "n_targets": 0,
+    "knockout_strength": 0.0,
+    "collapse_score": 0.0,
+    "mean_shift": -4.2269534099692585e-05,
+    "var_ratio": 1.01369893002774,
+    "n_periphery_cells": 5000
+  },
+  {
+    "gene": "SH3BGRL3",
+    "gene_idx": 11,
+    "n_targets": 0,
+    "knockout_strength": 0.0,
+    "collapse_score": 0.0,
+    "mean_shift": -0.00022430893201408342,
+    "var_ratio": 1.0049235878199567,
+    "n_periphery_cells": 5000
+  },
+  {
+    "gene": "ATP5F1E",
+    "gene_idx": 13,
+    "n_targets": 0,
+    "knockout_strength": 0.0,
+    "collapse_score": 0.0,
+    "mean_shift": -5.553066334629264e-05,
+    "var_ratio": 1.0068195654615608,
+    "n_periphery_cells": 5000
+  },
+  {
+    "gene": "MYL6",
+    "gene_idx": 15,
+    "n_targets": 0,
+    "knockout_strength": 0.0,
+    "collapse_score": 0.0,
+    "mean_shift": 0.00024663206125496995,
+    "var_ratio": 1.0134626365728152,
+    "n_periphery_cells": 5000
+  },
+  {
+    "gene": "TXNIP",
+    "gene_idx": 16,
+    "n_targets": 0,
+    "knockout_strength": 0.0,
+    "collapse_score": 0.0,
+    "mean_shift": 0.00130755197871546,
+    "var_ratio": 1.0116743205217604,
+    "n_periphery_cells": 5000
+  },
+  {
+    "gene": "H3F3A",
+    "gene_idx": 17,
+    "n_targets": 0,
+    "knockout_strength": 0.0,
+    "collapse_score": 0.0,
+    "mean_shift": -0.00034461747572556156,
+    "var_ratio": 1.0061982271541379,
+    "n_periphery_cells": 5000
+  },
+  {
+    "gene": "GAPDH",
+    "gene_idx": 23,
+    "n_targets": 1,
+    "knockout_strength": 0.009077072143554688,
+    "collapse_score": 0.0,
+    "mean_shift": -0.0037310545317204014,
+    "var_ratio": 1.0016517025660772,
+    "n_periphery_cells": 5000
+  },
+  {
+    "gene": "YPEL3",
+    "gene_idx": 24,
+    "n_targets": 0,
+    "knockout_strength": 0.0,
+    "collapse_score": 0.0,
+    "mean_shift": -0.0013564457640625749,
+    "var_ratio": 1.0145605816424503,
+    "n_periphery_cells": 5000
+  },
+  {
+    "gene": "MT-ND4L",
+    "gene_idx": 25,
+    "n_targets": 0,
+    "knockout_strength": 0.0,
+    "collapse_score": 0.0,
+    "mean_shift": -0.00023837488936351292,
+    "var_ratio": 1.0112552875876804,
+    "n_periphery_cells": 5000
+  },
+  {
+    "gene": "LAMTOR4",
+    "gene_idx": 26,
+    "n_targets": 0,
+    "knockout_strength": 0.0,
+    "collapse_score": 0.0,
+    "mean_shift": 0.00019523878976612785,
+    "var_ratio": 1.0102492916433692,
+    "n_periphery_cells": 5000
+  },
+  {
+    "gene": "TSPO",
+    "gene_idx": 27,
+    "n_targets": 0,
+    "knockout_strength": 0.0,
+    "collapse_score": 0.0,
+    "mean_shift": -9.57232512350803e-05,
+    "var_ratio": 1.0101217256084,
+    "n_periphery_cells": 5000
+  },
+  {
+    "gene": "RGS2",
+    "gene_idx": 30,
+    "n_targets": 0,
+    "knockout_strength": 0.0,
+    "collapse_score": 0.0,
+    "mean_shift": -0.0015248168248588323,
+    "var_ratio": 1.0071069312896683,
+    "n_periphery_cells": 5000
+  },
+  {
+    "gene": "MT-ATP6",
+    "gene_idx": 32,
+    "n_targets": 0,
+    "knockout_strength": 0.0,
+    "collapse_score": 0.0,
+    "mean_shift": 0.0017738131113498312,
+    "var_ratio": 1.0080223143090508,
+    "n_periphery_cells": 5000
+  },
+  {
+    "gene": "MT-CO2",
+    "gene_idx": 35,
+    "n_targets": 0,
+    "knockout_strength": 0.0,
+    "collapse_score": 0.0,
+    "mean_shift": -0.0009125979940453055,
+    "var_ratio": 1.0199376532623359,
+    "n_periphery_cells": 5000
+  },
+  {
+    "gene": "MT-CO3",
+    "gene_idx": 36,
+    "n_targets": 0,
+    "knockout_strength": 0.0,
+    "collapse_score": 0.0,
+    "mean_shift": 0.0005091846338455275,
+    "var_ratio": 1.0054141960416352,
+    "n_periphery_cells": 5000
+  },
+  {
+    "gene": "SDCBP",
+    "gene_idx": 42,
+    "n_targets": 0,
+    "knockout_strength": 0.0,
+    "collapse_score": 0.0,
+    "mean_shift": -0.000738552493178668,
+    "var_ratio": 1.002793629460848,
+    "n_periphery_cells": 5000
+  },
+  {
+    "gene": "ANP32A",
+    "gene_idx": 43,
+    "n_targets": 0,
+    "knockout_strength": 0.0,
+    "collapse_score": 0.0,
+    "mean_shift": 0.0011585035088355067,
+    "var_ratio": 1.0050332343578119,
+    "n_periphery_cells": 5000
+  },
+  {
+    "gene": "RAB7A",
+    "gene_idx": 44,
+    "n_targets": 0,
+    "knockout_strength": 0.0,
+    "collapse_score": 0.0,
+    "mean_shift": 0.00044375808330610056,
+    "var_ratio": 1.0157687340615076,
+    "n_periphery_cells": 5000
+  },
+  {
+    "gene": "PRR13",
+    "gene_idx": 45,
+    "n_targets": 0,
+    "knockout_strength": 0.0,
+    "collapse_score": 0.0,
+    "mean_shift": 0.00021666082972227052,
+    "var_ratio": 1.001914059683065,
+    "n_periphery_cells": 5000
+  },
+  {
+    "gene": "RNF149",
+    "gene_idx": 46,
+    "n_targets": 0,
+    "knockout_strength": 0.0,
+    "collapse_score": 0.0,
+    "mean_shift": 0.0002585078094559101,
+    "var_ratio": 1.016158242163051,
+    "n_periphery_cells": 5000
+  },
+  {
+    "gene": "SCAF11",
+    "gene_idx": 50,
+    "n_targets": 0,
+    "knockout_strength": 0.0,
+    "collapse_score": 0.0,
+    "mean_shift": 0.0003043072369788291,
+    "var_ratio": 1.0115194341201532,
+    "n_periphery_cells": 5000
+  },
+  {
+    "gene": "LITAF",
+    "gene_idx": 53,
+    "n_targets": 0,
+    "knockout_strength": 0.0,
+    "collapse_score": 0.0,
+    "mean_shift": 0.0013416165099476851,
+    "var_ratio": 1.002728067579863,
+    "n_periphery_cells": 5000
+  },
+  {
+    "gene": "MTRNR2L12",
+    "gene_idx": 55,
+    "n_targets": 0,
+    "knockout_strength": 0.0,
+    "collapse_score": 0.0,
+    "mean_shift": 0.0022991387954431897,
+    "var_ratio": 1.004473530382705,
+    "n_periphery_cells": 5000
+  },
+  {
+    "gene": "LRRFIP1",
+    "gene_idx": 56,
+    "n_targets": 0,
+    "knockout_strength": 0.0,
+    "collapse_score": 0.0,
+    "mean_shift": 0.000751406857519954,
+    "var_ratio": 1.0038109023743889,
+    "n_periphery_cells": 5000
+  },
+  {
+    "gene": "MDM2",
+    "gene_idx": 59,
+    "n_targets": 0,
+    "knockout_strength": 0.0,
+    "collapse_score": 0.0,
+    "mean_shift": 0.00044570940013710647,
+    "var_ratio": 1.0033069088377455,
+    "n_periphery_cells": 5000
+  },
+  {
+    "gene": "VMP1",
+    "gene_idx": 60,
+    "n_targets": 0,
+    "knockout_strength": 0.0,
+    "collapse_score": 0.0,
+    "mean_shift": -0.0018232884531619309,
+    "var_ratio": 1.0101268848768592,
+    "n_periphery_cells": 5000
+  },
+  {
+    "gene": "HIST1H2AC",
+    "gene_idx": 61,
+    "n_targets": 0,
+    "knockout_strength": 0.0,
+    "collapse_score": 0.0,
+    "mean_shift": -0.00016566153778996284,
+    "var_ratio": 1.0104727402259328,
+    "n_periphery_cells": 5000
+  },
+  {
+    "gene": "CFLAR",
+    "gene_idx": 62,
+    "n_targets": 0,
+    "knockout_strength": 0.0,
+    "collapse_score": 0.0,
+    "mean_shift": 0.0014257073246030094,
+    "var_ratio": 1.0036813434253078,
+    "n_periphery_cells": 5000
+  },
+  {
+    "gene": "ACAP2",
+    "gene_idx": 63,
+    "n_targets": 0,
+    "knockout_strength": 0.0,
+    "collapse_score": 0.0,
+    "mean_shift": 0.00016315156580004597,
+    "var_ratio": 1.0078532315886959,
+    "n_periphery_cells": 5000
+  },
+  {
+    "gene": "UBE2B",
+    "gene_idx": 64,
+    "n_targets": 0,
+    "knockout_strength": 0.0,
+    "collapse_score": 0.0,
+    "mean_shift": -0.0008764003039729573,
+    "var_ratio": 1.0117089587287025,
+    "n_periphery_cells": 5000
+  },
+  {
+    "gene": "JAK1",
+    "gene_idx": 68,
+    "n_targets": 0,
+    "knockout_strength": 0.0,
+    "collapse_score": 0.0,
+    "mean_shift": -0.0005614278566213882,
+    "var_ratio": 1.005640169024724,
+    "n_periphery_cells": 5000
+  },
+  {
+    "gene": "SERPINB1",
+    "gene_idx": 70,
+    "n_targets": 0,
+    "knockout_strength": 0.0,
+    "collapse_score": 0.0,
+    "mean_shift": -0.0010067362057946116,
+    "var_ratio": 1.0051629994862037,
+    "n_periphery_cells": 5000
+  },
+  {
+    "gene": "TKT",
+    "gene_idx": 72,
+    "n_targets": 0,
+    "knockout_strength": 0.0,
+    "collapse_score": 0.0,
+    "mean_shift": 0.0018774271428353417,
+    "var_ratio": 1.0002753318737527,
+    "n_periphery_cells": 5000
+  },
+  {
+    "gene": "OS9",
+    "gene_idx": 75,
+    "n_targets": 0,
+    "knockout_strength": 0.0,
+    "collapse_score": 0.0,
+    "mean_shift": -3.781416677239857e-05,
+    "var_ratio": 1.0131443922177141,
+    "n_periphery_cells": 5000
+  },
+  {
+    "gene": "ZYX",
+    "gene_idx": 76,
+    "n_targets": 0,
+    "knockout_strength": 0.0,
+    "collapse_score": 0.0,
+    "mean_shift": -0.00015985252965311503,
+    "var_ratio": 1.012453734040793,
+    "n_periphery_cells": 5000
+  },
+  {
+    "gene": "YPEL5",
+    "gene_idx": 77,
+    "n_targets": 0,
+    "knockout_strength": 0.0,
+    "collapse_score": 0.0,
+    "mean_shift": -0.0004221051545416632,
+    "var_ratio": 1.004568598662105,
+    "n_periphery_cells": 5000
+  },
+  {
+    "gene": "PKM",
+    "gene_idx": 78,
+    "n_targets": 0,
+    "knockout_strength": 0.0,
+    "collapse_score": 0.0,
+    "mean_shift": -0.0006090864407392038,
+    "var_ratio": 1.0080300543112506,
+    "n_periphery_cells": 5000
+  },
+  {
+    "gene": "MYH9",
+    "gene_idx": 79,
+    "n_targets": 0,
+    "knockout_strength": 0.0,
+    "collapse_score": 0.0,
+    "mean_shift": -0.000320558704830165,
+    "var_ratio": 1.0143092310509931,
+    "n_periphery_cells": 5000
+  },
+  {
+    "gene": "NDUFA1",
+    "gene_idx": 80,
+    "n_targets": 0,
+    "knockout_strength": 0.0,
+    "collapse_score": 0.0,
+    "mean_shift": -0.000677463969019243,
+    "var_ratio": 1.0119199071061924,
+    "n_periphery_cells": 5000
+  },
+  {
+    "gene": "KDM6B",
+    "gene_idx": 81,
+    "n_targets": 0,
+    "knockout_strength": 0.0,
+    "collapse_score": 0.0,
+    "mean_shift": -0.0005715034061529733,
+    "var_ratio": 1.008830529722511,
+    "n_periphery_cells": 5000
+  },
+  {
+    "gene": "PSMB3",
+    "gene_idx": 82,
+    "n_targets": 0,
+    "knockout_strength": 0.0,
+    "collapse_score": 0.0,
+    "mean_shift": 0.000997631481613026,
+    "var_ratio": 1.000581724642078,
+    "n_periphery_cells": 5000
+  },
+  {
+    "gene": "C4orf3",
+    "gene_idx": 84,
+    "n_targets": 0,
+    "knockout_strength": 0.0,
+    "collapse_score": 0.0,
+    "mean_shift": -0.0007211781533439376,
+    "var_ratio": 1.005651302574214,
+    "n_periphery_cells": 5000
+  },
+  {
+    "gene": "PSME1",
+    "gene_idx": 86,
+    "n_targets": 0,
+    "knockout_strength": 0.0,
+    "collapse_score": 0.0,
+    "mean_shift": 0.000936020116255265,
+    "var_ratio": 1.0106230379239538,
+    "n_periphery_cells": 5000
+  },
+  {
+    "gene": "RASSF2",
+    "gene_idx": 87,
+    "n_targets": 0,
+    "knockout_strength": 0.0,
+    "collapse_score": 0.0,
+    "mean_shift": 0.0011194038499418024,
+    "var_ratio": 1.0081226995072174,
+    "n_periphery_cells": 5000
+  },
+  {
+    "gene": "SNAP23",
+    "gene_idx": 89,
+    "n_targets": 0,
+    "knockout_strength": 0.0,
+    "collapse_score": 0.0,
+    "mean_shift": 0.0016766763807657403,
+    "var_ratio": 1.0031159195641794,
+    "n_periphery_cells": 5000
+  },
+  {
+    "gene": "UBALD2",
+    "gene_idx": 90,
+    "n_targets": 0,
+    "knockout_strength": 0.0,
+    "collapse_score": 0.0,
+    "mean_shift": 0.0013254605406433084,
+    "var_ratio": 1.0171602992892632,
+    "n_periphery_cells": 5000
+  },
+  {
+    "gene": "BCL6",
+    "gene_idx": 91,
+    "n_targets": 0,
+    "knockout_strength": 0.0,
+    "collapse_score": 0.0,
+    "mean_shift": -0.0011015849891445884,
+    "var_ratio": 1.0098044143653,
+    "n_periphery_cells": 5000
+  },
+  {
+    "gene": "ZNF106",
+    "gene_idx": 93,
+    "n_targets": 0,
+    "knockout_strength": 0.0,
+    "collapse_score": 0.0,
+    "mean_shift": -0.0002293704584196421,
+    "var_ratio": 1.0151715162131296,
+    "n_periphery_cells": 5000
+  },
+  {
+    "gene": "FOXO3",
+    "gene_idx": 94,
+    "n_targets": 0,
+    "knockout_strength": 0.0,
+    "collapse_score": 0.0,
+    "mean_shift": -9.172401143275888e-05,
+    "var_ratio": 1.007374191608046,
+    "n_periphery_cells": 5000
+  },
+  {
+    "gene": "GNG10",
+    "gene_idx": 95,
+    "n_targets": 0,
+    "knockout_strength": 0.0,
+    "collapse_score": 0.0,
+    "mean_shift": -0.0018502534144656524,
+    "var_ratio": 1.013339196876507,
+    "n_periphery_cells": 5000
+  },
+  {
+    "gene": "PTEN",
+    "gene_idx": 98,
+    "n_targets": 0,
+    "knockout_strength": 0.0,
+    "collapse_score": 0.0,
+    "mean_shift": -0.0005556413681016004,
+    "var_ratio": 1.0123007902006316,
+    "n_periphery_cells": 5000
+  }
+]
