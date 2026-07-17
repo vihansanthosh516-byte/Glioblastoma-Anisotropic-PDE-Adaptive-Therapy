@@ -75,15 +75,15 @@ class IntegratedInvasionSimulator:
         # P1: transition rates in [0.5, 0.8] range
         self.rules = {
             # Healthy cell rules
-            'healthy_proliferate': 0.03,
-            'healthy_to_periphery_base': 0.04,
+            'healthy_proliferate': 0.60,
+            'healthy_to_periphery_base': 0.70,
             'healthy_velocity_sensitivity': 0.45,
             'healthy_morphogen_sensitivity': 0.35,
             'healthy_replenish_rate': 0.02,  # Homeostasis: replenish empty near healthy
             
             # Periphery cell rules
-            'periphery_proliferate': 0.60,        # In [0.5, 0.8]
-            'periphery_to_core_base': 0.08,
+            'periphery_proliferate': 0.65,
+            'periphery_to_core_base': 0.60,
             'periphery_velocity_sensitivity': 0.35,
             'periphery_morphogen_sensitivity': 0.25,
             'periphery_secrete_rate': 0.65,
@@ -264,84 +264,87 @@ class IntegratedInvasionSimulator:
         return count
     
     def step(self) -> Dict[str, int]:
-        """Execute one integrated simulation step."""
-        new_grid = self.grid.clone()
+        """Execute one integrated simulation step with 10 CA sub-steps per PDE step."""
         changes = {'proliferation': 0, 'transition': 0, 'necrosis': 0, 'replenish': 0}
         
-        # 1. Morphogen PDE (Fisher-Kolmogorov)
+        # 1. Morphogen PDE (Fisher-Kolmogorov) - run once per PDE step
         self.fk_morphogen_step()
-        self.secrete_morphogen()
         
-        # 2. Healthy cell dynamics
-        healthy_mask = (self.grid == self.HEALTHY)
-        if healthy_mask.any():
-            empty_neighbors = self.count_neighbors(self.EMPTY)
-            tumor_neighbors = self.count_neighbors(self.PERIPHERY) + self.count_neighbors(self.CORE)
+        # 2. 10 discrete CA sub-steps
+        for sub_step in range(10):
+            self.secrete_morphogen()
+            new_grid = self.grid.clone()
             
-            # Velocity at healthy locations
-            vel_healthy = self.velocity_field * healthy_mask.float()
+            # Healthy cell dynamics
+            healthy_mask = (self.grid == self.HEALTHY)
+            if healthy_mask.any():
+                empty_neighbors = self.count_neighbors(self.EMPTY)
+                tumor_neighbors = self.count_neighbors(self.PERIPHERY) + self.count_neighbors(self.CORE)
+                
+                # Velocity at healthy locations
+                vel_healthy = self.velocity_field * healthy_mask.float()
+                
+                # Healthy -> Periphery (base + velocity-coupled + morphogen)
+                trans_prob = (
+                    self.rules['healthy_to_periphery_base'] + 
+                    self.rules['healthy_velocity_sensitivity'] * vel_healthy +
+                    self.rules['healthy_morphogen_sensitivity'] * self.morphogen
+                )
+                trans_mask = healthy_mask & (tumor_neighbors > 0) & (torch.rand_like(self.morphogen) < trans_prob)
+                new_grid[trans_mask] = self.PERIPHERY
+                changes['transition'] += int(trans_mask.sum().item())
+                
+                # Healthy proliferation
+                prolif_mask = healthy_mask & (empty_neighbors > 0) & (torch.rand_like(self.morphogen) < self.rules['healthy_proliferate'])
+                if prolif_mask.any():
+                    changes['proliferation'] += self.proliferate_cells(prolif_mask, self.HEALTHY, new_grid)
             
-            # Healthy -> Periphery (base + velocity-coupled + morphogen)
-            trans_prob = (
-                self.rules['healthy_to_periphery_base'] + 
-                self.rules['healthy_velocity_sensitivity'] * vel_healthy +
-                self.rules['healthy_morphogen_sensitivity'] * self.morphogen
-            )
-            trans_mask = healthy_mask & (tumor_neighbors > 0) & (torch.rand_like(self.morphogen) < trans_prob)
-            new_grid[trans_mask] = self.PERIPHERY
-            changes['transition'] += int(trans_mask.sum().item())
+            # Periphery cell dynamics
+            periphery_mask = (self.grid == self.PERIPHERY)
+            if periphery_mask.any():
+                empty_neighbors = self.count_neighbors(self.EMPTY)
+                vel_periphery = self.velocity_field * periphery_mask.float()
+                
+                # Periphery -> Core: base + velocity-coupled + morphogen
+                core_prob = (
+                    self.rules['periphery_to_core_base'] + 
+                    self.rules['periphery_velocity_sensitivity'] * vel_periphery +
+                    self.rules['periphery_morphogen_sensitivity'] * self.morphogen
+                )
+                core_mask = periphery_mask & (torch.rand_like(self.morphogen) < core_prob)
+                new_grid[core_mask] = self.CORE
+                changes['transition'] += int(core_mask.sum().item())
+                
+                # Periphery proliferation
+                prolif_mask = periphery_mask & (empty_neighbors > 0) & (torch.rand_like(self.morphogen) < self.rules['periphery_proliferate'])
+                if prolif_mask.any():
+                    changes['proliferation'] += self.proliferate_cells(prolif_mask, self.PERIPHERY, new_grid)
             
-            # Healthy proliferation
-            prolif_mask = healthy_mask & (empty_neighbors > 0) & (torch.rand_like(self.morphogen) < self.rules['healthy_proliferate'])
-            if prolif_mask.any():
-                changes['proliferation'] += self.proliferate_cells(prolif_mask, self.HEALTHY, new_grid)
-        
-        # 3. Periphery cell dynamics
-        periphery_mask = (self.grid == self.PERIPHERY)
-        if periphery_mask.any():
-            empty_neighbors = self.count_neighbors(self.EMPTY)
-            vel_periphery = self.velocity_field * periphery_mask.float()
+            # Core cell dynamics
+            core_mask = (self.grid == self.CORE)
+            if core_mask.any():
+                empty_neighbors = self.count_neighbors(self.EMPTY)
+                
+                # Core -> Necrotic (P0: core_necrose = 0.005)
+                necro_mask = core_mask & (torch.rand_like(self.morphogen) < self.rules['core_necrose'])
+                new_grid[necro_mask] = self.NECROTIC
+                changes['necrosis'] += int(necro_mask.sum().item())
+                
+                # Core proliferation (P0: core_proliferate = 0.2)
+                prolif_mask = core_mask & (empty_neighbors > 0) & (torch.rand_like(self.morphogen) < self.rules['core_proliferate'])
+                if prolif_mask.any():
+                    changes['proliferation'] += self.proliferate_cells(prolif_mask, self.CORE, new_grid)
             
-            # Periphery -> Core: base + velocity-coupled + morphogen
-            core_prob = (
-                self.rules['periphery_to_core_base'] + 
-                self.rules['periphery_velocity_sensitivity'] * vel_periphery +
-                self.rules['periphery_morphogen_sensitivity'] * self.morphogen
-            )
-            core_mask = periphery_mask & (torch.rand_like(self.morphogen) < core_prob)
-            new_grid[core_mask] = self.CORE
-            changes['transition'] += int(core_mask.sum().item())
+            # Healthy tissue homeostasis: replenish empty near healthy
+            empty_mask = (new_grid == self.EMPTY)
+            if empty_mask.any():
+                healthy_neighbors = self.count_neighbors(self.HEALTHY)
+                replenish_mask = empty_mask & (healthy_neighbors > 0) & (torch.rand_like(self.morphogen) < self.rules['healthy_replenish_rate'])
+                if replenish_mask.any():
+                    new_grid[replenish_mask] = self.HEALTHY
+                    changes['replenish'] += int(replenish_mask.sum().item())
             
-            # Periphery proliferation
-            prolif_mask = periphery_mask & (empty_neighbors > 0) & (torch.rand_like(self.morphogen) < self.rules['periphery_proliferate'])
-            if prolif_mask.any():
-                changes['proliferation'] += self.proliferate_cells(prolif_mask, self.PERIPHERY, new_grid)
-        
-        # 4. Core cell dynamics
-        core_mask = (self.grid == self.CORE)
-        if core_mask.any():
-            empty_neighbors = self.count_neighbors(self.EMPTY)
-            
-            # Core -> Necrotic (P0: core_necrose = 0.005)
-            necro_mask = core_mask & (torch.rand_like(self.morphogen) < self.rules['core_necrose'])
-            new_grid[necro_mask] = self.NECROTIC
-            changes['necrosis'] += int(necro_mask.sum().item())
-            
-            # Core proliferation (P0: core_proliferate = 0.2)
-            prolif_mask = core_mask & (empty_neighbors > 0) & (torch.rand_like(self.morphogen) < self.rules['core_proliferate'])
-            if prolif_mask.any():
-                changes['proliferation'] += self.proliferate_cells(prolif_mask, self.CORE, new_grid)
-        
-        # 5. Healthy tissue homeostasis: replenish empty near healthy
-        empty_mask = (new_grid == self.EMPTY)
-        if empty_mask.any():
-            healthy_neighbors = self.count_neighbors(self.HEALTHY)
-            replenish_mask = empty_mask & (healthy_neighbors > 0) & (torch.rand_like(self.morphogen) < self.rules['healthy_replenish_rate'])
-            if replenish_mask.any():
-                new_grid[replenish_mask] = self.HEALTHY
-                changes['replenish'] += int(replenish_mask.sum().item())
-        
-        self.grid = new_grid
+            self.grid = new_grid
         return changes
     
     def compute_front_metrics(self) -> Tuple[float, float, float]:

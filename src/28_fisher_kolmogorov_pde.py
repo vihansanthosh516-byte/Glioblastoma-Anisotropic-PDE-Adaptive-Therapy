@@ -48,69 +48,44 @@ def initialize_morphogen_field(
     return rho
 
 
-def build_4th_order_laplacian(
+def build_2nd_order_laplacian(
     H: int, W: int, dx: float = 1.0
 ) -> sp.csr_matrix:
     """
-    Build 4th-order accurate 2D Laplacian using 9-point stencil:
-    ∇²u ≈ (1/6dx²)[4(u_{i+1,j}+u_{i-1,j}+u_{i,j+1}+u_{i,j-1}) 
-                   + (u_{i+1,j+1}+u_{i+1,j-1}+u_{i-1,j+1}+u_{i-1,j-1})
-                   - 20u_{i,j}]
-    
-    For uniform grid with spacing dx, the coefficients are:
-    - Center: -20/(6dx²)
-    - Axis neighbors: 4/(6dx²)
-    - Diagonal neighbors: 1/(6dx²)
+    Build standard 2nd-order 2D Laplacian using 5-point stencil:
+    ∇²u ≈ (1/dx²)[u_{i+1,j} + u_{i-1,j} + u_{i,j+1} + u_{i,j-1} - 4u_{i,j}]
     """
     N = H * W
+    c_center = -4.0 / (dx * dx)
+    c_neighbor = 1.0 / (dx * dx)
     
-    # 9-point stencil coefficients
-    c_center = -20.0 / (6.0 * dx * dx)
-    c_axis = 4.0 / (6.0 * dx * dx)
-    c_diag = 1.0 / (6.0 * dx * dx)
-    
-    # Build in LIL format for easy construction
     L = sp.lil_matrix((N, N))
     
     for i in range(H):
         for j in range(W):
             idx = i * W + j
-            
-            # Center
             L[idx, idx] = c_center
-            
-            # Axis neighbors
             if i > 0:
-                L[idx, (i-1)*W + j] = c_axis
+                L[idx, (i-1)*W + j] = c_neighbor
             if i < H - 1:
-                L[idx, (i+1)*W + j] = c_axis
+                L[idx, (i+1)*W + j] = c_neighbor
             if j > 0:
-                L[idx, i*W + (j-1)] = c_axis
+                L[idx, i*W + (j-1)] = c_neighbor
             if j < W - 1:
-                L[idx, i*W + (j+1)] = c_axis
-            
-            # Diagonal neighbors
-            if i > 0 and j > 0:
-                L[idx, (i-1)*W + (j-1)] = c_diag
-            if i > 0 and j < W - 1:
-                L[idx, (i-1)*W + (j+1)] = c_diag
-            if i < H - 1 and j > 0:
-                L[idx, (i+1)*W + (j-1)] = c_diag
-            if i < H - 1 and j < W - 1:
-                L[idx, (i+1)*W + (j+1)] = c_diag
-    
+                L[idx, i*W + (j+1)] = c_neighbor
+                
     return L.tocsr()
 
 
-class CrankNicolsonFK:
-    """Crank-Nicolson solver for Fisher-Kolmogorov PDE with 4th-order Laplacian."""
+class ImexRungeKuttaFK:
+    """IMEX SSP2(2,2,2) Runge-Kutta solver for Fisher-Kolmogorov PDE with 2nd-order Laplacian."""
     
     def __init__(
         self,
         grid_size: Tuple[int, int],
         D: float = 1.0,
         r: float = 2.25,
-        dt: float = 0.01,
+        dt: float = 0.005,
         dx: float = 1.0,
         device: torch.device = None,
     ):
@@ -122,42 +97,57 @@ class CrankNicolsonFK:
         self.dx = dx
         self.device = device or torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         
-        # Build 4th-order Laplacian
-        print(f"[FK] Building 4th-order Laplacian for {self.H}x{self.W} grid...")
+        # Build 2nd-order Laplacian
+        print(f"[FK] Building 2nd-order Laplacian for {self.H}x{self.W} grid...")
         t0 = time.perf_counter()
-        self.L = build_4th_order_laplacian(self.H, self.W, dx)
+        self.L_sparse = build_2nd_order_laplacian(self.H, self.W, dx)
         print(f"[FK] Laplacian built in {time.perf_counter() - t0:.3f}s")
         
-        # Crank-Nicolson matrices for diffusion term
-        # (I - dt/2 * D * L) ρ^{n+1} = (I + dt/2 * D * L) ρ^n + dt * R(ρ)
+        # Scale Laplacian matrix by D
+        self.L = self.D * self.L_sparse
+        
+        # IMEX SSP2(2,2,2) parameters
+        self.gamma = 1.0 - 1.0 / np.sqrt(2.0)  # ~0.292893
+        
+        # Implicit matrix for diffusion: A = I - dt * gamma * L
         I = sp.eye(self.N, format='csr')
-        alpha = self.D * self.dt / 2.0
+        self.A = (I - self.dt * self.gamma * self.L).tocsr()
         
-        self.A = (I - alpha * self.L).tocsr()
-        self.B = (I + alpha * self.L).tocsr()
-        
-        # LU factorization for fast solves
+        # LU factorization of A
         print("[FK] Computing LU factorization of A...")
         t0 = time.perf_counter()
         self.A_lu = spla.splu(self.A.tocsc())
         print(f"[FK] LU factorization done in {time.perf_counter() - t0:.3f}s")
         
-        self.dt = dt
-        self.r = r
-    
     def step(self, rho: torch.Tensor) -> torch.Tensor:
-        """Single Crank-Nicolson step with explicit reaction term."""
-        # Move to numpy for sparse solve
+        """Single IMEX Runge-Kutta step."""
         rho_np = rho.detach().cpu().numpy().flatten()
         
-        # Explicit reaction term: r * ρ * (1 - ρ)
-        R = self.r * rho_np * (1.0 - rho_np)
+        # R(u) = r * u * (1 - u)
+        def R_func(u):
+            return self.r * u * (1.0 - u)
         
-        # RHS = B @ ρ^n + dt * R
-        rhs = self.B @ rho_np + self.dt * R
+        # Stage 1:
+        # u^(1) = A^-1 u^n
+        u1 = self.A_lu.solve(rho_np)
+        L_u1 = self.L @ u1
         
-        # Solve A @ ρ^{n+1} = rhs
-        rho_new_np = self.A_lu.solve(rhs)
+        # R1 = R(u^n)
+        R1 = R_func(rho_np)
+        
+        # Stage 2:
+        # u^(2) = A^-1 ( u^n + dt * (1 - 2*gamma) * L(u1) + dt * R1 )
+        rhs_u2 = rho_np + self.dt * (1.0 - 2.0 * self.gamma) * L_u1 + self.dt * R1
+        u2 = self.A_lu.solve(rhs_u2)
+        L_u2 = self.L @ u2
+        
+        # y^(2) = u^n + dt * R1
+        y2 = rho_np + self.dt * R1
+        R2 = R_func(y2)
+        
+        # Final update:
+        # u^(n+1) = u^n + dt/2 * (L(u1) + L(u2)) + dt/2 * (R1 + R2)
+        rho_new_np = rho_np + 0.5 * self.dt * (L_u1 + L_u2) + 0.5 * self.dt * (R1 + R2)
         
         # Clamp to [0, 1]
         rho_new_np = np.clip(rho_new_np, 0.0, 1.0)
@@ -172,15 +162,15 @@ def analytical_wave_speed(D: float, r: float) -> float:
 
 def simulate_fisher_kolmogorov(
     grid_size: Tuple[int, int] = (512, 512),
-    n_steps: int = 2000,
+    n_steps: int = 4000,
     D: float = 1.0,
     r: float = 2.25,
-    dt: float = 0.01,
-    save_interval: int = 200,
+    dt: float = 0.005,
+    save_interval: int = 400,
     device: torch.device = None,
 ) -> Tuple[np.ndarray, dict]:
     """
-    Run Fisher-Kolmogorov PDE simulation with Crank-Nicolson + 4th-order spatial scheme.
+    Run Fisher-Kolmogorov PDE simulation with IMEX Runge-Kutta + 2nd-order spatial scheme.
     
     Returns:
         - Field history: (n_snapshots, H, W)
@@ -190,13 +180,13 @@ def simulate_fisher_kolmogorov(
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     
     c_analytical = analytical_wave_speed(D, r)
-    print(f"[FK] Running Fisher-Kolmogorov (CN + 4th-order) on {device}")
+    print(f"[FK] Running Fisher-Kolmogorov (IMEX RK + 2nd-order) on {device}")
     print(f"[FK] Grid: {grid_size}, Steps: {n_steps}, D={D}, r={r}, dt={dt}")
     print(f"[FK] Analytical wave speed: c = 2*sqrt(Dr) = {c_analytical:.4f} pixels/step")
     print(f"[FK] At 5µm/pixel, 1 step=1hr: {c_analytical * 5:.2f} µm/hr")
     
     # Initialize
-    solver = CrankNicolsonFK(grid_size, D, r, dt, device=device)
+    solver = ImexRungeKuttaFK(grid_size, D, r, dt, device=device)
     rho = initialize_morphogen_field(grid_size, device, "tumor_core")
     
     # Storage
@@ -296,15 +286,10 @@ def main():
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     print(f"Device: {device}")
     
-    # CALIBRATED PARAMETERS for 10-50 µm/hr with <10% numerical error
-    # Target: c = 2*sqrt(D*r) = 2-10 px/step (10-50 µm/hr at 5µm/px, 1hr/step)
-    # For c=4.0 (20 µm/hr): D*r = 4.0
-    # D=1.0, r=4.0 -> c=4.0, but need small dt for stability
-    # Using dt=0.01, D=1.0, r=4.0 -> c=4.0 px/step = 20 µm/hr
-    
+    # CALIBRATED PARAMETERS for 10-50 µm/hr
     D = 1.0       # Diffusion coefficient
     r = 4.0       # Proliferation rate
-    dt = 0.01     # Tightened temporal discretization
+    dt = 0.005    # Tightened temporal discretization (IMEX)
     
     print(f"[FK] Calibrated params: D={D}, r={r}, dt={dt}")
     print(f"[FK] Target wave speed: {2*np.sqrt(D*r)*5:.1f} µm/hr")

@@ -117,49 +117,29 @@ def neb_saddle_search(
     """
     print("[NEB] Initializing Nudged Elastic Band search (Healthy -> Core via Periphery)...")
     
-    # Get Periphery zone centroids to initialize path through transition zone
-    periphery_centroids = find_periphery_centroids(latent, labels, k=8)
-    print(f"[NEB] Found {len(periphery_centroids)} Periphery centroids for path initialization")
-    
+    # Find periphery attractor ($E \approx 5.74$) to use as the explicit intermediate image state
+    periphery_mask = labels == 1
+    if periphery_mask.any():
+        periphery_energies = energy[periphery_mask]
+        min_idx = periphery_energies.argmin()
+        periphery_min = latent[periphery_mask][min_idx]
+        print(f"[NEB] Initializing path through Periphery attractor (E={periphery_energies[min_idx].item():.4f})")
+    else:
+        periphery_min = (healthy_min + core_min) / 2
+        print("[NEB] Warning: Periphery attractor not found, using midpoint fallback")
+
     n_total = n_images
     
-    # Initialize images along path: Healthy -> Periphery centroids -> Core
+    # Initialize images along path: Healthy -> Periphery attractor -> Core
     images = []
-    
-    # Phase 1: Healthy -> first Periphery centroid (20% of images)
-    n_first = n_total // 5
-    if len(periphery_centroids) > 0:
-        target = periphery_centroids[0]
-    else:
-        target = (healthy_min + core_min) / 2
-    for i in range(n_first):
-        alpha = i / max(1, n_first - 1)
-        point = healthy_min + alpha * (target - healthy_min)
+    n_half = n_total // 2
+    for i in range(n_half):
+        alpha = i / n_half
+        point = healthy_min + alpha * (periphery_min - healthy_min)
         images.append(point)
-    
-    # Phase 2: Through Periphery centroids (40% of images)
-    n_middle = 2 * n_total // 5
-    if len(periphery_centroids) > 1:
-        for i in range(n_middle):
-            idx = min(i * (len(periphery_centroids) - 1) // max(1, n_middle - 1), len(periphery_centroids) - 2)
-            alpha = (i % max(1, n_middle // (len(periphery_centroids) - 1))) / max(1, n_middle // (len(periphery_centroids) - 1))
-            point = periphery_centroids[idx] + alpha * (periphery_centroids[idx + 1] - periphery_centroids[idx])
-            images.append(point)
-    else:
-        for i in range(n_middle):
-            alpha = i / max(1, n_middle - 1)
-            point = periphery_centroids[0] + alpha * (core_min - periphery_centroids[0]) if len(periphery_centroids) > 0 else (healthy_min + core_min) / 2
-            images.append(point)
-    
-    # Phase 3: Last Periphery centroid -> Core (20% of images)
-    n_last = n_total - n_first - n_middle
-    if len(periphery_centroids) > 0:
-        start_point = periphery_centroids[-1]
-    else:
-        start_point = (healthy_min + core_min) / 2
-    for i in range(n_last):
-        alpha = i / max(1, n_last - 1)
-        point = start_point + alpha * (core_min - start_point)
+    for i in range(n_total - n_half):
+        alpha = i / (n_total - n_half - 1)
+        point = periphery_min + alpha * (core_min - periphery_min)
         images.append(point)
     
     images = torch.stack(images)
@@ -177,6 +157,9 @@ def neb_saddle_search(
             _, knn_idx = torch.topk(dists, k=1, largest=False)
             img_energies[i] = energy[knn_idx[0]].item()
         
+        # Find climbing image (highest energy interior image)
+        climbing_idx = torch.argmax(img_energies[1:-1]).item() + 1
+
         # 2. Compute spring forces between adjacent images
         spring_forces = torch.zeros_like(images)
         for i in range(1, n_total - 1):
@@ -205,31 +188,47 @@ def neb_saddle_search(
             spring_tangent = (spring_force @ tangent) * tangent
             
             # Total NEB force
-            total_forces[i] = true_normal + spring_tangent
+            if i == climbing_idx:
+                # Climbing Image: no normal spring force, invert parallel true force & invert spring force along tangent
+                total_forces[i] = (true_force - 2.0 * (true_force @ tangent) * tangent) - spring_tangent
+            else:
+                total_forces[i] = true_normal + spring_tangent
         
         # 4. Update images
         images[1:-1] += step_size * total_forces[1:-1]
         
-        # 5. Reparametrize (redistribute images equally along path)
-        arc_lengths = torch.zeros(n_total, device=energy.device)
-        for i in range(1, n_total):
-            arc_lengths[i] = arc_lengths[i-1] + (images[i] - images[i-1]).norm()
-        
-        total_length = arc_lengths[-1]
-        target_arc = torch.linspace(0, total_length, n_total, device=energy.device)
-        
+        # 5. Reparametrize (separately on each side of the climbing image to keep it fixed)
         new_images = torch.zeros_like(images)
         new_images[0] = images[0]
+        new_images[climbing_idx] = images[climbing_idx]
         new_images[-1] = images[-1]
+
+        # Segment 1: 0 to climbing_idx
+        arc_lengths1 = torch.zeros(climbing_idx + 1, device=energy.device)
+        for i in range(1, climbing_idx + 1):
+            arc_lengths1[i] = arc_lengths1[i-1] + (images[i] - images[i-1]).norm()
+        total_length1 = arc_lengths1[-1]
+        target_arc1 = torch.linspace(0, total_length1, climbing_idx + 1, device=energy.device)
         
-        for i in range(1, n_total - 1):
-            idx = torch.searchsorted(arc_lengths, target_arc[i]) - 1
-            idx = idx.clamp(0, n_total - 2)
-            
-            seg_start = arc_lengths[idx]
-            seg_end = arc_lengths[idx + 1]
-            alpha = (target_arc[i] - arc_lengths[idx]) / (arc_lengths[idx + 1] - arc_lengths[idx] + 1e-8)
+        for i in range(1, climbing_idx):
+            idx = torch.searchsorted(arc_lengths1, target_arc1[i]) - 1
+            idx = idx.clamp(0, climbing_idx - 1)
+            alpha = (target_arc1[i] - arc_lengths1[idx]) / (arc_lengths1[idx + 1] - arc_lengths1[idx] + 1e-8)
             new_images[i] = images[idx] + alpha * (images[idx + 1] - images[idx])
+
+        # Segment 2: climbing_idx to n_total - 1
+        arc_lengths2 = torch.zeros(n_total - climbing_idx, device=energy.device)
+        for i in range(1, n_total - climbing_idx):
+            idx_img = climbing_idx + i
+            arc_lengths2[i] = arc_lengths2[i-1] + (images[idx_img] - images[idx_img-1]).norm()
+        total_length2 = arc_lengths2[-1]
+        target_arc2 = torch.linspace(0, total_length2, n_total - climbing_idx, device=energy.device)
+        
+        for i in range(1, n_total - climbing_idx - 1):
+            idx = torch.searchsorted(arc_lengths2, target_arc2[i]) - 1
+            idx = idx.clamp(0, n_total - climbing_idx - 2)
+            alpha = (target_arc2[i] - arc_lengths2[idx]) / (arc_lengths2[idx + 1] - arc_lengths2[idx] + 1e-8)
+            new_images[climbing_idx + i] = images[climbing_idx + idx] + alpha * (images[climbing_idx + idx + 1] - images[climbing_idx + idx])
         
         images = new_images
         
@@ -237,7 +236,7 @@ def neb_saddle_search(
             interior_energies = img_energies[1:-1]
             if len(interior_energies) > 0:
                 max_energy = interior_energies.max().item()
-                print(f"  NEB iteration {iteration}/{n_iterations}, max interior energy={max_energy:.4f}")
+                print(f"  NEB iteration {iteration}/{n_iterations}, max interior energy={max_energy:.4f}, climbing index={climbing_idx}")
     
     # After convergence, find the image with highest energy (saddle)
     final_energies = []
