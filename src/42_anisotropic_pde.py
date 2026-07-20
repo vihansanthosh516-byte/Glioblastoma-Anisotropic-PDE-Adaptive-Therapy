@@ -71,7 +71,7 @@ CARRYING_CAPACITY = 1.0
 MASS_TEST_STEPS = 500
 
 # Time stepping for patient simulations (Week 3)
-N_PATIENT_STEPS = 2000
+N_PATIENT_STEPS = 1500
 PATIENT_SAVE_INTERVAL = 250
 
 
@@ -770,12 +770,8 @@ class CohortSimulator:
     # ------------------------------------------------------------------ #
     @staticmethod
     def patient_seed_center(patient_id: str, N: int = GRID_SIZE) -> Tuple[int, int]:
-        """Deterministic but patient-specific seed position inside core zone."""
-        seed = sum(ord(c) for c in patient_id)
-        rng = np.random.default_rng(seed)
-        cy = int(np.clip(rng.normal(16, 4), 4, 28))
-        cx = int(np.clip(rng.normal(N // 2, 8), 10, N - 10))
-        return cy, cx
+        """Fixed seed at center of sigmoidal white matter tract corridor."""
+        return 50, 50
 
     # ------------------------------------------------------------------ #
     def run_patient(
