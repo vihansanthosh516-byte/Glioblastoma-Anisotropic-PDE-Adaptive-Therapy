@@ -48,10 +48,20 @@ from scipy.ndimage import binary_dilation, gaussian_filter
 warnings.filterwarnings("ignore")
 
 # --------------------------------------------------------------------------- #
-# Global constants matching Month 6 grid and cohort conventions
+# Global constants (Phase 1: physical units, mm/days)
+#   dx            : 1.0 mm          (standard brain MRI voxel)
+#   dt            : 0.1 day         (CFL-safe: dt <= dx^2/(2*D_max) ~ 38.5)
+#   D_white       : 0.013 mm^2/day  (Swanson et al. 2003 — along tract)
+#   D_gray        : 0.0013 mm^2/day (10x lower, isotropic baseline)
+#   rho           : 0.02 /day       (~35 day doubling time)
+#   K             : 1.0 (normalized density fraction)
+# Abstract "unit" values (D=0.15, dt=0.05) are retained as legacy defaults
+# only for backward-compatible tensor geometry (Tract width/angle preserve
+# shape; only diffusivity magnitude changes the physics).
 # --------------------------------------------------------------------------- #
 GRID_SIZE = 100
-DX = 1.0
+DX_MM = 1.0                 # spatial spacing, mm
+DX = DX_MM                  # legacy alias
 TARGET_GENES = ["LST1", "S100A11", "S100A8", "ZNF106"]
 
 ZONE_REGIONS = {
@@ -60,17 +70,25 @@ ZONE_REGIONS = {
     "Leading Edge": (66, 100),
 }
 
-# Base anisotropic parameters (Week 1 defaults)
-D_BASE = 0.01            # isotropic diffusion baseline outside tract
-D_PARALLEL_DEFAULT = 0.15      # along tract axis
-D_PERPENDICULAR_DEFAULT = 0.005   # across tract axis (suppressed)
+# Physical anisotropic parameters (Phase 1, mm^2/day)
+D_WHITE = 0.013             # white matter, along tract axis (D_parallel)
+D_GRAY = 0.0013            # gray matter / baseline, isotropic (D_BASE)
+# Anisotropy ratio ~10 (Swanson 2003); D_perp = D_white / 10
+D_PARALLEL_DEFAULT = D_WHITE
+D_PERPENDICULAR_DEFAULT = 0.0013   # ~D_white/10, suppressed cross-tract
+D_BASE = D_GRAY
 
-# Solver parameters (Week 2)
-DT_DEFAULT = 0.05
+# Proliferation rate (Phase 1, /day)
+RHO_DEFAULT = 0.02
+
+# Solver parameters (Phase 1)
+DT_DEFAULT = 0.1            # days
 CARRYING_CAPACITY = 1.0
 MASS_TEST_STEPS = 500
 
 # Time stepping for patient simulations (Week 3)
+# N_PATIENT_STEPS * DT_DEFAULT gives simulated duration
+# 1500 * 0.1 day = 150 days (~6 months tumor evolution)
 N_PATIENT_STEPS = 1500
 PATIENT_SAVE_INTERVAL = 250
 
@@ -267,6 +285,10 @@ class TensorFieldBuilder:
             D_base=np.array(self.d_base),
             tract_angle_deg=np.array(np.rad2deg(self.tract_angle)),
             tract_width=np.array(self.tract_width),
+            # Phase 1 physical-unit metadata for downstream synthesis
+            units_dx_mm=np.array(DX_MM),
+            units_diffusion=np.array("mm^2/day"),
+            units_time=np.array("day"),
         )
         print(f"[Phase1] Saved tensor profiles -> {path}")
 
@@ -396,14 +418,18 @@ class AnisotropicFKSolver:
         )
         max_eig = float(per_pixel_eig.max())
         self.max_eigenvalue = max_eig
+        # CFL (physical units): dt <= dx^2 / (2 * D_max); units: day = mm^2/(mm^2/day)
         self.cfl_limit = (self.dx ** 2) / (2.0 * max(max_eig, 1e-12))
+        self.cfl_ok = bool(self.dt <= self.cfl_limit)
         if self.dt > self.cfl_limit:
-            print(f"[Phase2] WARNING dt={self.dt} exceeds CFL limit "
-                  f"{self.cfl_limit:.4f}; clamping to CFL-safe value.")
+            print(f"[Phase2] WARNING dt={self.dt} days exceeds CFL limit "
+                  f"{self.cfl_limit:.4f} days; clamping to 0.9*CFL.")
             self.dt = 0.9 * self.cfl_limit
+            self.cfl_ok = False
         print(f"[Phase2] Solver init: grid={self.H}x{self.W}, "
-              f"max eigenvalue(D)={max_eig:.4e}, "
-              f"CFL limit={self.cfl_limit:.4f}, dt={self.dt:.4f}")
+              f"max eigenvalue(D)={max_eig:.4e} mm^2/day, "
+              f"CFL limit={self.cfl_limit:.4f} days, dt={self.dt:.4f} days "
+              f"({'OK' if self.cfl_ok else 'CLAMPED'})")
 
     # ------------------------------------------------------------------ #
     def anisotropic_divergence(self, u: np.ndarray) -> np.ndarray:
