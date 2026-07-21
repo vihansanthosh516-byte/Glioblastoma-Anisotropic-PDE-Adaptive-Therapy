@@ -13,7 +13,7 @@ from sklearn.metrics import accuracy_score, f1_score, roc_auc_score
 # 1. HARDWARE ACCELERATION SETUP
 # =====================================================================
 DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-print(f"🧬 Computational Backend: Using {DEVICE.type.upper()}")
+print(f"Computational Backend: Using {DEVICE.type.upper()}")
 if DEVICE.type == 'cuda':
     print(f"   Target Device: {torch.cuda.get_device_name(0)}")
     torch.backends.cudnn.benchmark = True
@@ -36,7 +36,7 @@ class SingleCellDataset(Dataset):
         return x_dense, self.y[idx]
 
 def load_preprocessed_matrices():
-    print("📦 Initializing data stream from preprocessed arrays...")
+    print("Initializing data stream from preprocessed arrays...")
     X_raw = np.load("output/nn_X.npy", allow_pickle=True)
     y_raw = np.load("output/nn_y.npy")
     
@@ -45,7 +45,7 @@ def load_preprocessed_matrices():
     else:
         X_sparse = sp.csr_matrix(X_raw)
         
-    print(f"✅ Data Stream Ready. Shape: {X_sparse.shape[0]} cells × {X_sparse.shape[1]} genes")
+    print(f"Data Stream Ready. Shape: {X_sparse.shape[0]} cells x {X_sparse.shape[1]} genes")
     return X_sparse, y_raw
 
 # =====================================================================
@@ -136,7 +136,7 @@ def main():
     classification_criterion = nn.CrossEntropyLoss()
     
     # --- PHASE 1A: UNSUPERVISED VAE OPTIMIZATION ---
-    print("\n🏁 Executing Phase 1A: Unsupervised VAE Latent Compression...")
+    print("\nExecuting Phase 1A: Unsupervised VAE Latent Compression...")
     vae.train()
     for epoch in range(20):
         running_elbo = 0
@@ -151,7 +151,7 @@ def main():
         print(f"   Epoch {epoch+1:02d}/20 | Normalized ELBO Loss: {running_elbo / len(train_loader.dataset):.4f}")
         
     # --- PHASE 1B: EXTRACT FROZEN EMBEDDINGS & TRAIN EVAL HEAD ---
-    print("\n🔒 Freezing VAE Latent Parameters & Optimizing Evaluation Head...")
+    print("\nFreezing VAE Latent Parameters & Optimizing Evaluation Head...")
     vae.eval()
     
     for epoch in range(15):
@@ -169,7 +169,7 @@ def main():
             running_clf_loss += loss.item()
             
     # --- PHASE 1C: GRADIENT EVALUATION MATRIX ---
-    print("\n📊 Evaluating Deep Generative scVI Baseline on Test Partition...")
+    print("\nEvaluating Deep Generative scVI Baseline on Test Partition...")
     evaluation_head.eval()
     test_predictions = []
     test_probabilities = []
@@ -192,7 +192,7 @@ def main():
     f1 = f1_score(y_test, test_predictions, average='macro')
     auc = roc_auc_score(y_test, test_probabilities, multi_class='ovr', average='macro')
     
-    print("\n================== 🧬 scVI GENE MATRIX BASELINE RESULTS ==================")
+    print("\n================== scVI GENE MATRIX BASELINE RESULTS ==================")
     print(f"Testing Classification Accuracy: {accuracy * 100:.2f}%")
     print(f"Macro-Averaged F1 Score:         {f1:.4f}")
     print(f"Macro-Averaged AUC (OvR):        {auc:.4f}")
@@ -205,7 +205,7 @@ def main():
         json.dump(metrics_export, f, indent=4)
         
     # Extract and persist full dataset latent embeddings for Phase 3 diagnostics
-    print("\n💾 Extracting and compiling global 140k latent coordinates for Phase 3...")
+    print("\nExtracting and compiling global 140k latent coordinates for Phase 3...")
     global_loader = DataLoader(SingleCellDataset(X_sparse, y), batch_size=512, shuffle=False)
     global_latent_matrix = []
     
@@ -216,7 +216,7 @@ def main():
             global_latent_matrix.extend(mu.cpu().numpy())
             
     np.save("output/scvi_latent.npy", np.array(global_latent_matrix))
-    print("✅ Complete latent matrix successfully saved at output/scvi_latent.npy!")
+    print("Complete latent matrix successfully saved at output/scvi_latent.npy!")
 
 if __name__ == "__main__":
     main()
