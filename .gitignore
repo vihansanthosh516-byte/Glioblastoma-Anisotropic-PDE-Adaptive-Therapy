@@ -8,3 +8,4 @@ output/*.h5ad
 output/*.npy
 output/*.pt
 output/*.joblib
+output/*.npz

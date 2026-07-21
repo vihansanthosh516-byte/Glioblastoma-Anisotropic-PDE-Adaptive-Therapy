@@ -1,0 +1,53 @@
+{
+  "schema": "month10-iso-v1",
+  "patients": [
+    {
+      "patient_id": "PAT_0000",
+      "fractal_dimension": -2.292672151930582e-16,
+      "elongation": 1.0,
+      "tract_alignment_fraction": 0.50625
+    },
+    {
+      "patient_id": "PAT_0001",
+      "fractal_dimension": -2.292672151930582e-16,
+      "elongation": 1.0000000000000002,
+      "tract_alignment_fraction": 0.5
+    },
+    {
+      "patient_id": "PAT_0002",
+      "fractal_dimension": -2.292672151930582e-16,
+      "elongation": 1.0000000000000002,
+      "tract_alignment_fraction": 0.5
+    },
+    {
+      "patient_id": "PAT_0003",
+      "fractal_dimension": -2.292672151930582e-16,
+      "elongation": 1.0000000000000002,
+      "tract_alignment_fraction": 0.5
+    },
+    {
+      "patient_id": "PAT_0004",
+      "fractal_dimension": -2.292672151930582e-16,
+      "elongation": 1.0000000000000002,
+      "tract_alignment_fraction": 0.5
+    },
+    {
+      "patient_id": "PAT_0005",
+      "fractal_dimension": -2.292672151930582e-16,
+      "elongation": 1.0,
+      "tract_alignment_fraction": 0.50625
+    },
+    {
+      "patient_id": "PAT_0006",
+      "fractal_dimension": -2.292672151930582e-16,
+      "elongation": 1.0000000000000002,
+      "tract_alignment_fraction": 0.5
+    },
+    {
+      "patient_id": "PAT_0007",
+      "fractal_dimension": -2.292672151930582e-16,
+      "elongation": 1.0000000000000002,
+      "tract_alignment_fraction": 0.5
+    }
+  ]
+}
