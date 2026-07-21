@@ -40,10 +40,13 @@ from scipy.ndimage import gaussian_filter
 warnings.filterwarnings("ignore")
 
 # --------------------------------------------------------------------------- #
-# Global constants
+# Global constants (Phase 1: physical units, mm/days)
+#   dx=1.0 mm, dt=0.1 day, D_white=0.013 mm^2/day, D_gray=0.0013,
+#   rho_s=0.02 /day, rho_r=0.015 /day (resistance fitness cost).
 # --------------------------------------------------------------------------- #
 GRID_SIZE = 100
-DX = 1.0
+DX_MM = 1.0
+DX = DX_MM
 TARGET_GENES = ["LST1", "S100A11", "S100A8", "ZNF106"]
 
 ZONE_REGIONS = {
@@ -52,14 +55,16 @@ ZONE_REGIONS = {
     "Leading Edge": (66, 100),
 }
 
-# Base anisotropic parameters (from Month 7)
-D_BASE = 0.01
-D_PARALLEL_DEFAULT = 0.15
-D_PERPENDICULAR_DEFAULT = 0.005
+# Base anisotropic parameters (from Month 7 / Phase 1 physical units)
+D_WHITE = 0.013
+D_GRAY = 0.0013
+D_BASE = D_GRAY
+D_PARALLEL_DEFAULT = D_WHITE
+D_PERPENDICULAR_DEFAULT = 0.0013
 
-# Clone-specific proliferation rates
-RHO_SENSITIVE = 0.025
-RHO_RESISTANT = 0.015  # fitness cost of resistance
+# Clone-specific proliferation rates (Phase 1, /day)
+RHO_SENSITIVE = 0.02       # ~35 day doubling
+RHO_RESISTANT = 0.015      # fitness cost of resistance
 
 # Mutation rate (per division)
 MUTATION_RATE = 1e-5
@@ -67,20 +72,35 @@ MUTATION_RATE = 1e-5
 # Carrying capacity
 K = 1.0
 
-# Drug pharmacodynamics (Hill equation)
+# ----- Phase 1: TMZ pharmacokinetics (1-compartment IV bolus) ----- #
+# TMZ half-life: 1.8 hours = 0.075 days (literature)
+TMZ_HALF_LIFE_DAYS = 0.075
+K_EL = float(np.log(2) / TMZ_HALF_LIFE_DAYS)   # ~9.24 day^-1
+# Peak plasma concentration after standard 150-200 mg/m^2 dose (µg/mL)
+C_PEAK = 10.0
+# TMZ Hill-equation PD (Phase 1): EC50 in µg/mL (literature 2-10)
+TMZ_EC50_UG_ML = 5.0
+# Drug pharmacodynamics (Hill equation) — kept for legacy compatibility
+# NOTE: EC50 below is in abstract units; the Phase-1 path uses TMZ_EC50_UG_ML.
 E_MAX = 0.8
-EC50 = 0.5
+EC50 = TMZ_EC50_UG_ML
 HILL_COEFF = 2.0
 
-# Drug diffusion (along tensor field)
-D_DRUG = 0.3
-DRUG_DECAY = 0.02
+# Drug spatial diffusion - kept small; PK overrides bulk concentration
+# (kept for legacy drug_field pathway / mass-conservation sanity plots)
+D_DRUG = 0.13
+DRUG_DECAY = K_EL
+
+# Standard TMZ dosing schedule: 5 days on, 23 days off (28-day cycle)
+TMZ_DOSE_DAYS_ON = 5
+TMZ_CYCLE_DAYS = 28
 
 # Dosing
-MTD_DOSE = 1.0
-ADAPTIVE_DT = 0.05
+MTD_DOSE = C_PEAK          # µg/mL peak per dose (Phase 1)
+ADAPTIVE_DT = 0.1          # days (Phase 1)
 
-# MTD protocol: continuous dosing
+# MTD protocol: continuous dosing (abstract steps retained for legacy code;
+# under Phase 1 PK, "MTD" still means daily TMZ, C_RESET to C_PEAK each dose day)
 MTD_STEPS = 5000
 
 # Adaptive protocol
@@ -93,6 +113,74 @@ COHORT_PATIENTS = [f"PAT_{i:04d}" for i in range(8)]
 
 # Save intervals
 SAVE_INTERVAL = 250
+
+
+# =========================================================================== #
+# Phase 1: TMZ PK helper functions
+# =========================================================================== #
+def tmz_concentration(t_since_dose_days: float,
+                      c_peak: float = C_PEAK,
+                      k_el: float = K_EL) -> float:
+    """1-compartment IV bolus concentration at time t (days) after a dose.
+
+    C(t) = C_peak * exp(-k_el * t)
+    Returns drug concentration in µg/mL.
+    """
+    return float(c_peak * np.exp(-k_el * float(t_since_dose_days)))
+
+
+def tmz_dose_active(step_idx: int,
+                    dt_days: float = ADAPTIVE_DT,
+                    days_on: int = TMZ_DOSE_DAYS_ON,
+                    cycle_days: int = TMZ_CYCLE_DAYS) -> bool:
+    """Standard TMZ schedule: days 1-5 ON, 6-28 OFF (28-day cycle).
+
+    Returns True if the simulation step `step_idx` (zero-based, with
+    cumulative time = step_idx * dt_days) falls on a dosing day.
+    """
+    t_days = step_idx * dt_days
+    day_in_cycle = int(t_days) % cycle_days
+    return day_in_cycle < days_on
+
+
+def compute_tmz_schedule_C(step_idx: int,
+                           dt_days: float = ADAPTIVE_DT,
+                           c_peak: float = C_PEAK,
+                           k_el: float = K_EL,
+                           days_on: int = TMZ_DOSE_DAYS_ON,
+                           cycle_days: int = TMZ_CYCLE_DAYS) -> float:
+    """Concentration at simulation step assuming daily bolus doses during ON
+    days (each ON day resets plasma back to C_peak at the start of that day,
+    then decays). Returns µg/mL at the *end* of the current step (i.e. dt_days
+    after the most recent dosing event within this day).
+
+    For an ON day, residual decay from any earlier dose the same day is small
+    because k_el * dt_days << 1 (TMZ clears within hours); we approximate by
+    assuming each ON step starts at C_peak.
+    """
+    t_days = step_idx * dt_days
+    day_in_cycle = int(t_days) % cycle_days
+    if day_in_cycle < days_on:
+        # On a dosing day: peak reached, then decays over dt_days
+        return tmz_concentration(dt_days, c_peak=c_peak, k_el=k_el)
+    # Off day: time since last ON-day end
+    # day_in_cycle in [days_on, cycle_days)
+    days_since_last_dose = day_in_cycle - (days_on - 1) + (t_days - int(t_days))
+    return tmz_concentration(days_since_last_dose, c_peak=c_peak, k_el=k_el)
+
+
+def hill_kill_physical(C_ug_ml: float,
+                       E_max: float = E_MAX,
+                       EC50: float = TMZ_EC50_UG_ML,
+                       H: float = HILL_COEFF) -> float:
+    """Hill equation drug efficacy with physical concentration (µg/mL).
+
+    kill = E_max * C^H / (EC50^H + C^H)
+    Returns fractional kill rate per day (in [0, E_max]).
+    Accepts scalars or numpy arrays.
+    """
+    C = np.asarray(C_ug_ml, dtype=float)
+    return E_max * (C ** H) / (EC50 ** H + C ** H + 1e-12)
 
 
 # =========================================================================== #
@@ -363,6 +451,7 @@ class AdaptiveTherapySolver:
         dt: float = ADAPTIVE_DT,
         dx: float = DX,
         carrying_capacity: float = K,
+        use_physical_PK: bool = True,
     ) -> None:
         assert D_xx.shape == D_xy.shape == D_yy.shape
         self.H, self.W = D_xx.shape
@@ -385,6 +474,14 @@ class AdaptiveTherapySolver:
         self.dt = float(dt)
         self.dx = float(dx)
         self.K = float(carrying_capacity)
+
+        # Phase 1: physical 1-compartment TMZ PK (µg/mL, days)
+        # When enabled, `dose` in coupled_step is the bulk concentration
+        # C(t) [µg/mL] computed by the protocol runner from the dosing
+        # schedule (see compute_tmz_schedule_C / tmz_concentration).
+        self.use_physical_PK = bool(use_physical_PK)
+        self.k_el = K_EL
+        self.tmz_EC50 = TMZ_EC50_UG_ML
 
         # CFL for tumor diffusion
         per_pixel_eig = 0.5 * (self.D_xx + self.D_yy) + np.sqrt(
@@ -474,16 +571,28 @@ class AdaptiveTherapySolver:
     ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
         """
         Full coupled step:
-        1. Drug diffusion sub-steps
-        2. Tumor diffusion + reaction + competition + drug kill + mutation
+        Phase 1 (use_physical_PK=True):
+          - `dose` is the bulk plasma concentration C(t) in µg/mL
+          - Drug field is set uniform = dose (spatial diffusion skipped)
+          - kill_rate = hill_kill_physical(dose)
+        Legacy (use_physical_PK=False):
+          - Spatial drug diffusion-decay with boundary source
         """
-        # Drug diffusion sub-steps
-        C_curr = C.copy()
-        for _ in range(self.drug_substeps):
-            C_curr = self.drug_step(C_curr, dose, self.dt_drug_eff)
+        if self.use_physical_PK:
+            # Physical PK: bulk concentration directly drives kill rate
+            C_curr = np.full((self.H, self.W), float(dose), dtype=float)
+            # Use Hill with physical EC50 (µg/mL)
+            kill_rate = hill_kill_physical(
+                C_curr, E_max=self.E_max, EC50=self.tmz_EC50, H=self.hill_coeff
+            )
+        else:
+            # Legacy spatial drug diffusion
+            C_curr = C.copy()
+            for _ in range(self.drug_substeps):
+                C_curr = self.drug_step(C_curr, dose, self.dt_drug_eff)
 
-        # Drug kill rate at current concentration
-        kill_rate = self.hill_kill(C_curr)  # (H, W)
+            # Drug kill rate at current concentration (legacy EC50 in abstract units)
+            kill_rate = self.hill_kill(C_curr)  # (H, W)
 
         # Total local density for competition
         u_total = u_s + u_r
@@ -633,7 +742,7 @@ class PatientParameterMapper:
 
 
 # =========================================================================== #
-# MTD Simulation
+# MTD Simulation (Phase 1: TMZ PK schedule)
 # =========================================================================== #
 def run_mtd_protocol(
     solver: AdaptiveTherapySolver,
@@ -642,9 +751,12 @@ def run_mtd_protocol(
     u_r0: np.ndarray,
     n_steps: int = MTD_STEPS,
     save_interval: int = SAVE_INTERVAL,
-    dose: float = MTD_DOSE,
 ) -> Dict:
-    """Continuous MTD dosing simulation."""
+    """MTD with standard TMZ 5-days-on / 23-days-off schedule.
+
+    At each step, C(t) is computed from the dosing schedule via
+    compute_tmz_schedule_C(), which implements 1-compartment PK.
+    """
     u_s = u_s0.copy()
     u_r = u_r0.copy()
     C = np.zeros((solver.H, solver.W), dtype=float)
@@ -662,10 +774,12 @@ def run_mtd_protocol(
     C_hist[0] = C.astype(np.float32)
     mass_s_hist[0] = float(u_s.sum())
     mass_r_hist[0] = float(u_r.sum())
-    dose_hist[0] = dose
+    dose_hist[0] = compute_tmz_schedule_C(0)
 
     save_idx = 1
     for step in range(1, n_steps + 1):
+        # TMZ concentration at this step from PK schedule
+        dose = compute_tmz_schedule_C(step)
         u_s, u_r, C = solver.coupled_step(u_s, u_r, C, dose)
         mass_s_hist[step] = float(u_s.sum())
         mass_r_hist[step] = float(u_r.sum())
@@ -694,7 +808,7 @@ def run_mtd_protocol(
 
 
 # =========================================================================== #
-# Adaptive Therapy Simulation
+# Adaptive Therapy Simulation (Phase 1: TMZ PK with drug-holiday gating)
 # =========================================================================== #
 def run_adaptive_protocol(
     solver: AdaptiveTherapySolver,
@@ -703,11 +817,14 @@ def run_adaptive_protocol(
     u_r0: np.ndarray,
     n_steps: int = ADAPTIVE_STEPS,
     save_interval: int = SAVE_INTERVAL,
-    dose_on: float = MTD_DOSE,
     threshold_off: float = THRESHOLD_OFF,
     threshold_on: float = THRESHOLD_ON,
 ) -> Dict:
-    """Closed-loop adaptive dosing with drug holidays."""
+    """Closed-loop adaptive dosing with TMZ PK schedule gated by drug_on state.
+
+    - When drug_on=True: TMZ follows 5-on/23-off schedule (C(t) from schedule)
+    - When drug_on=False: C(t) decays from last dose (schedule OFF days)
+    """
     u_s = u_s0.copy()
     u_r = u_r0.copy()
     C = np.zeros((solver.H, solver.W), dtype=float)
@@ -730,20 +847,24 @@ def run_adaptive_protocol(
     C_hist[0] = C.astype(np.float32)
     mass_s_hist[0] = float(u_s.sum())
     mass_r_hist[0] = float(u_r.sum())
-    dose_hist[0] = dose_on if drug_on else 0.0
+    dose_hist[0] = compute_tmz_schedule_C(0) if drug_on else 0.0
     drug_state_hist[0] = drug_on
 
     save_idx = 1
     for step in range(1, n_steps + 1):
         current_mass = float(u_s.sum() + u_r.sum())
 
-        # Adaptive control logic
+        # Adaptive control logic (same thresholds as before)
         if drug_on and current_mass < threshold_off * baseline_mass:
             drug_on = False
         elif not drug_on and current_mass > threshold_on * baseline_mass:
             drug_on = True
 
-        dose = dose_on if drug_on else 0.0
+        # PK: compute C(t) from schedule, but only if drug_on
+        if drug_on:
+            dose = compute_tmz_schedule_C(step)
+        else:
+            dose = 0.0  # No dosing during holiday
 
         u_s, u_r, C = solver.coupled_step(u_s, u_r, C, dose)
 

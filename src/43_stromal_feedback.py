@@ -46,10 +46,14 @@ from scipy.signal import correlate2d
 warnings.filterwarnings("ignore")
 
 # --------------------------------------------------------------------------- #
-# Global constants
+# Global constants (Phase 1: physical units, mm/days)
+#   dx=1.0 mm, dt=0.1 day, D_white=0.013 mm^2/day, D_gray=0.0013,
+#   rho_0=0.02 /day. Chemical diffusion D_G scaled to remain >> D_tumor
+#   (stromal GF spreads faster than the cellular front).
 # --------------------------------------------------------------------------- #
 GRID_SIZE = 100
-DX = 1.0
+DX_MM = 1.0
+DX = DX_MM
 TARGET_GENES = ["LST1", "S100A11", "S100A8", "ZNF106"]
 INFLAMMATORY_GENES = ["S100A8", "S100A11", "LST1"]  # inflammatory/macrophage-recruiting
 
@@ -59,23 +63,26 @@ ZONE_REGIONS = {
     "Leading Edge": (66, 100),
 }
 
-# Base parameters (Week 1)
-D_BASE = 0.01
-D_PARALLEL_DEFAULT = 0.15
-D_PERPENDICULAR_DEFAULT = 0.005
-RHO_0 = 0.02
+# Base parameters (Week 1) — Phase 1 physical units (mm^2/day)
+D_WHITE = 0.013
+D_GRAY = 0.0013
+D_BASE = D_GRAY               # isotropic baseline outside tract
+D_PARALLEL_DEFAULT = D_WHITE  # along tract
+D_PERPENDICULAR_DEFAULT = 0.0013  # suppressed cross-tract (~D_white/10)
+RHO_0 = 0.02                  # proliferation baseline, /day
 K_M = 0.2
 BETA = 1.5
 CARRYING_CAPACITY = 1.0
 
 # Chemical diffusion (Week 2) - D_G >> D_u for fast chemical diffusion
-D_G = 0.5
+# Stromal growth factor diffuses ~10x faster than tumor cells (physical).
+D_G = 0.13
 GAMMA = 0.01
 ALPHA_BASE = 0.05
 
-# Solver parameters
-DT_DEFAULT = 0.05
-DT_CHEMICAL = 0.005  # much smaller for chemical diffusion (D_G >> D_u)
+# Solver parameters (Phase 1, days)
+DT_DEFAULT = 0.1
+DT_CHEMICAL = 0.01  # much smaller for chemical diffusion (D_G >> D_u)
 MASS_TEST_STEPS = 500
 
 # Time stepping for patient simulations
