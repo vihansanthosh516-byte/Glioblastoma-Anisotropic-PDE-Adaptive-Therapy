@@ -1,4 +1,4 @@
-# 🧬 Multi-Omic Anisotropic PDE Modeling & Adaptive Therapy Dynamics in Glioblastoma Cohorts
+# Multi-Omic Anisotropic PDE Modeling & Adaptive Therapy Dynamics in Glioblastoma Cohorts
 
 ![Python](https://img.shields.io/badge/Python-3.14+-blue?logo=python)
 ![License](https://img.shields.io/badge/License-MIT-green)
@@ -15,7 +15,7 @@ The framework ingests single-cell and bulk RNA-seq profiles, derives inflammator
 
 ---
 
-## 🔑 Key Findings & Clinical Summary
+## Key Findings & Clinical Summary
 
 | Discovery / Metric | Result / Finding | Statistical Evidence |
 | :--- | :--- | :--- |
@@ -29,7 +29,7 @@ The framework ingests single-cell and bulk RNA-seq profiles, derives inflammator
 
 ---
 
-## 🏗️ Full 10-Month Project Architecture
+## Full 10-Month Project Architecture
 
 ```text
 [ Months 1–3: Omics & Biomarkers ] ──> [ Months 4–6: ML Risk Stratification ]
