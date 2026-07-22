@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
-"""Phase 3 Extension: 3D Volumetric Anisotropic Tumor Growth Model.
+"""Phase 3 Extension: 3D Volumetric Anisotropic Tumor Growth Model (8-Patient Cohort).
 
 This module extends the 2D anisotropic Fisher-Kolmogorov solver to 3D space,
 operating on a 50x50x50 voxel mesh (1.0 mm resolution) with full 3x3 diffusion
 tensors derived from DTI principles.
 
 Key features:
+- 8-patient cohort (PAT_0000–PAT_0007) with patient-specific tract orientations
 - 3D tensor field: D(x,y,z) symmetric positive-definite 3x3 matrices
 - 3D divergence operator: ∇·(D∇u) with cross-derivative terms
 - Neumann zero-flux BCs on all 6 bounding faces (mode='constant', val=0)
@@ -13,8 +14,8 @@ Key features:
 - MTD vs Adaptive therapy comparison in 3D volume
 
 Output artifacts:
-- output/3d_tumor_volume_patient.npz (final density fields)
-- output/3d_extension_summary.json (volume, sphericity, dose-sparing metrics)
+- output/3d_master_cohort_volumes.npz (final density fields for all 8 patients)
+- output/3d_extension_summary.json (cohort-wide metrics + per-patient results)
 """
 from __future__ import annotations
 
@@ -69,47 +70,68 @@ TUMOR_RADIUS = 2  # voxels (small initial seed for clear invasion pattern)
 
 
 # --------------------------------------------------------------------------- #
-# 3D Tensor Field Generation (Strong Anisotropy with Tract Corridor)
+# 3D Tensor Field Generation (Patient-Specific Tract Orientations)
 # --------------------------------------------------------------------------- #
+COHORT_PATIENTS = [f"PAT_{i:04d}" for i in range(8)]
+
+# Patient-specific tract orientation vectors
+PATIENT_TRACTS = {
+    "PAT_0000": np.array([1.0, 1.0, 0.0]) / np.sqrt(2.0),  # Diagonal xy-plane
+    "PAT_0001": np.array([1.0, 1.0, 0.0]) / np.sqrt(2.0),  # Diagonal xy-plane
+    "PAT_0002": np.array([0.0, 0.0, 1.0]),                  # Vertical (z-axis)
+    "PAT_0003": np.array([0.0, 0.0, 1.0]),                  # Vertical (z-axis)
+    "PAT_0004": np.array([1.0, 0.0, 0.0]),                  # Horizontal (x-axis)
+    "PAT_0005": np.array([1.0, 0.0, 0.0]),                  # Horizontal (x-axis)
+    "PAT_0006": np.array([1.0, 1.0, 1.0]) / np.sqrt(3.0),  # Oblique (body diagonal)
+    "PAT_0007": np.array([1.0, 1.0, 1.0]) / np.sqrt(3.0),  # Oblique (body diagonal)
+}
+
+
 def create_3d_tensor_field(
     grid_size: int = GRID_SIZE,
     dx: float = DX,
     d_white: float = D_WHITE,
     d_gray: float = D_GRAY,
+    tract_orientation: np.ndarray = np.array([1.0, 1.0, 0.0]) / np.sqrt(2.0),
     seed: int = 42,
 ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
     """Generate a 3D symmetric positive-definite diffusion tensor field with
-    a STRONGLY ANISOTROPIC white matter tract corridor.
+    a STRONGLY ANISOTROPIC white matter tract corridor oriented along a
+    patient-specific direction vector.
 
-    The tract runs diagonally from (0,0,0) to (grid_size, grid_size, grid_size)
-    with a 10:1 anisotropy ratio (D_parallel = 0.013, D_perp = 0.0013 mm²/day).
-    Tumor cells will visibly stream along this fiber bundle.
+    The tract runs through the grid center with a 10:1 anisotropy ratio
+    (D_parallel = 0.013, D_perp = 0.0013 mm²/day).
+
+    Args:
+        grid_size: Grid dimension (cubic)
+        dx: Voxel spacing (mm)
+        d_white: Diffusion along tract (mm²/day)
+        d_gray: Diffusion perpendicular to tract (mm²/day)
+        tract_orientation: Unit vector [n_x, n_y, n_z] defining fast axis
+        seed: Random seed for perturbations
 
     Returns:
         D_xx, D_xy, D_xz, D_yy, D_yz, D_zz: 3D arrays (grid_size³ each)
-        representing the 6 unique components of the symmetric 3x3 tensor.
     """
     rng = np.random.default_rng(seed)
     gs = grid_size
+    n = tract_orientation  # Unit vector along tract
 
     # Create coordinate grids
     x, y, z = np.mgrid[0:gs, 0:gs, 0:gs]
 
-    # Define a WHITE MATTER TRACT CORRIDOR running diagonally
-    # Distance from point (x,y,z) to the diagonal line x=y (in xy-plane)
-    # and centered in z
-    dist_to_diagonal_xy = np.abs(x - y) / np.sqrt(2.0)
-    dist_to_center_z = np.abs(z - gs / 2.0)
+    # Define a WHITE MATTER TRACT CORRIDOR centered in the grid
+    # Distance from point to line through center with direction n
+    center = np.array([gs/2, gs/2, gs/2])
+    pos = np.stack([x, y, z], axis=-1) - center  # Position relative to center
     
-    # Tract corridor: narrow band along diagonal in xy-plane, spanning full z
-    tract_width_xy = 8.0  # voxels
-    tract_z_min = int(gs * 0.2)
-    tract_z_max = int(gs * 0.8)
+    # Project position onto direction perpendicular to n
+    proj_parallel = np.sum(pos * n, axis=-1, keepdims=True) * n
+    dist_perp = np.sqrt(np.sum((pos - proj_parallel) ** 2, axis=-1))
     
-    in_tract = (
-        (dist_to_diagonal_xy < tract_width_xy / 2.0) &
-        (z >= tract_z_min) & (z <= tract_z_max)
-    )
+    # Tract: cylindrical corridor along direction n
+    tract_radius = gs / 3.0  # ~16-17 voxels radius
+    in_tract = dist_perp < tract_radius
 
     # Initialize tensor components with isotropic gray matter baseline
     D_xx = np.full((gs, gs, gs), d_gray, dtype=float)
@@ -120,23 +142,17 @@ def create_3d_tensor_field(
     D_yz = np.zeros((gs, gs, gs), dtype=float)
 
     # In tract region: construct strongly anisotropic tensor
-    # Fast axis along diagonal direction n = [1, 1, 0] / sqrt(2)
     # D = D_perp * I + (D_parallel - D_perp) * (n ⊗ n)
     if np.any(in_tract):
-        # Unit vector along diagonal in xy-plane
-        n_x, n_y, n_z = 1.0 / np.sqrt(2.0), 1.0 / np.sqrt(2.0), 0.0
-        
-        # Anisotropic boost: D_parallel - D_perp
         delta_D = d_white - d_gray
         
         # Tensor components via outer product n ⊗ n
-        # D_ij = D_perp * δ_ij + delta_D * n_i * n_j
-        D_xx[in_tract] = d_gray + delta_D * (n_x ** 2)
-        D_yy[in_tract] = d_gray + delta_D * (n_y ** 2)
-        D_zz[in_tract] = d_gray + delta_D * (n_z ** 2)  # = d_gray (no boost in z)
-        D_xy[in_tract] = delta_D * n_x * n_y
-        D_xz[in_tract] = delta_D * n_x * n_z  # = 0
-        D_yz[in_tract] = delta_D * n_y * n_z  # = 0
+        D_xx[in_tract] = d_gray + delta_D * (n[0] ** 2)
+        D_yy[in_tract] = d_gray + delta_D * (n[1] ** 2)
+        D_zz[in_tract] = d_gray + delta_D * (n[2] ** 2)
+        D_xy[in_tract] = delta_D * n[0] * n[1]
+        D_xz[in_tract] = delta_D * n[0] * n[2]
+        D_yz[in_tract] = delta_D * n[1] * n[2]
 
         # Add small smooth perturbations for realism (maintain symmetry)
         noise_scale = 0.02 * d_gray
@@ -144,6 +160,8 @@ def create_3d_tensor_field(
         D_yy[in_tract] += rng.normal(0, noise_scale, size=in_tract.sum())
         D_zz[in_tract] += rng.normal(0, noise_scale, size=in_tract.sum())
         D_xy[in_tract] += rng.normal(0, noise_scale * 0.5, size=in_tract.sum())
+        D_xz[in_tract] += rng.normal(0, noise_scale * 0.5, size=in_tract.sum())
+        D_yz[in_tract] += rng.normal(0, noise_scale * 0.5, size=in_tract.sum())
 
     return D_xx, D_xy, D_xz, D_yy, D_yz, D_zz
 
@@ -304,7 +322,7 @@ def tmz_concentration(step: int, dt: float = DT) -> float:
 
 
 # --------------------------------------------------------------------------- #
-# Simulation Runners: MTD vs Adaptive
+# Simulation Runners: MTD vs Adaptive (Per-Patient)
 # --------------------------------------------------------------------------- #
 def run_mtd_3d(solver: AnisotropicFKSolver3D, u0: np.ndarray) -> Dict:
     """Run continuous MTD (5-on/23-off) in 3D."""
@@ -397,127 +415,169 @@ def compute_sphericity(u: np.ndarray) -> float:
 
 
 # --------------------------------------------------------------------------- #
-# Main Execution
+# Main Execution: 8-Patient 3D Cohort
 # --------------------------------------------------------------------------- #
 def main():
     print("=" * 70)
     print("Phase 3 Extension: 3D Volumetric Anisotropic Tumor Growth")
+    print("8-Patient Cohort Simulation (PAT_0000 – PAT_0007)")
     print("=" * 70)
 
-    # 1. Generate 3D tensor field
-    print("\n[1] Generating 3D diffusion tensor field with STRONG ANISOTROPY...")
-    D_xx, D_xy, D_xz, D_yy, D_yz, D_zz = create_3d_tensor_field(
-        grid_size=GRID_SIZE, dx=DX, d_white=D_WHITE, d_gray=D_GRAY, seed=42
-    )
-    print(f"    Grid: {GRID_SIZE}x{GRID_SIZE}x{GRID_SIZE} voxels ({DX} mm spacing)")
-    print(f"    D_white (parallel) = {D_WHITE} mm²/day")
-    print(f"    D_gray (perpendicular) = {D_GRAY} mm²/day")
-    print(f"    Anisotropy ratio: {D_WHITE / D_GRAY:.1f}x")
-    print(f"    Tract corridor: diagonal band (x~=~y), z=[{int(GRID_SIZE*0.2)}:{int(GRID_SIZE*0.8)}]")
+    # Store results for all patients
+    cohort_results = []
+    all_volumes = {}  # For NPZ export
 
-    # Verify positive-definiteness (spot check center of tract)
-    tract_center = (GRID_SIZE // 2, GRID_SIZE // 2, GRID_SIZE // 2)
-    tensor_center = np.array([
-        [D_xx[tract_center], D_xy[tract_center], D_xz[tract_center]],
-        [D_xy[tract_center], D_yy[tract_center], D_yz[tract_center]],
-        [D_xz[tract_center], D_yz[tract_center], D_zz[tract_center]],
-    ])
-    eigs_center = np.linalg.eigvalsh(tensor_center)
-    print(f"    Tract center eigenvalues: {eigs_center}")
-    print(f"    Eigenvalue ratio (max/min): {eigs_center.max() / eigs_center.min():.1f}x")
-    print(f"    Positive-definite check: {'PASS' if eigs_center.min() > 0 else 'FAIL'}")
+    for pid in COHORT_PATIENTS:
+        print(f"\n{'='*70}")
+        print(f"Processing {pid}...")
+        print(f"{'='*70}")
 
-    # 2. Initialize solver
-    print("\n[2] Initializing 3D anisotropic FK solver...")
-    solver = AnisotropicFKSolver3D(
-        D_xx, D_xy, D_xz, D_yy, D_yz, D_zz,
-        dt=DT, dx=DX, rho=RHO, K=K
-    )
+        # Get patient-specific tract orientation
+        tract_n = PATIENT_TRACTS[pid]
+        print(f"Tract orientation: n = [{tract_n[0]:.3f}, {tract_n[1]:.3f}, {tract_n[2]:.3f}]")
 
-    # 3. Initial tumor seed
-    print("\n[3] Planting initial tumor seed...")
-    u0 = initial_tumor_seed((GRID_SIZE, GRID_SIZE, GRID_SIZE))
-    initial_volume_mm3 = float(np.sum(u0 > 0.1)) * (DX ** 3)
-    print(f"    Initial tumor volume: {initial_volume_mm3:.2f} mm³")
+        # 1. Generate patient-specific 3D tensor field
+        print(f"\n[1] Generating 3D diffusion tensor field...")
+        D_xx, D_xy, D_xz, D_yy, D_yz, D_zz = create_3d_tensor_field(
+            grid_size=GRID_SIZE, dx=DX, d_white=D_WHITE, d_gray=D_GRAY,
+            tract_orientation=tract_n, seed=42 + int(pid.split('_')[1])
+        )
 
-    # 4. Run MTD simulation
-    print(f"\n[4] Running MTD simulation ({SIM_DAYS} days)...")
-    result_mtd = run_mtd_3d(solver, u0)
-    final_volume_mtd = float(np.sum(result_mtd["final_u"] > 0.1)) * (DX ** 3)
-    final_mass_mtd = float(result_mtd["final_u"].sum()) * (DX ** 3)
-    print(f"    Final tumor volume (MTD): {final_volume_mtd:.2f} mm³")
+        # Verify positive-definiteness (spot check center)
+        center = GRID_SIZE // 2
+        tensor_center = np.array([
+            [D_xx[center, center, center], D_xy[center, center, center], D_xz[center, center, center]],
+            [D_xy[center, center, center], D_yy[center, center, center], D_yz[center, center, center]],
+            [D_xz[center, center, center], D_yz[center, center, center], D_zz[center, center, center]],
+        ])
+        eigs_center = np.linalg.eigvalsh(tensor_center)
+        eig_ratio = float(eigs_center.max() / eigs_center.min()) if eigs_center.min() > 0 else float('inf')
+        print(f"    Eigenvalue ratio (max/min): {eig_ratio:.1f}x")
+        print(f"    Positive-definite: {'PASS' if eigs_center.min() > 0 else 'FAIL'}")
 
-    # 5. Run Adaptive simulation
-    print(f"\n[5] Running Adaptive therapy simulation ({SIM_DAYS} days)...")
-    result_adapt = run_adaptive_3d(solver, u0)
-    final_volume_adapt = float(np.sum(result_adapt["final_u"] > 0.1)) * (DX ** 3)
-    final_mass_adapt = float(result_adapt["final_u"].sum()) * (DX ** 3)
-    drug_on_frac = result_adapt["drug_on_fraction"]
-    print(f"    Final tumor volume (Adaptive): {final_volume_adapt:.2f} mm³")
-    print(f"    Drug on-fraction: {drug_on_frac:.2%}")
+        # 2. Initialize solver
+        print(f"\n[2] Initializing 3D anisotropic FK solver...")
+        solver = AnisotropicFKSolver3D(
+            D_xx, D_xy, D_xz, D_yy, D_yz, D_zz,
+            dt=DT, dx=DX, rho=RHO, K=K
+        )
 
-    # 6. Compute metrics
-    print("\n[6] Computing 3D metrics...")
-    sphericity_mtd = compute_sphericity(result_mtd["final_u"])
-    sphericity_adapt = compute_sphericity(result_adapt["final_u"])
-    dose_sparing = 1.0 - drug_on_frac  # fraction of time drug was OFF
+        # 3. Initial tumor seed (patient-specific offset)
+        print(f"\n[3] Planting initial tumor seed...")
+        u0 = initial_tumor_seed((GRID_SIZE, GRID_SIZE, GRID_SIZE))
+        initial_volume_mm3 = float(np.sum(u0 > 0.1)) * (DX ** 3)
+        print(f"    Initial tumor volume: {initial_volume_mm3:.2f} mm³")
 
-    print(f"    Sphericity (MTD): {sphericity_mtd:.3f}")
-    print(f"    Sphericity (Adaptive): {sphericity_adapt:.3f}")
-    print(f"    Dose sparing (Adaptive vs MTD): {dose_sparing:.1%}")
+        # 4. Run MTD simulation
+        print(f"\n[4] Running MTD simulation ({SIM_DAYS} days)...")
+        result_mtd = run_mtd_3d(solver, u0)
+        final_volume_mtd = float(np.sum(result_mtd["final_u"] > 0.1)) * (DX ** 3)
+        final_mass_mtd = float(result_mtd["final_u"].sum()) * (DX ** 3)
+        sphericity_mtd = compute_sphericity(result_mtd["final_u"])
+        print(f"    Final tumor volume (MTD): {final_volume_mtd:.2f} mm³")
 
-    # 7. Save artifacts
-    print("\n[7] Saving 3D artifacts...")
-    npz_path = OUTPUT_DIR / "3d_tumor_volume_patient.npz"
-    np.savez(
-        npz_path,
-        final_u_mtd=result_mtd["final_u"],
-        final_u_adapt=result_adapt["final_u"],
-        u0=u0,
-        D_xx=D_xx, D_xy=D_xy, D_xz=D_xz, D_yy=D_yy, D_yz=D_yz, D_zz=D_zz,
-        volume_history_mtd=np.array(result_mtd["volume_history"]),
-        volume_history_adapt=np.array(result_adapt["volume_history"]),
-        mass_history_mtd=np.array(result_mtd["mass_history"]),
-        mass_history_adapt=np.array(result_adapt["mass_history"]),
-    )
-    print(f"    Saved 3D tumor volumes -> {npz_path}")
+        # 5. Run Adaptive simulation
+        print(f"\n[5] Running Adaptive therapy simulation ({SIM_DAYS} days)...")
+        result_adapt = run_adaptive_3d(solver, u0)
+        final_volume_adapt = float(np.sum(result_adapt["final_u"] > 0.1)) * (DX ** 3)
+        final_mass_adapt = float(result_adapt["final_u"].sum()) * (DX ** 3)
+        drug_on_frac = result_adapt["drug_on_fraction"]
+        sphericity_adapt = compute_sphericity(result_adapt["final_u"])
+        dose_sparing = 1.0 - drug_on_frac
+        print(f"    Final tumor volume (Adaptive): {final_volume_adapt:.2f} mm³")
+        print(f"    Drug on-fraction: {drug_on_frac:.2%}")
+        print(f"    Dose sparing: {dose_sparing:.1%}")
 
+        # 6. Store results
+        patient_result = {
+            "patient_id": pid,
+            "tract_orientation": tract_n.tolist(),
+            "eigenvalue_ratio": eig_ratio,
+            "initial_volume_mm3": initial_volume_mm3,
+            "mtd": {
+                "final_volume_mm3": final_volume_mtd,
+                "final_mass": final_mass_mtd,
+                "sphericity": sphericity_mtd,
+            },
+            "adaptive": {
+                "final_volume_mm3": final_volume_adapt,
+                "final_mass": final_mass_adapt,
+                "sphericity": sphericity_adapt,
+                "drug_on_fraction": drug_on_frac,
+                "dose_sparing_fraction": dose_sparing,
+            },
+        }
+        cohort_results.append(patient_result)
+
+        # Store volumes for NPZ
+        all_volumes[f"{pid}_mtd"] = result_mtd["final_u"]
+        all_volumes[f"{pid}_adapt"] = result_adapt["final_u"]
+        all_volumes[f"{pid}_u0"] = u0
+        all_volumes[f"{pid}_D_xx"] = D_xx
+        all_volumes[f"{pid}_D_yy"] = D_yy
+        all_volumes[f"{pid}_D_zz"] = D_zz
+        all_volumes[f"{pid}_D_xy"] = D_xy
+        all_volumes[f"{pid}_D_xz"] = D_xz
+        all_volumes[f"{pid}_D_yz"] = D_yz
+
+    # 7. Compute cohort aggregate statistics
+    print(f"\n{'='*70}")
+    print("Cohort Aggregate Statistics")
+    print(f"{'='*70}")
+
+    mtd_volumes = [r["mtd"]["final_volume_mm3"] for r in cohort_results]
+    adapt_volumes = [r["adaptive"]["final_volume_mm3"] for r in cohort_results]
+    dose_sparings = [r["adaptive"]["dose_sparing_fraction"] for r in cohort_results]
+
+    print(f"MTD final volume: {np.mean(mtd_volumes):.1f} ± {np.std(mtd_volumes, ddof=1):.1f} mm³")
+    print(f"Adaptive final volume: {np.mean(adapt_volumes):.1f} ± {np.std(adapt_volumes, ddof=1):.1f} mm³")
+    print(f"Dose sparing (Adaptive vs MTD): {np.mean(dose_sparings)*100:.1f}% ± {np.std(dose_sparings, ddof=1)*100:.1f}%")
+
+    # 8. Save cohort artifacts
+    print(f"\n[8] Saving 3D cohort artifacts...")
+    npz_path = OUTPUT_DIR / "3d_master_cohort_volumes.npz"
+    np.savez(npz_path, **all_volumes)
+    print(f"    Saved 3D cohort volumes -> {npz_path}")
+
+    # Build summary JSON
     summary = {
         "grid_size": GRID_SIZE,
         "dx_mm": DX,
         "dt_days": DT,
         "sim_days": SIM_DAYS,
-        "initial_volume_mm3": initial_volume_mm3,
+        "cohort_size": len(COHORT_PATIENTS),
         "anisotropy": {
             "D_parallel": D_WHITE,
             "D_perpendicular": D_GRAY,
             "anisotropy_ratio": D_WHITE / D_GRAY,
-            "tract_orientation": "diagonal (x=y plane)",
-            "eigenvalue_ratio_center": float(eigs_center.max() / eigs_center.min()),
         },
-        "mtd": {
-            "final_volume_mm3": final_volume_mtd,
-            "final_mass": final_mass_mtd,
-            "sphericity": sphericity_mtd,
+        "patients": cohort_results,
+        "aggregate_statistics": {
+            "mtd_final_volume_mm3": {
+                "mean": float(np.mean(mtd_volumes)),
+                "std": float(np.std(mtd_volumes, ddof=1)),
+            },
+            "adaptive_final_volume_mm3": {
+                "mean": float(np.mean(adapt_volumes)),
+                "std": float(np.std(adapt_volumes, ddof=1)),
+            },
+            "dose_sparing_fraction": {
+                "mean": float(np.mean(dose_sparings)),
+                "std": float(np.std(dose_sparings, ddof=1)),
+            },
         },
-        "adaptive": {
-            "final_volume_mm3": final_volume_adapt,
-            "final_mass": final_mass_adapt,
-            "sphericity": sphericity_adapt,
-            "drug_on_fraction": drug_on_frac,
-            "dose_sparing_fraction": dose_sparing,
-        },
-        "notes": "Strong 10:1 anisotropy along diagonal white matter tract corridor. "
-                 "Tumor invasion elongates along fiber bundle, visible in 3D volume render.",
+        "notes": "8-patient 3D cohort with patient-specific tract orientations. "
+                 "Diagonal (PAT_0000-01), Vertical (PAT_0002-03), "
+                 "Horizontal (PAT_0004-05), Oblique (PAT_0006-07).",
     }
     json_path = OUTPUT_DIR / "3d_extension_summary.json"
     with open(json_path, "w") as f:
         json.dump(summary, f, indent=2)
-    print(f"    Saved summary metrics -> {json_path}")
+    print(f"    Saved cohort summary -> {json_path}")
 
-    print("\n" + "=" * 70)
+    print(f"\n{'='*70}")
     print("3D Extension Complete")
-    print("=" * 70)
+    print(f"{'='*70}")
     print(f"Deliverables:")
     print(f"  {npz_path}")
     print(f"  {json_path}")
