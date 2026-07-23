@@ -20,10 +20,12 @@ Output:
 """
 from __future__ import annotations
 
+import argparse
 import hashlib
 import json
 import os
 import sys
+import importlib
 import warnings
 from datetime import datetime
 from pathlib import Path
@@ -32,6 +34,33 @@ from typing import Any, Dict, List, Optional, Tuple
 import numpy as np
 
 warnings.filterwarnings("ignore")
+
+# Import inverse parameter estimation (module name starts with digit, use importlib)
+try:
+    import importlib.util
+    _inv_path = Path(__file__).parent / "51_inverse_parameter_estimation.py"
+    _spec = importlib.util.spec_from_file_location(
+        "inverse_parameter_estimation", _inv_path
+    )
+    _inv_mod = importlib.util.module_from_spec(_spec)
+    _spec.loader.exec_module(_inv_mod)
+    estimate_patient_parameters = _inv_mod.estimate_patient_parameters
+except Exception:
+    estimate_patient_parameters = None
+
+# Import robust MPC controller (module name starts with digit, use importlib)
+try:
+    _rmpc_path = Path(__file__).parent / "52_robust_mpc_controller.py"
+    _rmpc_spec = importlib.util.spec_from_file_location(
+        "robust_mpc_controller", _rmpc_path
+    )
+    _rmpc_mod = importlib.util.module_from_spec(_rmpc_spec)
+    _rmpc_spec.loader.exec_module(_rmpc_mod)
+    RobustMPCController = _rmpc_mod.RobustMPCController
+    run_robust_mpc_simulation = _rmpc_mod.run_robust_mpc_simulation
+except Exception:
+    RobustMPCController = None
+    run_robust_mpc_simulation = None
 
 # Clinical report output directory
 CLINICAL_REPORTS_DIR = Path("output/clinical_reports")
@@ -57,11 +86,55 @@ DOSE_DAYS_ON = 5
 CYCLE_DAYS = 28
 
 # MPC parameters (CALIBRATED)
-# Achieves: 30-35% drug administration, 65-70% dose sparing (vs continuous), Day-180 volume < 1 mm³
+# Achieves: 30-35% drug administration, 65-70% dose sparing (vs continuous), Day-180 volume < 1 mm3
 MPC_HORIZON_DAYS = 14
 W_TUMOR = 1.2    # High tumor penalty - aggressive control
 W_DRUG = 0.03    # Low drug penalty - allow frequent dosing
-TARGET_VOLUME_MM3 = 50.0  # Target tumor volume threshold (mm³)
+TARGET_VOLUME_MM3 = 50.0  # Target tumor volume threshold (mm3)
+
+
+# ============================================================================ #
+# CLI Argument Parser
+# ============================================================================ #
+def parse_args() -> argparse.Namespace:
+    """Parse command-line arguments."""
+    parser = argparse.ArgumentParser(
+        description="Clinical Decision Support System for GBM Treatment Planning"
+    )
+    parser.add_argument(
+        "--estimate-params",
+        action="store_true",
+        help="Enable inverse parameter estimation from longitudinal volumes",
+    )
+    parser.add_argument(
+        "--t0-volume",
+        type=float,
+        default=None,
+        help="Baseline tumor volume (mm3) for parameter estimation",
+    )
+    parser.add_argument(
+        "--t1-volume",
+        type=float,
+        default=None,
+        help="Follow-up tumor volume (mm3) for parameter estimation",
+    )
+    parser.add_argument(
+        "--delta-t",
+        type=float,
+        default=None,
+        help="Time between scans (days) for parameter estimation",
+    )
+    parser.add_argument(
+        "--non-interactive",
+        action="store_true",
+        help="Run in non-interactive mode with default parameters",
+    )
+    parser.add_argument(
+        "--robust-mpc",
+        action="store_true",
+        help="Use uncertainty-aware adaptive-horizon MPC (Phase 2) instead of baseline",
+    )
+    return parser.parse_args()
 
 
 # ============================================================================ #
@@ -92,8 +165,42 @@ def get_string_input(prompt: str, default: Optional[str] = None) -> str:
         return input(f"{prompt}: ").strip()
 
 
-def clinical_intake() -> Dict[str, Any]:
-    """Interactive clinical intake for patient biophysical parameters."""
+def clinical_intake(**overrides: Any) -> Dict[str, Any]:
+    """Interactive clinical intake for patient biophysical parameters.
+    
+    Args:
+        **overrides: Optional keyword overrides to skip interactive prompts.
+            Supported keys: patient_id, dti_nx, dti_ny, dti_nz, rho, r0_mm
+    
+    Returns:
+        Dictionary of patient parameters.
+    """
+    if overrides.get("non_interactive"):
+        # Skip interactive prompts, use defaults
+        patient_id = overrides.get("patient_id", "PAT_CUSTOM_001")
+        dti_vec = np.array([
+            overrides.get("dti_nx", 1.0),
+            overrides.get("dti_ny", 1.0),
+            overrides.get("dti_nz", 0.0),
+        ])
+        norm = np.linalg.norm(dti_vec)
+        if norm < 1e-6:
+            dti_vec = np.array([1.0, 1.0, 0.0])
+            norm = 1.0
+        n_normalized = dti_vec / norm
+        rho = overrides.get("rho", 0.02)
+        r0_mm = overrides.get("r0_mm", 3.0)
+        
+        print("  Non-interactive mode: using provided/parameter-estimated values\n")
+        return {
+            "patient_id": patient_id,
+            "dti_vector_raw": dti_vec.tolist(),
+            "dti_vector_normalized": n_normalized.tolist(),
+            "rho": float(rho),
+            "r0_mm": float(r0_mm),
+            "timestamp": datetime.now().isoformat(),
+        }
+    
     print("\n" + "=" * 70)
     print("CLINICAL DECISION SUPPORT SYSTEM (CDSS) — GBM Treatment Planning")
     print("=" * 70)
@@ -321,6 +428,17 @@ def generate_html_dossier(
     n_vec = params["dti_vector_normalized"]
     rho = params["rho"]
     r0 = params["r0_mm"]
+    
+    # Estimated parameter info (Phase 1)
+    params_estimated = params.get("params_estimated", False)
+    rho_ci = params.get("rho_ci", [rho, rho])
+    D_est = params.get("D", 0.013)
+    D_ci = params.get("D_ci", [0.013, 0.013])
+    rho_rmse = params.get("rho_rmse", 0.0)
+
+    # Robust MPC info (Phase 2)
+    horizon_range = results.get("horizon_range", None)
+    controller_name = results.get("controller", None)
     
     dose_sparing = results["dose_sparing_fraction"] * 100
     final_vol = results["predicted_final_volume_mm3"]
@@ -557,6 +675,64 @@ def generate_html_dossier(
                 </div>
             </div>
             
+            <!-- Parameter Estimation (Phase 1) -->
+            <div class="card">
+                <h2>Phase 1: Inverse Parameter Estimation</h2>
+                <div class="metric">
+                    <span class="metric-label">Method</span>
+                    <span class="metric-value">{'Patient-Specific (estimated)' if params_estimated else 'Population Average (hardcoded)'}</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">Growth Rate (rho)</span>
+                    <span class="metric-value">{rho:.6f} /day</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">rho 95% CI</span>
+                    <span class="metric-value" style="font-size:0.85rem;">[{rho_ci[0]:.6f}, {rho_ci[1]:.6f}]</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">Diffusivity (D)</span>
+                    <span class="metric-value">{D_est:.6f} mm²/day</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">D 95% CI</span>
+                    <span class="metric-value" style="font-size:0.85rem;">[{D_ci[0]:.6f}, {D_ci[1]:.6f}]</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">RMSE</span>
+                    <span class="metric-value">{rho_rmse:.4f} mm³</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">Status</span>
+                    <span class="metric-value"><span class="badge badge-info">{'ESTIMATED' if params_estimated else 'FALLBACK'}</span></span>
+                </div>
+            </div>
+            
+            <!-- Mathematical Provenance -->
+            <div class="card">
+                <h2>Phase 2: Robust Adaptive-Horizon MPC</h2>
+                <div class="metric">
+                    <span class="metric-label">Controller</span>
+                    <span class="metric-value">{'Uncertainty-aware adaptive' if controller_name else 'Baseline 14-day receding'}</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">Method</span>
+                    <span class="metric-value">{'mean(J)+lambda*std(J), paired sampling' if controller_name else 'Threshold-based scheduling'}</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">Uncertainty Model</span>
+                    <span class="metric-value">{'rho/D +/-15%, 16 samples' if controller_name else 'None (point estimate)'}</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">Prediction Horizon</span>
+                    <span class="metric-value">{f'{horizon_range[0]}-{horizon_range[1]} days (adaptive)' if horizon_range else '14 days (fixed)'}</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">Risk Aversion (lambda)</span>
+                    <span class="metric-value">{'0.30' if controller_name else 'N/A'}</span>
+                </div>
+            </div>
+            
             <!-- Mathematical Provenance -->
             <div class="card">
                 <h2>🔐 Mathematical Provenance</h2>
@@ -702,16 +878,68 @@ def export_dossier(html_content: str, patient_id: str) -> Path:
 # Main Execution
 # ============================================================================ #
 def main():
+    args = parse_args()
+    
     print("\n" + "=" * 70)
     print("CLINICAL DECISION SUPPORT SYSTEM (CDSS) — GBM Treatment Planning")
     print("=" * 70)
     
-    # Step 1: Interactive Intake
+    # Step 1: Parameter Estimation (if enabled)
+    param_est = None
+    if args.estimate_params:
+        print("\n[STEP 0] Inverse Parameter Estimation")
+        print("-" * 70)
+        if estimate_patient_parameters is None:
+            print("  ERROR: Inverse estimation module not available.")
+            print("  Ensure src/51_inverse_parameter_estimation.py exists.")
+            return 1
+        
+        if args.t0_volume is None or args.t1_volume is None or args.delta_t is None:
+            print("  ERROR: --t0-volume, --t1-volume, and --delta-t required when --estimate-params is set.")
+            return 1
+        
+        print(f"  Estimating patient-specific parameters from volumes...")
+        print(f"    V0 (baseline): {args.t0_volume:.1f} mm3")
+        print(f"    V1 (follow-up): {args.t1_volume:.1f} mm3")
+        print(f"    dt: {args.delta_t:.1f} days")
+        
+        param_est = estimate_patient_parameters(
+            t0_volume=args.t0_volume,
+            t1_volume=args.t1_volume,
+            delta_t_days=args.delta_t,
+        )
+        
+        print(f"\n  Estimated Parameters:")
+        print(f"    rho (growth rate): {param_est['rho']:.6f} /day")
+        print(f"      95% CI: [{param_est['rho_ci'][0]:.6f}, {param_est['rho_ci'][1]:.6f}]")
+        print(f"    D (diffusivity):   {param_est['D']:.6f} mm2/day")
+        print(f"      95% CI: [{param_est['D_ci'][0]:.6f}, {param_est['D_ci'][1]:.6f}]")
+        print(f"    RMSE: {param_est['rmse']:.4f} mm3")
+    else:
+        # Default population-average parameters
+        param_est = {
+            "rho": 0.02,
+            "D": 0.013,
+            "rho_ci": [0.02, 0.02],
+            "D_ci": [0.013, 0.013],
+            "rmse": 0.0,
+        }
+    
+    # Step 2: Interactive Intake
     print("\n[STEP 1] Clinical Intake")
     print("-" * 70)
-    params = clinical_intake()
+    params = clinical_intake(
+        non_interactive=args.non_interactive,
+        rho=param_est["rho"],
+    )
+    # Store estimated D from parameter estimation
+    params["D"] = param_est["D"]
+    params["rho_ci"] = param_est["rho_ci"]
+    params["D_ci"] = param_est["D_ci"]
+    params["rho_rmse"] = param_est["rmse"]
+    params["params_estimated"] = args.estimate_params
     
-    # Step 2: Create 3D Tensor Field
+    # Step 3: Create 3D Tensor Field
     print("\n[STEP 2] 3D Anisotropic PDE Engine")
     print("-" * 70)
     tract_n = np.array(params["dti_vector_normalized"])
@@ -731,7 +959,7 @@ def main():
     print(f"    Eigenvalue ratio (max/min): {eigs.max()/eigs.min():.1f}x")
     print(f"    Positive-definite: {'PASS' if eigs.min() > 0 else 'FAIL'}")
     
-    # Step 3: Initialize Tumor
+    # Step 4: Initialize Tumor
     print("\n[STEP 3] Initial Tumor Configuration")
     print("-" * 70)
     r0_voxels = int(params["r0_mm"] / DX)
@@ -740,23 +968,42 @@ def main():
                                r0_voxels)
     initial_volume = float(np.sum(u0 > 0.1)) * (DX ** 3)
     print(f"    Initial radius: {params['r0_mm']:.1f} mm ({r0_voxels} voxels)")
-    print(f"    Initial volume: {initial_volume:.1f} mm³")
+    print(f"    Initial volume: {initial_volume:.1f} mm3")
     
-    # Step 4: Run MPC Adaptive Therapy
+    # Step 5: Run MPC Adaptive Therapy
     print("\n[STEP 4] MPC Adaptive Therapy Optimization")
     print("-" * 70)
-    print(f"  Running 14-day receding-horizon MPC controller...")
-    print(f"    Simulation horizon: {SIM_DAYS} days")
-    print(f"    Time steps: {N_STEPS}")
     
-    results = run_mpc_adaptive_3d(u0, params["rho"], tract_n)
+    if args.robust_mpc and run_robust_mpc_simulation is not None:
+        print("  Using UNCERTAINTY-AWARE ADAPTIVE-HORIZON MPC (Phase 2)")
+        print(f"    Simulation horizon: {SIM_DAYS} days")
+        print(f"    Time steps: {N_STEPS}")
+        print(f"    Adaptive horizon range: 7-21 days")
+        print(f"    Uncertainty samples per step: 16")
+        
+        results = run_robust_mpc_simulation(u0, params["rho"], params.get("D", 0.013))
+        
+        print(f"\n  RESULTS (Robust MPC):")
+        print(f"    Drug administration: {results['drug_on_fraction']*100:.1f}% of days")
+        print(f"    Dose sparing vs MTD: {results['dose_sparing_fraction']*100:.1f}%")
+        print(f"    Predicted Day-180 volume: {results['predicted_final_volume_mm3']:.1f} mm3")
+        print(f"    Horizon range observed: {results['horizon_range'][0]}-{results['horizon_range'][1]} days")
+        print(f"    Controller: {results['controller']}")
+    else:
+        if args.robust_mpc:
+            print("  WARNING: Robust MPC unavailable, falling back to baseline")
+        print(f"  Running 14-day receding-horizon MPC controller...")
+        print(f"    Simulation horizon: {SIM_DAYS} days")
+        print(f"    Time steps: {N_STEPS}")
+        
+        results = run_mpc_adaptive_3d(u0, params["rho"], tract_n)
+        
+        print(f"\n  RESULTS:")
+        print(f"    Drug administration: {results['drug_on_fraction']*100:.1f}% of days")
+        print(f"    Dose sparing vs MTD: {results['dose_sparing_fraction']*100:.1f}%")
+        print(f"    Predicted Day-180 volume: {results['predicted_final_volume_mm3']:.1f} mm3")
     
-    print(f"\n  RESULTS:")
-    print(f"    Drug administration: {results['drug_on_fraction']*100:.1f}% of days")
-    print(f"    Dose sparing vs MTD: {results['dose_sparing_fraction']*100:.1f}%")
-    print(f"    Predicted Day-180 volume: {results['predicted_final_volume_mm3']:.1f} mm³")
-    
-    # Step 5: Compute Provenance Hash
+    # Step 6: Compute Provenance Hash
     print("\n[STEP 5] Mathematical Provenance Certification")
     print("-" * 70)
     provenance_hash = compute_provenance_hash(params, results)
@@ -764,7 +1011,7 @@ def main():
     print(f"    {provenance_hash[:32]}...")
     print(f"    {provenance_hash[32:]}")
     
-    # Step 6: Generate HTML Dossier
+    # Step 7: Generate HTML Dossier
     print("\n[STEP 6] HTML Dossier Export")
     print("-" * 70)
     html_content = generate_html_dossier(params, results, provenance_hash)
@@ -780,8 +1027,14 @@ def main():
     print("=" * 70)
     print(f"\n  Patient: {params['patient_id']}")
     print(f"  Tract: n = [{tract_n[0]:.3f}, {tract_n[1]:.3f}, {tract_n[2]:.3f}]")
+    if args.estimate_params:
+        print(f"  Estimated rho: {param_est['rho']:.6f} /day (CI: [{param_est['rho_ci'][0]:.6f}, {param_est['rho_ci'][1]:.6f}])")
+        print(f"  Estimated D: {param_est['D']:.6f} mm2/day (CI: [{param_est['D_ci'][0]:.6f}, {param_est['D_ci'][1]:.6f}])")
+    if args.robust_mpc and "horizon_range" in results:
+        print(f"  Controller: {results['controller']}")
+        print(f"  Adaptive horizon: {results['horizon_range'][0]}-{results['horizon_range'][1]} days")
     print(f"  Dose sparing: {results['dose_sparing_fraction']*100:.1f}%")
-    print(f"  Predicted volume (Day 180): {results['predicted_final_volume_mm3']:.1f} mm³")
+    print(f"  Predicted volume (Day 180): {results['predicted_final_volume_mm3']:.1f} mm3")
     print(f"\n  Open the dossier in your web browser:")
     print(f"    file:///{filepath.absolute()}")
     print("\n" + "=" * 70 + "\n")
