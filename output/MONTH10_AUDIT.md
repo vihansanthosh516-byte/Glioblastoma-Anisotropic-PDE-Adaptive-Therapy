@@ -1,6 +1,6 @@
 # MONTH 10 AUDIT LOG
 
-Generated: 2026-07-21T22:49:19
+Generated: 2026-07-22T22:33:08
 
 ## Environment
 - Python interpreter: `C:\Users\vihan\20206 science fair\venv\Scripts\python.exe`
@@ -12,6 +12,7 @@ Generated: 2026-07-21T22:49:19
 ## Metric JSON inputs (read-only)
 | File | Size |
 |---|---|
+| `output\3d_extension_summary.json` | 5,504 bytes |
 | `output\aba_analysis_results.json` | 1,038 bytes |
 | `output\aba_metrics.json` | 145,289 bytes |
 | `output\adaptive_geometry_metrics.json` | 6,952 bytes |
@@ -27,7 +28,7 @@ Generated: 2026-07-21T22:49:19
 | `output\invasion_metrics.json` | 72,602 bytes |
 | `output\invasion_summary.json` | 761 bytes |
 | `output\isotropic_baseline_metrics.json` | 1,474 bytes |
-| `output\master_cohort_summary.json` | 41,044 bytes |
+| `output\master_cohort_summary.json` | 46,203 bytes |
 | `output\method1_metrics.json` | 2,704 bytes |
 | `output\method2_metrics.json` | 1,370 bytes |
 | `output\method3_metrics.json` | 1,404 bytes |
@@ -37,11 +38,13 @@ Generated: 2026-07-21T22:49:19
 | `output\penalized_survival_metrics.json` | 3,821 bytes |
 | `output\pid_decomposition.json` | 11,735 bytes |
 | `output\real_cohort_manifest.json` | 1,108 bytes |
+| `output\robust_mpc_benchmark.json` | 816 bytes |
 | `output\saddle_point_metrics.json` | 3,640 bytes |
 | `output\scvi_metrics.json` | 102 bytes |
 | `output\single_ko_results.json` | 19,220 bytes |
 | `output\single_ko_ti.json` | 448 bytes |
 | `output\sobol_sensitivity_results.json` | 894 bytes |
+| `output\spatial_metrics_cache.json` | 5,188 bytes |
 | `output\spatial_recurrence_summary.json` | 3,641 bytes |
 | `output\stromal_feedback_metrics.json` | 6,269 bytes |
 | `output\survival_stats_summary.json` | 2,856 bytes |
@@ -52,6 +55,8 @@ Generated: 2026-07-21T22:49:19
 | `output\02_top10_markers_per_cluster_heatmap.png` | 280,637 bytes | 3964x1572 |
 | `output\02_umap_by_class.png` | 484,608 bytes | 1346x865 |
 | `output\02_umap_by_patient.png` | 557,964 bytes | 1801x865 |
+| `output\3d_orthogonal_slices.png` | 79,430 bytes | 4470x1551 |
+| `output\3d_tumor_render.png` | 320,176 bytes | 2325x1971 |
 | `output\adaptive_initial_clones.png` | 150,792 bytes | 3390x1735 |
 | `output\adaptive_tensor_validation.png` | 221,678 bytes | 2534x2166 |
 | `output\adaptive_therapy_comparison.png` | 709,809 bytes | 3837x3201 |
@@ -76,7 +81,7 @@ Generated: 2026-07-21T22:49:19
 | `output\gradient_failure_analysis.png` | 557,103 bytes | 4770x1769 |
 | `output\invasion_dynamics_analysis.png` | 835,808 bytes | 4000x2880 |
 | `output\km_survival_curves.png` | 300,050 bytes | 3570x3000 |
-| `output\master_cohort_synthesis.png` | 722,524 bytes | 4081x3503 |
+| `output\master_cohort_synthesis.png` | 972,273 bytes | 4081x4860 |
 | `output\method1_lr_confusion.png` | 47,547 bytes | 900x720 |
 | `output\method1_rf_confusion.png` | 46,457 bytes | 900x720 |
 | `output\method2_confusion.png` | 44,770 bytes | 900x720 |
@@ -88,7 +93,7 @@ Generated: 2026-07-21T22:49:19
 | `output\optimization_matrix.png` | 209,507 bytes | 3836x2969 |
 | `output\penalized_coefficients.png` | 150,653 bytes | 4470x1545 |
 | `output\penalized_regularization_paths.png` | 264,963 bytes | 4470x1531 |
-| `output\sobol_tornado_plot.png` | 52,082 bytes | 1737x967 |
+| `output\sobol_tornado_plot.png` | 52,086 bytes | 1737x967 |
 | `output\spatial_pde_parameters.png` | 320,777 bytes | 2371x3448 |
 | `output\spatial_recurrence_risk.png` | 213,597 bytes | 4732x2457 |
 | `output\spatial_risk_profile.png` | 195,024 bytes | 2968x1191 |
@@ -115,7 +120,7 @@ Generated: 2026-07-21T22:49:19
 - stromal fallback used: False
 
 ## `__pycache__` cleanup
-- `138` `__pycache__` directories removed under src/ and venv/ (D5 idempotency — bytecode regenerates on next run).
+- `139` `__pycache__` directories removed under src/ and venv/ (D5 idempotency â€” bytecode regenerates on next run).
 
 ## Notes
 - Bash `run_all.sh` requires Git Bash / WSL on Windows. PowerShell equivalent can be substituted.
