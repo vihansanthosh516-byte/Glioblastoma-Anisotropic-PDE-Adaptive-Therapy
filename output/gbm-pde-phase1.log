@@ -1,0 +1,46 @@
+[{"stream_name":"stdout","time":2.410420742,"data":"[PHASE 4] Generating 3D DTI tensor field...\n"}
+,{"stream_name":"stdout","time":68.060438751,"data":"  Tensor shape: (128, 128, 64, 3, 3)\n"}
+,{"stream_name":"stdout","time":68.062262597,"data":"  FA range: [0.150, 0.750]\n"}
+,{"stream_name":"stdout","time":68.062300061,"data":"[PHASE 4] Generating proliferation field rho...\n"}
+,{"stream_name":"stdout","time":68.13996458,"data":"  rho range: [0.00500, 0.12000] day^-1\n"}
+,{"stream_name":"stdout","time":68.170099671,"data":"[CFL] max_eig~0.2184, dx=0.781 -\u003e dt=0.09307 days, n_steps=967 (T=90.0d)\n"}
+,{"stream_name":"stdout","time":68.170160494,"data":"[PHASE 4] Running 90-day therapy simulation: 967 steps, dt=0.09307 days...\n"}
+,{"stream_name":"stdout","time":70.187082851,"data":"  Step 0/967: day=0.1, vol=505.7 mm^3, max_u=0.501\n"}
+,{"stream_name":"stdout","time":77.343086242,"data":"  Step 48/967: day=4.6, vol=597.8 mm^3, max_u=0.536\n"}
+,{"stream_name":"stdout","time":84.401995636,"data":"  Step 96/967: day=9.0, vol=707.4 mm^3, max_u=0.573\n"}
+,{"stream_name":"stdout","time":91.557940771,"data":"  Step 144/967: day=13.5, vol=837.4 mm^3, max_u=0.616\n"}
+,{"stream_name":"stdout","time":94.03167251,"data":"[DAY 15.0] Surgery: volume=125.5 mm^3\n"}
+,{"stream_name":"stdout","time":98.563368583,"data":"  Step 192/967: day=18.0, vol=141.5 mm^3, max_u=0.054\n"}
+,{"stream_name":"stdout","time":105.483277225,"data":"  Step 240/967: day=22.4, vol=104.7 mm^3, max_u=0.039\n"}
+,{"stream_name":"stdout","time":112.558325301,"data":"  Step 288/967: day=26.9, vol=62.0 mm^3, max_u=0.022\n"}
+,{"stream_name":"stdout","time":119.748310176,"data":"  Step 336/967: day=31.4, vol=34.6 mm^3, max_u=0.012\n"}
+,{"stream_name":"stdout","time":126.817739412,"data":"  Step 384/967: day=35.8, vol=28.6 mm^3, max_u=0.014\n"}
+,{"stream_name":"stdout","time":133.903616932,"data":"  Step 432/967: day=40.3, vol=21.0 mm^3, max_u=0.016\n"}
+,{"stream_name":"stdout","time":140.942235842,"data":"  Step 480/967: day=44.8, vol=19.0 mm^3, max_u=0.018\n"}
+,{"stream_name":"stdout","time":147.955209086,"data":"  Step 528/967: day=49.2, vol=18.7 mm^3, max_u=0.021\n"}
+,{"stream_name":"stdout","time":155.029683702,"data":"  Step 576/967: day=53.7, vol=21.8 mm^3, max_u=0.026\n"}
+,{"stream_name":"stdout","time":162.126996424,"data":"  Step 624/967: day=58.2, vol=26.0 mm^3, max_u=0.032\n"}
+,{"stream_name":"stdout","time":169.193317388,"data":"  Step 672/967: day=62.6, vol=31.5 mm^3, max_u=0.040\n"}
+,{"stream_name":"stdout","time":176.270904767,"data":"  Step 720/967: day=67.1, vol=38.7 mm^3, max_u=0.051\n"}
+,{"stream_name":"stdout","time":183.344180635,"data":"  Step 768/967: day=71.6, vol=48.1 mm^3, max_u=0.064\n"}
+,{"stream_name":"stdout","time":190.50581804,"data":"  Step 816/967: day=76.0, vol=60.3 mm^3, max_u=0.080\n"}
+,{"stream_name":"stdout","time":197.596236966,"data":"  Step 864/967: day=80.5, vol=77.3 mm^3, max_u=0.102\n"}
+,{"stream_name":"stdout","time":204.517678406,"data":"  Step 912/967: day=85.0, vol=116.9 mm^3, max_u=0.151\n"}
+,{"stream_name":"stdout","time":211.54274079,"data":"  Step 960/967: day=89.4, vol=175.9 mm^3, max_u=0.220\n"}
+,{"stream_name":"stdout","time":212.427281957,"data":"[PHASE 4] Computing therapy metrics...\n"}
+,{"stream_name":"stdout","time":212.434379694,"data":"[METRICS] Pre-surg volume: 885.8 mm^3\n"}
+,{"stream_name":"stdout","time":212.434413738,"data":"[METRICS] Post-surg min: 17.9 mm^3\n"}
+,{"stream_name":"stdout","time":212.434420243,"data":"[METRICS] Resection reduction: 98.0%\n"}
+,{"stream_name":"stdout","time":212.434425578,"data":"[METRICS] Days to recurrence: -1.0\n"}
+,{"stream_name":"stdout","time":212.434431018,"data":"[METRICS] Day 90 volume: 185.0 mm^3\n"}
+,{"stream_name":"stdout","time":212.434462368,"data":"[METRICS] Recurrence asymmetry: -0.280\n"}
+,{"stream_name":"stdout","time":214.678526699,"data":"[SAVE] Figure -\u003e output/phase4_virtual_therapy.png\n"}
+,{"stream_name":"stdout","time":214.678609349,"data":"[SAVE] Metrics -\u003e output/phase4_therapy_metrics.json\n"}
+,{"stream_name":"stdout","time":214.678621269,"data":"[PHASE 4] Complete.\n"}
+,{"stream_name":"stderr","time":217.011968994,"data":"/usr/local/lib/python3.12/dist-packages/mistune.py:435: SyntaxWarning: invalid escape sequence '\\|'\n"}
+,{"stream_name":"stderr","time":217.012016797,"data":"  cells[i][c] = re.sub('\\\\\\\\\\|', '|', cell)\n"}
+,{"stream_name":"stderr","time":217.293107924,"data":"/usr/local/lib/python3.12/dist-packages/nbconvert/filters/filter_links.py:36: SyntaxWarning: invalid escape sequence '\\_'\n"}
+,{"stream_name":"stderr","time":217.29315361,"data":"  text = re.sub(r'_', '\\_', text) # Escape underscores in display text\n"}
+,{"stream_name":"stderr","time":218.584567085,"data":"[NbConvertApp] Converting notebook __script__.ipynb to html\n"}
+,{"stream_name":"stderr","time":219.945457763,"data":"[NbConvertApp] Writing 379062 bytes to __results__.html\n"}
+]
