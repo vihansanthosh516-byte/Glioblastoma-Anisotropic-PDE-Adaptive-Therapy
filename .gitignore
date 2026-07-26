@@ -1,0 +1,45 @@
+# Virtual environments & cache
+.venv/
+.venv-1/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.kaggle-outputs/
+
+# IDE/Editor/OS
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# Kaggle run cache (keep source files in kaggle_run/)
+kaggle_run/__pycache__/
+kaggle_run/*.pyc
+
+# Debug/Temp
+debug.txt
+*.log
+*.tmp
+*.temp
+
+# Secrets
+.env
+.env.local
+*.pem
+*.key
+
+# Generated outputs (track via LFS if needed, but ignore by default)
+output/
+
+# Medical data formats & model weights
+*.nii
+*.nii.gz
+*.dcm
+*.pt
+*.pth
+*.pkl
