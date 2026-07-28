@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Unified Kaggle Pipeline: Track B (Months 7-10) + Phase 7 Validation
+Unified Kaggle Pipeline: Tracks A, B, C + Phases 7-15
 ====================================================================
 Runs on Kaggle GPU (T4 x2). Outputs to /kaggle/working/output/
 """
@@ -10,6 +10,7 @@ import subprocess
 import json
 import numpy as np
 import pandas as pd
+import shutil
 from pathlib import Path
 
 # Ensure output directory
@@ -26,7 +27,8 @@ def install_deps():
     subprocess.run([sys.executable, "-m", "pip", "install", "-q", 
         "torch", "torchvision", "torchaudio", "--index-url", "https://download.pytorch.org/whl/cu118"], check=True)
     subprocess.run([sys.executable, "-m", "pip", "install", "-q",
-        "numpy", "scipy", "matplotlib", "pandas", "scikit-learn", "SALib", "tqdm"], check=True)
+        "numpy", "scipy", "matplotlib", "pandas", "scikit-learn", "SALib", "tqdm",
+        "stable-baselines3", "gymnasium", "pyserial"], check=True)
     print("Dependencies installed.")
 
 def clone_repo():
@@ -132,40 +134,32 @@ def main():
     repo_dir = clone_repo()
     ensure_prerequisite_data(repo_dir)
     
-    # Track B: Months 7-10 (scripts 42-48, 45)
-    track_b_scripts = [
-        ("src/42_anisotropic_pde.py", "Month 7: Anisotropic Tensor Diffusion"),
-        ("src/43_stromal_feedback.py", "Month 8: Stromal Feedback Coupling"),
-        ("src/44_adaptive_therapy.py", "Month 9: Adaptive Therapy Engine"),
-        ("src/46_sensitivity_analysis.py", "Phase 2b: Sobol Sensitivity Analysis"),
-        ("src/47_optimal_control.py", "Phase 3: Dual-Drug MPC Optimal Control"),
-        ("src/48_3d_extension.py", "Phase 3D: 3D Volumetric Extension"),
-        ("src/45_validation_synthesis.py", "Month 10: Master Cohort Synthesis"),
+    # Phase 14: Hardware-in-the-Loop Integration
+    phase14_scripts = [
+        ("src/hil/pump_interface.py", "Phase 14: Hardware-in-the-Loop Integration"),
     ]
     
-    # Phase 7: Validation (scripts 60-63)
-    phase7_scripts = [
-        ("kaggle_run/run_job_61.py", "Phase 7: RL Convergence & Seed Robustness (5 seeds)"),
-        ("kaggle_run/run_job_62.py", "Phase 7: Biomarker Bootstrap Stability (1000x)"),
-        ("kaggle_run/run_job_63.py", "Phase 7: Reward Weight Sensitivity (10 configs)"),
+    all_phases = [
+        ("Phase 14 (HIL)", phase14_scripts),
     ]
     
-    all_scripts = track_b_scripts + phase7_scripts
-    
-    for script, desc in all_scripts:
-        full_path = repo_dir / script
-        if not full_path.exists():
-            print(f"SKIP: {script} not found")
-            continue
-        run_script(str(full_path), desc, cwd=repo_dir)
+    for phase_name, scripts in all_phases:
+        print(f"\n{'='*60}")
+        print(f"PHASE: {phase_name}")
+        print(f"{'='*60}")
+        for script, desc in scripts:
+            full_path = REPO_DIR / script
+            if not full_path.exists():
+                print(f"SKIP: {script} not found")
+                continue
+            run_script(str(full_path), desc, cwd=REPO_DIR)
     
     # Copy outputs to /kaggle/working/output for download
     print("\n" + "=" * 60)
     print("COPYING OUTPUTS FOR DOWNLOAD")
     print("=" * 60)
-    src_out = repo_dir / "output"
+    src_out = REPO_DIR / "output"
     if src_out.exists():
-        import shutil
         for f in src_out.glob("*"):
             dst = OUTPUT_DIR / f.name
             if f.is_file():
