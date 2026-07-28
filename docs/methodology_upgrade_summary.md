@@ -166,11 +166,11 @@ where J is evaluated over (ρ±15%, D±15%) parameter samples
 - [x] Spatial metrics added to `master_cohort_summary.json`
 - [x] New panels E, F, G in `master_cohort_synthesis.png`
 
-### Tier 4 Success Criteria (In Progress)
+### Tier 4 Success Criteria (Complete)
 - [x] Abstract updated in `README.md`
 - [x] `docs/methodology_upgrade_summary.md` created
-- [ ] `POSTER_KEY_FINDINGS.md` template updated
-- [ ] Positioning statement reflects all 3 tiers
+- [x] `POSTER_KEY_FINDINGS.md` template updated (in `output/`)
+- [x] Positioning statement reflects all 3 tiers
 
 ---
 
@@ -214,4 +214,4 @@ venv\Scripts\python.exe src\53_spatial_metrics.py --validate
 
 ## Final Positioning Statement
 
-> "We developed a patient-specific computational oncology platform that integrates 3D anisotropic DTI tract modeling, inverse biophysical parameter estimation, uncertainty-aware adaptive MPC control, and spatial validation with Dice/Hausdorff metrics into a unified research decision-support tool for glioblastoma treatment planning."
+> "We developed a patient-specific computational oncology platform that integrates **3D anisotropic DTI tract modeling**, **inverse biophysical parameter estimation**, **uncertainty-aware adaptive MPC control**, and **spatial validation with Dice/Hausdorff metrics** into a unified research decision-support tool for glioblastoma treatment planning. The framework spans three interlocking tracks: (A) MSOS — single-cell multi-omics through causal GRN to invasion dynamics and clinical validation; (B) 10-Month PDE Cohort — anisotropic diffusion, stromal coupling, adaptive therapy, and global sensitivity; (C) Digital Twin Reactor — inverse estimation, robust MPC, 3D DTI solver, RL adaptive steering, and virtual cohort validation. Together, these establish a reproducible, biophysically grounded pipeline for in-silico clinical trial design and adaptive therapy optimization."
