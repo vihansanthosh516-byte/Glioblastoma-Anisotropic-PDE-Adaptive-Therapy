@@ -32,10 +32,16 @@ Deliverables:
 """
 from __future__ import annotations
 
+import argparse
 import json
+import sys
 import warnings
 from pathlib import Path
-from typing import Dict, List, Tuple
+from typing import Dict, List, Tuple, Optional
+
+# Ensure project root is on sys.path for src.* imports
+PROJECT_ROOT = Path(__file__).parent.parent
+sys.path.insert(0, str(PROJECT_ROOT))
 
 import matplotlib
 matplotlib.use("Agg")
@@ -222,6 +228,17 @@ class TensorFieldBuilder:
         self.lambda_2 = lam2_field
         return D_xx, D_xy, self.D_yx, D_yy
 
+    def _compute_eigenvalues(self) -> None:
+        """
+        Compute eigenvalues from current tensor components (D_xx, D_xy, D_yy).
+        Used when tensor components are set externally (e.g., real DTI data).
+        """
+        trace = self.D_xx + self.D_yy
+        det = self.D_xx * self.D_yy - self.D_xy * self.D_yx
+        disc = np.sqrt(np.maximum(trace**2 - 4*det, 0))
+        self.lambda_1 = 0.5 * (trace + disc)
+        self.lambda_2 = 0.5 * (trace - disc)
+
     # ------------------------------------------------------------------ #
     def validate_tensor(self) -> Dict[str, float]:
         """
@@ -230,6 +247,14 @@ class TensorFieldBuilder:
         assert self.D_xx is not None, "build_tensor_field() must run first"
         sym_err = float(np.max(np.abs(self.D_xy - self.D_yx)))
 
+        # Compute eigenvalues if not already done (e.g., when using real tensors)
+        if not hasattr(self, 'lambda_1') or not hasattr(self, 'lambda_2'):
+            trace = self.D_xx + self.D_yy
+            det = self.D_xx * self.D_yy - self.D_xy * self.D_yx
+            disc = np.sqrt(np.maximum(trace**2 - 4*det, 0))
+            self.lambda_1 = 0.5 * (trace + disc)
+            self.lambda_2 = 0.5 * (trace - disc)
+        
         # Positive definite iff both eigenvalues > 0, equiv: trace > 0 and det > 0
         trace = self.D_xx + self.D_yy
         det = self.D_xx * self.D_yy - self.D_xy * self.D_yx
@@ -304,12 +329,24 @@ class TensorFieldBuilder:
         assert self.D_xx is not None
         path.parent.mkdir(parents=True, exist_ok=True)
 
+        # Ensure eigenvalues are computed
+        if not hasattr(self, 'lambda_1') or not hasattr(self, 'lambda_2'):
+            self._compute_eigenvalues()
+        
         # Subsample for quiver legibility
         step = 5
         yy, xx = np.mgrid[0:self.N, 0:self.N]
         xs = xx[::step, ::step]
         ys = yy[::step, ::step]
-        theta_sub = self.theta_field[::step, ::step]
+        
+        # For real tensors, theta_field might not exist - compute from D_xy/D_xx
+        if hasattr(self, 'theta_field') and self.theta_field is not None:
+            theta_sub = self.theta_field[::step, ::step]
+        else:
+            # Compute theta from tensor components: theta = 0.5 * atan2(2*D_xy, D_xx - D_yy)
+            theta = 0.5 * np.arctan2(2 * self.D_xy, self.D_xx - self.D_yy)
+            theta_sub = theta[::step, ::step]
+        
         lam1_sub = self.lambda_1[::step, ::step]
         lam2_sub = self.lambda_2[::step, ::step]
         # Vector along principal eigenvector, scaled by anisotropy
@@ -322,8 +359,9 @@ class TensorFieldBuilder:
 
         # Panel 1: tract mask + quiver overlay
         ax = axes[0, 0]
-        ax.imshow(self.tract_mask, origin="lower", cmap="gray", alpha=0.6,
-                  extent=[0, self.N, 0, self.N])
+        if hasattr(self, 'tract_mask') and self.tract_mask is not None:
+            ax.imshow(self.tract_mask, origin="lower", cmap="gray", alpha=0.6,
+                      extent=[0, self.N, 0, self.N])
         ax.quiver(xs, ys, U, -V, color="red", scale=15, width=0.004,
                   headwidth=3, headlength=4)
         ax.set_title("White Matter Tract Corridor\n+ Principal Eigenvector Field",
@@ -755,8 +793,13 @@ class PatientParameterMapper:
                               base_builder.d_base)
 
         # Keep orientation field from base builder
-        c = np.cos(base_builder.theta_field)
-        s = np.sin(base_builder.theta_field)
+        if getattr(base_builder, 'theta_field', None) is not None:
+            c = np.cos(base_builder.theta_field)
+            s = np.sin(base_builder.theta_field)
+        else:
+            # Default to zero-angle fiber orientation if using real tensor fields
+            c = np.ones_like(base_builder.D_xx)
+            s = np.zeros_like(base_builder.D_xx)
         D_xx = lam1_field * c * c + lam2_field * s * s
         D_yy = lam1_field * s * s + lam2_field * c * c
         D_xy = (lam1_field - lam2_field) * s * c
@@ -1171,32 +1214,239 @@ def save_all_evolution(results: List[Dict], path: Path) -> None:
     print(f"[Phase4] Saved combined evolution npz -> {path}")
 
 
+def _build_real_tensor_field(
+    tensor_npz_path: Path,
+    target_grid_size: int = GRID_SIZE,
+) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """
+    Load real 2D DTI tensor field from NPZ and interpolate to grid.
+    
+    Expected NPZ format:
+        D_xx, D_xy, D_yy: (H, W) arrays
+        or 3D field: D_xx, D_xy, D_yy: (D, H, W) - use mid-slice
+    
+    Returns:
+        D_xx, D_xy, D_yy interpolated to GRID_SIZE x GRID_SIZE
+    """
+    data = np.load(tensor_npz_path)
+    
+    # Try to load tensor components
+    if 'D_xx' in data:
+        D_xx = data['D_xx']
+        D_xy = data.get('D_xy', np.zeros_like(D_xx))
+        D_yy = data['D_yy']
+    elif 'tensor_field' in data:
+        # 3D tensor field (3, 3, D, H, W) - take mid-sagittal slice
+        tf = data['tensor_field']
+        mid = tf.shape[2] // 2
+        D_xx = tf[0, 0, mid]
+        D_xy = tf[0, 1, mid]
+        D_yy = tf[1, 1, mid]
+    else:
+        raise ValueError(f"NPZ missing tensor components. Keys: {list(data.keys())}")
+    
+    # Ensure 2D
+    if D_xx.ndim == 3:
+        D_xx = D_xx[D_xx.shape[0] // 2]
+        D_xy = D_xy[D_xy.shape[0] // 2]
+        D_yy = D_yy[D_yy.shape[0] // 2]
+    
+    # Interpolate to target grid
+    from scipy.ndimage import zoom
+    zoom_factors = (target_grid_size / D_xx.shape[0], target_grid_size / D_xx.shape[1])
+    D_xx = zoom(D_xx, zoom_factors, order=1)
+    D_xy = zoom(D_xy, zoom_factors, order=1)
+    D_yy = zoom(D_yy, zoom_factors, order=1)
+    
+    return D_xx, D_xy, D_yy
+
+
+def _load_real_initial_mask(
+    mask_path: Path,
+    target_grid_size: int = GRID_SIZE,
+) -> np.ndarray:
+    """
+    Load real tumor segmentation mask and interpolate to grid.
+    
+    Expected: NIfTI file with binary or label mask, or NPZ with u0/tumor_mask/mask keys
+    """
+    # Try to load as NPZ first (preprocessed)
+    if mask_path.suffix == '.npz':
+        data = np.load(mask_path)
+        # Try various common keys
+        for key in ['u0', 'tumor_mask', 'mask', 'density_maps', 'risk_maps', 'density', 'risk']:
+            if key in data:
+                mask = data[key]
+                break
+        else:
+            # Fallback to first array value
+            mask = list(data.values())[0]
+    else:
+        # Try NIfTI
+        try:
+            import nibabel as nib
+            img = nib.load(str(mask_path))
+            mask = img.get_fdata(dtype=np.float32)
+            # Binarize if labels
+            mask = (mask > 0).astype(np.float32)
+        except ImportError:
+            # Fallback: try as raw numpy
+            mask = np.load(str(mask_path))
+    
+    # If 3D with multiple patients, take first patient
+    if mask.ndim == 4:
+        mask = mask[0]
+    # If 3D with multiple slices, take middle
+    elif mask.ndim == 3:
+        mask = mask[mask.shape[0] // 2]
+    
+    # Interpolate
+    from scipy.ndimage import zoom
+    zoom_factors = (target_grid_size / mask.shape[0], target_grid_size / mask.shape[1])
+    mask = zoom(mask, zoom_factors, order=0)  # nearest for mask
+    mask = (mask > 0.5).astype(np.float32)
+    
+    return mask
+
+
 def main():
+    parser = argparse.ArgumentParser(
+        description="Month 7: Anisotropic Tensor Diffusion Engineering"
+    )
+    parser.add_argument(
+        "--real-tensor",
+        type=str,
+        default=None,
+        help="Path to real DTI tensor field NPZ (D_xx, D_xy, D_yy or tensor_field)"
+    )
+    parser.add_argument(
+        "--real-mask",
+        type=str,
+        default=None,
+        help="Path to real tumor segmentation mask (NIfTI or NPZ with 'u0'/'tumor_mask')"
+    )
+    parser.add_argument(
+        "--real-patient-dir",
+        type=str,
+        default=None,
+        help="Path to BraTS patient directory (loads all modalities)"
+    )
+    parser.add_argument(
+        "--grid-size",
+        type=int,
+        default=GRID_SIZE,
+        help=f"Grid size for simulation (default: {GRID_SIZE})"
+    )
+    parser.add_argument(
+        "--output-dir",
+        type=str,
+        default="output",
+        help="Output directory (default: output)"
+    )
+    parser.add_argument(
+        "--use-real-only",
+        action="store_true",
+        help="Skip synthetic cohort, run only real patient simulation"
+    )
+    args = parser.parse_args()
+    
     print("=" * 70)
     print("MONTH 7: ANISOTROPIC TENSOR DIFFUSION ENGINEERING")
     print("=" * 70)
-    output_dir = Path("output")
+    output_dir = Path(args.output_dir)
     output_dir.mkdir(exist_ok=True)
-
+    
+    # Track whether we have real data
+    has_real_tensor = args.real_tensor is not None
+    has_real_mask = args.real_mask is not None
+    has_real_patient = args.real_patient_dir is not None
+    
+    if has_real_patient:
+        # Load all modalities from BraTS directory
+        print(f"\n[Real Data] Loading BraTS patient from {args.real_patient_dir}...")
+        try:
+            from src.dicom_loader import load_brats_patient, prepare_simulation_inputs
+            patient_data = load_brats_patient(args.real_patient_dir, target_shape=(args.grid_size, args.grid_size, args.grid_size))
+            sim_inputs = prepare_simulation_inputs(patient_data, target_shape=(args.grid_size, args.grid_size, args.grid_size))
+            # Use mid-slice for 2D simulation
+            mid = args.grid_size // 2
+            has_real_tensor = True
+            has_real_mask = True
+            real_tensor_field = sim_inputs['tensor_field'][:, :, mid]
+            real_mask = sim_inputs['u0'][mid]
+            print(f"  Loaded tensor field shape: {real_tensor_field.shape}")
+            print(f"  Loaded initial mask shape: {real_mask.shape}")
+        except Exception as e:
+            print(f"  [WARNING] Failed to load BraTS patient: {e}")
+            has_real_tensor = False
+            has_real_mask = False
+    
+    # Load standalone real tensor if provided
+    if has_real_tensor and not has_real_patient:
+        print(f"\n[Real Data] Loading tensor field from {args.real_tensor}...")
+        D_xx_real, D_xy_real, D_yy_real = _build_real_tensor_field(
+            Path(args.real_tensor), args.grid_size
+        )
+    
+    # Load standalone real mask if provided
+    if has_real_mask and not has_real_patient:
+        print(f"\n[Real Data] Loading initial mask from {args.real_mask}...")
+        real_mask = _load_real_initial_mask(Path(args.real_mask), args.grid_size)
+    
     # ------------------ PHASE 1 -------------------------------
     print("\n" + "#" * 70)
     print("# PHASE 1: Tensor Matrix Field Construction")
     print("#" * 70)
-    builder = TensorFieldBuilder(
-        grid_size=GRID_SIZE,
-        d_parallel=D_PARALLEL_DEFAULT,
-        d_perpendicular=D_PERPENDICULAR_DEFAULT,
-        d_base=D_BASE,
-        tract_angle_deg=45.0,
-        tract_width=15,
-    )
-    builder.build_tract_mask()
-    builder.build_orientation_field()
-    builder.build_tensor_field()
+    
+    # Determine which tensor field to use
+    use_real_tensor = has_real_tensor or has_real_patient
+    
+    if use_real_tensor:
+        # Use real DTI tensor field (either from standalone file or BraTS patient)
+        builder = TensorFieldBuilder(
+            grid_size=args.grid_size,
+            d_parallel=D_PARALLEL_DEFAULT,
+            d_perpendicular=D_PERPENDICULAR_DEFAULT,
+            d_base=D_BASE,
+            tract_angle_deg=45.0,
+            tract_width=15,
+        )
+        if has_real_patient:
+            # Use tensor field from BraTS patient (mid-slice of 3D tensor field)
+            # real_tensor_field has shape (3, 3, H, W) from mid-slice
+            builder.D_xx = real_tensor_field[0, 0]
+            builder.D_xy = real_tensor_field[0, 1]
+            builder.D_yx = real_tensor_field[1, 0]  # Symmetric
+            builder.D_yy = real_tensor_field[1, 1]
+            builder._compute_eigenvalues()
+            print("  Using real BraTS DTI tensor field (mid-slice)")
+        else:
+            # Use standalone real tensor file
+            builder.D_xx = D_xx_real
+            builder.D_xy = D_xy_real
+            builder.D_yx = D_xy_real.copy()
+            builder.D_yy = D_yy_real
+            builder._compute_eigenvalues()
+            print("  Using real DTI tensor field (standalone file)")
+    else:
+        # Synthetic tensor field (original behavior)
+        builder = TensorFieldBuilder(
+            grid_size=args.grid_size,
+            d_parallel=D_PARALLEL_DEFAULT,
+            d_perpendicular=D_PERPENDICULAR_DEFAULT,
+            d_base=D_BASE,
+            tract_angle_deg=45.0,
+            tract_width=15,
+        )
+        builder.build_tract_mask()
+        builder.build_orientation_field()
+        builder.build_tensor_field()
+        print("  Using synthetic tract tensor field")
+    
     val_metrics = builder.validate_tensor()
     builder.save_npz(output_dir / "anisotropic_tensor_profiles.npz")
     builder.plot_validation(output_dir / "anisotropic_tensor_validation.png")
-
+    
     # ------------------ PHASE 2 -------------------------------
     print("\n" + "#" * 70)
     print("# PHASE 2: Finite-Difference Solver & Mass Conservation")
@@ -1211,8 +1461,66 @@ def main():
         save_plot_path=output_dir / "anisotropic_solver_mass_test.png",
     )
     mass_test_metrics = test_result["metrics"]
-
-    # ------------------ PHASE 3 -------------------------------
+    
+    if args.use_real_only and (has_real_mask or has_real_patient):
+        # Run single real patient simulation
+        print("\n" + "#" * 70)
+        print("# REAL PATIENT SIMULATION")
+        print("#" * 70)
+        
+        # Use real initial condition
+        if has_real_patient:
+            u0 = real_mask
+        else:
+            u0 = real_mask
+        
+        # Create solver with reaction
+        real_solver = AnisotropicFKSolver(
+            D_xx=builder.D_xx, D_xy=builder.D_xy, D_yy=builder.D_yy,
+            rho=RHO_DEFAULT, dt=DT_DEFAULT,
+        )
+        
+        # Run simulation
+        print(f"  Running {N_PATIENT_STEPS} steps...")
+        u = u0.copy()
+        history = []
+        for step in range(N_PATIENT_STEPS):
+            u = real_solver.step(u, 0.0)  # No drug
+            if step % PATIENT_SAVE_INTERVAL == 0:
+                history.append(u.copy())
+        
+        # Save results
+        np.savez_compressed(
+            output_dir / "real_patient_evolution.npz",
+            initial=u0,
+            final=u,
+            history=np.array(history),
+            tensor_D_xx=builder.D_xx,
+            tensor_D_xy=builder.D_xy,
+            tensor_D_yy=builder.D_yy,
+        )
+        
+        # Plot
+        fig, axes = plt.subplots(1, 3, figsize=(15, 5))
+        axes[0].imshow(u0, cmap='hot', origin='lower')
+        axes[0].set_title('Initial (Real MRI)')
+        axes[1].imshow(history[-1], cmap='hot', origin='lower')
+        axes[1].set_title(f'After {len(history)*PATIENT_SAVE_INTERVAL} steps')
+        axes[2].imshow(u, cmap='hot', origin='lower')
+        axes[2].set_title('Final')
+        for ax in axes:
+            ax.axis('off')
+        plt.tight_layout()
+        plt.savefig(output_dir / "real_patient_evolution.png", dpi=200)
+        plt.close()
+        
+        print(f"  Saved real patient results to {output_dir}/")
+        print("\n" + "=" * 70)
+        print("[COMPLETE] Real Patient Simulation")
+        print("=" * 70)
+        return
+    
+    # ------------------ PHASE 3 (Original Cohort) -------------------------------
     print("\n" + "#" * 70)
     print("# PHASE 3: Cohort Expression Profile Coupling")
     print("#" * 70)
@@ -1225,7 +1533,7 @@ def main():
         dt=DT_DEFAULT,
     )
     results = cohort_sim.run_cohort(builder, output_dir=output_dir)
-
+    
     # ------------------ PHASE 4 -------------------------------
     print("\n" + "#" * 70)
     print("# PHASE 4: Deep Branching Visualization & Geometry Metrics")
@@ -1234,22 +1542,20 @@ def main():
     viz.plot_cohort_canvas(results, output_dir / "anisotropic_recurrence_maps.png")
     metrics = viz.compute_all_metrics(results)
     viz.plot_geometry_summary(metrics, output_dir / "anisotropic_geometry_summary.png")
-
+    
     # Save metrics JSON
     with open(output_dir / "anisotropic_geometry_metrics.json", "w") as f:
-        # Combine phase1, phase2 and phase4 metrics
         full_report = {
             "phase1_tensor_validation": val_metrics,
             "phase2_mass_conservation": mass_test_metrics,
             "phase4_geometry_metrics": metrics,
         }
         json.dump(full_report, f, indent=2, default=str)
-    print(f"[Phase4] Saved metrics JSON -> "
-          f"{output_dir / 'anisotropic_geometry_metrics.json'}")
-
+    print(f"[Phase4] Saved metrics JSON -> {output_dir / 'anisotropic_geometry_metrics.json'}")
+    
     # Save combined evolution npz
     save_all_evolution(results, output_dir / "anisotropic_evolution_all_patients.npz")
-
+    
     # ------------------ SUMMARY --------------------------------
     print("\n" + "=" * 70)
     print("[SUMMARY] Month 7 Anisotropic Tensor Diffusion Engineering")
@@ -1262,18 +1568,25 @@ def main():
     mean_pa = float(np.mean([m["perimeter_to_area_ratio"] for m in metrics]))
     print(f"  Mean fractal dimension      : {mean_fd:.3f}")
     print(f"  Mean perimeter/area ratio   : {mean_pa:.3f}")
-    print(f"  Branching (D_f > 1.2)       : "
-          f"{sum(m['fractal_dimension'] > 1.2 for m in metrics)} / {len(metrics)}")
-
+    print(f"  Branching (D_f > 1.2)       : {sum(m['fractal_dimension'] > 1.2 for m in metrics)} / {len(metrics)}")
+    
     print("\nDeliverables:")
     print("  output/anisotropic_tensor_profiles.npz")
     print("  output/anisotropic_tensor_validation.png")
     print("  output/anisotropic_solver_mass_test.png")
-    print(f"  output/anisotropic_evolution_PAT_000{{0..7}}.npz  (8 files)")
+    for r in results:
+        print(f"  output/anisotropic_evolution_{r['patient_id']}.npz")
     print("  output/anisotropic_recurrence_maps.png")
     print("  output/anisotropic_geometry_summary.png")
     print("  output/anisotropic_geometry_metrics.json")
     print("  output/anisotropic_evolution_all_patients.npz")
+    
+    if has_real_mask:
+        print("  output/real_patient_evolution.npz")
+        print("  output/real_patient_evolution.png")
+
+if __name__ == "__main__":
+    main()
     print("\n[SUCCESS] Month 7 complete.")
 
 

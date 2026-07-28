@@ -19,6 +19,7 @@ Algorithm:
 Usage:
     python src/51_inverse_parameter_estimation.py --test
     python src/51_inverse_parameter_estimation.py --t0-volume 1000 --t1-volume 1200 --delta-t 30
+    python src/51_inverse_parameter_estimation.py --nifti-t0 T0_seg.nii.gz --nifti-t1 T1_seg.nii.gz --delta-t 30
 """
 from __future__ import annotations
 
@@ -37,7 +38,7 @@ warnings.filterwarnings("ignore")
 
 # Physiological bounds (per plan specification)
 RHO_MIN = 0.005  # /day (minimum growth rate)
-RHO_MAX = 0.05   # /day (maximum growth rate)
+RHO_MAX = 0.1    # /day (maximum growth rate)
 D_MIN = 0.001    # mm²/day (minimum diffusivity)
 D_MAX = 0.05     # mm²/day (maximum diffusivity)
 
@@ -53,6 +54,59 @@ NOISE_STD = 0.10  # 10% Gaussian noise for robustness testing
 # A GBM cannot exceed the cranial vault; set K to a large value so logistic
 # suppression is negligible at typical tumor volumes (1-50 cm^3 = 1000-50000 mm^3)
 K_DEFAULT = 1.0e6  # mm3 (acts as near-pure exponential for small tumors)
+
+
+def _load_volume_from_nifti(nifti_path: Path) -> float:
+    """
+    Load tumor volume from NIfTI segmentation file.
+    
+    Args:
+        nifti_path: Path to NIfTI file with tumor segmentation
+        
+    Returns:
+        Tumor volume in mm³
+    """
+    try:
+        import nibabel as nib
+    except ImportError:
+        raise ImportError("nibabel required for NIfTI support. Install with: pip install nibabel")
+    
+    img = nib.load(str(nifti_path))
+    data = img.get_fdata(dtype=np.float32)
+    affine = img.affine
+    
+    # Get voxel volume from affine
+    voxel_volume = abs(np.linalg.det(affine[:3, :3]))  # mm³ per voxel
+    
+    # Binarize mask (any non-zero = tumor)
+    tumor_mask = data > 0
+    
+    # Count tumor voxels
+    n_voxels = np.sum(tumor_mask)
+    
+    # Volume in mm³
+    volume_mm3 = n_voxels * voxel_volume
+    
+    return volume_mm3
+
+
+def _load_volumes_from_brats(
+    t0_seg_path: Path,
+    t1_seg_path: Path,
+) -> Tuple[float, float]:
+    """
+    Load tumor volumes from two BraTS segmentation files.
+    
+    Args:
+        t0_seg_path: Path to baseline segmentation NIfTI
+        t1_seg_path: Path to follow-up segmentation NIfTI
+        
+    Returns:
+        (V0, V1) volumes in mm³
+    """
+    V0 = _load_volume_from_nifti(t0_seg_path)
+    V1 = _load_volume_from_nifti(t1_seg_path)
+    return V0, V1
 
 
 def surrogate_ode_model(
@@ -356,6 +410,29 @@ def validate_with_synthetic_data(
     return results
 
 
+def _load_nifti_volume(nii_path: Path) -> float:
+    """Load NIfTI segmentation and compute tumor volume in mm³."""
+    try:
+        import nibabel as nib
+    except ImportError:
+        raise ImportError("nibabel required for NIfTI loading: pip install nibabel")
+    
+    img = nib.load(str(nii_path))
+    data = img.get_fdata(dtype=np.float32)
+    affine = img.affine
+    
+    # Binarize (any non-zero label = tumor)
+    mask = (data > 0).astype(np.float32)
+    
+    # Compute voxel volume from affine
+    voxel_vol_mm3 = np.abs(np.linalg.det(affine[:3, :3]))
+    
+    tumor_voxels = float(np.sum(mask))
+    tumor_vol_mm3 = tumor_voxels * voxel_vol_mm3
+    
+    return tumor_vol_mm3
+
+
 def main():
     """Main entry point for inverse parameter estimation."""
     parser = argparse.ArgumentParser(
@@ -382,6 +459,18 @@ def main():
         help="Time between scans (days)",
     )
     parser.add_argument(
+        "--nifti-t0",
+        type=str,
+        default=None,
+        help="Path to baseline segmentation NIfTI (.nii.gz)",
+    )
+    parser.add_argument(
+        "--nifti-t1",
+        type=str,
+        default=None,
+        help="Path to follow-up segmentation NIfTI (.nii.gz)",
+    )
+    parser.add_argument(
         "--output",
         type=str,
         default=None,
@@ -401,50 +490,76 @@ def main():
                 json.dump(results, f, indent=2)
             print(f"Results saved to: {output_path}")
         
+
         return 0
     
-    if args.t0_volume and args.t1_volume and args.delta_t:
-        # Estimate parameters for patient
+    # Determine volumes from NIfTI or direct arguments
+    if args.nifti_t0 and args.nifti_t1:
+        if not args.delta_t:
+            print("Error: --delta-t is required when using --nifti-t0/--nifti-t1")
+            parser.print_help()
+            return 1
+        
         print(f"\n{'='*70}")
-        print("PATIENT PARAMETER ESTIMATION")
+        print("LOADING VOLUMES FROM NIFTI SEGMENTATIONS")
         print(f"{'='*70}")
-        print(f"Baseline volume (V0): {args.t0_volume:.1f} mm3")
-        print(f"Follow-up volume (V1): {args.t1_volume:.1f} mm3")
-        print(f"Time interval (dt): {args.delta_t:.1f} days")
-        print(f"{'='*70}\n")
+        print(f"Baseline NIfTI: {args.nifti_t0}")
+        print(f"Follow-up NIfTI: {args.nifti_t1}")
+        print(f"Time interval: {args.delta_t:.1f} days")
         
-        result = estimate_patient_parameters(
-            t0_volume=args.t0_volume,
-            t1_volume=args.t1_volume,
-            delta_t_days=args.delta_t,
-        )
+        try:
+            V0 = _load_nifti_volume(Path(args.nifti_t0))
+            V1 = _load_nifti_volume(Path(args.nifti_t1))
+            print(f"Loaded V0 = {V0:.1f} mm3")
+            print(f"Loaded V1 = {V1:.1f} mm3")
+        except Exception as e:
+            print(f"Error loading NIfTI files: {e}")
+            return 1
         
-        print("ESTIMATED PARAMETERS:")
-        print(f"  rho (growth rate):     {result['rho']:.6f} /day")
-        print(f"                         95% CI: [{result['rho_ci'][0]:.6f}, {result['rho_ci'][1]:.6f}]")
-        print(f"  D (diffusivity):       {result['D']:.6f} mm2/day")
-        print(f"                         95% CI: [{result['D_ci'][0]:.6f}, {result['D_ci'][1]:.6f}]")
-        print(f"  Convergence:         {'Yes' if result['convergence'] else 'No'}")
-        print(f"  Iterations:          {result['n_iterations']}")
-        print(f"  RMSE:                {result['rmse']:.4f} mm³")
-        print(f"{'='*70}\n")
+        t0_vol, t1_vol = V0, V1
+        delta_t = args.delta_t
         
-        if args.output:
-            output_path = Path(args.output)
-            output_path.parent.mkdir(parents=True, exist_ok=True)
-            # Remove non-serializable bootstrap samples for JSON output
-            result_json = {k: v for k, v in result.items() if k != "bootstrap_samples"}
-            with open(output_path, "w") as f:
-                json.dump(result_json, f, indent=2)
-            print(f"Results saved to: {output_path}")
-        
-        return 0
+    elif args.t0_volume and args.t1_volume and args.delta_t:
+        t0_vol, t1_vol, delta_t = args.t0_volume, args.t1_volume, args.delta_t
+    else:
+        parser.print_help()
+        print("\nError: Provide either (--t0-volume --t1-volume --delta-t) OR (--nifti-t0 --nifti-t1 --delta-t)")
+        return 1
     
-    # No arguments provided - show help
-    parser.print_help()
-    print("\nExamples:")
-    print("  python src/51_inverse_parameter_estimation.py --test")
-    print("  python src/51_inverse_parameter_estimation.py --t0-volume 1000 --t1-volume 1200 --delta-t 30")
+    # Estimate parameters for patient
+    print(f"\n{'='*70}")
+    print("PATIENT PARAMETER ESTIMATION")
+    print(f"{'='*70}")
+    print(f"Baseline volume (V0): {t0_vol:.1f} mm3")
+    print(f"Follow-up volume (V1): {t1_vol:.1f} mm3")
+    print(f"Time interval (dt): {delta_t:.1f} days")
+    print(f"{'='*70}\n")
+    
+    result = estimate_patient_parameters(
+        t0_volume=t0_vol,
+        t1_volume=t1_vol,
+        delta_t_days=delta_t,
+    )
+    
+    print("ESTIMATED PARAMETERS:")
+    print(f"  rho (growth rate):     {result['rho']:.6f} /day")
+    print(f"                         95% CI: [{result['rho_ci'][0]:.6f}, {result['rho_ci'][1]:.6f}]")
+    print(f"  D (diffusivity):       {result['D']:.6f} mm2/day")
+    print(f"                         95% CI: [{result['D_ci'][0]:.6f}, {result['D_ci'][1]:.6f}]")
+    print(f"  Convergence:         {'Yes' if result['convergence'] else 'No'}")
+    print(f"  Iterations:          {result['n_iterations']}")
+    print(f"  RMSE:                {result['rmse']:.4f} mm3")
+    print(f"{'='*70}\n")
+    
+    if args.output:
+        output_path = Path(args.output)
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        # Remove non-serializable bootstrap samples for JSON output
+        result_json = {k: v for k, v in result.items() if k != "bootstrap_samples"}
+        with open(output_path, "w") as f:
+            json.dump(result_json, f, indent=2)
+        print(f"Results saved to: {output_path}")
+    
     return 0
 
 
