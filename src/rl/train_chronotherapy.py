@@ -123,7 +123,8 @@ def train_ppo(
         gamma=gamma
     )
     
-    # Create model
+    # Create model - Force CPU for MLP policy PPO (GPU overhead not worth it)
+    # Also handles legacy GPUs like P100 (sm_60) which PyTorch no longer supports
     model = PPO(
         "MlpPolicy",
         vec_env,
@@ -140,7 +141,7 @@ def train_ppo(
         verbose=1,
         seed=seed,
         tensorboard_log=log_dir,
-        device="auto",
+        device="cpu",  # Force CPU for MLP policy PPO - GPU overhead not worth it
     )
     
     # Callbacks
