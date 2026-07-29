@@ -15,6 +15,7 @@ import torch
 from pathlib import Path
 from datetime import datetime
 from typing import Dict
+import argparse
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
@@ -111,7 +112,7 @@ def run_virtual_trial(
             dose_rad = 1.0 if in_rt else 0.0
             
             action = np.array([float(dose_tmz), 0.0, float(dose_rad), 0.0], dtype=np.float32)
-            obs, reward, terminated, truncated, _ = base_env.envs[0].step(action)
+            obs, reward, terminated, truncated, _ = base_env.step(action)
             if terminated or truncated:
                 break
         
@@ -135,7 +136,7 @@ def run_virtual_trial(
             else:
                 action = np.array([0.0, 0.0, 0.0, 0.0], dtype=np.float32)
             
-            obs, reward, terminated, truncated, _ = base_env.envs[0].step(action)
+            obs, reward, terminated, truncated, _ = base_env.step(action)
             vol_prev = vol_curr
             if terminated or truncated:
                 break
@@ -187,13 +188,22 @@ def compute_statistics(results: Dict) -> Dict:
 
 
 def main():
+    parser = argparse.ArgumentParser(description="Phase 15: Virtual Clinical Trial")
+    parser.add_argument("--model-path", type=str, default="output/phase13_ppo_chronotherapy/ppo_chronotherapy_final.zip",
+                        help="Path to trained PPO model")
+    parser.add_argument("--vecnorm-path", type=str, default="output/phase13_ppo_chronotherapy/vecnormalize.pkl",
+                        help="Path to VecNormalize stats")
+    parser.add_argument("--n-patients", type=int, default=1000, help="Number of patients")
+    parser.add_argument("--max-episode-hours", type=int, default=168, help="Max episode hours")
+    args = parser.parse_args()
+    
     print("=" * 70)
-    print("Phase 15: Virtual Clinical Trial - 1000-Patient Cohort")
+    print("Phase 15: Virtual Clinical Trial")
     print("=" * 70)
     
     # Paths
-    model_path = "/kaggle/working/gbm-repo/output/phase13_ppo_chronotherapy/ppo_chronotherapy_final.zip"
-    vecnorm_path = "/kaggle/working/gbm-repo/output/phase13_ppo_chronotherapy/vecnormalize.pkl"
+    model_path = args.model_path
+    vecnorm_path = args.vecnorm_path
     
     if not os.path.exists(model_path):
         print(f"[ERROR] Model not found at {model_path}")
@@ -202,10 +212,10 @@ def main():
     
     # Load model
     print(f"[Phase 15] Loading model from {model_path}")
-    model, eval_env = load_trained_policy(model_path, "/kaggle/working/gbm-repo/" + vecnorm_path)
+    model, eval_env = load_trained_policy(model_path, vecnorm_path)
     
     # Run trial
-    results = run_virtual_trial(model, eval_env, n_patients=1000, max_episode_hours=168)
+    results = run_virtual_trial(model, eval_env, n_patients=args.n_patients, max_episode_hours=args.max_episode_hours)
     
     # Statistics
     stats = compute_statistics(results)
@@ -213,8 +223,8 @@ def main():
     # Save results
     output = {
         "timestamp": datetime.now().isoformat(),
-        "n_patients": 1000,
-        "max_episode_hours": 168,
+        "n_patients": args.n_patients,
+        "max_episode_hours": args.max_episode_hours,
         "results": results,
         "statistics": stats,
     }

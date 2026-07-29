@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Unified Kaggle Pipeline: Tracks A, B, C + Phases 7-15
+Unified Kaggle Pipeline: Phase 13 (PPO Training) + Phase 15 (Virtual Trial)
 ====================================================================
 Runs on Kaggle GPU (T4 x2). Outputs to /kaggle/working/output/
 """
@@ -28,7 +28,7 @@ def install_deps():
         "torch", "torchvision", "torchaudio", "--index-url", "https://download.pytorch.org/whl/cu118"], check=True)
     subprocess.run([sys.executable, "-m", "pip", "install", "-q",
         "numpy", "scipy", "matplotlib", "pandas", "scikit-learn", "SALib", "tqdm",
-        "stable-baselines3", "gymnasium", "pyserial"], check=True)
+        "stable-baselines3", "gymnasium", "pyserial", "scipy"], check=True)
     print("Dependencies installed.")
 
 def clone_repo():
@@ -42,46 +42,35 @@ def clone_repo():
     return REPO_DIR
 
 def ensure_prerequisite_data(repo_dir: Path):
-    """Generate required data files for Track B scripts if they don't exist."""
+    """Generate required data files for Phase 13/15 scripts if they don't exist."""
     print("=" * 60)
     print("ENSURING PREREQUISITE DATA FILES")
     print("=" * 60)
     
-    # Use repo's output directory
     repo_output = repo_dir / "output"
     repo_output.mkdir(parents=True, exist_ok=True)
     
-    # spatial_recurrence_profiles.npz (from Track A Month 6)
+    # spatial_recurrence_profiles.npz
     profiles_path = repo_output / "spatial_recurrence_profiles.npz"
     if not profiles_path.exists():
         print("Generating synthetic spatial_recurrence_profiles.npz...")
         np.random.seed(42)
         n_patients = 8
         patient_ids = np.array([f"PAT_{i:04d}" for i in range(n_patients)])
-        
-        # Generate synthetic rho_fields (8 patients, 100x100 each)
         rho_fields = np.random.uniform(0.01, 0.05, size=(n_patients, 100, 100)).astype(np.float32)
-        
-        profiles = {
-            "patient_ids": patient_ids,
-            "rho_fields": rho_fields,
-            "n_patients": n_patients,
-        }
-        
+        profiles = {"patient_ids": patient_ids, "rho_fields": rho_fields, "n_patients": n_patients}
         np.savez_compressed(profiles_path, **profiles)
         print(f"  Created {profiles_path}")
     else:
         print(f"  Found {profiles_path}")
     
-    # Zone CSV files (from Track A clinical validation)
-    # Expected format: patient_id, gene, expression_log2tpm (long format)
+    # Zone CSV files
     zone_files = {
         "real_cohort_le.csv": "Leading Edge",
         "real_cohort_ct.csv": "Cellular Tumor", 
         "real_cohort_it.csv": "Infiltrating Tumor",
     }
-    
-    invasive_genes = ["S100A8", "S100A11"]  # INVASIVE_GENES from script
+    invasive_genes = ["S100A8", "S100A11"]
     all_genes = invasive_genes + [f"GENE_{j:03d}" for j in range(50)]
     
     for fname, zone_name in zone_files.items():
@@ -91,12 +80,10 @@ def ensure_prerequisite_data(repo_dir: Path):
             np.random.seed(42)
             n_patients = 8
             patient_ids = [f"PAT_{i:04d}" for i in range(n_patients)]
-            
             rows = []
             for pid in patient_ids:
                 for gene in all_genes:
-                    if gene in invasive_genes:
-                        # Higher expression for invasive genes in certain zones
+                    if gene in ["S100A8", "S100A11"]:
                         if zone_name == "Leading Edge":
                             base = np.random.uniform(5.5, 7.0)
                         elif zone_name == "Cellular Tumor":
@@ -105,12 +92,7 @@ def ensure_prerequisite_data(repo_dir: Path):
                             base = np.random.uniform(3.5, 5.0)
                     else:
                         base = np.random.uniform(2.0, 5.0)
-                    rows.append({
-                        "patient_id": pid,
-                        "gene": gene,
-                        "expression_log2tpm": base
-                    })
-            
+                    rows.append({"patient_id": pid, "gene": gene, "expression_log2tpm": base})
             df = pd.DataFrame(rows)
             df.to_csv(fpath, index=False)
             print(f"  Created {fpath}")
@@ -134,13 +116,19 @@ def main():
     repo_dir = clone_repo()
     ensure_prerequisite_data(repo_dir)
     
-    # Phase 14: Hardware-in-the-Loop Integration
-    phase14_scripts = [
-        ("src/hil/pump_interface.py", "Phase 14: Hardware-in-the-Loop Integration"),
+    # Phase 13: Circadian-Aware RL Training
+    phase13_scripts = [
+        ("src/rl/train_chronotherapy.py", "Phase 13: Circadian-Aware PPO Training"),
+    ]
+    
+    # Phase 15: Virtual Clinical Trial
+    phase15_scripts = [
+        ("src/phase15_virtual_trial.py", "Phase 15: 1000-Patient Virtual Clinical Trial"),
     ]
     
     all_phases = [
-        ("Phase 14 (HIL)", phase14_scripts),
+        ("Phase 13 (PPO)", phase13_scripts),
+        ("Phase 15 (Trial)", phase15_scripts),
     ]
     
     for phase_name, scripts in all_phases:
