@@ -1,0 +1,193 @@
+
+
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <title>BraTS 2023: Adult Glioma | Kaggle</title>
+  <meta charset="utf-8" />
+    <meta name="robots" content="index, follow" />
+  <meta name="description" content="RSNA-ASNR-MICCAI BraTS 2023: Adult Glioma Challenge" />
+    <meta name="keywords" content="health,cancer,image,deep learning,image segmentation,multimodal" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, minimum-scale=1.0">
+  <meta name="theme-color" content="#008ABC" />
+  <script nonce="VZaBV7PIfhyXOORFIchLJA==" type="text/javascript">
+    window["pageRequestStartTime"] = 1716474790408;
+    window["pageRequestEndTime"] = 1716474790493;
+    window["initialPageLoadStartTime"] = new Date().getTime();
+  </script>
+  <script nonce="VZaBV7PIfhyXOORFIchLJA==" id="gsi-client" src="https://accounts.google.com/gsi/client" async defer></script>
+  <script nonce="VZaBV7PIfhyXOORFIchLJA==">window.KAGGLE_JUPYTERLAB_PATH = "/static/assets/jupyterlab/jupyterlab-index-c314eb69b7ae5836ed8c.html";</script>
+  <link rel="preconnect" href="https://www.google-analytics.com" crossorigin="anonymous" /><link rel="preconnect" href="https://stats.g.doubleclick.net" /><link rel="preconnect" href="https://storage.googleapis.com" /><link rel="preconnect" href="https://apis.google.com" />
+  <link href="/static/images/favicon.ico" rel="shortcut icon" type="image/x-icon" />
+  <link rel="manifest" href="/static/json/manifest.json" crossorigin="use-credentials">
+
+
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+
+  <link href="https://fonts.googleapis.com/css?family=Inter:400,400i,500,500i,600,600i,700,700i&display=swap"
+    rel="preload" as="style" />
+  <link href="https://fonts.googleapis.com/css2?family=Google+Symbols:FILL@0..1&display=block"
+    rel="preload" as="style" />
+  <link href="https://fonts.googleapis.com/css?family=Inter:400,400i,500,500i,600,600i,700,700i&display=swap"
+    rel="stylesheet" media="print" id="async-google-font-1" />
+  <link href="https://fonts.googleapis.com/css2?family=Google+Symbols:FILL@0..1&display=block"
+    rel="stylesheet" media="print" id="async-google-font-2" />
+  <script nonce="VZaBV7PIfhyXOORFIchLJA==" type="text/javascript">
+    const styleSheetIds = ["async-google-font-1", "async-google-font-2"];
+    styleSheetIds.forEach(function (id) {
+      document.getElementById(id).addEventListener("load", function() {
+        this.media = "all";
+      });
+    });
+  </script>
+
+  <script nonce="VZaBV7PIfhyXOORFIchLJA==" src="https://www.google.com/recaptcha/enterprise.js?render=6LcW02cpAAAAAJlaJemsQQEwAiTEYB4aR6FYE_rD&waf=session" async defer></script>
+   <style>.grecaptcha-badge { visibility: hidden; }</style>
+
+    <link rel="canonical" href="https://www.kaggle.com/datasets/shakilrana/brats-2023-adult-glioma" />
+    <link rel="stylesheet" type="text/css" href="/static/assets/vendor.css?v=dne" />
+    <link rel="stylesheet" type="text/css" href="/static/assets/app.css?v=62d595175a876550f3e6" />
+
+  
+    
+ 
+      <script nonce="VZaBV7PIfhyXOORFIchLJA==">
+        try{(function(a,s,y,n,c,h,i,d,e){d=s.createElement("style");
+        d.appendChild(s.createTextNode(""));s.head.appendChild(d);d=d.sheet;
+        y=y.map(x => d.insertRule(x + "{ opacity: 0 !important }"));
+        h.start=1*new Date;h.end=i=function(){y.forEach(x => x<d.cssRules.length ? d.deleteRule(x) : {})};
+        (a[n]=a[n]||[]).hide=h;setTimeout(function(){i();h.end=null},c);h.timeout=c;
+        })(window,document,['.site-header-react__nav'],'dataLayer',2000,{'GTM-52LNT9S':true});}catch(ex){}
+    </script>
+    <script nonce="VZaBV7PIfhyXOORFIchLJA==">
+        window.dataLayer = window.dataLayer || [];
+        function gtag() { dataLayer.push(arguments); }
+        gtag('js', new Date());
+        gtag('config', 'G-T7QHS60L4Q', {
+            'optimize_id': 'GTM-52LNT9S',
+            'displayFeaturesTask': null,
+            'send_page_view': false,
+            'content_group1': 'Datasets'
+        });
+    </script>
+    <script nonce="VZaBV7PIfhyXOORFIchLJA==" async src="https://www.googletagmanager.com/gtag/js?id=G-T7QHS60L4Q"></script>
+
+  
+    
+    <meta property="og:url" content="https://www.kaggle.com/datasets/shakilrana/brats-2023-adult-glioma" />
+    <meta property="og:title" content="BraTS 2023: Adult Glioma" />
+    <meta property="og:description" content="RSNA-ASNR-MICCAI BraTS 2023: Adult Glioma Challenge" />
+    <meta property="og:type" content="website" />
+    <meta property="og:image" content="https://storage.googleapis.com/kaggle-datasets-images/3487993/6090679/7c48acba828bdb45f8a3ed6a26cf8cbe/dataset-card.png?t=2023-07-06-19-43-03" />
+    <meta property="fb:app_id" content="2665027677054710" />
+
+    <meta name="twitter:card" content="summary" />
+    <meta name="twitter:site" content="@kaggledatasets" />
+
+
+  <meta name="twitter:site" content="@Kaggle" /> 
+  
+    
+            <script nonce="VZaBV7PIfhyXOORFIchLJA==" type="application/ld+json">{"@context":"http://schema.org/","@type":"Dataset","name":"BraTS 2023: Adult Glioma","description":"\nAmple multi-institutional routine clinically-acquired multi-parametric MRI (mpMRI) scans of glioma, are used as the training, validation, and testing data for this year’s BraTS challenge.\n\nThe training and validation data are the same that were used in BraTS'21; however, the testing dataset used in this year's challenge has been updated with many more routine clinically-acquired mpMRI scans. Ground truth annotations of the tumor sub-regions are created and approved by expert neuroradiologists for every subject included in the training, validation, and testing datasets to quantitatively evaluate the predicted tumor segmentations.\n\n\n## Imaging Data Description\nAll BraTS mpMRI scans are available as NIfTI files (.nii.gz) and describe a) native (T1) and b) post-contrast T1-weighted (T1Gd), c) T2-weighted (T2), and d) T2 Fluid Attenuated Inversion Recovery (T2-FLAIR) volumes, and were acquired with different clinical protocols and various scanners from multiple data contributing institutions.\n\nAll the imaging datasets have been annotated manually, by one to four raters, following the same annotation protocol, and their annotations were approved by experienced neuro-radiologists. Annotations comprise the GD-enhancing tumor (ET — label 3), the peritumoral edematous/invaded tissue (ED — label 2), and the necrotic tumor core (NCR — label 1), as described in the latest BraTS summarizing paper. The ground truth data were created after their pre-processing, i.e., co-registered to the same anatomical template, interpolated to the same resolution (1 mm3) and skull-stripped.\n\n## Comparison with Previous BraTS datasets\nThis year we provide the naming convention and name mapping between the data of BraTS'22-'17, and the subjects used from the data collections of TCGA-GBM, TCGA-LGG, IvyGAP, and CPTAC-GBM, available through The Cancer Imaging Archive (TCIA) to further facilitate research beyond the directly BraTS related tasks.\n\n# Task: Tumor Sub-region Segmentation\nThe participants are called to address this task by using the provided clinically-acquired training data to develop their method and produce segmentation labels of the different glioma sub-regions. The sub-regions considered for evaluation are the \"enhancing tumor\" (ET), the \"tumor core\" (TC), and the \"whole tumor\" (WT) [see figure below]. The ET is described by areas that show hyper-intensity in T1Gd when compared to T1, but also when compared to “healthy” white matter in T1Gd. The TC describes the bulk of the tumor, which is what is typically resected. The TC entails the ET, as well as the necrotic (NCR) parts of the tumor. The appearance of NCR is typically hypo-intense in T1-Gd when compared to T1. The WT describes the complete extent of the disease, as it entails the TC and the peritumoral edematous/invaded tissue (ED), which is typically depicted by hyper-intense signal in FLAIR.\n\nThe provided segmentation labels have values of:\n\n**1 for NCR\n2 for ED\n3 for ET\n0 for everything else.**\n\n\n Note that starting this year, the label value for ET is \"3\" (compared to \"4\" in previous BraTS Challenges).\n\n\n## Data Usage Agreement / Citations\n***You are free to use and/or refer to the BraTS datasets in your own research, provided that you always cite the flagship manuscript (published or pre-published) resulting from the challenge as well as the following three manuscripts:***\n\n[1] U.Baid, et al., The RSNA-ASNR-MICCAI BraTS 2021 Benchmark on Brain Tumor Segmentation and Radiogenomic Classification, arXiv:2107.02314, 2021.\n\n[2] B. H. Menze, A. Jakab, S. Bauer, J. Kalpathy-Cramer, K. Farahani, J. Kirby, et al. \"The Multimodal Brain Tumor Image Segmentation Benchmark (BRATS)\", IEEE Transactions on Medical Imaging 34(10), 1993-2024 (2015) DOI: 10.1109/TMI.2014.2377694\n\n[3] S. Bakas, H. Akbari, A. Sotiras, M. Bilello, M. Rozycki, J.S. Kirby, et al., \"Advancing The Cancer Genome Atlas glioma MRI collections with expert segmentation labels and radiomic features\", Nature Scientific Data, 4:170117 (2017) DOI: 10.1038/sdata.2017.117\n\nIn addition, if there are no restrictions imposed from the journal/conference you submit your paper about citing \"Data Citations\", please be specific and also cite the following:\n\n[4] S. Bakas, H. Akbari, A. Sotiras, M. Bilello, M. Rozycki, J. Kirby, et al., \"Segmentation Labels and Radiomic Features for the Pre-operative Scans of the TCGA-GBM collection\", The Cancer Imaging Archive, 2017. DOI: 10.7937/K9/TCIA.2017.KLXWJJ1Q\n\n[5] S. Bakas, H. Akbari, A. Sotiras, M. Bilello, M. Rozycki, J. Kirby, et al., \"Segmentation Labels and Radiomic Features for the Pre-operative Scans of the TCGA-LGG collection\", The Cancer Imaging Archive, 2017. DOI: 10.7937/K9/TCIA.2017.GJQ7R0EF","url":"https://www.kaggle.com/shakilrana/brats-2023-adult-glioma","version":1,"keywords":["subject, health and fitness, health","subject, health and fitness, health, health conditions, cancer","data type, image","technique, deep learning","task, image-segmentation","data type, multimodal data"],"license":{"@type":"CreativeWork","name":"CC0: Public Domain","url":"https://creativecommons.org/publicdomain/zero/1.0/"},"identifier":["3487993"],"includedInDataCatalog":{"@type":"DataCatalog","name":"Kaggle","url":"https://www.kaggle.com"},"creator":{"@type":"Person","name":"Shakil Mahmud Shuvo","url":"https://www.kaggle.com/shakilrana","image":"https://storage.googleapis.com/kaggle-avatars/thumbnails/4955496-kg.png?t=2023-10-02-13-57-39"},"distribution":[{"@type":"DataDownload","requiresSubscription":true,"encodingFormat":"zip","fileFormat":"zip","contentUrl":"https://www.kaggle.com/datasets/shakilrana/brats-2023-adult-glioma/download?datasetVersionNumber=1","contentSize":"3008015255 bytes"}],"commentCount":3,"dateModified":"2023-07-06T16:36:07.103Z","discussionUrl":"https://www.kaggle.com/shakilrana/brats-2023-adult-glioma/discussion","alternateName":"RSNA-ASNR-MICCAI BraTS 2023: Adult Glioma Challenge","isAccessibleForFree":true,"thumbnailUrl":"https://storage.googleapis.com/kaggle-datasets-images/3487993/6090679/7c48acba828bdb45f8a3ed6a26cf8cbe/dataset-card.png?t=2023-07-06-19-43-03","interactionStatistic":[{"@type":"InteractionCounter","interactionType":"http://schema.org/CommentAction","userInteractionCount":3},{"@type":"InteractionCounter","interactionType":"http://schema.org/DownloadAction","userInteractionCount":1183},{"@type":"InteractionCounter","interactionType":"http://schema.org/ViewAction","userInteractionCount":8023},{"@type":"InteractionCounter","interactionType":"http://schema.org/LikeAction","userInteractionCount":17}]}</script>
+        
+
+  
+    
+
+  
+    
+
+
+    <script nonce="VZaBV7PIfhyXOORFIchLJA==">window['useKaggleAnalytics'] = true;</script>
+
+  <script id="gapi-target" nonce="VZaBV7PIfhyXOORFIchLJA==" src="https://apis.google.com/js/api.js" defer
+    async></script>
+  <script nonce="VZaBV7PIfhyXOORFIchLJA==" src="/static/assets/runtime.js?v=994e7180b6cfb19b28d6"></script>
+  <script nonce="VZaBV7PIfhyXOORFIchLJA==" src="/static/assets/vendor.js?v=38b5f1af3c791be446c0"></script>
+  <script nonce="VZaBV7PIfhyXOORFIchLJA==" src="/static/assets/app.js?v=a3b5ab9d32c273924237"></script>
+    <script nonce="VZaBV7PIfhyXOORFIchLJA==" type="text/javascript">
+      window.kaggleStackdriverConfig = {
+        key: 'AIzaSyA4eNqUdRRskJsCZWVz-qL655Xa5JEMreE',
+        projectId: 'kaggle-161607',
+        service: 'web-fe',
+        version: 'ci',
+        userId: '0'
+      }
+    </script>
+</head>
+<body>
+
+  <main>
+    
+
+
+
+
+
+<div id="site-container"></div>
+
+<div id="site-body" class="hide">
+    
+
+
+<script nonce="VZaBV7PIfhyXOORFIchLJA==" type="text/x-mathjax-config">
+    MathJax.Hub.Config({
+    "HTML-CSS": {
+    preferredFont: "TeX",
+    availableFonts: ["STIX", "TeX"],
+    linebreaks: {
+    automatic: true
+    },
+    EqnChunk: (MathJax.Hub.Browser.isMobile ? 10 : 50)
+    },
+    tex2jax: {
+    inlineMath: [["\\(", "\\)"], ["\\\\(", "\\\\)"]],
+    displayMath: [["$$", "$$"], ["\\[", "\\]"]],
+    processEscapes: true,
+    ignoreClass: "tex2jax_ignore|dno"
+    },
+    TeX: {
+    noUndefined: {
+    attributes: {
+    mathcolor: "red",
+    mathbackground: "#FFEEEE",
+    mathsize: "90%"
+    }
+    }
+    },
+    Macros: {
+    href: "{}"
+    },
+    skipStartupTypeset: true,
+    messageStyle: "none",
+    extensions: ["Safe.js"],
+    });
+</script>
+<script type="text/javascript" nonce="VZaBV7PIfhyXOORFIchLJA==">
+  window.addEventListener("DOMContentLoaded", () => {
+    const head = document.getElementsByTagName("head")[0];
+    const lib = document.createElement("script");
+    lib.type = "text/javascript";
+    // Always use the production asset in local dev, which is served from GCS. We tried to proxy and / or serve this
+    // in a better way in localhost, but it didn't work out. See b/328073416#comment8 for details.
+    const forceProdHost = window.location.hostname === "localhost";
+    lib.src = `${forceProdHost ? "https://www.kaggle.com" : ""}/static/mathjax/2.7.9/MathJax.js?config=TeX-AMS-MML_HTMLorMML`;
+    head.appendChild(lib);
+  });
+</script>
+
+
+
+
+
+
+</div>
+
+
+
+
+  </main>
+</body>
+
+</html>
