@@ -1,7 +1,0 @@
-67: '→' :: 'patial Genomics Deconvolution → PDE Parameter Fields\n\nMaps c'
-885: '×' :: '8\nDOMAIN_MM = 100.0  # 100 mm × 100 mm spatial domain\n\n# Nef'
-987: '→' :: '-informed)\n# MES/AC: invasive → high D; NPC/OPC: proliferati'
-1020: '→' :: 'igh D; NPC/OPC: proliferative → high rho\nMES_WEIGHT_D = 1.0\n'
-6152: '→' :: 'patial Genomics Deconvolution → PDE Parameter Fields",\n     '
-6515: '→' :: '2)\n\n    print(f"[SAVE] Figure → {out_dir / \'phase1_spatial_g'
-6595: '→' :: '")\n    print(f"[SAVE] Metrics → {out_dir / \'phase1_deconv_me'
