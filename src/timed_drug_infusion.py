@@ -102,7 +102,7 @@ def run_pk_pde_simulation(
     # Simulation state
     C_t = 0.0  # Current drug concentration in brain tissue
     
-    # Snapshots to store
+    # Snapshots to store (for static figure)
     snapshots = {}
     snapshots['Day 0'] = u.copy()
     
@@ -110,6 +110,11 @@ def run_pk_pde_simulation(
     volume_history = []
     concentration_history = []
     time_points = []
+    
+    # NEW: Save 3D time-series snapshots for interactive 4D visualization
+    save_3d_interval = 5  # Save every 5 days
+    os.makedirs("output/time_series", exist_ok=True)
+    np.save(f"output/time_series/tumor_3d_day_000.npy", u)
 
     # Convert infusion days to set for O(1) lookup
     infusion_set = set(infusion_days)
@@ -148,7 +153,11 @@ def run_pk_pde_simulation(
         concentration_history.append(C_t)
         time_points.append(day)
 
-        # Store key timepoint snapshots
+        # NEW: Save 3D snapshot every N days for time-slider visualization
+        if day % save_3d_interval == 0:
+            np.save(f"output/time_series/tumor_3d_day_{day:03d}.npy", u)
+
+        # Store key timepoint snapshots (for static figure)
         if day in infusion_days:
             snapshots[f'Day {day} (Infusion)'] = u.copy()
         elif day == total_days:
