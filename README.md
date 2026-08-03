@@ -47,6 +47,7 @@ clinical trials, and future translational research.
 | **A: MSOS** | Single-cell omics → causal GRN → invasion PDE → drug discovery → clinical validation | 01–41, 50a, 52a, 53b, 54, 55a, 55b, 56a | `src/run_pipeline.py` (partial) |
 | **B: 10-Month PDE Cohort** | Anisotropic PDE → stromal coupling → adaptive therapy → Sobol sensitivity → 3D extension → synthesis | 42–48 | `bash run_all.sh` |
 | **C: Digital Twin Reactor** | Inverse estimation → robust MPC → 3D DTI → RL adaptive → global SA → virtual cohort → report | 49, 50b, 51, 52b, 53a, 56b, 57–65 | Individual scripts |
+| **Visualization** | Interactive 4D tumor evolution (3D+time) on real BraTS patients | `visualization/view_3d_time_slider.py` | `python src/timed_drug_infusion.py --days 120 && python visualization/view_3d_time_slider.py` |
 
 ---
 
@@ -224,6 +225,11 @@ python src/65_generate_final_report.py
 
 # Track C Phases 10-15: Neural PDE & Chronotherapy
 python src/phase15_virtual_trial.py --model-path output/phase13_ppo_chronotherapy/ppo_chronotherapy_final.zip --vecnorm-path output/phase13_ppo_chronotherapy/vecnormalize.pkl --n-patients 5 --max-episode-hours 12
+
+# Interactive 4D Tumor Visualization (3D+time on real BraTS patient)
+python src/timed_drug_infusion.py --patient BraTS2021_00000 --days 120 --infusion-days 30 60 90
+python visualization/view_3d_time_slider.py --input-dir output/time_series --output output/true_3d_time_series_dashboard.html
+# Open in browser: start output/true_3d_time_series_dashboard.html
 ```
 
 **Platform note:** `run_all.sh` is a POSIX bash script. On Windows, run under
@@ -265,12 +271,17 @@ foreach ($s in 42,43,44,45) { & venv\Scripts\python.exe "src\${s}_*.py" }
 │   ├── resource.py
 │   ├── run_pipeline.py
 │   └── timed_drug_infusion.py
-├── tests/                          # pytest suite (inverse est, robust MPC, spatial metrics)
-└── output/                         # Generated artifacts (JSON, PNG, MD, NPZ, TSV, CSV)
+├── visualization/                      # Interactive 3D/4D viewers
+│   ├── view_3d_tumor.py               # Static 3D tumor segmentation viewer (matplotlib)
+│   ├── view_3d_plotly.py              # Interactive 3D isosurface (Plotly HTML)
+│   └── view_3d_time_slider.py         # 4D time-slider dashboard (Plotly HTML)
+├── tests/                            # pytest suite (inverse est, robust MPC, spatial metrics)
+└── output/                           # Generated artifacts (JSON, PNG, MD, NPZ, TSV, CSV)
     ├── Track A: 01_*, 02_*, nn_*, method*_*, benchmark_*, cgat/*, scvi_*, nmf_*, csgt_*, te_*, master_switches.tsv, aba_*, fk_*, invasion_*, single_ko_*, dual_ko_*, drug_gating_*, clinical_*, survival_*, penalized_*, spatial_recurrence_*, final_dose_response_matrix.csv, clinical_actionability_report.md
     ├── Track B: anisotropic_*, stromal_*, adaptive_*, sobol_*, dual_drug_comparison.json, 3d_*, master_cohort_*, POSTER_KEY_FINDINGS.md, MONTH10_AUDIT.md, isotropic_baseline_metrics.json
     ├── Track C (Phases 1–9): 3d_interactive_tumor_dashboard.html, clinical_reports/, robust_mpc_benchmark.json, phase3_3d_dti_metrics.json, phase4_therapy_metrics.json, phase5_adaptive_metrics.json, phase6_sensitivity_metrics.json, ablation_and_baselines_metrics.json, rl_convergence_metrics.json, biomarker_stability_metrics.json, reward_sensitivity_metrics.json, phase8_cohort_metrics.json, final_executive_summary.json, 65_master_summary_figure.png
-    └── Track C (Phases 10–15): fno_model.pth, fno_dataset.pt, phase13_ppo_chronotherapy/ (ppo_chronotherapy_final.zip, vecnormalize.pkl), phase15_virtual_trial_results.json, EXECUTIVE_SUMMARY.md
+    ├── Track C (Phases 10–15): fno_model.pth, fno_dataset.pt, phase13_ppo_chronotherapy/ (ppo_chronotherapy_final.zip, vecnormalize.pkl), phase15_virtual_trial_results.json, EXECUTIVE_SUMMARY.md
+    └── Visualization: time_series/ (tumor_3d_day_*.npy), true_3d_time_series_dashboard.html, real_patient_timed_infusion*.png
 ```
 
 > **Git hygiene (D6):** All per-patient `.npz` binary arrays are excluded from
