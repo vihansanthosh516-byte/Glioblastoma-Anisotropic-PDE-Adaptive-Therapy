@@ -1,0 +1,68 @@
+version: "3.9"
+# =============================================================================
+# docker-compose.yml - GBM Digital Twin benchmark suite (Proposal 5)
+# =============================================================================
+# Stateless, reproducible runner. Two services share the same image:
+#
+#   benchmark   Full end-to-end Track B + C pipeline (default benchmark)
+#   ash         Interactive debugging shell with data/output mounts
+#   serve       Interactive 3D dashboard on http://localhost:7860
+#
+# Image is tagged with the git commit SHA:
+#   docker compose build          # builds gbm-digital-twin:latest
+#   docker compose run --rm benchmark
+#   docker compose run --rm ash
+#   docker compose up serve
+#
+# Data & output mount points:
+#   ./data  -> /data   (raw DICOM / NIfTI DTI / BraTS patient dirs, read-only)
+#   ./output-> /output (generated artifacts)
+# =============================================================================
+services:
+  benchmark:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: gbm-digital-twin:latest
+    container_name: gbm-benchmark
+    volumes:
+      - ./data:/data:ro
+      - ./output:/output
+    environment:
+      - PYTHONUNBUFFERED=1
+      - MPLBACKEND=Agg
+      - OUTPUT_DIR=/output
+      - DATA_DIR=/data
+    command: ["--benchmark"]
+    # CPU-friendly default resource limits; bump for HPC runs
+    deploy:
+      resources:
+        limits:
+          cpus: "4.0"
+          memory: 8g
+
+  ash:
+    image: gbm-digital-twin:latest
+    container_name: gbm-ash
+    profiles: ["debug"]
+    volumes:
+      - ./data:/data:ro
+      - ./output:/output
+    environment:
+      - PYTHONPATH=/app:/app/src
+    entrypoint: ["/bin/bash"]
+    stdin_open: true
+    tty: true
+
+  serve:
+    image: gbm-digital-twin:latest
+    container_name: gbm-serve
+    profiles: ["serve"]
+    volumes:
+      - ./data:/data:ro
+      - ./output:/output
+    ports:
+      - "7860:7860"
+    environment:
+      - PYTHONPATH=/app:/app/src
+    command: ["--serve"]

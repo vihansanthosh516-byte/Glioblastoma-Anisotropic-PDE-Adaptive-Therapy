@@ -1332,6 +1332,27 @@ def main():
         help="Path to BraTS patient directory (loads all modalities)"
     )
     parser.add_argument(
+        "--dti-tensor",
+        type=str,
+        default=None,
+        help="Path to real DTI tensor NIfTI (.nii/.nii.gz). Uses src/dti_loader.py "
+             "PatientTensorBuilder to replace the synthetic diagonal tract with "
+             "patient-specific white-matter pathways."
+    )
+    parser.add_argument(
+        "--dti-fa",
+        type=str,
+        default=None,
+        help="FA NIfTI volume for brain masking when using --dti-tensor."
+    )
+    parser.add_argument(
+        "--gene-scale",
+        type=float,
+        default=1.0,
+        help="Patient-specific multiplicative scaling on lam_parallel/lam_perp "
+             "(transcriptomic influence preserved over real DTI tensors)."
+    )
+    parser.add_argument(
         "--grid-size",
         type=int,
         default=GRID_SIZE,
@@ -1360,6 +1381,25 @@ def main():
     has_real_tensor = args.real_tensor is not None
     has_real_mask = args.real_mask is not None
     has_real_patient = args.real_patient_dir is not None
+    has_dti_patient = args.dti_tensor is not None
+
+    # ------------------ Real DTI patient (Proposal 1) --------------------
+    if has_dti_patient:
+        print(f"\n[DTI] Loading patient-specific DTI tensor from {args.dti_tensor}...")
+        try:
+            from src.dti_loader import PatientTensorBuilder
+            patient_builder = PatientTensorBuilder.from_nifti(
+                tensor_path=Path(args.dti_tensor),
+                fa_path=Path(args.dti_fa) if args.dti_fa else None,
+                target_shape_3d=(args.grid_size, args.grid_size, args.grid_size),
+                gene_scale=args.gene_scale,
+            )
+            patient_builder.validate()
+            dti_2d = patient_builder.mid_slice_2d()
+            print(f"  2D mid-slice tract voxels: {patient_builder.tract_mask.sum()}")
+        except Exception as e:
+            print(f"  [WARNING] DTI load failed: {e}. Falling back to synthetic tract.")
+            has_dti_patient = False
     
     if has_real_patient:
         # Load all modalities from BraTS directory
@@ -1399,8 +1439,8 @@ def main():
     print("#" * 70)
     
     # Determine which tensor field to use
-    use_real_tensor = has_real_tensor or has_real_patient
-    
+    use_real_tensor = has_real_tensor or has_real_patient or has_dti_patient
+
     if use_real_tensor:
         # Use real DTI tensor field (either from standalone file or BraTS patient)
         builder = TensorFieldBuilder(
@@ -1411,7 +1451,18 @@ def main():
             tract_angle_deg=45.0,
             tract_width=15,
         )
-        if has_real_patient:
+        if has_dti_patient:
+            # Patient-specific DTI tensors from src/dti_loader.py (Proposal 1)
+            builder.D_xx = patient_builder.D_xx
+            builder.D_xy = patient_builder.D_xy
+            builder.D_yx = patient_builder.D_xy.copy()
+            builder.D_yy = patient_builder.D_yy
+            builder.tract_mask = patient_builder.tract_mask
+            builder.theta_field = patient_builder.theta_field
+            builder.lambda_1 = patient_builder.lambda_1
+            builder.lambda_2 = patient_builder.lambda_2
+            print("  Using real patient-specific DTI tensor field (src/dti_loader.py)")
+        elif has_real_patient:
             # Use tensor field from BraTS patient (mid-slice of 3D tensor field)
             # real_tensor_field has shape (3, 3, H, W) from mid-slice
             builder.D_xx = real_tensor_field[0, 0]

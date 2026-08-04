@@ -174,9 +174,81 @@ def run_deconvolution(
 def map_fractions_to_parameters(
     frac_mean: np.ndarray,
     frac_lower: np.ndarray,
-    frac_upper: np.ndarray
+    frac_upper: np.ndarray,
+    patient_id: str | None = None,
+    multiomic_model_path: str | None = None,
+    multiomic_features_path: str | None = None,
 ) -> Dict[str, np.ndarray]:
-    """Map Neftel fractions to rho and D with uncertainty propagation."""
+    """Map Neftel fractions to rho and D with uncertainty propagation.
+
+    When ``multiomic_model_path`` (a pickled ElasticNet bundle from
+    src/multiomic_fusion.py) is provided AND the per-patient feature row for
+    ``patient_id`` is found in ``multiomic_features_path``, the rho/D
+    predictions come from the multi-omic fusion model (Proposal 2). Otherwise the
+    legacy transcriptomic-only linear mapping is used.
+
+    The convention matches the physical ranges used downstream:
+        RHO in [0.005, 0.12] /day
+        D   in [0.01,  0.50]  mm^2/day
+    """
+    # --- Multi-omic fusion path (Proposal 2) ------------------------------ #
+    if multiomic_model_path is not None and Path(multiomic_model_path).exists():
+        try:
+            import sys
+            sys.path.insert(0, str(Path(__file__).parent))
+            from multiomic_fusion import (
+                predict_params_from_features,
+                get_patient_vector,
+                feature_columns,
+                METHYLATION_FEATURES, CNV_FEATURES, METABOLIC_FEATURES,
+                NEFTEL_STATES,
+            )
+            fpath = Path(multiomic_features_path) if multiomic_features_path \
+                else Path("output/multiomic_features.tsv")
+            # Spot-level X: Neftel fractions (from deconvolution) +
+            # patient-level omic block (shared across spots for that patient).
+            if patient_id is not None and fpath.exists():
+                pt = get_patient_vector(patient_id, fpath)
+                m_start, m_end = 4, 4 + len(METHYLATION_FEATURES)
+                c_end = m_end + len(CNV_FEATURES)
+                metab_end = c_end + len(METABOLIC_FEATURES)
+                meth = pt[m_start:m_end]
+                cnv = pt[m_end:c_end]
+                metab = pt[c_end:metab_end]
+            else:
+                meth = np.full(len(METHYLATION_FEATURES), 0.5,
+                               dtype=np.float64)
+                cnv = np.zeros(len(CNV_FEATURES), dtype=np.float64)
+                metab = np.full(len(METABOLIC_FEATURES), 1.0,
+                                dtype=np.float64)
+            n_spots = frac_mean.shape[0]
+            X = np.concatenate([
+                frac_mean,
+                np.broadcast_to(meth, (n_spots, len(meth))),
+                np.broadcast_to(cnv, (n_spots, len(cnv))),
+                np.broadcast_to(metab, (n_spots, len(metab))),
+            ], axis=1)
+            rho_mean, D_mean = predict_params_from_features(
+                X, model_path=Path(multiomic_model_path)
+            )
+            # Uncertainty bands span the [RHO_MIN, RHO_MAX] range propagated from
+            # posterior fraction spread; for simplicity we use ±10% envelope.
+            rho_lower = 0.9 * rho_mean
+            rho_upper = 1.1 * rho_mean
+            D_lower = 0.9 * D_mean
+            D_upper = 1.1 * D_mean
+            return {
+                "rho_mean": rho_mean, "rho_lower": rho_lower,
+                "rho_upper": rho_upper,
+                "D_mean": D_mean, "D_lower": D_lower, "D_upper": D_upper,
+                "prolif_score": frac_mean[:, 0] + frac_mean[:, 1],
+                "invas_score": frac_mean[:, 2] + frac_mean[:, 3],
+                "multiomic_model": str(multiomic_model_path),
+            }
+        except Exception as e:
+            print(f"  [multiomic] predict failed ({e}); falling back to legacy mapping")
+
+    # --- Legacy: linear transcriptomic-only mapping ----------------------- #
     # State indices
     npc_idx, opc_idx = 0, 1
     ac_idx, mes_idx = 2, 3
@@ -345,6 +417,17 @@ def save_visualization(
 # Main Pipeline
 # --------------------------------------------------------------------------- #
 def main() -> None:
+    import argparse
+    parser = argparse.ArgumentParser(
+        description="Phase 1: Spatial Genomics Deconvolution"
+    )
+    parser.add_argument("--multiomic-model", type=str, default=None,
+                        help="Pickled ElasticNet bundle from src/multiomic_fusion.py")
+    parser.add_argument("--multiomic-features", type=str, default=None,
+                        help="multiomic_features.tsv path")
+    parser.add_argument("--patient-id", type=str, default=None)
+    args_deconv = parser.parse_args()
+
     out_dir = Path("output")
     out_dir.mkdir(parents=True, exist_ok=True)
     
@@ -378,7 +461,14 @@ def main() -> None:
     
     # Step 5: Map to biophysical parameters with uncertainty
     print("[PHASE 1] Mapping fractions to rho and D with 95% credible intervals...")
-    params = map_fractions_to_parameters(frac_mean, frac_lower, frac_upper)
+    if args_deconv.multiomic_model:
+        print(f"  Using multi-omic fusion model: {args_deconv.multiomic_model}")
+    params = map_fractions_to_parameters(
+        frac_mean, frac_lower, frac_upper,
+        patient_id=args_deconv.patient_id,
+        multiomic_model_path=args_deconv.multiomic_model,
+        multiomic_features_path=args_deconv.multiomic_features,
+    )
     
     # Step 6: Interpolate to full 3D grid
     print("[PHASE 1] Interpolating to full 3D grid...")

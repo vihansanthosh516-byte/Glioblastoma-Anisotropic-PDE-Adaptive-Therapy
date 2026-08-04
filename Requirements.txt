@@ -1,1 +1,5 @@
 SALib>=1.4.7
+nibabel>=5.2.0
+dipy>=1.9.0
+scikit-learn>=1.4.0
+h5py>=3.10.0

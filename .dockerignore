@@ -1,0 +1,45 @@
+# --- Keep build context small -------------------------------------------------
+.venv/
+.venv-1/
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+
+# IDE / OS
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
+
+# Heavy generated artifacts (mounted at runtime, never baked into image)
+output/
+data/brats/
+data/*.nii
+data/*.nii.gz
+*.nii
+*.nii.gz
+*.dcm
+*.pth
+*.pt
+*.pkl
+*.npz
+
+# CI / cache
+.git/
+.kaggle-outputs/
+kaggle_run/__pycache__/
+kaggle_run/*.pyc
+
+# Secrets
+.env
+.env.local
+*.pem
+*.key
+*.log
+*.tmp
+*.temp
+debug.txt

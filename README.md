@@ -51,6 +51,21 @@ clinical trials, and future translational research.
 
 ---
 
+## Recent Extensions (Proposals 1–5)
+
+Five extensions round out the framework. All are unit-tested / smoke-tested
+and are documented in their module docstrings.
+
+| # | Capability | New module(s) | Entry point |
+|---|------------|---------------|-------------|
+| **1** | **Real-Patient DTI Integration** — replaces the synthetic diagonal tract with patient-specific $3\times3$ diffusion tensors from NIfTI DTI volumes, resamples to the computational grid, masks non-brain voxels, optionally verifies eigenvectors via DIPY tractography | `src/dti_loader.py` | `python src/42_anisotropic_pde.py --dti-tensor fa_tensor.nii.gz --dti-fa fa.nii.gz --gene-scale 1.0` |
+| **2** | **Multi-Omic & Epigenetic Feature Fusion** — fuses Neftel-state fractions with DNA methylation (MGMT), CNV (EGFR/PDGFRA), and metabolic flux features to predict $\rho$ and $D$ via cross-validated ElasticNet | `src/multiomic_fusion.py`; integrates into `src/50_spatial_genomics_deconv.py`; `tests/test_multiomic_fusion.py` | `python src/multiomic_fusion.py`; `python src/50_spatial_genomics_deconv.py --multiomic-model output/multiomic_elasticnet.pkl --multiomic-features output/multiomic_features.tsv` |
+| **3** | **Explainable AI & Policy Saliency Maps** — gradient-based saliency of the RL policy w.r.t. the 3D tumour density tensor, rendered as Plotly isosurface HTML overlays and a multi-day dose-on report embeddable in the HIL UI | `src/xai_saliency.py`, `visualization/view_3d_saliency.py` | `python visualization/view_3d_saliency.py --day 10 --patient-id PAT_01 --output output/saliency_day_10.html` |
+| **4** | **HIL Uncertainty Quantification** — FNO ensemble (N=5) + Monte-Carlo (M=200) rollout produces a 95% confidence band on future tumour volume; dose-escalate alert when the lower bound clears a critical threshold; JSONL calibration log for empirical 95% coverage | `src/uq_fno_ensemble.py` | `python src/uq_fno_ensemble.py --model-dir output/fno_ensemble --horizon-days 30 --M 200 --patient-id UQ_DEMO` |
+| **5** | **Docker Benchmark Suite** — stateless, SHA-tagged reproducibility container running the full Track B + C + UQ + test pipeline; `docker compose run --rm benchmark` | `Dockerfile`, `docker-entrypoint.sh`, `docker-compose.yml`, `Makefile`, `.dockerignore` | `make build && make run` (or `docker compose run --rm benchmark`) |
+
+---
+
 ## Three Parallel Research Tracks
 
 ### Track A: MSOS — Multi-Scale Spatial Oncology Suite (Months 1–6 + Clinical)
@@ -408,16 +423,18 @@ Known limitations:
 
 Planned extensions:
 
-- Real DTI tensor ingestion (replace synthetic tensors with patient-specific $3 \times 3$ DTI tensors)
+- ~~Real DTI tensor ingestion (replace synthetic tensors with patient-specific $3 \times 3$ DTI tensors)~~ **Implemented** — `src/dti_loader.py` (`PatientTensorBuilder`) ingests NIfTI/Analyze DTI tensor volumes + FA masks, constructs the field $D(x)=\lambda_\parallel v_1 v_1^\top+\lambda_\perp(I-v_1 v_1^\top)$, resamples to the model grid, masks non-brain voxels, and integrates with `src/42_anisotropic_pde.py` via `--dti-tensor` / `--dti-fa` ``--gene-scale``. Optional DIPY tractography verification included.
 - BraTS validation; TCGA-GBM validation; Ivy GAP integration
 - 3D volumetric boundary masking (dural / skull / ventricular CSF zero-flux)
 - Multi-clonal tumor evolution
 - Bayesian parameter estimation
 - Model Predictive Control baseline comparison vs RL
 - Large-scale virtual clinical trials
-- Explainable reinforcement learning
-- Docker deployment for full reproducibility
+- ~~Explainable reinforcement learning~~ **Implemented** — `src/xai_saliency.py` computes policy-log-probability gradients w.r.t. the 3D tumour tensor and renders Plotly isosurface overlays via `visualization/view_3d_saliency.py`; multi-day dose-on saliency HTML reports embed into the HIL UI.
+- ~~Docker deployment for full reproducibility~~ **Implemented** — `Dockerfile` + `docker-entrypoint.sh` + `docker-compose.yml` + `Makefile` provide a stateless, SHA-tagged benchmark suite (`docker compose run --rm benchmark`).
 - Prospective clinical trial endpoint design (TTP at reduced drug exposure)
+- ~~Multi-omic / epigenetic feature fusion~~ **Implemented** — `src/multiomic_fusion.py` fuses Neftel fractions with methylation (MGMT promoter), CNV (EGFR / PDGFRA), and metabolic-flux features, trains cross-validated ElasticNet models for $\rho$ and $D$, and is wired into `src/50_spatial_genomics_deconv.py` via `--multiomic-model` / `--multiomic-features`. Verified by `tests/test_multiomic_fusion.py` (multi-omic beats unimodal baseline when omic features drive labels).
+- ~~HIL uncertainty quantification~~ **Implemented** — `src/uq_fno_ensemble.py` trains an N=5 FNO ensemble, runs M=200 Monte-Carlo rollouts, plots the 95% confidence band as a Plotly HTML page embeddable in the HIL UI, fires a dose-escalate alert when the lower bound clears the critical tumour volume, and maintains a JSONL calibration log of empirical 95% coverage.
 
 ---
 
