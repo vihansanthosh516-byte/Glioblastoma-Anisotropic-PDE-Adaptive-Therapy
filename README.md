@@ -13,11 +13,13 @@
 ## Table of Contents
 
 - [Overview](#overview)
+- [Interactive Visual Dashboards](#interactive-visual-dashboards)
+- [Installation & Quickstart](#installation--quickstart)
 - [Three Parallel Research Tracks](#three-parallel-research-tracks)
 - [Track A: MSOS — Multi-Scale Spatial Oncology Suite (Months 1–6 + Clinical)](#track-a-msos--multi-scale-spatial-oncology-suite-months-16--clinical)
 - [Track B: 10-Month PDE Cohort (Months 7–10)](#track-b-10-month-pde-cohort-months-710)
 - [Track C: Digital Twin Reactor (Phases 1–9)](#track-c-digital-twin-reactor-phases-19)
-- [Installation & Quickstart](#installation--quickstart)
+- [Recent Extensions (Proposals 1–5)](#recent-extensions-proposals-15)
 - [Repository Structure](#repository-structure)
 - [Key Findings Across Tracks](#key-findings-across-tracks)
 - [Validation & Reproducibility](#validation--reproducibility)
@@ -51,18 +53,87 @@ clinical trials, and future translational research.
 
 ---
 
-## Recent Extensions (Proposals 1–5)
+## Interactive Visual Dashboards
 
-Five extensions round out the framework. All are unit-tested / smoke-tested
-and are documented in their module docstrings.
+The framework ships with several interactive, browser-based HTML viewers (Plotly)
+that turn raw PDE/RL/DTI outputs into inspectable 3D and 4D artifacts. Open any
+generated `.html` file in a browser — no server required — for fast
+demonstrations and reviewer-friendly evidence.
 
-| # | Capability | New module(s) | Entry point |
-|---|------------|---------------|-------------|
-| **1** | **Real-Patient DTI Integration** — replaces the synthetic diagonal tract with patient-specific $3\times3$ diffusion tensors from NIfTI DTI volumes, resamples to the computational grid, masks non-brain voxels, optionally verifies eigenvectors via DIPY tractography | `src/dti_loader.py` | `python src/42_anisotropic_pde.py --dti-tensor fa_tensor.nii.gz --dti-fa fa.nii.gz --gene-scale 1.0` |
-| **2** | **Multi-Omic & Epigenetic Feature Fusion** — fuses Neftel-state fractions with DNA methylation (MGMT), CNV (EGFR/PDGFRA), and metabolic flux features to predict $\rho$ and $D$ via cross-validated ElasticNet | `src/multiomic_fusion.py`; integrates into `src/50_spatial_genomics_deconv.py`; `tests/test_multiomic_fusion.py` | `python src/multiomic_fusion.py`; `python src/50_spatial_genomics_deconv.py --multiomic-model output/multiomic_elasticnet.pkl --multiomic-features output/multiomic_features.tsv` |
-| **3** | **Explainable AI & Policy Saliency Maps** — gradient-based saliency of the RL policy w.r.t. the 3D tumour density tensor, rendered as Plotly isosurface HTML overlays and a multi-day dose-on report embeddable in the HIL UI | `src/xai_saliency.py`, `visualization/view_3d_saliency.py` | `python visualization/view_3d_saliency.py --day 10 --patient-id PAT_01 --output output/saliency_day_10.html` |
-| **4** | **HIL Uncertainty Quantification** — FNO ensemble (N=5) + Monte-Carlo (M=200) rollout produces a 95% confidence band on future tumour volume; dose-escalate alert when the lower bound clears a critical threshold; JSONL calibration log for empirical 95% coverage | `src/uq_fno_ensemble.py` | `python src/uq_fno_ensemble.py --model-dir output/fno_ensemble --horizon-days 30 --M 200 --patient-id UQ_DEMO` |
-| **5** | **Docker Benchmark Suite** — stateless, SHA-tagged reproducibility container running the full Track B + C + UQ + test pipeline; `docker compose run --rm benchmark` | `Dockerfile`, `docker-entrypoint.sh`, `docker-compose.yml`, `Makefile`, `.dockerignore` | `make build && make run` (or `docker compose run --rm benchmark`) |
+| Dashboard | What it shows | Produce it with |
+|-----------|---------------|-----------------|
+| **4D Time-Slider Tumor Viewer** (real BraTS patient) | 3D tumor density evolving through infusion days with an interactive slider | `python src/timed_drug_infusion.py --patient BraTS2021_00000 --days 120 --infusion-days 30 60 90 && python visualization/view_3d_time_slider.py --input-dir output/time_series --output output/true_3d_time_series_dashboard.html` |
+| **3D Interactive Tumor Dashboard** | Plotly isosurface + clinical metrics overlay | `python src/49_interactive_3d_dashboard.py` (writes `output/3d_interactive_tumor_dashboard.html`) |
+| **Static 3D Tumor Isosurface** | Quick Plotly isosurface of a segmentation snapshot | `python visualization/view_3d_plotly.py` |
+| **Matplotlib 3D Tumor Viewer** | Static matplotlib render for papers / offline viewing | `python visualization/view_3d_tumor.py` |
+| **RL Policy Saliency Maps (XAI)** (Proposal 3) | Tumour + per-step policy-saliency isosurfaces; multi-day dose-on report embeddable in the HIL UI | `python visualization/view_3d_saliency.py --day 10 --patient-id PAT_01 --output output/saliency_day_10.html` |
+| **HIL UQ Trajectory** (Proposal 4) | Predicted tumour volume with shaded 95 % confidence band for the next 7–30 days; dose-escalate alert | `python src/uq_fno_ensemble.py --model-dir output/fno_ensemble --horizon-days 30 --M 200 --patient-id UQ_DEMO` |
+
+> **Tip for judges / reviewers:** the highest-impact demo is the 4D Time-Slider
+> Viewer — it animates a real BraTS tumor responding to scheduled drug infusion.
+
+---
+
+## Installation & Quickstart
+
+```bash
+# Clone repository
+git clone https://github.com/vihansanthosh516-byte/Glioblastoma-Anisotropic-PDE-Adaptive-Therapy.git
+cd Glioblastoma-Anisotropic-PDE-Adaptive-Therapy
+
+# Create virtual environment (Python 3.12+; 3.14 recommended)
+python -m venv venv
+source venv/bin/activate          # Linux / macOS
+.\venv\Scripts\Activate.ps1       # Windows PowerShell
+
+# Install dependencies
+pip install -r Requirements.txt   # Core pinned: SALib, nibabel, dipy, sklearn, h5py
+pip install numpy scipy matplotlib pillow pandas gymnasium torch plotly
+
+# --- One-command interactive demo (real BraTS patient, 4D viewer) -----------
+python src/timed_drug_infusion.py --patient BraTS2021_00000 --days 120 --infusion-days 30 60 90
+python visualization/view_3d_time_slider.py --input-dir output/time_series \
+    --output output/true_3d_time_series_dashboard.html
+# Open in browser: start output/true_3d_time_series_dashboard.html
+
+# --- Docker: full reproducible benchmark (Proposal 5) ----------------------
+make build && make run           # or:  docker compose run --rm benchmark
+
+# --- Track B: 10-Month PDE Cohort (Months 7 → 10) -------------------------
+bash run_all.sh                   # Linux / macOS / Git Bash / WSL
+bash run_all.sh --month10         # Only Month 10 synthesis (assumes 42–44 done)
+
+# --- Track C: Digital Twin reactor phases (run individually) --------------
+python src/51_inverse_parameter_estimation.py --test
+python src/52_robust_mpc_controller.py --benchmark --n-mc 50
+python src/53_spatial_metrics.py --validate
+python src/58_rl_adaptive_steering.py
+python src/59_sensitivity_analysis.py
+python src/60_baselines_and_ablation.py
+python src/61_rl_convergence_diagnostics.py
+python src/62_biomarker_bootstrap_stability.py
+python src/63_reward_sensitivity.py
+python src/64_virtual_cohort_simulation.py
+python src/65_generate_final_report.py
+
+# --- Track C Phases 10-15: Neural PDE & Chronotherapy ---------------------
+python src/phase15_virtual_trial.py \
+    --model-path output/phase13_ppo_chronotherapy/ppo_chronotherapy_final.zip \
+    --vecnorm-path output/phase13_ppo_chronotherapy/vecnormalize.pkl \
+    --n-patients 5 --max-episode-hours 12
+
+# --- Optional extensions (Proposals 1, 3, 4) -----------------------------
+python src/42_anisotropic_pde.py --dti-tensor fa_tensor.nii.gz --dti-fa fa.nii.gz --gene-scale 1.0
+python visualization/view_3d_saliency.py --day 10 --patient-id PAT_01 --output output/saliency_day_10.html
+python src/uq_fno_ensemble.py --model-dir output/fno_ensemble --horizon-days 30 --M 200 --patient-id UQ_DEMO
+```
+
+**Platform note:** `run_all.sh` is a POSIX bash script. On Windows, run under
+**Git Bash** or **WSL**. A PowerShell equivalent:
+
+```powershell
+foreach ($s in 42,43,44,45) { & venv\Scripts\python.exe "src\${s}_*.py" }
+```
 
 ---
 
@@ -205,54 +276,18 @@ python src/phase15_virtual_trial.py --model-path output/phase13_ppo_chronotherap
 
 ---
 
-## Installation & Quickstart
+## Recent Extensions (Proposals 1–5)
 
-```bash
-# Clone repository
-git clone https://github.com/vihansanthosh516-byte/Glioblastoma-Anisotropic-PDE-Adaptive-Therapy.git
-cd Glioblastoma-Anisotropic-PDE-Adaptive-Therapy
+Five extensions round out the framework. All are unit-tested / smoke-tested
+and are documented in their module docstrings.
 
-# Create virtual environment (Python 3.14+)
-python -m venv venv
-source venv/bin/activate          # Linux / macOS
-.\venv\Scripts\Activate.ps1       # Windows PowerShell
-
-# Install dependencies
-pip install -r Requirements.txt   # Core pinned: SALib>=1.4.7
-pip install numpy scipy matplotlib pillow pandas gymnasium torch
-
-# Track B: Run 10-Month PDE Cohort (Months 7 → 10)
-bash run_all.sh                   # Linux / macOS / Git Bash / WSL
-bash run_all.sh --month10         # Only Month 10 synthesis (assumes 42–44 done)
-
-# Track C: Run Digital Twin phases individually
-python src/51_inverse_parameter_estimation.py --test
-python src/52_robust_mpc_controller.py --benchmark --n-mc 50
-python src/53_spatial_metrics.py --validate
-python src/58_rl_adaptive_steering.py
-python src/59_sensitivity_analysis.py
-python src/60_baselines_and_ablation.py
-python src/61_rl_convergence_diagnostics.py
-python src/62_biomarker_bootstrap_stability.py
-python src/63_reward_sensitivity.py
-python src/64_virtual_cohort_simulation.py
-python src/65_generate_final_report.py
-
-# Track C Phases 10-15: Neural PDE & Chronotherapy
-python src/phase15_virtual_trial.py --model-path output/phase13_ppo_chronotherapy/ppo_chronotherapy_final.zip --vecnorm-path output/phase13_ppo_chronotherapy/vecnormalize.pkl --n-patients 5 --max-episode-hours 12
-
-# Interactive 4D Tumor Visualization (3D+time on real BraTS patient)
-python src/timed_drug_infusion.py --patient BraTS2021_00000 --days 120 --infusion-days 30 60 90
-python visualization/view_3d_time_slider.py --input-dir output/time_series --output output/true_3d_time_series_dashboard.html
-# Open in browser: start output/true_3d_time_series_dashboard.html
-```
-
-**Platform note:** `run_all.sh` is a POSIX bash script. On Windows, run under
-**Git Bash** or **WSL**. A PowerShell equivalent:
-
-```powershell
-foreach ($s in 42,43,44,45) { & venv\Scripts\python.exe "src\${s}_*.py" }
-```
+| # | Capability | New module(s) | Entry point |
+|---|------------|---------------|-------------|
+| **1** | **Real-Patient DTI Integration** — replaces the synthetic diagonal tract with patient-specific $3\times3$ diffusion tensors from NIfTI DTI volumes, resamples to the computational grid, masks non-brain voxels, optionally verifies eigenvectors via DIPY tractography | `src/dti_loader.py` | `python src/42_anisotropic_pde.py --dti-tensor fa_tensor.nii.gz --dti-fa fa.nii.gz --gene-scale 1.0` |
+| **2** | **Multi-Omic & Epigenetic Feature Fusion** — fuses Neftel-state fractions with DNA methylation (MGMT), CNV (EGFR/PDGFRA), and metabolic flux features to predict $\rho$ and $D$ via cross-validated ElasticNet | `src/multiomic_fusion.py`; integrates into `src/50_spatial_genomics_deconv.py`; `tests/test_multiomic_fusion.py` | `python src/multiomic_fusion.py`; `python src/50_spatial_genomics_deconv.py --multiomic-model output/multiomic_elasticnet.pkl --multiomic-features output/multiomic_features.tsv` |
+| **3** | **Explainable AI & Policy Saliency Maps** — gradient-based saliency of the RL policy w.r.t. the 3D tumour density tensor, rendered as Plotly isosurface HTML overlays and a multi-day dose-on report embeddable in the HIL UI | `src/xai_saliency.py`, `visualization/view_3d_saliency.py` | `python visualization/view_3d_saliency.py --day 10 --patient-id PAT_01 --output output/saliency_day_10.html` |
+| **4** | **HIL Uncertainty Quantification** — FNO ensemble (N=5) + Monte-Carlo (M=200) rollout produces a 95% confidence band on future tumour volume; dose-escalate alert when the lower bound clears a critical threshold; JSONL calibration log for empirical 95% coverage | `src/uq_fno_ensemble.py` | `python src/uq_fno_ensemble.py --model-dir output/fno_ensemble --horizon-days 30 --M 200 --patient-id UQ_DEMO` |
+| **5** | **Docker Benchmark Suite** — stateless, SHA-tagged reproducibility container running the full Track B + C + UQ + test pipeline; `docker compose run --rm benchmark` | `Dockerfile`, `docker-entrypoint.sh`, `docker-compose.yml`, `Makefile`, `.dockerignore` | `make build && make run` (or `docker compose run --rm benchmark`) |
 
 ---
 
