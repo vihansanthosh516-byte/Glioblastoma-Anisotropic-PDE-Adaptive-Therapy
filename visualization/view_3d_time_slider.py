@@ -141,7 +141,7 @@ def create_interactive_dashboard(grids, day_labels, output_path: str = "output/t
             "yanchor": "top",
             "buttons": [
                 {
-                    "args": [None, {"frame": {"duration": 300, "redraw": True}, "fromcurrent": True, "transition": {"duration": 100}}],
+                    "args": [None, {"frame": {"duration": 500, "redraw": True}, "fromcurrent": True, "transition": {"duration": 200, "easing": "cubic-in-out"}, "mode": "immediate"}],
                     "label": "▶ Play",
                     "method": "animate"
                 },
@@ -162,7 +162,7 @@ def create_interactive_dashboard(grids, day_labels, output_path: str = "output/t
                 "visible": True,
                 "xanchor": "right"
             },
-            "transition": {"duration": 100, "easing": "cubic-in-out"},
+            "transition": {"duration": 200, "easing": "cubic-in-out"},
             "pad": {"b": 10, "t": 50},
             "len": 0.9,
             "x": 0.1,

@@ -44,6 +44,7 @@ def load_patient_mask(nii_path: str, downsample: int = 2) -> np.ndarray:
 
 def run_pk_pde_simulation(
     patient_id: str = "BraTS2021_00000",
+    mask_path: str = None,
     downsample: int = 2,
     dt_days: float = 1.0,
     total_days: int = 120,
@@ -57,7 +58,8 @@ def run_pk_pde_simulation(
     Run PK/PD tumor simulation with timed drug infusions.
     
     Args:
-        patient_id: BraTS patient directory name
+        patient_id: BraTS patient directory name (used if mask_path not provided)
+        mask_path: Direct path to tumor mask NIfTI file (overrides patient_id)
         downsample: Factor to downsample MRI (2 = 2x downsample)
         dt_days: Time step in days
         total_days: Total simulation days
@@ -74,6 +76,8 @@ def run_pk_pde_simulation(
     print("  TIMED DRUG INFUSION & DYNAMIC TUMOR RESPONSE ENGINE   ")
     print("=" * 60)
     print(f"  Patient: {patient_id}")
+    if mask_path:
+        print(f"  Mask: {mask_path}")
     print(f"  Downsample: {downsample}x")
     print(f"  Simulation: {total_days} days, dt={dt_days} day")
     print(f"  Growth rate (rho): {rho} /day")
@@ -84,18 +88,22 @@ def run_pk_pde_simulation(
     print("=" * 60)
 
     # 1. Load Real Patient NIfTI Initial State
-    base_dir = f"data/brats/{patient_id}"
-    nii_path = os.path.join(base_dir, f"{patient_id}_seg.nii.gz")
+    if mask_path and os.path.exists(mask_path):
+        nii_path = mask_path
+        print(f"[LOAD] Loading custom mask from: {nii_path}")
+    else:
+        base_dir = f"data/brats/{patient_id}"
+        nii_path = os.path.join(base_dir, f"{patient_id}_seg.nii.gz")
+        
+        if not os.path.exists(nii_path):
+            found = glob.glob("data/brats/*/*seg.nii.gz")
+            if found:
+                nii_path = found[0]
+                print(f"[INFO] Using fallback: {nii_path}")
+            else:
+                raise FileNotFoundError(f"No BraTS segmentation found for {patient_id}")
+        print(f"[LOAD] Loading patient from: {nii_path}")
     
-    if not os.path.exists(nii_path):
-        found = glob.glob("data/brats/*/*seg.nii.gz")
-        if found:
-            nii_path = found[0]
-            print(f"[INFO] Using fallback: {nii_path}")
-        else:
-            raise FileNotFoundError(f"No BraTS segmentation found for {patient_id}")
-
-    print(f"[LOAD] Loading patient from: {nii_path}")
     u = load_patient_mask(nii_path, downsample=downsample)
     print(f"[LOAD] Tumor mask shape: {u.shape}, volume: {np.sum(u > 0.05)} voxels")
 
@@ -254,6 +262,8 @@ def main():
     )
     parser.add_argument("--patient", type=str, default="BraTS2021_00000",
                         help="BraTS patient directory name")
+    parser.add_argument("--mask-path", type=str, default=None,
+                        help="Direct path to tumor mask NIfTI file (overrides --patient)")
     parser.add_argument("--downsample", type=int, default=2,
                         help="Downsample factor for MRI")
     parser.add_argument("--days", type=int, default=120,
@@ -275,6 +285,7 @@ def main():
     
     run_pk_pde_simulation(
         patient_id=args.patient,
+        mask_path=args.mask_path,
         downsample=args.downsample,
         dt_days=args.dt,
         total_days=args.days,
