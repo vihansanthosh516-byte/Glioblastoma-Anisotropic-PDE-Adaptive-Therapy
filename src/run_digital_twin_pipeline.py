@@ -20,6 +20,13 @@ import pandas as pd
 from pathlib import Path
 from typing import List, Dict, Tuple, Optional
 
+try:
+    from src.treatment_aware_pde import TreatmentSchedule
+except ImportError:
+    import sys, pathlib
+    sys.path.insert(0, str(pathlib.Path(__file__).parent.parent))
+    from src.treatment_aware_pde import TreatmentSchedule
+
 
 CLINICAL_EXCEL = "data/tcia/MU-Glioma-Post_ClinicalData-July2025.xlsx"
 SHEET_NAME = "MU Glioma Post"
@@ -284,25 +291,50 @@ def find_tumor_masks(patient_dir: str) -> Tuple[List[str], List[int]]:
     return [], []
 
 
-def run_inverse_estimation(mask_t0: str, mask_t1: str, delta_t: float, output_json: str) -> Tuple[Optional[float], Optional[float]]:
-    """Run inverse parameter estimation."""
-    cmd = [
-        sys.executable, "src/51_inverse_parameter_estimation.py",
-        "--nifti-t0", mask_t0,
-        "--nifti-t1", mask_t1,
-        "--delta-t", str(delta_t),
-        "--output", output_json
-    ]
-    result = subprocess.run(cmd, capture_output=True, text=True, cwd=".")
-    
-    if result.returncode != 0:
+def run_inverse_estimation(mask_t0: str, mask_t1: str, delta_t: float, output_json: str, treatment_schedule: Optional[TreatmentSchedule] = None) -> Tuple[Optional[float], Optional[float]]:
+    """Run inverse parameter estimation with optional treatment schedule."""
+    try:
+        import nibabel as nib
+    except ImportError:
         return None, None
     
     try:
-        with open(output_json, 'r') as f:
-            data = json.load(f)
-        return data.get('rho'), data.get('D')
-    except Exception:
+        # Load volumes from NIfTI
+        img0 = nib.load(mask_t0)
+        data0 = img0.get_fdata(dtype=np.float32)
+        voxel_vol0 = abs(np.linalg.det(img0.affine[:3, :3]))
+        V0 = float(np.sum(data0 > 0) * voxel_vol0)
+        
+        img1 = nib.load(mask_t1)
+        data1 = img1.get_fdata(dtype=np.float32)
+        voxel_vol1 = abs(np.linalg.det(img1.affine[:3, :3]))
+        V1 = float(np.sum(data1 > 0) * voxel_vol1)
+        
+        # Call estimation API directly with treatment schedule
+        import sys, pathlib, importlib.util
+        spec = importlib.util.spec_from_file_location(
+            "inv_est", pathlib.Path(__file__).with_name("51_inverse_parameter_estimation.py")
+        )
+        inv_est = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(inv_est)
+        
+        result = inv_est.estimate_patient_parameters(
+            t0_volume=V0,
+            t1_volume=V1,
+            delta_t_days=delta_t,
+            treatment_schedule=treatment_schedule,
+        )
+        
+        # Save result
+        import json
+        result_json = {k: v for k, v in result.items() if k != "bootstrap_samples"}
+        Path(output_json).parent.mkdir(parents=True, exist_ok=True)
+        with open(output_json, 'w') as f:
+            json.dump(result_json, f, indent=2)
+        
+        return result['rho'], result['D']
+    except Exception as e:
+        print(f"[ERROR] Inverse estimation failed: {e}")
         return None, None
 
 
@@ -548,6 +580,8 @@ def main():
     # Build treatment schedule
     print("\n[STEP 3] Building treatment schedule...")
     treatment_schedule = build_treatment_schedule(events, args.days)
+    tmz_days = tuple(float(i) for i, value in enumerate(treatment_schedule['drug_concentration']) if value > 0)
+    pde_schedule = TreatmentSchedule(tmz_bolus_days=tmz_days)
     
     # Save schedule for reference
     with open(output_dir / "treatment_schedule.json", 'w') as f:
@@ -579,7 +613,7 @@ def main():
             delta_t = float(tp2_day) - float(tp1_day)
         
         est_output = output_dir / "inverse_estimation.json"
-        est_rho, est_D = run_inverse_estimation(masks[0], masks[1], delta_t, str(est_output))
+        est_rho, est_D = run_inverse_estimation(masks[0], masks[1], delta_t, str(est_output), pde_schedule)
         
         if est_rho is not None:
             rho, D = est_rho, est_D

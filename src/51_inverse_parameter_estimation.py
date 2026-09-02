@@ -34,6 +34,19 @@ import numpy as np
 from scipy.optimize import minimize
 from scipy.stats import norm
 
+try:
+    from .treatment_aware_pde import TreatmentSchedule, treatment_aware_ode_model
+except ImportError:  # direct script or import-by-path execution
+    import importlib.util
+    _treatment_path = Path(__file__).with_name("treatment_aware_pde.py")
+    _spec = importlib.util.spec_from_file_location("treatment_aware_pde", _treatment_path)
+    _treatment_module = importlib.util.module_from_spec(_spec)
+    sys.modules["treatment_aware_pde"] = _treatment_module
+    assert _spec.loader is not None
+    _spec.loader.exec_module(_treatment_module)
+    TreatmentSchedule = _treatment_module.TreatmentSchedule
+    treatment_aware_ode_model = _treatment_module.treatment_aware_ode_model
+
 warnings.filterwarnings("ignore")
 
 # Physiological bounds (per plan specification)
@@ -177,6 +190,9 @@ def objective_function(
     V0: float,
     V1_target: float,
     delta_t: float,
+    treatment_schedule: Optional[TreatmentSchedule] = None,
+    alpha: float = 0.08,
+    beta: float = 0.03,
 ) -> float:
     """
     Objective function for parameter optimization.
@@ -201,7 +217,11 @@ def objective_function(
     D = max(D_MIN, min(D_MAX, D))
     
     # Simulate volume
-    V1_sim = surrogate_ode_model(rho, D, V0, delta_t)
+    V1_sim = (
+        treatment_aware_ode_model(rho, D, V0, delta_t, treatment_schedule, alpha, beta)
+        if treatment_schedule is not None
+        else surrogate_ode_model(rho, D, V0, delta_t)
+    )
     
     # Squared relative error (scale-invariant)
     scale = max(abs(V1_target), 1.0)
@@ -218,6 +238,9 @@ def estimate_patient_parameters(
     bounds: Optional[Tuple[Tuple[float, float], Tuple[float, float]]] = None,
     method: str = "L-BFGS-B",
     n_bootstrap: int = N_BOOTSTRAP,
+    treatment_schedule: Optional[TreatmentSchedule] = None,
+    alpha: float = 0.08,
+    beta: float = 0.03,
 ) -> Dict[str, Any]:
     """
     Estimate patient-specific biophysical parameters from longitudinal volumes.
@@ -255,7 +278,7 @@ def estimate_patient_parameters(
     result = minimize(
         fun=objective_function,
         x0=np.array(initial_guess),
-        args=(t0_volume, t1_volume, delta_t_days),
+        args=(t0_volume, t1_volume, delta_t_days, treatment_schedule, alpha, beta),
         method=method,
         bounds=bounds_for_method,
         options={"maxiter": 1000, "disp": False},
@@ -287,7 +310,11 @@ def estimate_patient_parameters(
     D_ci = np.percentile(bootstrap_samples[:, 1], [2.5, 97.5])
     
     # RMSE
-    V1_pred = surrogate_ode_model(rho_est, D_est, t0_volume, delta_t_days)
+    V1_pred = (
+        treatment_aware_ode_model(rho_est, D_est, t0_volume, delta_t_days, treatment_schedule, alpha, beta)
+        if treatment_schedule is not None
+        else surrogate_ode_model(rho_est, D_est, t0_volume, delta_t_days)
+    )
     rmse = np.sqrt((V1_pred - t1_volume) ** 2)
     
     return {
