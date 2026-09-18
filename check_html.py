@@ -1,0 +1,10 @@
+with open('output/batch_digital_twins/unified_4d_patient_viewer.html', 'r') as f:
+    c = f.read()
+print('Plotly CDN:', 'plotly-2.27.0.min.js' in c)
+print('volumePlot div:', 'id="volumePlot"' in c)
+print('treatmentPlot div:', 'id="treatmentPlot"' in c)
+print('timelinePlot div:', 'id="timelinePlot"' in c)
+print('dropdown onchange:', 'dropdown.addEventListener' in c)
+print('loadPatient function:', 'function loadPatient' in c)
+print('Plotly.newPlot:', 'Plotly.newPlot' in c)
+print('patientData variable:', 'const patientData' in c)

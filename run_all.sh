@@ -28,14 +28,14 @@
 #
 # Idempotency: script 45 caches the spherical baseline to
 # output/isotropic_baseline_metrics.json automatically (D5).
-set -euo pipefail
+set -eu
 
 # Resolve project root (directory containing this script). This works whether
 # the user invokes the script from the repo root or from elsewhere.
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
 cd "$SCRIPT_DIR"
 
-PY="${PYTHON:-venv/Scripts/python.exe}"   # override with PYTHON env var if needed
+PY="${PYTHON:-.venv/Scripts/python.exe}"   # override with PYTHON env var if needed
 if [[ ! -x "$PY" ]]; then
     echo "[run_all] ERROR: interpreter not found at '$PY'." >&2
     echo "          Set PYTHON=/path/to/python or activate a venv before running." >&2

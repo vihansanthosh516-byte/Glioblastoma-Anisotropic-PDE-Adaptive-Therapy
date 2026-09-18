@@ -82,7 +82,11 @@ where J is evaluated over (ρ±15%, D±15%) parameter samples
 **Key Achievements**:
 - Dose-sparing ≥60% ✓
 - Adaptive horizon adjusts 7–21 days based on dynamics ✓
+<<<<<<< HEAD
 - Non-inferior TTP vs standard MPC (paired t = −1.00, p = 0.35) ✓
+=======
+- Non-inferior TTP vs standard MPC (p > 0.05) ✓
+>>>>>>> 1be6df8e9737fb3a9f7ee274b3822d40fcc8b97c
 
 ---
 
@@ -158,7 +162,11 @@ where J is evaluated over (ρ±15%, D±15%) parameter samples
 - [x] Robust MPC achieves ≥60% dose-sparing
 - [x] Cost variance reduced vs standard MPC
 - [x] Adaptive horizon adjusts 7–21 days correctly
+<<<<<<< HEAD
 - [x] Non-inferior TTP vs standard MPC (paired t = −1.00, p = 0.35)
+=======
+- [x] TTP non-inferior to standard MPC (paired t-test p > 0.05)
+>>>>>>> 1be6df8e9737fb3a9f7ee274b3822d40fcc8b97c
 
 ### Tier 3 Success Criteria ✓
 - [x] DSC cohort mean computed (0.21 ± 0.02 - expected low for anisotropic vs isotropic)
@@ -166,11 +174,19 @@ where J is evaluated over (ρ±15%, D±15%) parameter samples
 - [x] Spatial metrics added to `master_cohort_summary.json`
 - [x] New panels E, F, G in `master_cohort_synthesis.png`
 
+<<<<<<< HEAD
 ### Tier 4 Success Criteria (In Progress)
 - [x] Abstract updated in `README.md`
 - [x] `docs/methodology_upgrade_summary.md` created
 - [ ] `POSTER_KEY_FINDINGS.md` template updated
 - [ ] Positioning statement reflects all 3 tiers
+=======
+### Tier 4 Success Criteria (Complete)
+- [x] Abstract updated in `README.md`
+- [x] `docs/methodology_upgrade_summary.md` created
+- [x] `POSTER_KEY_FINDINGS.md` template updated (in `output/`)
+- [x] Positioning statement reflects all 3 tiers
+>>>>>>> 1be6df8e9737fb3a9f7ee274b3822d40fcc8b97c
 
 ---
 
@@ -214,4 +230,8 @@ venv\Scripts\python.exe src\53_spatial_metrics.py --validate
 
 ## Final Positioning Statement
 
+<<<<<<< HEAD
 > "We developed a patient-specific computational oncology platform that integrates 3D anisotropic DTI tract modeling, inverse biophysical parameter estimation, uncertainty-aware adaptive MPC control, and spatial validation with Dice/Hausdorff metrics into a unified research decision-support tool for glioblastoma treatment planning."
+=======
+> "We developed a patient-specific computational oncology platform that integrates **3D anisotropic DTI tract modeling**, **inverse biophysical parameter estimation**, **uncertainty-aware adaptive MPC control**, and **spatial validation with Dice/Hausdorff metrics** into a unified research decision-support tool for glioblastoma treatment planning. The framework spans three interlocking tracks: (A) MSOS — single-cell multi-omics through causal GRN to invasion dynamics and clinical validation; (B) 10-Month PDE Cohort — anisotropic diffusion, stromal coupling, adaptive therapy, and global sensitivity; (C) Digital Twin Reactor — inverse estimation, robust MPC, 3D DTI solver, RL adaptive steering, and virtual cohort validation. Together, these establish a reproducible, biophysically grounded pipeline for in-silico clinical trial design and adaptive therapy optimization."
+>>>>>>> 1be6df8e9737fb3a9f7ee274b3822d40fcc8b97c

@@ -1,1 +1,9 @@
+<<<<<<< HEAD
 SALib>=1.4.7
+=======
+SALib>=1.4.7
+nibabel>=5.2.0
+dipy>=1.9.0
+scikit-learn>=1.4.0
+h5py>=3.10.0
+>>>>>>> 1be6df8e9737fb3a9f7ee274b3822d40fcc8b97c

@@ -4,6 +4,7 @@
 This module estimates patient-specific biophysical parameters (ρ, D) from
 longitudinal imaging data using bounded optimization with bootstrap uncertainty.
 
+<<<<<<< HEAD
 Parameter Identifiability & Confidence Bounds (Tier 1):
 ------------------------------------------------------
 Volume-only inverse problems are inherently underdetermined: a single pair of
@@ -28,10 +29,13 @@ bounded optimization. The L-BFGS-B algorithm enforces these bounds during
 optimization, and bootstrap resampling (N=100) quantifies estimation
 uncertainty via 95% confidence intervals.
 
+=======
+>>>>>>> 1be6df8e9737fb3a9f7ee274b3822d40fcc8b97c
 Mathematical Formulation:
     Given: T₀ (baseline volume), T₁ (follow-up volume), Δt (time between scans)
     Solve: min_{ρ, D} ||V_simulated(ρ, D, Δt) - T₁||²
     Subject to:
+<<<<<<< HEAD
         - 0.005 ≤ ρ ≤ 0.05 /day (physiological bounds)
         - 0.001 ≤ D ≤ 0.1 mm²/day (diffusivity bounds)
 
@@ -40,10 +44,23 @@ Algorithm:
     - Surrogate ODE model for fast evaluation: dV/dt = ρ*V*(1-V/K) + D*∇²V
     - Bootstrap resampling (N=100) for confidence intervals
     - Convergence residuals reported: objective value, gradient norm, iterations
+=======
+        - 0.005 ≤ ρ ≤ 0.1 /day (physiological bounds)
+        - 0.001 ≤ D ≤ 0.05 mm²/day (diffusivity bounds)
+
+Algorithm:
+    - scipy.optimize.minimize with Nelder-Mead or Powell method
+    - Surrogate ODE model for fast evaluation: dV/dt = ρ*V*(1-V/K) + D*∇²V
+    - Bootstrap resampling (N=100) for confidence intervals
+>>>>>>> 1be6df8e9737fb3a9f7ee274b3822d40fcc8b97c
 
 Usage:
     python src/51_inverse_parameter_estimation.py --test
     python src/51_inverse_parameter_estimation.py --t0-volume 1000 --t1-volume 1200 --delta-t 30
+<<<<<<< HEAD
+=======
+    python src/51_inverse_parameter_estimation.py --nifti-t0 T0_seg.nii.gz --nifti-t1 T1_seg.nii.gz --delta-t 30
+>>>>>>> 1be6df8e9737fb3a9f7ee274b3822d40fcc8b97c
 """
 from __future__ import annotations
 
@@ -58,6 +75,7 @@ import numpy as np
 from scipy.optimize import minimize
 from scipy.stats import norm
 
+<<<<<<< HEAD
 warnings.filterwarnings("ignore")
 
 # Physiological bounds (per plan specification — Tier 1 identifiability)
@@ -67,6 +85,28 @@ RHO_MIN = 0.005  # /day (minimum growth rate: ~0.5%/day)
 RHO_MAX = 0.05   # /day (maximum growth rate: ~ln(2)/14 ≈ 0.05/day)
 D_MIN = 0.001    # mm²/day (minimum diffusivity: near-spherical)
 D_MAX = 0.1      # mm²/day (maximum diffusivity: fast infiltration)
+=======
+try:
+    from .treatment_aware_pde import TreatmentSchedule, treatment_aware_ode_model
+except ImportError:  # direct script or import-by-path execution
+    import importlib.util
+    _treatment_path = Path(__file__).with_name("treatment_aware_pde.py")
+    _spec = importlib.util.spec_from_file_location("treatment_aware_pde", _treatment_path)
+    _treatment_module = importlib.util.module_from_spec(_spec)
+    sys.modules["treatment_aware_pde"] = _treatment_module
+    assert _spec.loader is not None
+    _spec.loader.exec_module(_treatment_module)
+    TreatmentSchedule = _treatment_module.TreatmentSchedule
+    treatment_aware_ode_model = _treatment_module.treatment_aware_ode_model
+
+warnings.filterwarnings("ignore")
+
+# Physiological bounds (per plan specification)
+RHO_MIN = 0.005  # /day (minimum growth rate)
+RHO_MAX = 0.1    # /day (maximum growth rate)
+D_MIN = 0.001    # mm²/day (minimum diffusivity)
+D_MAX = 0.05     # mm²/day (maximum diffusivity)
+>>>>>>> 1be6df8e9737fb3a9f7ee274b3822d40fcc8b97c
 
 # Default initial guess
 RHO_DEFAULT = 0.02    # /day
@@ -82,6 +122,62 @@ NOISE_STD = 0.10  # 10% Gaussian noise for robustness testing
 K_DEFAULT = 1.0e6  # mm3 (acts as near-pure exponential for small tumors)
 
 
+<<<<<<< HEAD
+=======
+def _load_volume_from_nifti(nifti_path: Path) -> float:
+    """
+    Load tumor volume from NIfTI segmentation file.
+    
+    Args:
+        nifti_path: Path to NIfTI file with tumor segmentation
+        
+    Returns:
+        Tumor volume in mm³
+    """
+    try:
+        import nibabel as nib
+    except ImportError:
+        raise ImportError("nibabel required for NIfTI support. Install with: pip install nibabel")
+    
+    img = nib.load(str(nifti_path))
+    data = img.get_fdata(dtype=np.float32)
+    affine = img.affine
+    
+    # Get voxel volume from affine
+    voxel_volume = abs(np.linalg.det(affine[:3, :3]))  # mm³ per voxel
+    
+    # Binarize mask (any non-zero = tumor)
+    tumor_mask = data > 0
+    
+    # Count tumor voxels
+    n_voxels = np.sum(tumor_mask)
+    
+    # Volume in mm³
+    volume_mm3 = n_voxels * voxel_volume
+    
+    return volume_mm3
+
+
+def _load_volumes_from_brats(
+    t0_seg_path: Path,
+    t1_seg_path: Path,
+) -> Tuple[float, float]:
+    """
+    Load tumor volumes from two BraTS segmentation files.
+    
+    Args:
+        t0_seg_path: Path to baseline segmentation NIfTI
+        t1_seg_path: Path to follow-up segmentation NIfTI
+        
+    Returns:
+        (V0, V1) volumes in mm³
+    """
+    V0 = _load_volume_from_nifti(t0_seg_path)
+    V1 = _load_volume_from_nifti(t1_seg_path)
+    return V0, V1
+
+
+>>>>>>> 1be6df8e9737fb3a9f7ee274b3822d40fcc8b97c
 def surrogate_ode_model(
     rho: float,
     D: float,
@@ -150,6 +246,12 @@ def objective_function(
     V0: float,
     V1_target: float,
     delta_t: float,
+<<<<<<< HEAD
+=======
+    treatment_schedule: Optional[TreatmentSchedule] = None,
+    alpha: float = 0.08,
+    beta: float = 0.03,
+>>>>>>> 1be6df8e9737fb3a9f7ee274b3822d40fcc8b97c
 ) -> float:
     """
     Objective function for parameter optimization.
@@ -174,7 +276,15 @@ def objective_function(
     D = max(D_MIN, min(D_MAX, D))
     
     # Simulate volume
+<<<<<<< HEAD
     V1_sim = surrogate_ode_model(rho, D, V0, delta_t)
+=======
+    V1_sim = (
+        treatment_aware_ode_model(rho, D, V0, delta_t, treatment_schedule, alpha, beta)
+        if treatment_schedule is not None
+        else surrogate_ode_model(rho, D, V0, delta_t)
+    )
+>>>>>>> 1be6df8e9737fb3a9f7ee274b3822d40fcc8b97c
     
     # Squared relative error (scale-invariant)
     scale = max(abs(V1_target), 1.0)
@@ -191,6 +301,12 @@ def estimate_patient_parameters(
     bounds: Optional[Tuple[Tuple[float, float], Tuple[float, float]]] = None,
     method: str = "L-BFGS-B",
     n_bootstrap: int = N_BOOTSTRAP,
+<<<<<<< HEAD
+=======
+    treatment_schedule: Optional[TreatmentSchedule] = None,
+    alpha: float = 0.08,
+    beta: float = 0.03,
+>>>>>>> 1be6df8e9737fb3a9f7ee274b3822d40fcc8b97c
 ) -> Dict[str, Any]:
     """
     Estimate patient-specific biophysical parameters from longitudinal volumes.
@@ -201,7 +317,11 @@ def estimate_patient_parameters(
         delta_t_days: Time between scans (days)
         initial_guess: Initial [rho, D] guess (default: [0.02, 0.013])
         bounds: Parameter bounds [(rho_min, rho_max), (D_min, D_max)]
+<<<<<<< HEAD
         method: Optimization method (default: "L-BFGS-B")
+=======
+        method: Optimization method (default: "Nelder-Mead")
+>>>>>>> 1be6df8e9737fb3a9f7ee274b3822d40fcc8b97c
         n_bootstrap: Number of bootstrap samples for CI (default: 100)
     
     Returns:
@@ -210,6 +330,7 @@ def estimate_patient_parameters(
             - D: Estimated diffusion coefficient (mm²/day)
             - rho_ci: 95% confidence interval for rho [lower, upper]
             - D_ci: 95% confidence interval for D [lower, upper]
+<<<<<<< HEAD
             - convergence: dict with:
                 - success: bool indicating successful convergence
                 - objective_value: final objective function value (residual)
@@ -217,6 +338,10 @@ def estimate_patient_parameters(
                 - n_iterations: Number of iterations
                 - n_function_evals: Number of function evaluations
                 - message: optimizer status message
+=======
+            - convergence: bool indicating successful convergence
+            - n_iterations: Number of iterations
+>>>>>>> 1be6df8e9737fb3a9f7ee274b3822d40fcc8b97c
             - rmse: Root mean squared error of fit
             - bootstrap_samples: Array of [rho, D] bootstrap samples
     """
@@ -233,7 +358,11 @@ def estimate_patient_parameters(
     result = minimize(
         fun=objective_function,
         x0=np.array(initial_guess),
+<<<<<<< HEAD
         args=(t0_volume, t1_volume, delta_t_days),
+=======
+        args=(t0_volume, t1_volume, delta_t_days, treatment_schedule, alpha, beta),
+>>>>>>> 1be6df8e9737fb3a9f7ee274b3822d40fcc8b97c
         method=method,
         bounds=bounds_for_method,
         options={"maxiter": 1000, "disp": False},
@@ -241,6 +370,7 @@ def estimate_patient_parameters(
     
     rho_est, D_est = result.x
     
+<<<<<<< HEAD
     # L-BFGS-B convergence diagnostics
     convergence_info = {
         "success": bool(result.success),
@@ -251,6 +381,8 @@ def estimate_patient_parameters(
         "message": str(result.message) if hasattr(result, "message") else "N/A",
     }
     
+=======
+>>>>>>> 1be6df8e9737fb3a9f7ee274b3822d40fcc8b97c
     # Bootstrap resampling for confidence intervals
     bootstrap_samples = np.zeros((n_bootstrap, 2))
     
@@ -275,7 +407,15 @@ def estimate_patient_parameters(
     D_ci = np.percentile(bootstrap_samples[:, 1], [2.5, 97.5])
     
     # RMSE
+<<<<<<< HEAD
     V1_pred = surrogate_ode_model(rho_est, D_est, t0_volume, delta_t_days)
+=======
+    V1_pred = (
+        treatment_aware_ode_model(rho_est, D_est, t0_volume, delta_t_days, treatment_schedule, alpha, beta)
+        if treatment_schedule is not None
+        else surrogate_ode_model(rho_est, D_est, t0_volume, delta_t_days)
+    )
+>>>>>>> 1be6df8e9737fb3a9f7ee274b3822d40fcc8b97c
     rmse = np.sqrt((V1_pred - t1_volume) ** 2)
     
     return {
@@ -283,7 +423,12 @@ def estimate_patient_parameters(
         "D": float(D_est),
         "rho_ci": [float(rho_ci[0]), float(rho_ci[1])],
         "D_ci": [float(D_ci[0]), float(D_ci[1])],
+<<<<<<< HEAD
         "convergence": convergence_info,
+=======
+        "convergence": bool(result.success or result.fun < 1e-6),
+        "n_iterations": int(result.nit if hasattr(result, "nit") else 0),
+>>>>>>> 1be6df8e9737fb3a9f7ee274b3822d40fcc8b97c
         "rmse": float(rmse),
         "bootstrap_samples": bootstrap_samples.tolist(),
     }
@@ -344,11 +489,19 @@ def validate_with_synthetic_data(
                 delta_t_days=delta_t,
             )
             
+<<<<<<< HEAD
             if est["convergence"]["success"]:
                 convergence_count += 1
                 rho_errors.append(est["rho"] - true_rho)
                 D_errors.append(est["D"] - true_D)
                 n_iterations_list.append(est["convergence"]["n_iterations"])
+=======
+            if est["convergence"]:
+                convergence_count += 1
+                rho_errors.append(est["rho"] - true_rho)
+                D_errors.append(est["D"] - true_D)
+                n_iterations_list.append(est["n_iterations"])
+>>>>>>> 1be6df8e9737fb3a9f7ee274b3822d40fcc8b97c
         
         # Compute metrics
         rho_rmse = np.sqrt(np.mean(np.array(rho_errors) ** 2)) if rho_errors else float("inf")
@@ -397,6 +550,32 @@ def validate_with_synthetic_data(
     return results
 
 
+<<<<<<< HEAD
+=======
+def _load_nifti_volume(nii_path: Path) -> float:
+    """Load NIfTI segmentation and compute tumor volume in mm³."""
+    try:
+        import nibabel as nib
+    except ImportError:
+        raise ImportError("nibabel required for NIfTI loading: pip install nibabel")
+    
+    img = nib.load(str(nii_path))
+    data = img.get_fdata(dtype=np.float32)
+    affine = img.affine
+    
+    # Binarize (any non-zero label = tumor)
+    mask = (data > 0).astype(np.float32)
+    
+    # Compute voxel volume from affine
+    voxel_vol_mm3 = np.abs(np.linalg.det(affine[:3, :3]))
+    
+    tumor_voxels = float(np.sum(mask))
+    tumor_vol_mm3 = tumor_voxels * voxel_vol_mm3
+    
+    return tumor_vol_mm3
+
+
+>>>>>>> 1be6df8e9737fb3a9f7ee274b3822d40fcc8b97c
 def main():
     """Main entry point for inverse parameter estimation."""
     parser = argparse.ArgumentParser(
@@ -423,6 +602,21 @@ def main():
         help="Time between scans (days)",
     )
     parser.add_argument(
+<<<<<<< HEAD
+=======
+        "--nifti-t0",
+        type=str,
+        default=None,
+        help="Path to baseline segmentation NIfTI (.nii.gz)",
+    )
+    parser.add_argument(
+        "--nifti-t1",
+        type=str,
+        default=None,
+        help="Path to follow-up segmentation NIfTI (.nii.gz)",
+    )
+    parser.add_argument(
+>>>>>>> 1be6df8e9737fb3a9f7ee274b3822d40fcc8b97c
         "--output",
         type=str,
         default=None,
@@ -442,6 +636,7 @@ def main():
                 json.dump(results, f, indent=2)
             print(f"Results saved to: {output_path}")
         
+<<<<<<< HEAD
         return 0
     
     if args.t0_volume and args.t1_volume and args.delta_t:
@@ -488,8 +683,84 @@ def main():
     print("\nExamples:")
     print("  python src/51_inverse_parameter_estimation.py --test")
     print("  python src/51_inverse_parameter_estimation.py --t0-volume 1000 --t1-volume 1200 --delta-t 30")
+=======
+
+        return 0
+    
+    # Determine volumes from NIfTI or direct arguments
+    if args.nifti_t0 and args.nifti_t1:
+        if not args.delta_t:
+            print("Error: --delta-t is required when using --nifti-t0/--nifti-t1")
+            parser.print_help()
+            return 1
+        
+        print(f"\n{'='*70}")
+        print("LOADING VOLUMES FROM NIFTI SEGMENTATIONS")
+        print(f"{'='*70}")
+        print(f"Baseline NIfTI: {args.nifti_t0}")
+        print(f"Follow-up NIfTI: {args.nifti_t1}")
+        print(f"Time interval: {args.delta_t:.1f} days")
+        
+        try:
+            V0 = _load_nifti_volume(Path(args.nifti_t0))
+            V1 = _load_nifti_volume(Path(args.nifti_t1))
+            print(f"Loaded V0 = {V0:.1f} mm3")
+            print(f"Loaded V1 = {V1:.1f} mm3")
+        except Exception as e:
+            print(f"Error loading NIfTI files: {e}")
+            return 1
+        
+        t0_vol, t1_vol = V0, V1
+        delta_t = args.delta_t
+        
+    elif args.t0_volume and args.t1_volume and args.delta_t:
+        t0_vol, t1_vol, delta_t = args.t0_volume, args.t1_volume, args.delta_t
+    else:
+        parser.print_help()
+        print("\nError: Provide either (--t0-volume --t1-volume --delta-t) OR (--nifti-t0 --nifti-t1 --delta-t)")
+        return 1
+    
+    # Estimate parameters for patient
+    print(f"\n{'='*70}")
+    print("PATIENT PARAMETER ESTIMATION")
+    print(f"{'='*70}")
+    print(f"Baseline volume (V0): {t0_vol:.1f} mm3")
+    print(f"Follow-up volume (V1): {t1_vol:.1f} mm3")
+    print(f"Time interval (dt): {delta_t:.1f} days")
+    print(f"{'='*70}\n")
+    
+    result = estimate_patient_parameters(
+        t0_volume=t0_vol,
+        t1_volume=t1_vol,
+        delta_t_days=delta_t,
+    )
+    
+    print("ESTIMATED PARAMETERS:")
+    print(f"  rho (growth rate):     {result['rho']:.6f} /day")
+    print(f"                         95% CI: [{result['rho_ci'][0]:.6f}, {result['rho_ci'][1]:.6f}]")
+    print(f"  D (diffusivity):       {result['D']:.6f} mm2/day")
+    print(f"                         95% CI: [{result['D_ci'][0]:.6f}, {result['D_ci'][1]:.6f}]")
+    print(f"  Convergence:         {'Yes' if result['convergence'] else 'No'}")
+    print(f"  Iterations:          {result['n_iterations']}")
+    print(f"  RMSE:                {result['rmse']:.4f} mm3")
+    print(f"{'='*70}\n")
+    
+    if args.output:
+        output_path = Path(args.output)
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        # Remove non-serializable bootstrap samples for JSON output
+        result_json = {k: v for k, v in result.items() if k != "bootstrap_samples"}
+        with open(output_path, "w") as f:
+            json.dump(result_json, f, indent=2)
+        print(f"Results saved to: {output_path}")
+    
+>>>>>>> 1be6df8e9737fb3a9f7ee274b3822d40fcc8b97c
     return 0
 
 
 if __name__ == "__main__":
+<<<<<<< HEAD
     sys.exit(main())
+=======
+    sys.exit(main())
+>>>>>>> 1be6df8e9737fb3a9f7ee274b3822d40fcc8b97c
