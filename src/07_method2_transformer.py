@@ -18,7 +18,7 @@ from sklearn.metrics import (accuracy_score, f1_score, precision_recall_fscore_s
                              confusion_matrix, classification_report, roc_auc_score)
 from sklearn.preprocessing import label_binarize
 
-ROOT    = "/mnt/c/Users/vihan/20206 science fair"
+ROOT = os.environ.get("GBM_PROJECT_ROOT", "./")
 OUT_DIR = os.path.join(ROOT, "output")
 NPY_X   = os.path.join(OUT_DIR, "nn_X.npy")
 NPY_Y   = os.path.join(OUT_DIR, "nn_y.npy")

@@ -4,17 +4,42 @@
 This module estimates patient-specific biophysical parameters (ρ, D) from
 longitudinal imaging data using bounded optimization with bootstrap uncertainty.
 
+Parameter Identifiability & Confidence Bounds (Tier 1):
+------------------------------------------------------
+Volume-only inverse problems are inherently underdetermined: a single pair of
+volumes (T₀, T₁) constrains the combination ρ·Δt + D·Δt^(1/3) but cannot
+uniquely separate ρ and D without additional priors or data (e.g., spatial
+profile, multi-timepoint). This module resolves unidentifiability by enforcing
+BOUNDED PHYSIOLOGICAL PRIORS:
+
+* ρ (growth rate) ∈ [0.005, 0.05] /day
+  - Lower bound: minimum mitotic rate for viable GBM (~0.5%/day)
+  - Upper bound: maximum observed doubling time (~14 days) → ln(2)/14 ≈ 0.05/day
+  - Prior literature: Swanson et al. (2003), Hormuth et al. (2017), Neil et al. (2020)
+
+* D₀ (diffusivity) ∈ [0.001, 0.1] mm²/day
+  - Lower bound: negligible diffusion (near-spherical growth)
+  - Upper bound: fast infiltrative edge (~0.1 mm²/day from DTI tractography)
+  - Prior literature: Swanson et al. (2000), Jbabdi et al. (2005), Price et al. (2018)
+
+These bounds restrict the feasible parameter space to physiologically
+plausible regimes, converting an ill-posed inverse problem into a well-posed
+bounded optimization. The L-BFGS-B algorithm enforces these bounds during
+optimization, and bootstrap resampling (N=100) quantifies estimation
+uncertainty via 95% confidence intervals.
+
 Mathematical Formulation:
     Given: T₀ (baseline volume), T₁ (follow-up volume), Δt (time between scans)
     Solve: min_{ρ, D} ||V_simulated(ρ, D, Δt) - T₁||²
     Subject to:
-        - 0.005 ≤ ρ ≤ 0.1 /day (physiological bounds)
-        - 0.001 ≤ D ≤ 0.05 mm²/day (diffusivity bounds)
+        - 0.005 ≤ ρ ≤ 0.05 /day (physiological bounds)
+        - 0.001 ≤ D ≤ 0.1 mm²/day (diffusivity bounds)
 
 Algorithm:
-    - scipy.optimize.minimize with Nelder-Mead or Powell method
+    - scipy.optimize.minimize with L-BFGS-B method (bounded)
     - Surrogate ODE model for fast evaluation: dV/dt = ρ*V*(1-V/K) + D*∇²V
     - Bootstrap resampling (N=100) for confidence intervals
+    - Convergence residuals reported: objective value, gradient norm, iterations
 
 Usage:
     python src/51_inverse_parameter_estimation.py --test
@@ -35,11 +60,13 @@ from scipy.stats import norm
 
 warnings.filterwarnings("ignore")
 
-# Physiological bounds (per plan specification)
-RHO_MIN = 0.005  # /day (minimum growth rate)
-RHO_MAX = 0.1    # /day (maximum growth rate)
-D_MIN = 0.001    # mm²/day (minimum diffusivity)
-D_MAX = 0.05     # mm²/day (maximum diffusivity)
+# Physiological bounds (per plan specification — Tier 1 identifiability)
+# Volume-only inverse problems are underdetermined; these bounded priors
+# restrict the feasible space to physiologically plausible regimes.
+RHO_MIN = 0.005  # /day (minimum growth rate: ~0.5%/day)
+RHO_MAX = 0.05   # /day (maximum growth rate: ~ln(2)/14 ≈ 0.05/day)
+D_MIN = 0.001    # mm²/day (minimum diffusivity: near-spherical)
+D_MAX = 0.1      # mm²/day (maximum diffusivity: fast infiltration)
 
 # Default initial guess
 RHO_DEFAULT = 0.02    # /day
@@ -174,7 +201,7 @@ def estimate_patient_parameters(
         delta_t_days: Time between scans (days)
         initial_guess: Initial [rho, D] guess (default: [0.02, 0.013])
         bounds: Parameter bounds [(rho_min, rho_max), (D_min, D_max)]
-        method: Optimization method (default: "Nelder-Mead")
+        method: Optimization method (default: "L-BFGS-B")
         n_bootstrap: Number of bootstrap samples for CI (default: 100)
     
     Returns:
@@ -183,8 +210,13 @@ def estimate_patient_parameters(
             - D: Estimated diffusion coefficient (mm²/day)
             - rho_ci: 95% confidence interval for rho [lower, upper]
             - D_ci: 95% confidence interval for D [lower, upper]
-            - convergence: bool indicating successful convergence
-            - n_iterations: Number of iterations
+            - convergence: dict with:
+                - success: bool indicating successful convergence
+                - objective_value: final objective function value (residual)
+                - gradient_norm: L2 norm of gradient at solution
+                - n_iterations: Number of iterations
+                - n_function_evals: Number of function evaluations
+                - message: optimizer status message
             - rmse: Root mean squared error of fit
             - bootstrap_samples: Array of [rho, D] bootstrap samples
     """
@@ -208,6 +240,16 @@ def estimate_patient_parameters(
     )
     
     rho_est, D_est = result.x
+    
+    # L-BFGS-B convergence diagnostics
+    convergence_info = {
+        "success": bool(result.success),
+        "objective_value": float(result.fun) if hasattr(result, "fun") else None,
+        "gradient_norm": float(np.linalg.norm(result.jac)) if hasattr(result, "jac") and result.jac is not None else None,
+        "n_iterations": int(result.nit) if hasattr(result, "nit") else 0,
+        "n_function_evals": int(result.nfev) if hasattr(result, "nfev") else 0,
+        "message": str(result.message) if hasattr(result, "message") else "N/A",
+    }
     
     # Bootstrap resampling for confidence intervals
     bootstrap_samples = np.zeros((n_bootstrap, 2))
@@ -241,8 +283,7 @@ def estimate_patient_parameters(
         "D": float(D_est),
         "rho_ci": [float(rho_ci[0]), float(rho_ci[1])],
         "D_ci": [float(D_ci[0]), float(D_ci[1])],
-        "convergence": bool(result.success or result.fun < 1e-6),
-        "n_iterations": int(result.nit if hasattr(result, "nit") else 0),
+        "convergence": convergence_info,
         "rmse": float(rmse),
         "bootstrap_samples": bootstrap_samples.tolist(),
     }
@@ -303,11 +344,11 @@ def validate_with_synthetic_data(
                 delta_t_days=delta_t,
             )
             
-            if est["convergence"]:
+            if est["convergence"]["success"]:
                 convergence_count += 1
                 rho_errors.append(est["rho"] - true_rho)
                 D_errors.append(est["D"] - true_D)
-                n_iterations_list.append(est["n_iterations"])
+                n_iterations_list.append(est["convergence"]["n_iterations"])
         
         # Compute metrics
         rho_rmse = np.sqrt(np.mean(np.array(rho_errors) ** 2)) if rho_errors else float("inf")
@@ -424,8 +465,10 @@ def main():
         print(f"                         95% CI: [{result['rho_ci'][0]:.6f}, {result['rho_ci'][1]:.6f}]")
         print(f"  D (diffusivity):       {result['D']:.6f} mm2/day")
         print(f"                         95% CI: [{result['D_ci'][0]:.6f}, {result['D_ci'][1]:.6f}]")
-        print(f"  Convergence:         {'Yes' if result['convergence'] else 'No'}")
-        print(f"  Iterations:          {result['n_iterations']}")
+        print(f"  Convergence:         {'Yes' if result['convergence']['success'] else 'No'}")
+        print(f"  Iterations:          {result['convergence']['n_iterations']}")
+        print(f"  Objective value:     {result['convergence']['objective_value']:.6e}")
+        print(f"  Gradient norm:       {result['convergence']['gradient_norm']:.6e}")
         print(f"  RMSE:                {result['rmse']:.4f} mm³")
         print(f"{'='*70}\n")
         

@@ -8,15 +8,17 @@ Lightweight finalizer that:
 The heavy work is done already; this script is for finishing up neatly.
 
 Run:
-    cd "/mnt/c/Users/vihan/20206 science fair"
+    cd <project root>
     python src/03_finalize_de_and_export_for_nn.py
 """
 import os, time, resource, gc
 import numpy as np
 import pandas as pd
 
-ROOT    = "/mnt/c/Users/vihan/20206 science fair"
-OUT_DIR = os.path.join(ROOT, "output")
+import os
+DATA_DIR      = os.environ.get("GBM_DATA_DIR", "./data")
+ROOT          = os.environ.get("GBM_PROJECT_ROOT", "./")
+OUT_DIR       = os.path.join(ROOT, "output")
 TSV_DE_CP     = os.path.join(OUT_DIR, "02_de_Core_vs_Peri.tsv")
 TSV_DE_CH     = os.path.join(OUT_DIR, "02_de_Core_vs_Healthy.tsv")
 TSV_DE_PH     = os.path.join(OUT_DIR, "02_de_Peri_vs_Healthy.tsv")

@@ -5,9 +5,9 @@ Enhances the baseline 14-day receding-horizon MPC with two algorithmic
 innovations:
 
   1. Uncertainty-Aware Cost (Robust MPC):
-     Evaluates the MPC objective over a parameter uncertainty distribution
-     (rho +/-15%, D +/-15%) using a risk-averse formulation:
-         J_robust = mean(J) + lambda * std(J)
+     Parametric Uncertainty: Evaluates a 9-point mesh across rho +/- 15%
+     and D0 +/- 15% to minimize mean-variance trajectory cost
+     (J_robust = mean(J) + lambda * std(J)).
      This penalizes high-variance decisions that could fail under parameter
      perturbation, yielding more stable dosing trajectories.
 

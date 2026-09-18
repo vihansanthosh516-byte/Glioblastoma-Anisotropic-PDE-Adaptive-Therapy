@@ -19,8 +19,8 @@ Memory plan:
   - We never call .toarray() on the sparse matrix.
 
 Run order:
-    cd "/mnt/c/Users/vihan/20206 science fair"
-    python 01_load_and_filter.py
+    cd <project root>
+    GBM_PROJECT_ROOT=<project root> python 01_load_and_filter.py
 """
 import os, gc, sys, time, json, resource
 import numpy as np
@@ -34,8 +34,9 @@ os.environ["OPENBLAS_NUM_THREADS"]   = "2"
 os.environ["MKL_NUM_THREADS"]        = "2"
 os.environ["NUMEXPR_NUM_THREADS"]    = "2"
 
-DATA_DIR        = "/mnt/c/Users/vihan/multiomic-gbm/scrna"
-OUT_DIR         = "/mnt/c/Users/vihan/20206 science fair/output"
+import os
+DATA_DIR        = os.environ.get("GBM_DATA_DIR", "./data")
+OUT_DIR         = os.environ.get("GBM_OUT_DIR", "./output")
 os.makedirs(OUT_DIR, exist_ok=True)
 
 OUT_H5AD        = os.path.join(OUT_DIR, "01_filtered_three_class.h5ad")

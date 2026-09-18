@@ -1,6 +1,6 @@
 # MONTH 10 AUDIT LOG
 
-Generated: 2026-07-22T22:33:08
+Generated: 2026-07-23T14:17:54
 
 ## Environment
 - Python interpreter: `C:\Users\vihan\20206 science fair\venv\Scripts\python.exe`
@@ -28,7 +28,7 @@ Generated: 2026-07-22T22:33:08
 | `output\invasion_metrics.json` | 72,602 bytes |
 | `output\invasion_summary.json` | 761 bytes |
 | `output\isotropic_baseline_metrics.json` | 1,474 bytes |
-| `output\master_cohort_summary.json` | 46,203 bytes |
+| `output\master_cohort_summary.json` | 46,195 bytes |
 | `output\method1_metrics.json` | 2,704 bytes |
 | `output\method2_metrics.json` | 1,370 bytes |
 | `output\method3_metrics.json` | 1,404 bytes |
@@ -43,7 +43,7 @@ Generated: 2026-07-22T22:33:08
 | `output\scvi_metrics.json` | 102 bytes |
 | `output\single_ko_results.json` | 19,220 bytes |
 | `output\single_ko_ti.json` | 448 bytes |
-| `output\sobol_sensitivity_results.json` | 894 bytes |
+| `output\sobol_sensitivity_results.json` | 886 bytes |
 | `output\spatial_metrics_cache.json` | 5,188 bytes |
 | `output\spatial_recurrence_summary.json` | 3,641 bytes |
 | `output\stromal_feedback_metrics.json` | 6,269 bytes |
@@ -81,7 +81,7 @@ Generated: 2026-07-22T22:33:08
 | `output\gradient_failure_analysis.png` | 557,103 bytes | 4770x1769 |
 | `output\invasion_dynamics_analysis.png` | 835,808 bytes | 4000x2880 |
 | `output\km_survival_curves.png` | 300,050 bytes | 3570x3000 |
-| `output\master_cohort_synthesis.png` | 972,273 bytes | 4081x4860 |
+| `output\master_cohort_synthesis.png` | 972,186 bytes | 4081x4860 |
 | `output\method1_lr_confusion.png` | 47,547 bytes | 900x720 |
 | `output\method1_rf_confusion.png` | 46,457 bytes | 900x720 |
 | `output\method2_confusion.png` | 44,770 bytes | 900x720 |
@@ -93,7 +93,7 @@ Generated: 2026-07-22T22:33:08
 | `output\optimization_matrix.png` | 209,507 bytes | 3836x2969 |
 | `output\penalized_coefficients.png` | 150,653 bytes | 4470x1545 |
 | `output\penalized_regularization_paths.png` | 264,963 bytes | 4470x1531 |
-| `output\sobol_tornado_plot.png` | 52,086 bytes | 1737x967 |
+| `output\sobol_tornado_plot.png` | 52,001 bytes | 1737x967 |
 | `output\spatial_pde_parameters.png` | 320,777 bytes | 2371x3448 |
 | `output\spatial_recurrence_risk.png` | 213,597 bytes | 4732x2457 |
 | `output\spatial_risk_profile.png` | 195,024 bytes | 2968x1191 |
@@ -120,7 +120,7 @@ Generated: 2026-07-22T22:33:08
 - stromal fallback used: False
 
 ## `__pycache__` cleanup
-- `139` `__pycache__` directories removed under src/ and venv/ (D5 idempotency â€” bytecode regenerates on next run).
+- `139` `__pycache__` directories removed under src/ and venv/ (D5 idempotency — bytecode regenerates on next run).
 
 ## Notes
 - Bash `run_all.sh` requires Git Bash / WSL on Windows. PowerShell equivalent can be substituted.

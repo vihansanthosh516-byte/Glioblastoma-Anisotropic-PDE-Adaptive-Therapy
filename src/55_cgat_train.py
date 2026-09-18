@@ -1,6 +1,6 @@
 """
-16_cgat_train.py
-================
+55_cgat_train.py
+=================
 Train Edge-Aware GAT on FULL 140k-cell graph using full-batch training.
 No neighbor sampling needed - full graph fits in memory.
 """
@@ -20,7 +20,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import seaborn as sns
 
-ROOT = "/mnt/c/Users/vihan/20206 science fair"
+ROOT = os.environ.get("GBM_PROJECT_ROOT", "./")
 OUT_DIR = os.path.join(ROOT, "output", "cgat")
 
 EDGE_INDEX_PATH = os.path.join(OUT_DIR, "gat_edge_index_full.npy")

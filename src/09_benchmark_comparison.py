@@ -16,7 +16,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import seaborn as sns
 
-ROOT    = "/mnt/c/Users/vihan/20206 science fair"
+ROOT = os.environ.get("GBM_PROJECT_ROOT", "./")
 OUT_DIR = os.path.join(ROOT, "output")
 
 # Input metric files

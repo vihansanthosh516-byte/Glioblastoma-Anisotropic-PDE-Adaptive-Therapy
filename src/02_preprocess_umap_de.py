@@ -25,7 +25,7 @@ Outputs (in output/):
     02_de_top100_per_pair.tsv
 
 Run:
-    cd "/mnt/c/Users/vihan/20206 science fair"
+    cd <project root>
     python src/02_preprocess_umap_de.py
 """
 import os, gc, time, resource
@@ -42,7 +42,9 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import seaborn as sns
 
-ROOT          = "/mnt/c/Users/vihan/20206 science fair"
+import os
+DATA_DIR      = os.environ.get("GBM_DATA_DIR", "./data")
+ROOT          = os.environ.get("GBM_PROJECT_ROOT", "./")
 OUT_DIR       = os.path.join(ROOT, "output")
 H5_IN         = os.path.join(OUT_DIR, "01_filtered_three_class.h5ad")
 

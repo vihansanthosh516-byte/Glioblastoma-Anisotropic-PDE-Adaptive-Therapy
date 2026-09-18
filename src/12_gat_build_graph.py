@@ -12,7 +12,7 @@ import pandas as pd
 from sklearn.neighbors import NearestNeighbors
 import anndata as ad
 
-ROOT = "/mnt/c/Users/vihan/20206 science fair"
+ROOT = os.environ.get("GBM_PROJECT_ROOT", "./")
 OUT_DIR = os.path.join(ROOT, "output", "cgat")
 
 LATENT_PATH = os.path.join(OUT_DIR, "cvae_latent.npy")      # (15000, 32)

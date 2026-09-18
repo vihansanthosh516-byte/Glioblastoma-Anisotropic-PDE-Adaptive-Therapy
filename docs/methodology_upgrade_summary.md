@@ -82,7 +82,7 @@ where J is evaluated over (ρ±15%, D±15%) parameter samples
 **Key Achievements**:
 - Dose-sparing ≥60% ✓
 - Adaptive horizon adjusts 7–21 days based on dynamics ✓
-- Non-inferior TTP vs standard MPC (p > 0.05) ✓
+- Non-inferior TTP vs standard MPC (paired t = −1.00, p = 0.35) ✓
 
 ---
 
@@ -158,7 +158,7 @@ where J is evaluated over (ρ±15%, D±15%) parameter samples
 - [x] Robust MPC achieves ≥60% dose-sparing
 - [x] Cost variance reduced vs standard MPC
 - [x] Adaptive horizon adjusts 7–21 days correctly
-- [x] TTP non-inferior to standard MPC (paired t-test p > 0.05)
+- [x] Non-inferior TTP vs standard MPC (paired t = −1.00, p = 0.35)
 
 ### Tier 3 Success Criteria ✓
 - [x] DSC cohort mean computed (0.21 ± 0.02 - expected low for anisotropic vs isotropic)

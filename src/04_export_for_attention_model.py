@@ -23,7 +23,7 @@ Memory footprint: ~146 MB dense + ~150 MB sparse X_sub genator/loader warm +
 ~600 MB working memory at peak. Total ~1 GB. Well inside WSL budget.
 
 Run:
-    cd "/mnt/c/Users/vihan/20206 science fair"
+    cd <project root>
     python src/04_export_for_attention_model.py
 """
 import os, gc, time, resource
@@ -37,8 +37,10 @@ import pandas as pd
 import scanpy as sc
 from sklearn.model_selection import train_test_split
 
-ROOT    = "/mnt/c/Users/vihan/20206 science fair"
-OUT_DIR = os.path.join(ROOT, "output")
+import os
+DATA_DIR      = os.environ.get("GBM_DATA_DIR", "./data")
+ROOT          = os.environ.get("GBM_PROJECT_ROOT", "./")
+OUT_DIR       = os.path.join(ROOT, "output")
 H5_SUB  = os.path.join(OUT_DIR, "02_adata_subsampled.h5ad")
 
 NPY_X      = os.path.join(OUT_DIR, "nn_X.npy")

@@ -1,5 +1,5 @@
 """
-15_cgat_build_graph.py
+54_cgat_build_graph.py
 ======================
 Build k-NN graph on FULL 140k cVAE latent space with edge features.
 Memory-efficient: uses sklearn NearestNeighbors with n_jobs.
@@ -8,7 +8,7 @@ import os, time, resource, gc, json
 import numpy as np
 from sklearn.neighbors import NearestNeighbors
 
-ROOT = "/mnt/c/Users/vihan/20206 science fair"
+ROOT = os.environ.get("GBM_PROJECT_ROOT", "./")
 OUT_DIR = os.path.join(ROOT, "output", "cgat")
 
 LATENT_PATH = os.path.join(OUT_DIR, "cvae_latent_full.npy")
