@@ -18,6 +18,17 @@ import time
 from pathlib import Path
 from typing import Dict, List, Tuple
 
+# Resolve project root from this script's location (src/ -> project root)
+
+from pathlib import Path as _Path
+PROJECT_ROOT = _Path(__file__).resolve().parent.parent
+OUTPUT_DIR = PROJECT_ROOT / "output"
+OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+OUTPUT_DIR = PROJECT_ROOT / "output"
+OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+
 import numpy as np
 import torch
 
@@ -58,19 +69,20 @@ class CellularAutomaton:
         
         # CALIBRATED Transition rules (P0 patch)
         # 512x512 at 5µm/pixel, transition rates [0.5, 0.8]
+        # FIXED: Balanced rates for sustained invasion wavefront
         self.rules = {
-            'healthy_proliferate': 0.60,
-            'healthy_to_periphery_base': 0.70,      # P0: increased
-            'healthy_velocity_sensitivity': 0.60,    # P0: stronger velocity coupling
-            'periphery_proliferate': 0.75,
-            'periphery_to_core_base': 0.65,         # P0: increased
-            'periphery_velocity_sensitivity': 0.55,  # P0: stronger velocity coupling
-            'periphery_secrete_morphogen': 0.80,
-            'core_proliferate': 0.20,                # P0: reduced to 0.2
-            'core_necrose': 0.005,                   # P0: reduced to 0.005
-            'diffusion_rate': 0.30,
-            # Healthy homeostasis
-            'healthy_replenish_rate': 0.02,          # Homeostatic replenishment
+            'healthy_proliferate': 0.12,
+            'healthy_to_periphery_base': 0.10,
+            'healthy_velocity_sensitivity': 0.10,
+            'periphery_proliferate': 0.18,
+            'periphery_to_core_base': 0.08,
+            'periphery_velocity_sensitivity': 0.08,
+            'periphery_secrete_morphogen': 0.25,
+            'core_proliferate': 0.06,
+            'core_necrose': 0.0015,
+            'diffusion_rate': 0.12,
+            # Healthy homeostasis - stronger replenishment
+            'healthy_replenish_rate': 0.08,
         }
         
         # Neighborhood offsets
@@ -83,8 +95,8 @@ class CellularAutomaton:
     def _load_velocity_field(self) -> None:
         """Load phenotypic velocity magnitude from Month 1 and map to grid."""
         try:
-            vel_mag = np.load("output/phenotypic_velocity_magnitude.npy")  # (15000,)
-            pca_coords = np.load("output/phenotypic_velocity_pca2d.npy")   # (15000, 2)
+            vel_mag = np.load(OUTPUT_DIR / "phenotypic_velocity_magnitude.npy")  # (15000,)
+            pca_coords = np.load(OUTPUT_DIR / "phenotypic_velocity_pca2d.npy")   # (15000, 2)
             
             # Normalize coords to grid
             coords = pca_coords.copy()
@@ -314,10 +326,10 @@ class CellularAutomaton:
 
 
 def run_simulation(
-    n_steps: int = 400,
+    n_steps: int = 800,
     grid_size: Tuple[int, int] = (512, 512),
     save_interval: int = 20,
-    ca_substeps_per_pde_step: int = 10,
+    ca_substeps_per_pde_step: int = 3,
 ) -> Tuple[List[np.ndarray], List[np.ndarray], List[Dict]]:
     """Run full invasion simulation with CA sub-stepping."""
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -376,30 +388,37 @@ def main():
     
     # Run simulation
     grid_hist, morph_hist, metrics = run_simulation(
-        n_steps=400,
+        n_steps=800,
         grid_size=(512, 512),
         save_interval=20,
     )
     
     # Export
     print("\n[EXPORT] Saving simulation data...")
-    Path("output").mkdir(exist_ok=True)
-    
-    np.save("output/aba_grid_history.npy", np.array(grid_hist, dtype=np.int8))
-    np.save("output/aba_morphogen_history.npy", np.array(morph_hist, dtype=np.float32))
-    with open("output/aba_metrics.json", "w") as f:
+
+    grid_path = OUTPUT_DIR / "aba_grid_history.npy"
+    morph_path = OUTPUT_DIR / "aba_morphogen_history.npy"
+    metrics_path = OUTPUT_DIR / "aba_metrics.json"
+
+    np.save(grid_path, np.array(grid_hist, dtype=np.int8))
+    np.save(morph_path, np.array(morph_hist, dtype=np.float32))
+    with open(metrics_path, "w") as f:
         json.dump(metrics, f, indent=2)
-    
+
+    for p in (grid_path, morph_path, metrics_path):
+        assert p.exists(), f"FAILED TO WRITE: {p}"
+        print(f"[SAVE] {p} size={p.stat().st_size}")
+
     # Final stats
     final = metrics[-1]
     print(f"\n[SIM] Final cell counts: {final['cell_counts']}")
     print(f"[SIM] Total steps: {len(metrics)}")
     print(f"[SIM] Saved {len(grid_hist)} snapshots")
-    
+
     print("\n[SUCCESS] Month 3 Week 1 Complete: Agent-Based Invasion Engine")
-    print("  - Grid history: output/aba_grid_history.npy")
-    print("  - Morphogen history: output/aba_morphogen_history.npy")
-    print("  - Metrics: output/aba_metrics.json")
+    print(f"  - Grid history: {grid_path}")
+    print(f"  - Morphogen history: {morph_path}")
+    print(f"  - Metrics: {metrics_path}")
 
 
 if __name__ == "__main__":
