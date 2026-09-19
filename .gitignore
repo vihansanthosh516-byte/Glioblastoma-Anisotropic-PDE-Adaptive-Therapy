@@ -29,3 +29,45 @@ output/*.joblib
 output/*.npz
 output/02_run.log
 output/invasion_frames/
+kaggle_run/gbm-repo/
+# === Added after folder merge 2026-09-19 ===
+# Raw datasets — never commit
+data/brats/
+data/tcia/
+data/raw/
+*.tar
+*.tar.gz
+*.zip
+*.nii
+*.nii.gz
+
+# Merge backups from PowerShell merge script
+*.bak_*
+
+# Large per-patient output directories
+output/batch_digital_twins/
+output/digital_twins/
+output/clinical_digital_twin/
+output/patient_digital_twin/
+output/time_series/
+output/time_series_3d/
+output/time_series_3d_embedded/
+output/time_series_3d_light/
+output/cgat/
+output/phase13_ppo_chronotherapy/
+output/spib_model_d=3_t=1_b=0.0100_learn=0.001000cpt0/
+output/spib_model_d=3_t=5_b=0.0100_learn=0.001000cpt0/
+
+# Large HTML dashboards
+output/true_3d_time_series_dashboard.html
+output/clinical_4d_dashboard.html
+
+# 102 MB attention weights
+output/nn_attention_weights.tsv
+
+# Terminal transcripts and logs
+terminal_session.txt
+*.log
+
+# OS noise
+.DS_Store

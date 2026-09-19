@@ -15,7 +15,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.utils.data import DataLoader, TensorDataset
 
-ROOT = os.environ.get("GBM_PROJECT_ROOT", "./")
+ROOT = "."
 OUT_DIR = os.path.join(ROOT, "output", "cgat")
 os.makedirs(OUT_DIR, exist_ok=True)
 

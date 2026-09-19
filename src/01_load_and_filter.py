@@ -19,8 +19,8 @@ Memory plan:
   - We never call .toarray() on the sparse matrix.
 
 Run order:
-    cd <project root>
-    GBM_PROJECT_ROOT=<project root> python 01_load_and_filter.py
+    cd "/mnt/c/Users/vihan/20206 science fair"
+    python 01_load_and_filter.py
 """
 import os, gc, sys, time, json, resource
 import numpy as np
@@ -29,14 +29,13 @@ import scanpy as sc
 from scipy.io import mmread
 
 # Limit BLAS thread count so we don't blow up WSL memory on matrix ops.
-os.environ["OMP_NUM_THREADS"]        = "2"
-os.environ["OPENBLAS_NUM_THREADS"]   = "2"
-os.environ["MKL_NUM_THREADS"]        = "2"
-os.environ["NUMEXPR_NUM_THREADS"]    = "2"
+os.environ["OMP_NUM_THREADS"] = "22"
+os.environ["OPENBLAS_NUM_THREADS"] = "22"
+os.environ["MKL_NUM_THREADS"] = "22"
+os.environ["NUMEXPR_NUM_THREADS"] = "22"
 
-import os
-DATA_DIR        = os.environ.get("GBM_DATA_DIR", "./data")
-OUT_DIR         = os.environ.get("GBM_OUT_DIR", "./output")
+DATA_DIR = "C:/Users/vihan/multiomic-gbm/scrna"
+OUT_DIR = "./output"
 os.makedirs(OUT_DIR, exist_ok=True)
 
 OUT_H5AD        = os.path.join(OUT_DIR, "01_filtered_three_class.h5ad")
@@ -64,7 +63,7 @@ else:
 log(f"barcodes: {barcodes.shape}, gene_ids: {gene_ids.shape}")
 
 # ---- 2. Read the MTX matrix (sparse, then transpose) -----------------------
-log("Reading matrix.mtx.gz (this is the slowest step, expect ~2-3 minutes)...")
+log("Reading matrix.mtx (this is the slowest step, expect ~2-3 minutes)...")
 t0 = time.time()
 X = mmread(os.path.join(DATA_DIR, "matrix.mtx.gz")).tocsr().astype(np.float32)
 log(f"Matrix loaded in {time.time()-t0:.1f}s :: {X.dtype}, shape={X.shape}, nnz={X.nnz}")

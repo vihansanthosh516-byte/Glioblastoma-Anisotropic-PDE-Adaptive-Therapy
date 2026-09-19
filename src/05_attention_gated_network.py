@@ -23,7 +23,7 @@ Why this is a great science fair model:
 Memory: model has ~3.2M params. Trivial.
 
 Run:
-    cd <project root>
+    cd "."
     python src/05_attention_gated_network.py
 """
 import os, time, resource, json, gc
@@ -35,7 +35,7 @@ import pandas as pd
 import torch, torch.nn as nn, torch.nn.functional as F
 from torch.utils.data import DataLoader, TensorDataset
 
-ROOT    = os.environ.get("GBM_PROJECT_ROOT", "./")
+ROOT    = "."
 OUT_DIR = os.path.join(ROOT, "output")
 NPY_X   = os.path.join(OUT_DIR, "nn_X.npy")
 NPY_Y   = os.path.join(OUT_DIR, "nn_y.npy")

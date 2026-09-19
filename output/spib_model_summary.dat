@@ -1,0 +1,21 @@
+Final Result
+Final: 0
+Loss (train) 0.459544	KL loss (train): 2.178819
+Reconstruction loss (train) 0.437755
+Loss (test) 0.430382	KL loss (test): 2.094811
+Reconstruction loss (test) 0.409434
+dt: 1	 Beta: 0.010000	 Learning_rate: 0.001000
+Final Result
+Final: 0
+Loss (train) 0.461060	KL loss (train): 2.235812
+Reconstruction loss (train) 0.438702
+Loss (test) 0.427383	KL loss (test): 2.048726
+Reconstruction loss (test) 0.406896
+dt: 1	 Beta: 0.010000	 Learning_rate: 0.001000
+Final Result
+Final: 0
+Loss (train) 0.421916	KL loss (train): 2.001755
+Reconstruction loss (train) 0.401898
+Loss (test) 0.443926	KL loss (test): 1.673308
+Reconstruction loss (test) 0.427193
+dt: 5	 Beta: 0.010000	 Learning_rate: 0.001000

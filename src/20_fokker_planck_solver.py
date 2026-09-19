@@ -11,6 +11,7 @@ CALIBRATION: Uses transition scores (T_i) and zone-specific priors to create pro
 
 from __future__ import annotations
 
+import os
 import time
 from pathlib import Path
 from typing import Tuple
@@ -42,14 +43,20 @@ def load_transition_scores(device: torch.device) -> torch.Tensor:
 
 def load_te_weights() -> Tuple[np.ndarray, np.ndarray]:
     """Load TE matrix and compute out-degree weights."""
-    te_matrix = np.load("output/te_matrix.npy")
-    out_degree = te_matrix.sum(axis=1)
-    if out_degree.max() > out_degree.min():
-        out_degree_norm = (out_degree - out_degree.min()) / (out_degree.max() - out_degree.min())
+    te_path = "output/te_matrix.npy"
+    if os.path.exists(te_path):
+        te_matrix = np.load(te_path)
+        out_degree = te_matrix.sum(axis=1)
+        if out_degree.max() > out_degree.min():
+            out_degree_norm = (out_degree - out_degree.min()) / (out_degree.max() - out_degree.min())
+        else:
+            out_degree_norm = np.zeros_like(out_degree)
+        print(f"[TE] Loaded matrix {te_matrix.shape}, out-degree range: [{out_degree.min():.4f}, {out_degree.max():.4f}]")
+        return te_matrix, out_degree_norm
     else:
-        out_degree_norm = np.zeros_like(out_degree)
-    print(f"[TE] Loaded matrix {te_matrix.shape}, out-degree range: [{out_degree.min():.4f}, {out_degree.max():.4f}]")
-    return te_matrix, out_degree_norm
+        print("[TE] te_matrix.npy not found — using uniform weights")
+        # Return dummy arrays (100 genes, uniform weights)
+        return np.eye(100), np.ones(100)
 
 
 def gpu_kde_density(
@@ -250,7 +257,7 @@ def main() -> None:
     transition_scores = load_transition_scores(device)
     te_matrix, out_degree_norm = load_te_weights()
 
-    densities = gpu_kde_density(latent, bandwidth=0.3)
+    densities = gpu_kde_density(latent, bandwidth=0.08)
 
     energy = construct_waddington_energy(
         densities, transition_scores, labels, device,

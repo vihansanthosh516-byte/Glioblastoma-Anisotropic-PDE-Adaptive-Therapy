@@ -1,0 +1,6 @@
+,dsc_aniso,dsc_aniso,dsc_iso,dsc_iso,delta,delta
+,mean,std,mean,std,mean,std
+mode,,,,,,
+Atlas DTI,0.8229,0.3488,0.7987,0.3945,0.0242,0.06
+DKI,0.1065,0.0766,0.0275,0.0649,0.079,0.0679
+Standard DTI,0.7843,0.1661,0.9464,0.0606,-0.1621,0.1202

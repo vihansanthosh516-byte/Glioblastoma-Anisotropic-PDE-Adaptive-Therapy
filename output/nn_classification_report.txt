@@ -1,0 +1,9 @@
+              precision    recall  f1-score   support
+
+        Core       0.86      0.82      0.84      1000
+   Periphery       0.69      0.73      0.71      1000
+     Healthy       0.80      0.80      0.80      1000
+
+    accuracy                           0.78      3000
+   macro avg       0.79      0.78      0.79      3000
+weighted avg       0.79      0.78      0.79      3000

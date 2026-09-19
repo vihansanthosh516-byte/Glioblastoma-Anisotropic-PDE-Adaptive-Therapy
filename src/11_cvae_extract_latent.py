@@ -15,7 +15,7 @@ import torch
 from torch.utils.data import DataLoader, TensorDataset
 from scipy.sparse import issparse
 
-ROOT = os.environ.get("GBM_PROJECT_ROOT", "./")
+ROOT = "."
 FULL_H5AD = os.path.join(ROOT, "output", "01_filtered_three_class.h5ad")
 CVAE_MODEL = os.path.join(ROOT, "output", "cgat", "cvae_model.pt")
 OUT_DIR = os.path.join(ROOT, "output", "cgat")

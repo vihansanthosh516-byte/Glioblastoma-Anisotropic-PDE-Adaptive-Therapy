@@ -25,7 +25,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import seaborn as sns
 
-ROOT = os.environ.get("GBM_PROJECT_ROOT", "./")
+ROOT = "."
 OUT_DIR = os.path.join(ROOT, "output", "cgat")
 
 EDGE_INDEX_PATH = os.path.join(OUT_DIR, "gat_edge_index.npy")

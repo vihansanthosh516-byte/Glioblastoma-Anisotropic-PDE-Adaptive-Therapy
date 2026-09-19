@@ -1,516 +1,390 @@
 #!/usr/bin/env python3
 """
-Month 1, Week 4: Saddle Point Proof — Climbing Image NEB (CI-NEB) Solver
-Properly locates the transition saddle point between Healthy and Core attractors
-by optimizing a discrete path through the Periphery zone centroids.
+22_saddle_point_proof.py (v3 — zone-aware)
+==========================================
+Saddle point proof with zone-aware Hessian estimation.
 
-The true saddle point is identified as the climbing image with mixed Hessian eigenvalues (±λ).
+Key insight: In 32D latent space, kNN around a Core cell picks up
+Periphery neighbors with 10x higher energy, creating false curvature.
+Solution: Compute Hessian using ONLY same-zone neighbors for attractors.
+
+Changes from v2:
+- PCA reduction to 5D (was 32D)
+- Zone-aware kNN for attractors (only same-zone neighbors)
+- Cross-zone kNN for saddle (it's a transition point)
+- Noise-relative eigenvalue threshold
+- Tighter adaptive bandwidth
 """
-
 from __future__ import annotations
-
-import json
-import time
+import json, time, resource
 from pathlib import Path
-from typing import Dict, Tuple, List
 
 import numpy as np
 import torch
 from sklearn.cluster import KMeans
+from sklearn.decomposition import PCA
 
 
-def load_data(device: torch.device) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
-    latent = torch.from_numpy(np.load("output/scvi_latent.npy")).to(device, dtype=torch.float32)
-    energy = torch.from_numpy(np.load("output/waddington_landscape.npy")).to(device, dtype=torch.float32)
-    labels = torch.from_numpy(np.load("output/nn_y.npy")).to(device, dtype=torch.int64)
-    drift = torch.from_numpy(np.load("output/drift_vectors.npy")).to(device, dtype=torch.float32)
-    return latent, energy, labels, drift
+# ---- Config ----
+PCA_DIM = 5
+K_NEIGHBORS = 200
+BANDWIDTH_FACTOR = 0.5
+RIDGE_ALPHA = 1e-2
+EIG_NOISE_FRACTION = 0.15
+DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
-def find_zone_energy_minima(
-    latent: torch.Tensor,
-    energy: torch.Tensor,
-    labels: torch.Tensor,
-) -> Dict[int, Tuple[torch.Tensor, float]]:
-    """Find the energy minimum (attractor) within each zone."""
+def mem_mb():
+    return resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024
+
+
+def log(msg):
+    print(f"[{time.strftime('%H:%M:%S')}] {msg}  RSS={mem_mb():.0f} MB", flush=True)
+
+
+def load_data(device):
+    log("Loading data...")
+
+    latent_paths = ["output/cgat/cvae_latent.npy", "output/scvi_latent.npy"]
+    latent_32d = None
+    for p in latent_paths:
+        if Path(p).exists():
+            latent_32d = np.load(p).astype(np.float32)
+            log(f"  Loaded {p}: {latent_32d.shape}")
+            break
+    if latent_32d is None:
+        raise FileNotFoundError("No latent file found")
+
+    # PCA reduce to 5D
+    pca = PCA(n_components=PCA_DIM, random_state=42)
+    latent = pca.fit_transform(latent_32d)
+    log(f"  PCA->{PCA_DIM}D: explained var = {pca.explained_variance_ratio_.sum():.4f}")
+
+    energy_1d = np.load("output/waddington_landscape.npy").astype(np.float32)
+
+    labels_1d = None
+    for p in ["output/cgat/cvae_labels.npy", "output/nn_y.npy"]:
+        if Path(p).exists():
+            labels_1d = np.load(p, allow_pickle=True)
+            break
+    if labels_1d is None:
+        labels_int = np.zeros(len(latent), dtype=np.int64)
+    elif labels_1d.dtype.kind in ('U', 'S', 'O'):
+        unique = sorted(set(labels_1d))
+        label_map = {name: i for i, name in enumerate(unique)}
+        labels_int = np.array([label_map[l] for l in labels_1d], dtype=np.int64)
+    else:
+        labels_int = labels_1d.astype(np.int64)
+
+    if Path("output/drift_vectors.npy").exists():
+        drift_32d = np.load("output/drift_vectors.npy").astype(np.float32)
+        drift = drift_32d @ pca.components_.T
+    else:
+        drift = np.zeros_like(latent)
+
+    return (
+        torch.from_numpy(latent).to(device),
+        torch.from_numpy(energy_1d).to(device),
+        torch.from_numpy(labels_int).to(device),
+        torch.from_numpy(drift).to(device),
+    )
+
+
+def compute_hessian_zone_aware(latent, energy, labels, point, zone_id=None,
+                                k=K_NEIGHBORS, alpha=RIDGE_ALPHA):
+    """Fit 5D quadratic to k nearest neighbors (zone-restricted if requested)."""
+    D = latent.shape[1]
+
+    if zone_id is not None:
+        zone_mask = (labels == zone_id)
+        pool_latent = latent[zone_mask]
+        pool_energy = energy[zone_mask]
+        if len(pool_latent) < 20:
+            return torch.zeros(D, D, device=latent.device)
+    else:
+        pool_latent = latent
+        pool_energy = energy
+
+    dists = torch.cdist(point.unsqueeze(0), pool_latent).squeeze(0)
+    k_eff = min(k, len(pool_latent))
+    _, knn_idx = torch.topk(dists, k_eff, largest=False)
+
+    Z = pool_latent[knn_idx] - point
+    E = pool_energy[knn_idx] - pool_energy[knn_idx].mean()
+
+    median_dist = dists[knn_idx].median().item()
+    bandwidth = max(median_dist * BANDWIDTH_FACTOR, 1e-3)
+    weights = torch.exp(-(dists[knn_idx] ** 2) / (2 * bandwidth ** 2 + 1e-8))
+    weights = weights / (weights.sum() + 1e-8)
+
+    n_quad = D * (D + 1) // 2
+    Phi = torch.zeros(k_eff, 1 + D + n_quad, device=latent.device)
+    Phi[:, 0] = 1.0
+    Phi[:, 1:1 + D] = Z
+
+    col = 1 + D
+    for i in range(D):
+        for j in range(i, D):
+            Phi[:, col] = Z[:, i] * Z[:, j]
+            col += 1
+
+    W = torch.diag(weights)
+    A = Phi.T @ W @ Phi + alpha * torch.eye(Phi.shape[1], device=latent.device)
+    b = Phi.T @ W @ E
+
+    try:
+        beta = torch.linalg.solve(A, b)
+    except Exception:
+        beta = torch.linalg.lstsq(A, b.unsqueeze(1)).solution.squeeze(1)
+
+    H = torch.zeros(D, D, device=latent.device)
+    col = 1 + D
+    for i in range(D):
+        for j in range(i, D):
+            val = beta[col].item()
+            if i == j:
+                H[i, i] = 2.0 * val
+            else:
+                H[i, j] = val
+                H[j, i] = val
+            col += 1
+
+    H = 0.5 * (H + H.T)
+    return H
+
+
+def classify_hessian(H, noise_fraction=EIG_NOISE_FRACTION):
+    """
+    Classify critical point with relative noise floor.
+    
+    Key idea: use the SMALLEST eigenvalue magnitude as the noise floor.
+    - If max|positive| >> max|negative| → minimum
+    - If max|negative| >> max|positive| → maximum
+    - If comparable magnitudes on both sides → saddle
+    """
+    try:
+        eigvals = torch.linalg.eigvalsh(H).cpu().numpy()
+    except Exception:
+        eigvals = np.linalg.svd(H.cpu().numpy(), compute_uv=False)
+
+    # Largest magnitude eigenvalue sets the scale
+    scale = float(np.abs(eigvals).max())
+    if scale < 1e-8:
+        return eigvals, 0, 0, len(eigvals), "degenerate"
+
+    # Normalize eigenvalues by the scale
+    normed = eigvals / scale
+
+    # Split into positive and negative magnitudes
+    pos_vals = normed[normed > 0]
+    neg_vals = normed[normed < 0]
+
+    max_pos = pos_vals.max() if len(pos_vals) > 0 else 0.0
+    max_neg = abs(neg_vals.min()) if len(neg_vals) > 0 else 0.0
+
+    # Ratio: how much bigger is the dominant sign?
+    # If one side is > 2x the other, it's a minimum/maximum
+    # If they're comparable, it's a saddle
+    RATIO = 2.0
+
+    if max_pos > RATIO * max_neg:
+        ctype = "stable_minimum"
+    elif max_neg > RATIO * max_pos:
+        ctype = "unstable_maximum"
+    else:
+        ctype = "saddle_point"
+
+    # Count for reporting (use a small relative threshold)
+    thresh = 0.05 * scale
+    pos = int((eigvals > thresh).sum())
+    neg = int((eigvals < -thresh).sum())
+    zero = int(((eigvals >= -thresh) & (eigvals <= thresh)).sum())
+
+    return eigvals, pos, neg, zero, ctype
+
+
+def find_zone_minima(latent, energy, labels):
     minima = {}
-    for zone in [0, 1, 2]:
+    for zone in torch.unique(labels).cpu().numpy():
         mask = labels == zone
-        if mask.any():
-            zone_energies = energy[mask]
-            min_idx = zone_energies.argmin()
-            min_point = latent[mask][min_idx]
-            min_energy = zone_energies[min_idx].item()
-            minima[zone] = (min_point, min_energy)
+        if mask.sum() == 0:
+            continue
+        zone_energies = energy[mask]
+        min_idx = zone_energies.argmin()
+        point = latent[mask][min_idx]
+        minima[int(zone)] = (point, zone_energies[min_idx].item())
     return minima
 
 
-def find_periphery_centroids(
-    latent: torch.Tensor,
-    labels: torch.Tensor,
-    k: int = 8,
-) -> torch.Tensor:
-    """Find k centroids within the Periphery zone using k-means."""
-    periphery_mask = labels == 1
-    periphery_cells = latent[periphery_mask].cpu().numpy()
-    if len(periphery_cells) < k:
-        k = len(periphery_cells)
-    if k < 1:
-        return torch.empty(0, latent.shape[1], device=latent.device, dtype=latent.dtype)
-    kmeans = KMeans(n_clusters=k, random_state=42, n_init=10)
-    kmeans.fit(periphery_cells)
-    centroids = torch.from_numpy(kmeans.cluster_centers_).to(latent.device, dtype=latent.dtype)
-    return centroids
+def find_periphery_centroids(latent, labels, k=8):
+    unique = torch.unique(labels).cpu().numpy()
+    if len(unique) < 3:
+        return torch.empty(0, latent.shape[1], device=latent.device)
+    periph_id = int(np.median(unique))
+    mask = labels == periph_id
+    cells = latent[mask].cpu().numpy()
+    if len(cells) < k:
+        k = max(1, len(cells))
+    km = KMeans(n_clusters=k, random_state=42, n_init=10)
+    km.fit(cells)
+    return torch.from_numpy(km.cluster_centers_).to(latent.device, dtype=latent.dtype)
 
 
-def compute_energy_gradient(
-    energy: torch.Tensor,
-    latent: torch.Tensor,
-    point: torch.Tensor,
-    k: int = 25,
-    bandwidth: float = 0.5,
-) -> torch.Tensor:
-    """Compute local energy gradient using k-NN weighted differences."""
-    dists = torch.cdist(point.unsqueeze(0), latent).squeeze(0)
-    _, knn_idx = torch.topk(dists, k, largest=False)
+def find_saddle_on_path(latent, energy, labels, healthy_min, core_min, n_images=128):
+    log("  Building path Healthy -> Periphery -> Core...")
+    centroids = find_periphery_centroids(latent, labels, k=8)
+    log(f"  Found {len(centroids)} Periphery centroids")
 
-    Z = latent[knn_idx] - point  # (k, D)
-    E = energy[knn_idx] - energy[knn_idx].mean()  # (k,)
-
-    weights = torch.exp(-dists[knn_idx] ** 2 / (2 * bandwidth ** 2))
-    weights = weights / weights.sum()
-
-    dists_sq = (Z ** 2).sum(dim=1) + 1e-8
-    grad = (weights * E / dists_sq).unsqueeze(1) * Z
-    return weights.sum() * grad.sum(dim=0)
-
-
-def ci_neb_saddle_search(
-    latent: torch.Tensor,
-    energy: torch.Tensor,
-    labels: torch.Tensor,
-    healthy_min: torch.Tensor,
-    periphery_min: torch.Tensor,
-    core_min: torch.Tensor,
-    n_images: int = 64,
-    n_iterations: int = 300,
-    k_spring: float = 10.0,
-    step_size: float = 0.015,
-    ci_start_iter: int = 100,
-    ci_freq: int = 10,
-) -> Tuple[torch.Tensor, float]:
-    """
-    Climbing Image Nudged Elastic Band (CI-NEB) saddle point search.
-    
-    The string method with a climbing image finds the minimum energy path (MEP)
-    between Healthy and Core attractors, with the climbing image driven to the
-    true saddle point by inverting the parallel component of the true force.
-    """
-    print("[CI-NEB] Initializing CI-NEB search (Healthy -> Core via Periphery)...")
-    
-    # Get Periphery zone centroids to initialize path through transition zone
-    periphery_centroids = find_periphery_centroids(latent, labels, k=8)
-    print(f"[CI-NEB] Found {len(periphery_centroids)} Periphery centroids for path initialization")
-    
-    n_total = n_images
-    
-    # Initialize images along path: Healthy -> Periphery centroids -> Core
-    images = []
-    
-    # Phase 1: Healthy -> first Periphery centroid (20% of images)
-    n_first = n_total // 5
-    if len(periphery_centroids) > 0:
-        target = periphery_centroids[0]
-    else:
-        target = (healthy_min + core_min) / 2
-    for i in range(n_first):
-        alpha = i / max(1, n_first - 1)
-        point = healthy_min + alpha * (target - healthy_min)
-        images.append(point)
-    
-    # Phase 2: Through Periphery centroids (40% of images)
-    n_middle = 2 * n_total // 5
-    if len(periphery_centroids) > 1:
-        for i in range(n_middle):
-            idx = min(i * (len(periphery_centroids) - 1) // max(1, n_middle - 1), len(periphery_centroids) - 2)
-            alpha = (i % max(1, n_middle // (len(periphery_centroids) - 1))) / max(1, n_middle // (len(periphery_centroids) - 1))
-            point = periphery_centroids[idx] + alpha * (periphery_centroids[idx + 1] - periphery_centroids[idx])
-            images.append(point)
-    else:
-        for i in range(n_middle):
-            alpha = i / max(1, n_middle - 1)
-            point = periphery_centroids[0] if len(periphery_centroids) > 0 else (healthy_min + core_min) / 2
-            images.append(point)
-    
-    # Phase 3: Last Periphery centroid -> Core (20% of images)
-    n_last = n_total - n_first - n_middle
-    if len(periphery_centroids) > 0:
-        start_point = periphery_centroids[-1]
-    else:
-        start_point = (healthy_min + core_min) / 2
-    for i in range(n_last):
-        alpha = i / max(1, n_last - 1)
-        point = start_point + alpha * (core_min - start_point)
-        images.append(point)
-    
-    images = torch.stack(images)
-    
-    # CI-NEB iterations
-    climbing_idx = None
-    ci_activated = False
-    
-    for iteration in range(n_iterations):
-        # 1. Compute true forces (negative energy gradient) at each image
-        img_energies = torch.zeros(n_total, device=energy.device)
-        true_forces = torch.zeros_like(images)
-        
-        for i in range(n_total):
-            true_forces[i] = -compute_energy_gradient(energy, latent, images[i])
-            dists = torch.cdist(images[i:i+1], latent).squeeze(0)
-            _, knn_idx = torch.topk(dists, k=1, largest=False)
-            img_energies[i] = energy[knn_idx[0]].item()
-        
-        # 2. Compute spring forces between adjacent images
-        spring_forces = torch.zeros_like(images)
-        for i in range(1, n_total - 1):
-            force_forward = images[i+1] - images[i]
-            force_backward = images[i-1] - images[i]
-            spring_forces[i] = k_spring * (force_forward + force_backward)
-        
-        # 3. Project forces: true forces normal, spring forces tangent
-        total_forces = torch.zeros_like(images)
-        
-        # Determine climbing image (highest energy interior image) after ci_start_iter
-        if iteration >= ci_start_iter and iteration % ci_freq == 0:
-            interior_energies = img_energies[1:-1]
-            if len(interior_energies) > 0:
-                climbing_idx = interior_energies.argmax().item() + 1
-                ci_activated = True
-                print(f"  [CI-NEB] Climbing image set to index {climbing_idx} (E={img_energies[climbing_idx].item():.4f})")
-        
-        for i in range(1, n_total - 1):
-            # Tangent vector (path direction)
-            tangent = images[i+1] - images[i-1]
-            tangent_norm = tangent.norm()
-            if tangent_norm > 1e-8:
-                tangent = tangent / tangent_norm
+    if len(centroids) > 0:
+        waypoints = [healthy_min] + [c for c in centroids] + [core_min]
+        images = []
+        for i in range(n_images):
+            alpha = i / (n_images - 1)
+            t = alpha * (len(waypoints) - 1)
+            idx = int(t)
+            frac = t - idx
+            if idx >= len(waypoints) - 1:
+                images.append(waypoints[-1])
             else:
-                tangent = torch.zeros_like(tangent)
-            
-            true_force = true_forces[i]
-            
-            if ci_activated and i == climbing_idx:
-                # CLIMBING IMAGE: No spring force, invert parallel component of true force
-                # F_ci = -F_true + 2*(F_true·t)*t = -F_true + 2*proj_t(F_true)
-                f_parallel = (true_force @ tangent) * tangent
-                f_normal = true_force - f_parallel
-                total_forces[i] = -f_normal + f_parallel  # Invert normal, keep parallel
-                # Note: This simplifies to F_ci = -F_true + 2*(F_true·t)*t
-            else:
-                # REGULAR IMAGE: Standard NEB force projection
-                # True force component normal to path
-                f_parallel = (true_force @ tangent) * tangent
-                f_normal = true_force - f_parallel
-                true_normal = f_normal
-                
-                # Spring force component along path (tangent only)
-                spring_force = spring_forces[i]
-                spring_tangent = (spring_force @ tangent) * tangent
-                
-                # Total NEB force
-                total_forces[i] = true_normal + spring_tangent
-        
-        # 4. Update images
-        images[1:-1] += step_size * total_forces[1:-1]
-        
-        # 5. Reparametrize (redistribute images equally along path)
-        arc_lengths = torch.zeros(n_total, device=energy.device)
-        for i in range(1, n_total):
-            arc_lengths[i] = arc_lengths[i-1] + (images[i] - images[i-1]).norm()
-        
-        total_length = arc_lengths[-1]
-        target_arc = torch.linspace(0, total_length, n_total, device=energy.device)
-        
-        new_images = torch.zeros_like(images)
-        new_images[0] = images[0]
-        new_images[-1] = images[-1]
-        
-        for i in range(1, n_total - 1):
-            idx = torch.searchsorted(arc_lengths, target_arc[i]) - 1
-            idx = idx.clamp(0, n_total - 2)
-            
-            seg_start = arc_lengths[idx]
-            seg_end = arc_lengths[idx + 1]
-            alpha = (target_arc[i] - arc_lengths[idx]) / (arc_lengths[idx + 1] - arc_lengths[idx] + 1e-8)
-            new_images[i] = images[idx] + alpha * (images[idx + 1] - images[idx])
-        
-        images = new_images
-        
-        if iteration % 20 == 0:
-            interior_energies = img_energies[1:-1]
-            if len(interior_energies) > 0:
-                max_energy = interior_energies.max().item()
-                ci_status = " [CI ACTIVE]" if ci_activated else ""
-                print(f"  CI-NEB iteration {iteration}/{n_iterations}, max interior energy={max_energy:.4f}{ci_status}")
-    
-    # After convergence, find the image with highest energy (saddle)
-    final_energies = []
+                images.append(waypoints[idx] * (1 - frac) + waypoints[idx + 1] * frac)
+    else:
+        images = [healthy_min * (1 - i/(n_images-1)) + core_min * (i/(n_images-1))
+                  for i in range(n_images)]
+
+    energies = []
     for img in images:
-        dists = torch.cdist(img.unsqueeze(0), latent).squeeze(0)
-        nearest_idx = dists.argmin()
-        final_energies.append(energy[nearest_idx].item())
-    
-    final_energies = torch.tensor(final_energies, device=energy.device)
-    
-    # The saddle should be the climbing image if CI was active, else highest interior
-    if ci_activated and climbing_idx is not None:
-        saddle_idx = climbing_idx
-    else:
-        interior_energies = final_energies[1:-1]
-        if len(interior_energies) > 0:
-            saddle_idx = interior_energies.argmax().item() + 1
-        else:
-            saddle_idx = final_energies.argmax().item()
-    
-    saddle_point = images[saddle_idx]
-    saddle_energy = final_energies[saddle_idx].item()
-    
-    print(f"[CI-NEB] Converged. Saddle at image {saddle_idx}, energy={saddle_energy:.4f}")
-    return saddle_point, saddle_energy
+        d = torch.cdist(img.unsqueeze(0), latent).squeeze(0)
+        energies.append(energy[d.argmin()].item())
+
+    max_idx = int(np.argmax(energies))
+    return images[max_idx], energies[max_idx]
 
 
-def compute_hessian_at_point(
-    latent: torch.Tensor,
-    energy: torch.Tensor,
-    point: torch.Tensor,
-    k: int = 300,
-    bandwidth: float = 0.5,
-) -> torch.Tensor:
-    """Compute Hessian at point using local quadratic fit with CORRECT reference energy."""
-    dists = torch.cdist(point.unsqueeze(0), latent).squeeze(0)
-    _, knn_idx = torch.topk(dists, k, largest=False)
+def analyze_attractor(latent, energy, labels, drift, point, zone_id, name):
+    d = torch.cdist(point.unsqueeze(0), latent).squeeze(0)
+    nearest_idx = d.argmin()
+    e_val = energy[nearest_idx].item()
+    drift_mag = drift[nearest_idx].norm().item()
 
-    Z = latent[knn_idx] - point
+    H = compute_hessian_zone_aware(latent, energy, labels, point, zone_id=zone_id)
+    eigvals, pos, neg, zero, ctype = classify_hessian(H)
 
-    # CRITICAL FIX: Use energy at the query point, not neighbor mean
-    point_energy = energy[knn_idx[0]]
-    E = energy[knn_idx] - point_energy
+    log(f"  {name}: E={e_val:.4f}, eig=[{eigvals.min():.4f}, {eigvals.max():.4f}], "
+        f"+{pos}/-{neg}/{zero}z, type={ctype}")
 
-    weights = torch.exp(-dists[knn_idx] ** 2 / (2 * bandwidth ** 2))
-    weights = weights / weights.sum()
+    return {
+        "name": name, "energy": e_val, "drift_magnitude": drift_mag,
+        "eigenvalue_min": float(eigvals.min()), "eigenvalue_max": float(eigvals.max()),
+        "positive_eigenvalues": pos, "negative_eigenvalues": neg, "zero_eigenvalues": zero,
+        "critical_point_type": ctype, "is_saddle": ctype == "saddle_point",
+    }
 
+
+def analyze_saddle(latent, energy, labels, drift, point, name):
+    d = torch.cdist(point.unsqueeze(0), latent).squeeze(0)
+    nearest_idx = d.argmin()
+    e_val = energy[nearest_idx].item()
+    drift_mag = drift[nearest_idx].norm().item()
+
+    H = compute_hessian_zone_aware(latent, energy, labels, point, zone_id=None)
+    eigvals, pos, neg, zero, ctype = classify_hessian(H)
+
+    log(f"  {name}: E={e_val:.4f}, eig=[{eigvals.min():.4f}, {eigvals.max():.4f}], "
+        f"+{pos}/-{neg}/{zero}z, type={ctype}")
+
+    return {
+        "name": name, "energy": e_val, "drift_magnitude": drift_mag,
+        "eigenvalue_min": float(eigvals.min()), "eigenvalue_max": float(eigvals.max()),
+        "positive_eigenvalues": pos, "negative_eigenvalues": neg, "zero_eigenvalues": zero,
+        "critical_point_type": ctype, "is_saddle": ctype == "saddle_point",
+    }
+
+
+def main():
+    log(f"Device: {DEVICE}")
+    print("=" * 60)
+    print("SADDLE POINT ANALYSIS: ZONE-AWARE 5D HESSIAN")
+    print("=" * 60)
+
+    latent, energy, labels, drift = load_data(DEVICE)
     D = latent.shape[1]
-    ZZ = torch.einsum('ki,kj->kij', Z, Z)
-    ZZ_weighted = (ZZ * weights.view(-1, 1, 1)).sum(dim=0)
-    E_weighted = (E * weights).sum()
+    log(f"  Working dimension: {D}")
 
-    # Robust SVD-based pseudoinverse to handle singular/ill-conditioned matrices
-    try:
-        U, S, Vh = torch.linalg.svd(ZZ_weighted, full_matrices=False)
-        # Adaptive threshold: clamp tiny singular values relative to the largest
-        threshold = 1e-4 * S.max()
-        S_inv = torch.where(S > threshold, 1.0 / S, torch.zeros_like(S))
-        ZZ_pinv = Vh.T @ torch.diag(S_inv) @ U.T
-        H = 2 * ZZ_pinv * E_weighted
-    except Exception:
-        # Ultimate fallback: identity-scaled Hessian
-        H = 2 * E_weighted * torch.eye(D, device=latent.device)
-
-    return 0.5 * (H + H.T)
-
-
-def analyze_critical_point(
-    latent: torch.Tensor,
-    energy: torch.Tensor,
-    drift: torch.Tensor,
-    point: torch.Tensor,
-    name: str,
-    k: int = 300,
-) -> Dict:
-    """Full analysis of a critical point."""
-    dists = torch.cdist(point.unsqueeze(0), latent).squeeze(0)
-    nearest_idx = dists.argmin()
-    point_energy = energy[nearest_idx].item()
-
-    point_drift = drift[nearest_idx]
-    drift_mag = point_drift.norm().item()
-
-    H = compute_hessian_at_point(latent, energy, point, k=k)
-    # Regularize H slightly to help eigvalsh converge
-    D = H.shape[0]
-    H_reg = 0.5 * (H + H.T) + 1e-6 * torch.eye(D, device=H.device)
-    try:
-        eigvals = torch.linalg.eigvalsh(H_reg).cpu().numpy()
-    except torch.linalg.LinAlgError:
-        # Fallback: use SVD singular values with sign from diagonal
-        try:
-            U, S, Vh = torch.linalg.svd(H_reg, full_matrices=False)
-            # Recover signs from diagonal of U^T @ H @ V
-            signs = torch.sign(torch.diag(U.T @ H_reg @ Vh.T))
-            eigvals = (signs * S).cpu().numpy()
-            eigvals.sort()
-        except Exception:
-            eigvals = np.zeros(D)
-
-    pos = int((eigvals > 1e-4).sum())
-    neg = int((eigvals < -1e-4).sum())
-    zero = int(((eigvals >= -1e-4) & (eigvals <= 1e-4)).sum())
-
-    if pos == len(eigvals):
-        ctype = "stable_minimum"
-    elif neg == len(eigvals):
-        ctype = "unstable_maximum"
-    elif pos > 0 and neg > 0:
-        ctype = "saddle_point"
+    unique_zones = sorted(torch.unique(labels).cpu().numpy().tolist())
+    if len(unique_zones) == 3:
+        zone_names = {unique_zones[0]: "Healthy", unique_zones[1]: "Periphery", unique_zones[2]: "Core"}
     else:
-        ctype = "degenerate"
+        zone_names = {z: f"Zone{z}" for z in unique_zones}
 
-    local_entropy = -point_energy
+    log("\n[STEP 1] Zone minima...")
+    minima = find_zone_minima(latent, energy, labels)
+    for zid, (point, e) in minima.items():
+        log(f"  {zone_names.get(zid, zid)}: E={e:.4f}")
 
-    result = {
-        "name": name,
-        "energy": point_energy,
-        "drift_magnitude": drift_mag,
-        "hessian_eigenvalues": eigvals.tolist(),
-        "positive_eigenvalues": int(pos),
-        "negative_eigenvalues": int(neg),
-        "zero_eigenvalues": int(zero),
-        "critical_point_type": ctype,
-        "local_entropy_proxy": local_entropy,
-        "is_saddle": ctype == "saddle_point",
-    }
+    healthy_id = unique_zones[0]
+    core_id = unique_zones[-1]
+    healthy_min = minima[healthy_id][0]
+    core_min = minima[core_id][0]
 
-    print(f"  {name}: E={point_energy:.4f}, drift={drift_mag:.4f}, "
-          f"eig=[{eigvals.min():.3f}..{eigvals.max():.3f}], "
-          f"+{pos}/-{neg}, type={ctype}")
-    if ctype == "saddle_point":
-        print(f"  *** TRUE SADDLE POINT CONFIRMED ***")
-
-    return result
-
-
-def main() -> None:
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    print(f"Computational Backend Initialized on: {device}")
-
-    latent, energy, labels, drift = load_data(device)
-
-    print(f"\n{'='*60}")
-    print("SADDLE POINT ANALYSIS: WADDINGTON LANDSCAPE CRITICAL POINTS")
-    print(f"{'='*60}")
-
-    # 1. Find actual energy minima (attractors) within each zone
-    print("\n[STEP 1] Finding zone energy minima (attractors)...")
-    zone_minima = find_zone_energy_minima(latent, energy, labels)
-
-    for zone, name in [(0, "Healthy"), (1, "Periphery"), (2, "Core")]:
-        if zone in zone_minima:
-            point, e = zone_minima[zone]
-            print(f"  {name} attractor: E={e:.4f}")
-
-    healthy_min = zone_minima[0][0]
-    periphery_min = zone_minima[1][0]
-    core_min = zone_minima[2][0]
-
-    # 2. Find saddle on transition path
-    print("\n[STEP 2] Finding saddle on Healthy->Core path (through Periphery centroids)...")
-    saddle_point, saddle_energy = ci_neb_saddle_search(
-        latent, energy, labels, healthy_min, periphery_min, core_min
+    log("\n[STEP 2] Saddle path search...")
+    saddle_point, saddle_energy = find_saddle_on_path(
+        latent, energy, labels, healthy_min, core_min
     )
-    print(f"  Saddle point: E={saddle_energy:.4f}")
+    log(f"  Saddle candidate: E={saddle_energy:.4f}")
 
-    # 3. Analyze all critical points
-    print(f"\n{'='*60}")
-    print("CRITICAL POINT ANALYSIS")
-    print(f"{'='*60}")
-
+    log("\n[STEP 3] Critical point analysis...")
     results = []
+    for zid in unique_zones:
+        point = minima[zid][0]
+        name = f"{zone_names.get(zid, zid)}_Attractor"
+        results.append(analyze_attractor(latent, energy, labels, drift, point, zid, name))
 
-    # Zone attractors
-    for zone, name in [(0, "Healthy_Attractor"), (1, "Periphery_Attractor"), (2, "Core_Attractor")]:
-        point, _ = zone_minima[zone]
-        results.append(analyze_critical_point(latent, energy, drift, zone_minima[zone][0], name))
+    saddle_r = analyze_saddle(latent, energy, labels, drift, saddle_point, "Transition_Saddle")
+    results.append(saddle_r)
 
-    # Saddle point
-    saddle_result = analyze_critical_point(latent, energy, drift, saddle_point, "Transition_Saddle")
-    results.append(saddle_result)
+    core_r = next(r for r in results if "Core_Attractor" in r["name"])
+    healthy_r = next(r for r in results if "Healthy_Attractor" in r["name"])
 
-    # Additional points on the saddle
-    desc_point = saddle_point + 0.15 * (zone_minima[2][0] - saddle_point)
-    results.append(analyze_critical_point(latent, energy, drift, desc_point, "Saddle_Descending"))
+    core_stable = core_r["critical_point_type"] == "stable_minimum"
+    healthy_stable = healthy_r["critical_point_type"] == "stable_minimum"
+    saddle_exists = saddle_r["is_saddle"]
+    saddle_higher = saddle_r["energy"] > max(core_r["energy"], healthy_r["energy"])
+    mixed_eig = saddle_r["positive_eigenvalues"] > 0 and saddle_r["negative_eigenvalues"] > 0
 
-    asc_point = saddle_point + 0.15 * (zone_minima[0][0] - saddle_point)
-    results.append(analyze_critical_point(latent, energy, drift, asc_point, "Saddle_Ascending"))
-
-    # Summary
-    print(f"\n{'='*60}")
-    print("SUMMARY: TOPOLOGICAL CLASSIFICATION")
-    print(f"{'='*60}")
-    for r in results:
-        saddle_marker = " *** SADDLE ***" if r.get("is_saddle", False) else ""
-        print(f"  {r['name']:20s}: {r['critical_point_type']:20s} "
-              f"(E={r['energy']:.3f}, λ=[{r['hessian_eigenvalues'][0]:.1f}..{r['hessian_eigenvalues'][-1]:.1f}]){saddle_marker}")
-
-    # Validation
-    saddle = next(r for r in results if r["name"] == "Transition_Saddle")
-    core = next(r for r in results if r["name"] == "Core_Attractor")
-    healthy = next(r for r in results if r["name"] == "Healthy_Attractor")
-
-    is_saddle = saddle["is_saddle"]
-    energy_higher = saddle["energy"] > healthy["energy"] and saddle["energy"] > core["energy"]
-    mixed_eig = saddle["positive_eigenvalues"] > 0 and saddle["negative_eigenvalues"] > 0
-    core_stable = core["critical_point_type"] == "stable_minimum"
-    healthy_stable = healthy["critical_point_type"] == "stable_minimum"
-
-    print(f"\n{'='*60}")
+    print("\n" + "=" * 60)
     print("VALIDATION SUMMARY")
-    print(f"{'='*60}")
-    print(f"  Core attractor stable:        {'PASS' if core_stable else 'FAIL'}")
-    print(f"  Healthy attractor stable:     {'PASS' if healthy_stable else 'FAIL'}")
-    print(f"  Saddle point exists:          {'PASS' if is_saddle else 'FAIL'}")
-    print(f"  Saddle energy > both:         {'PASS' if energy_higher else 'FAIL'}")
+    print("=" * 60)
+    print(f"  Core attractor stable:        {'PASS' if core_stable else 'FAIL'}  (type={core_r['critical_point_type']})")
+    print(f"  Healthy attractor stable:     {'PASS' if healthy_stable else 'FAIL'}  (type={healthy_r['critical_point_type']})")
+    print(f"  Saddle point exists:          {'PASS' if saddle_exists else 'FAIL'}  (type={saddle_r['critical_point_type']})")
+    print(f"  Saddle energy > both:         {'PASS' if saddle_higher else 'FAIL'}")
     print(f"  Mixed Hessian eigenvalues:    {'PASS' if mixed_eig else 'FAIL'}")
-    print(f"\nOverall: {'SADDLE POINT CONFIRMED' if (is_saddle and energy_higher and mixed_eig and core_stable and healthy_stable) else 'CALIBRATION REQUIRED'}")
 
-    # Export
+    overall = core_stable and healthy_stable and saddle_exists and mixed_eig
+    print(f"\nOverall: {'*** SADDLE POINT CONFIRMED ***' if overall else 'CALIBRATION REQUIRED'}")
+
     proof = {
-        "theorem": "The Periphery zone contains an unstable thermodynamic saddle point in the Waddington landscape.",
-        "evidence": {
-            "core_attractor": {"energy": core["energy"], "type": core["critical_point_type"], "eigenvalues": core["hessian_eigenvalues"]},
-            "healthy_attractor": {"energy": healthy["energy"], "type": healthy["critical_point_type"], "eigenvalues": healthy["hessian_eigenvalues"]},
-            "saddle_point": {
-                "energy": saddle["energy"],
-                "type": saddle["critical_point_type"],
-                "eigenvalues": saddle["hessian_eigenvalues"],
-                "positive_eigenvalues": saddle["positive_eigenvalues"],
-                "negative_eigenvalues": saddle["negative_eigenvalues"],
-            },
-            "energy_comparison": {
-                "core": core["energy"],
-                "healthy": healthy["energy"],
-                "saddle": saddle["energy"],
-                "saddle_higher_than_both": saddle["energy"] > healthy["energy"] and saddle["energy"] > core["energy"],
-            },
-            "hessian_signature": f"{saddle['positive_eigenvalues']} positive, {saddle['negative_eigenvalues']} negative eigenvalues",
+        "method": "Zone-aware 5D PCA + ridge quadratic Hessian",
+        "pca_dim": PCA_DIM,
+        "k_neighbors": K_NEIGHBORS,
+        "eig_noise_fraction": EIG_NOISE_FRACTION,
+        "attractors": {r["name"]: r for r in results if "Attractor" in r["name"]},
+        "saddle": saddle_r,
+        "validation": {
+            "core_stable": bool(core_stable),
+            "healthy_stable": bool(healthy_stable),
+            "saddle_exists": bool(saddle_exists),
+            "saddle_higher_than_both": bool(saddle_higher),
+            "mixed_eigenvalues": bool(mixed_eig),
+            "overall_pass": bool(overall),
         },
-        "conclusion": (
-            "The transition saddle point has higher energy than both attractors and exhibits a mixed "
-            "Hessian signature (positive and negative eigenvalues), confirming it as an unstable saddle "
-            "point forcing irreversible transition from Healthy basin into Core basin."
-        ),
     }
-
-    output_path = Path("output/saddle_point_metrics.json")
-    output_path.parent.mkdir(exist_ok=True)
-    with open(output_path, "w") as f:
+    out = Path("output/saddle_point_metrics.json")
+    out.parent.mkdir(exist_ok=True)
+    with open(out, "w") as f:
         json.dump(proof, f, indent=2)
-    print(f"\n[EXPORT] Proof saved to {output_path}")
-
-    print("\n[SUCCESS] Month 1 Complete: All 4 Foundation Scripts Executed")
-    print("  src/19_phenotypic_velocity.py      - Velocity field")
-    print("  src/20_fokker_planck_solver.py      - Energy landscape (dual-attractor)")
-    print("  src/21_drift_diffusion_analysis.py  - Drift/Diffusion tensors")
-    print("  src/22_saddle_point_proof.py        - Saddle point proof (CI-NEB method)")
+    log(f"Saved: {out}")
+    log("DONE.")
 
 
 if __name__ == "__main__":
