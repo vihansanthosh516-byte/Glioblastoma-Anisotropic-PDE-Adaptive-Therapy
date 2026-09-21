@@ -1,27 +1,32 @@
 #!/usr/bin/env python3
 """
-Month 5, Week 2: Survival Analysis Suite
+Month 5, Week 2: Survival Analysis Suite (Real TCGA-GBM Clinical Data)
 
-Loads the clinical mapped cohort, computes Kaplan-Meier curves,
-log-rank tests, Cox PH models, and generates publication-ready
+Loads the clinical mapped cohort from script 35 (real TCGA-GBM data),
+computes Kaplan-Meier curves, log-rank tests, Cox PH models on clinical
+covariates (age, gender, molecular subtype), and generates publication-ready
 multi-panel survival plots.
 """
 
 from __future__ import annotations
 
 import json
-import os
 import warnings
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Tuple
 
 import matplotlib
+
+from pathlib import Path as _Path
+PROJECT_ROOT = _Path(__file__).resolve().parent.parent
+OUTPUT_DIR = PROJECT_ROOT / "output"
+OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from scipy import stats
-from scipy.optimize import minimize
 
 warnings.filterwarnings("ignore")
 
@@ -190,23 +195,103 @@ def cox_ph_fit(
     }
 
 
-def stratify_by_expression(
+def stratify_by_covariate(
     df: pd.DataFrame,
-    gene: str,
+    covariate: str,
     method: str = "median",
 ) -> np.ndarray:
-    """Stratify patients into high/low expression groups."""
-    expr_col = f"{gene}_expr"
-    values = df[expr_col].values
-    if method == "median":
-        cutoff = np.median(values)
-    elif method == "tertile":
-        cutoff = np.percentile(values, 66.67)
-    elif method == "quartile":
-        cutoff = np.percentile(values, 75)
+    """Stratify patients by clinical covariate (median for continuous, value for categorical)."""
+    values = df[covariate].values
+    if covariate in ["age_at_diagnosis"]:
+        if method == "median":
+            cutoff = np.median(values)
+        elif method == "tertile":
+            cutoff = np.percentile(values, 66.67)
+        elif method == "quartile":
+            cutoff = np.percentile(values, 75)
+        else:
+            raise ValueError(f"Unknown method: {method}")
+        return (values > cutoff).astype(int)
+    elif covariate in ["gender"]:
+        return values.astype(int)
+    elif covariate in ["molecular_subtype"]:
+        unique_vals = np.unique(values)
+        if len(unique_vals) <= 2:
+            return (values > np.median(values)).astype(int)
+        ref = unique_vals[0]
+        return (values != ref).astype(int)
     else:
-        raise ValueError(f"Unknown method: {method}")
-    return (values > cutoff).astype(int)
+        raise ValueError(f"Unknown covariate: {covariate}")
+
+
+def run_univariate_survival_clinical(
+    patient_df: pd.DataFrame,
+    covariates: List[str],
+    time: np.ndarray,
+    event: np.ndarray,
+) -> pd.DataFrame:
+    """Run log-rank test and Cox PH for each clinical covariate."""
+    results = []
+
+    for cov in covariates:
+        if cov not in patient_df.columns:
+            continue
+
+        # Stratify by covariate
+        group = stratify_by_covariate(patient_df, cov)
+
+        # Log-rank test
+        chi2, p_lr = logrank_test(time, event, group)
+
+        # Cox PH
+        if cov == "molecular_subtype":
+            # Dummy encode: one-hot with reference
+            dummies = pd.get_dummies(patient_df[cov], prefix=cov, drop_first=True)
+            X = dummies.values.astype(float)
+        else:
+            X = patient_df[cov].values.reshape(-1, 1).astype(float)
+        cox = cox_ph_fit(time, event, X)
+
+        results.append({
+            "covariate": cov,
+            "logrank_chi2": float(chi2),
+            "logrank_p": float(p_lr),
+            "cox_hr": float(cox["hr"][0]) if len(cox["hr"]) > 0 else 1.0,
+            "cox_ci_lower": float(cox["ci_lower"][0]) if len(cox["ci_lower"]) > 0 else 1.0,
+            "cox_ci_upper": float(cox["ci_upper"][0]) if len(cox["ci_upper"]) > 0 else 1.0,
+            "cox_p": float(cox["p_values"][0]) if len(cox["p_values"]) > 0 else 1.0,
+            "n_high": int(group.sum()),
+            "n_low": int((1 - group).sum()),
+        })
+
+    return pd.DataFrame(results)
+
+
+def run_multivariate_survival_clinical(
+    patient_df: pd.DataFrame,
+    covariates: List[str],
+    time: np.ndarray,
+    event: np.ndarray,
+) -> Dict:
+    """Run multivariate Cox PH with clinical covariates."""
+    # Build design matrix - handle categorical
+    X_df = pd.get_dummies(patient_df[covariates], columns=["molecular_subtype"], drop_first=True)
+    feature_names = X_df.columns.tolist()
+    X = X_df.values.astype(float)
+    # Handle missing
+    if np.isnan(X).any():
+        X = np.nan_to_num(X, nan=np.nanmean(X))
+
+    cox = cox_ph_fit(time, event, X)
+
+    return {
+        "features": feature_names,
+        "coefficients": dict(zip(feature_names, cox["coefficients"])),
+        "hr": dict(zip(feature_names, cox["hr"])),
+        "ci_lower": dict(zip(feature_names, cox["ci_lower"])),
+        "ci_upper": dict(zip(feature_names, cox["ci_upper"])),
+        "p_values": dict(zip(feature_names, cox["p_values"])),
+    }
 
 
 # --------------------------------------------------------------------------- #
@@ -214,38 +299,33 @@ def stratify_by_expression(
 # --------------------------------------------------------------------------- #
 def plot_km_panels(
     patient_df: pd.DataFrame,
-    genes: List[str],
-    output_path: str = "output/km_survival_curves.png",
+    covariates: List[str],
+    time: np.ndarray,
+    event: np.ndarray,
+    output_path: str = str(OUTPUT_DIR / "km_survival_curves.png"),
 ) -> None:
-    """Generate multi-panel Kaplan-Meier survival curves."""
-    n_genes = len(genes)
-    n_cols = min(2, n_genes)
-    n_rows = (n_genes + n_cols - 1) // n_cols
+    """Generate multi-panel Kaplan-Meier survival curves for clinical covariates."""
+    n_cov = len(covariates)
+    n_cols = min(2, n_cov)
+    n_rows = (n_cov + n_cols - 1) // n_cols
 
     fig, axes = plt.subplots(n_rows, n_cols, figsize=(6 * n_cols, 5 * n_rows))
-    if n_genes == 1:
+    if n_cov == 1:
         axes = np.array([axes])
     axes = axes.flatten()
 
-    for idx, gene in enumerate(genes):
+    for idx, cov in enumerate(covariates):
         ax = axes[idx]
-        expr_col = f"{gene}_expr"
-        if expr_col not in patient_df.columns:
-            ax.text(0.5, 0.5, f"{gene}: no expression data",
-                    ha='center', va='center', transform=ax.transAxes)
-            continue
+        
+        group = stratify_by_covariate(patient_df, cov)
 
-        group = stratify_by_expression(patient_df, gene, method="median")
-        time = patient_df["survival_time_days"].values
-        event = patient_df["vital_status"].values
-
-        # High expression
+        # High group
         mask_high = group == 1
         t_high, s_high = kaplan_meier(time[mask_high], event[mask_high])
         ax.step(t_high, s_high, where='post', label=f'High (n={mask_high.sum()})',
                 color='#e74c3c', linewidth=2)
 
-        # Low expression
+        # Low group
         mask_low = group == 0
         t_low, s_low = kaplan_meier(time[mask_low], event[mask_low])
         ax.step(t_low, s_low, where='post', label=f'Low (n={mask_low.sum()})',
@@ -259,16 +339,16 @@ def plot_km_panels(
 
         ax.set_xlabel('Survival Time (days)', fontsize=11)
         ax.set_ylabel('Survival Probability', fontsize=11)
-        ax.set_title(f'{gene} Expression', fontsize=12, fontweight='bold')
+        ax.set_title(f'{cov} (High vs Low)', fontsize=12, fontweight='bold')
         ax.legend(loc='lower left', fontsize=9)
         ax.grid(True, alpha=0.3)
         ax.set_ylim(0, 1.05)
 
     # Hide unused subplots
-    for idx in range(n_genes, len(axes)):
+    for idx in range(len(covariates), len(axes)):
         axes[idx].set_visible(False)
 
-    plt.suptitle('Kaplan-Meier Survival Curves by Gene Expression\n'
+    plt.suptitle('Kaplan-Meier Survival Curves by Clinical Covariate\n'
                  '(High vs Low, median split)',
                  fontsize=14, fontweight='bold', y=0.995)
     plt.tight_layout()
@@ -279,7 +359,7 @@ def plot_km_panels(
 
 def plot_forest(
     multivariate_results: Dict,
-    output_path: str = "output/forest_plot.png",
+    output_path: str = str(OUTPUT_DIR / "forest_plot.png"),
 ) -> None:
     """Generate forest plot of multivariate Cox HRs."""
     features = multivariate_results["features"]
@@ -312,16 +392,11 @@ def plot_forest(
 
     ax.axvline(x=1.0, color='k', linestyle='--', alpha=0.3)
     ax.set_xlabel('Hazard Ratio (95% CI)', fontsize=11)
-    ax.set_title('Multivariate Cox PH: Gene Expression + Clinical Covariates',
+    ax.set_title('Multivariate Cox PH: Clinical Covariates (Age, Gender, Subtype)',
                  fontsize=12, fontweight='bold')
     ax.set_yticks([])
     ax.set_xlim(0.5, max(hi_arr) * 1.3)
     ax.grid(True, axis='x', alpha=0.3)
-
-    plt.tight_layout()
-    plt.savefig(output_path, dpi=300, bbox_inches='tight')
-    plt.close()
-    print(f"[PLOT] Forest plot saved to {output_path}")
 
     plt.tight_layout()
     plt.savefig(output_path, dpi=300, bbox_inches='tight')
@@ -334,78 +409,105 @@ def plot_forest(
 # --------------------------------------------------------------------------- #
 def main():
     print("=" * 60)
-    print("MONTH 5 WEEK 2: SURVIVAL ANALYSIS SUITE")
+    print("MONTH 5 WEEK 2: SURVIVAL ANALYSIS SUITE (Real TCGA-GBM Data)")
     print("=" * 60)
 
-    # Load clinical cohort
+    # Load clinical cohort (real TCGA-GBM data from script 35)
     print("\n[LOAD] Reading clinical_mapped_cohort.csv...")
-    patient_df = pd.read_csv("output/clinical_mapped_cohort.csv")
+    patient_df = pd.read_csv(str(OUTPUT_DIR / "clinical_mapped_cohort.csv"))
     print(f"  Cohort: {patient_df.shape[0]} patients, {patient_df.shape[1]} features")
 
-    # Identify target genes
-    expr_cols = [c for c in patient_df.columns if c.endswith('_expr')]
-    genes = [c.replace('_expr', '') for c in expr_cols]
-    print(f"\n[TARGETS] Genes for survival analysis: {genes}")
+    # Clinical covariates for survival analysis
+    clinical_covariates = ["age_at_diagnosis", "gender", "molecular_subtype"]
+    print(f"\n[COVARIATES] Clinical covariates: {clinical_covariates}")
 
-    # Univariate survival
+    # Fix column names
+    time = patient_df["os_time_days"].values
+    event = patient_df["os_event"].values
+
+    print(f"\n  Survival time range: {time.min():.0f} - {time.max():.0f} days")
+    print(f"  Events: {event.sum()}/{len(event)} ({100*event.mean():.1f}%)")
+    print(f"  Median survival: {np.median(time[event == 1]):.1f} days")
+
+    # Univariate survival on clinical covariates
     print("\n[SURVIVAL] Univariate analysis (log-rank + Cox)...")
-    time = patient_df["survival_time_days"].values
-    event = patient_df["vital_status"].values
-
     univariate_results = []
-    for gene in genes:
-        group = stratify_by_expression(patient_df, gene, method="median")
+    for cov in clinical_covariates:
+        if cov not in patient_df.columns:
+            print(f"  {cov}: NOT IN DATA")
+            continue
+
+        # Stratify by covariate
+        group = stratify_by_covariate(patient_df, cov)
+        
+        # Log-rank test
         chi2, p_lr = logrank_test(time, event, group)
-        X = patient_df[f"{gene}_expr"].values.reshape(-1, 1)
+
+        # Cox PH
+        if cov == "molecular_subtype":
+            # Dummy encode: one-hot with reference
+            dummies = pd.get_dummies(patient_df[cov], prefix=cov, drop_first=True)
+            X = dummies.values.astype(float)
+        else:
+            X = patient_df[cov].values.reshape(-1, 1).astype(float)
         cox = cox_ph_fit(time, event, X)
 
         univariate_results.append({
-            "gene": gene,
-            "logrank_chi2": chi2,
-            "logrank_p": p_lr,
-            "cox_hr": float(cox["hr"][0]),
-            "cox_ci_lower": float(cox["ci_lower"][0]),
-            "cox_ci_upper": float(cox["ci_upper"][0]),
-            "cox_p": float(cox["p_values"][0]),
+            "covariate": cov,
+            "logrank_chi2": float(chi2),
+            "logrank_p": float(p_lr),
+            "cox_hr": float(cox["hr"][0]) if len(cox["hr"]) > 0 else 1.0,
+            "cox_ci_lower": float(cox["ci_lower"][0]) if len(cox["ci_lower"]) > 0 else 1.0,
+            "cox_ci_upper": float(cox["ci_upper"][0]) if len(cox["ci_upper"]) > 0 else 1.0,
+            "cox_p": float(cox["p_values"][0]) if len(cox["p_values"]) > 0 else 1.0,
             "n_high": int(group.sum()),
             "n_low": int((1 - group).sum()),
         })
+
+        print(f"  {cov}: HR={cox['hr'][0]:.3f} "
+              f"({cox['ci_lower'][0]:.3f}-{cox['ci_upper'][0]:.3f}), "
+              f"log-rank p={p_lr:.4f}, Cox p={cox['p_values'][0]:.4f}")
 
     uni_df = pd.DataFrame(univariate_results)
     print(uni_df.to_string(index=False))
 
     # Multivariate Cox
-    print("\n[SURVIVAL] Multivariate Cox PH (genes + age)...")
-    clinical_covariates = ["age_at_diagnosis"]
-    cols = [f"{g}_expr" for g in genes] + clinical_covariates
-    X = patient_df[cols].values.astype(float)
-    X = np.nan_to_num(X, nan=np.nanmean(X))
+    print("\n[SURVIVAL] Multivariate Cox PH (age + gender + molecular subtype)...")
+    X_df = pd.get_dummies(patient_df[["age_at_diagnosis", "gender", "molecular_subtype"]], 
+                          columns=["molecular_subtype"], drop_first=True)
+    feature_names = X_df.columns.tolist()
+    X = X_df.values.astype(float)
+    if np.isnan(X).any():
+        X = np.nan_to_num(X, nan=np.nanmean(X))
 
     cox = cox_ph_fit(time, event, X)
     multivariate_results = {
-        "features": cols,
-        "coefficients": dict(zip(cols, cox["coefficients"])),
-        "hr": dict(zip(cols, cox["hr"])),
-        "ci_lower": dict(zip(cols, cox["ci_lower"])),
-        "ci_upper": dict(zip(cols, cox["ci_upper"])),
-        "p_values": dict(zip(cols, cox["p_values"])),
+        "features": feature_names,
+        "coefficients": dict(zip(feature_names, cox["coefficients"])),
+        "hr": dict(zip(feature_names, cox["hr"])),
+        "ci_lower": dict(zip(feature_names, cox["ci_lower"])),
+        "ci_upper": dict(zip(feature_names, cox["ci_upper"])),
+        "p_values": dict(zip(feature_names, cox["p_values"])),
     }
 
-    for feat in cols:
-        print(f"  {feat}: HR={cox['hr'][cols.index(feat)]:.3f} "
-              f"({cox['ci_lower'][cols.index(feat)]:.3f}-{cox['ci_upper'][cols.index(feat)]:.3f}), "
-              f"p={cox['p_values'][cols.index(feat)]:.4f}")
+    for feat in feature_names:
+        print(f"  {feat}: HR={cox['hr'][feature_names.index(feat)]:.3f} "
+              f"({cox['ci_lower'][feature_names.index(feat)]:.3f}-{cox['ci_upper'][feature_names.index(feat)]:.3f}), "
+              f"p={cox['p_values'][feature_names.index(feat)]:.4f}")
 
-    # Generate plots
+    # Generate KM plots for clinical covariates
     print("\n[PLOTS] Generating visual artifacts...")
-    Path("output").mkdir(exist_ok=True)
-    plot_km_panels(patient_df, genes, "output/km_survival_curves.png")
-    plot_forest(multivariate_results, "output/forest_plot.png")
+    OUTPUT_DIR.mkdir(exist_ok=True)
+    plot_km_panels(patient_df, clinical_covariates, time, event,
+                   str(OUTPUT_DIR / "km_survival_curves.png"))
+    plot_forest(multivariate_results, str(OUTPUT_DIR / "forest_plot.png"))
 
     # Export summaries
     print("\n[EXPORT] Saving statistical summaries...")
-    uni_df.to_csv("output/univariate_survival.csv", index=False)
-    with open("output/multivariate_survival.json", "w") as f:
+    uni_df = pd.DataFrame(univariate_results)
+    uni_df.to_csv(str(OUTPUT_DIR / "univariate_survival.csv"), index=False)
+    
+    with open(str(OUTPUT_DIR / "multivariate_survival.json"), "w") as f:
         json.dump(multivariate_results, f, indent=2)
 
     # Combined summary JSON
@@ -415,14 +517,14 @@ def main():
         "cohort_size": int(patient_df.shape[0]),
         "n_events": int(event.sum()),
         "median_survival_days": float(np.median(time[event == 1])),
-        "genes_analyzed": genes,
+        "covariates_analyzed": clinical_covariates,
     }
-    with open("output/survival_stats_summary.json", "w") as f:
+    with open(str(OUTPUT_DIR / "survival_stats_summary.json"), "w") as f:
         json.dump(summary, f, indent=2)
 
-    print("\n[SUCCESS] Month 5 Week 2 Complete: Survival Analysis")
-    print("  - output/km_survival_curves.png")
-    print("  - output/forest_plot.png")
+    print("\n[SUCCESS] Month 5 Week 2 Complete: Survival Analysis (Real TCGA-GBM)")
+    print("  - output/km_survival_curves.png (clinical covariates)")
+    print("  - output/forest_plot.png (multivariate Cox)")
     print("  - output/univariate_survival.csv")
     print("  - output/multivariate_survival.json")
     print("  - output/survival_stats_summary.json")
