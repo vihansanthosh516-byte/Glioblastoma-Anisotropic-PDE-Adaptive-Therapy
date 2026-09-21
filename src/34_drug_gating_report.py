@@ -12,6 +12,12 @@ from pathlib import Path
 from typing import Dict, List, Tuple
 
 import matplotlib
+
+from pathlib import Path as _Path
+PROJECT_ROOT = _Path(__file__).resolve().parent.parent
+OUTPUT_DIR = PROJECT_ROOT / "output"
+OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import numpy as np
@@ -19,11 +25,11 @@ import numpy as np
 
 def load_all_results() -> Dict:
     """Load all Month 4 results."""
-    single_ko = json.load(open("output/single_ko_results.json"))
-    single_ko_ti = json.load(open("output/single_ko_ti.json"))
-    dual_ko = json.load(open("output/dual_ko_results.json"))
-    dual_ko_ti = json.load(open("output/dual_ko_ti.json"))
-    with open("output/master_switches.tsv") as f:
+    single_ko = json.load(open(str(OUTPUT_DIR / "single_ko_results.json")))
+    single_ko_ti = json.load(open(str(OUTPUT_DIR / "single_ko_ti.json")))
+    dual_ko = json.load(open(str(OUTPUT_DIR / "dual_ko_results.json")))
+    dual_ko_ti = json.load(open(str(OUTPUT_DIR / "dual_ko_ti.json")))
+    with open(str(OUTPUT_DIR / "master_switches.tsv")) as f:
         lines = f.readlines()[1:]
         master_switches = []
         for line in lines:
@@ -134,7 +140,7 @@ def generate_report(data: Dict, output_path: str):
     single_ti = data['single_ko_ti']
     dual_ti = data['dual_ko_ti']
     ms = data['master_switches']
-    single_ko = json.load(open("output/single_ko_results.json"))
+    single_ko = json.load(open(str(OUTPUT_DIR / "single_ko_results.json")))
 
     md = f"""# Month 4: In Silico Combinatorial Drug Gating Report
 
@@ -177,7 +183,7 @@ TI = C_tumor / C_healthy (higher = better therapeutic window)
 | Rank | Gene | Tumor C | Healthy C | TI |
 |------|------|---------|-----------|-----|
 """
-    single_ti = json.load(open("output/single_ko_ti.json"))
+    single_ti = json.load(open(str(OUTPUT_DIR / "single_ko_ti.json")))
     for i, r in enumerate(single_ti[:10], 1):
         md += f"| {i} | {r['gene']} | {r['tumor_collapse']:.4f} | {r['healthy_collapse']:.4f} | {r['therapeutic_index']:.2f} |\n"
 
@@ -301,16 +307,16 @@ def main():
 
     # Create optimization matrix
     matrix, genes = create_optimization_matrix(data)
-    np.save("output/optimization_matrix.npy", matrix)
-    with open("output/optimization_matrix_genes.txt", "w") as f:
+    np.save(str(OUTPUT_DIR / "optimization_matrix.npy"), matrix)
+    with open(str(OUTPUT_DIR / "optimization_matrix_genes.txt"), "w") as f:
         for g in genes:
             f.write(f"{g}\n")
 
     # Generate plots
-    plot_optimization_matrix(matrix, genes, "output/optimization_matrix.png")
+    plot_optimization_matrix(matrix, genes, str(OUTPUT_DIR / "optimization_matrix.png"))
 
     # Generate report
-    generate_report(data, "output/drug_gating_report.md")
+    generate_report(data, str(OUTPUT_DIR / "drug_gating_report.md"))
 
     print("\n[SUCCESS] Month 4 Week 4 Complete: Drug Gating Report")
     print("  - output/drug_gating_report.md")

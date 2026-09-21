@@ -1,0 +1,22 @@
+parameter	value	units
+wave_speed_pixels_per_step	2.659288330078125	
+wave_speed_um_per_hour	26.59288330078125	
+core_growth_rate	432.0248239804809	
+max_periphery_cells	3058	
+final_periphery_cells	3058	
+necrosis_accumulation_rate	292.2244370860928	
+final_necrotic_fraction	0.17190170288085938	
+total_steps	150	
+
+# Clinical Correlation
+wave_speed_um_per_hour	26.59288330078125	
+literature_range_um_per_hour	[10, 50]	
+wave_speed_in_range	True	
+core_doubling_time_hours	47.48256182967528	
+literature_doubling_time_days	[7, 30]	
+doubling_time_in_range	False	
+invasive_front_periphery_fraction	0.04181422887068765	
+necrotic_fraction	0.38125655690547905	
+literature_necrotic_fraction_range	[0.1, 0.4]	
+necrotic_fraction_in_range	True	
+histological_pattern	infiltrative	

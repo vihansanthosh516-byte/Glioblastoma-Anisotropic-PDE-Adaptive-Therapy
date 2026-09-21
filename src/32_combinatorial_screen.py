@@ -15,6 +15,12 @@ import torch.nn as nn
 # structural trace floor) plus the per-zone trace helper, so the
 # combinatorial screen measures collapse against the TUMOR baseline trace
 # instead of a mix of healthy + tumor latents that previously saturated.
+
+from pathlib import Path as _Path
+PROJECT_ROOT = _Path(__file__).resolve().parent.parent
+OUTPUT_DIR = PROJECT_ROOT / "output"
+OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+
 spec = importlib.util.spec_from_file_location("therapeutic_index", "src/33_therapeutic_index.py")
 therapeutic_index = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(therapeutic_index)
@@ -85,7 +91,7 @@ class VAEEncoder(nn.Module):
 
 def load_cvae_encoder(device: torch.device):
     """Load pre-trained cVAE encoder from checkpoint."""
-    state_dict = torch.load("output/cgat/cvae_model.pt", map_location="cpu", weights_only=False)["model_state"]
+    state_dict = torch.load(str(OUTPUT_DIR / "cgat/cvae_model.pt"), map_location="cpu", weights_only=False)["model_state"]
     encoder = VAEEncoder(state_dict).to(device)
     encoder.eval()
     for p in encoder.parameters():
@@ -96,24 +102,24 @@ def load_cvae_encoder(device: torch.device):
 
 def load_data(device: torch.device):
     """Load latent space, transition scores, labels, and gene names."""
-    latent = torch.from_numpy(np.load("output/scvi_latent.npy")).to(device, dtype=torch.float32)
-    scores = torch.from_numpy(np.load("output/csgt_transition_scores.npy")).to(device, dtype=torch.float32)
-    labels = torch.from_numpy(np.load("output/nn_y.npy")).to(device, dtype=torch.int64)
-    with open("output/te_gene_names.txt") as f:
+    latent = torch.from_numpy(np.load(str(OUTPUT_DIR / "scvi_latent.npy"))).to(device, dtype=torch.float32)
+    scores = torch.from_numpy(np.load(str(OUTPUT_DIR / "csgt_transition_scores.npy"))).to(device, dtype=torch.float32)
+    labels = torch.from_numpy(np.load(str(OUTPUT_DIR / "nn_y.npy"))).to(device, dtype=torch.int64)
+    with open(str(OUTPUT_DIR / "te_gene_names.txt")) as f:
         gene_names = [line.strip().split('\t')[-1] for line in f.readlines()]
     return latent, scores, labels, gene_names
 
 
 def load_single_ko_results() -> List[Dict]:
     """Load single KO results."""
-    with open("output/single_ko_results.json") as f:
+    with open(str(OUTPUT_DIR / "single_ko_results.json")) as f:
         return json.load(f)
 
 
 def load_expression_data(device: torch.device):
     """Load full expression matrix and gene names."""
-    X = torch.from_numpy(np.load("output/nn_X.npy")).to(device, dtype=torch.float32)
-    with open("output/te_gene_names.txt") as f:
+    X = torch.from_numpy(np.load(str(OUTPUT_DIR / "nn_X.npy"))).to(device, dtype=torch.float32)
+    with open(str(OUTPUT_DIR / "te_gene_names.txt")) as f:
         gene_names = [line.strip().split('\t')[-1] for line in f]
     return X, gene_names
 
@@ -258,12 +264,12 @@ def main():
     results.sort(key=lambda x: x['bliss_synergy'], reverse=True)
 
     # Export
-    Path("output").mkdir(exist_ok=True)
-    with open("output/dual_ko_results.json", "w") as f:
+    OUTPUT_DIR.mkdir(exist_ok=True)
+    with open(str(OUTPUT_DIR / "dual_ko_results.json"), "w") as f:
         json.dump(results, f, indent=2)
 
     # TSV summary
-    with open("output/dual_ko_summary.tsv", "w") as f:
+    with open(str(OUTPUT_DIR / "dual_ko_summary.tsv"), "w") as f:
         f.write("rank\tgene_A\tgene_B\tcollapse_score\tC_A\tC_B\tbliss_synergy\tloewe_synergy\n")
         for i, r in enumerate(results[:50], 1):
             f.write(f"{i}\t{r['gene_a']}\t{r['gene_b']}\t{r['collapse_score']:.6f}\t"

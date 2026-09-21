@@ -18,6 +18,12 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 
+
+from pathlib import Path as _Path
+PROJECT_ROOT = _Path(__file__).resolve().parent.parent
+OUTPUT_DIR = PROJECT_ROOT / "output"
+OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+
 class VAEEncoder(nn.Module):
     """cVAE encoder extracted from trained model."""
     
@@ -77,8 +83,8 @@ class VAEEncoder(nn.Module):
 def load_cvae_encoder(device: torch.device) -> VAEEncoder:
     """Load pre-trained cVAE encoder from saved model."""
     print("[LOAD] Loading cVAE encoder...")
-    state_dict = torch.load("output/cgat/cvae_model.pt", map_location="cpu")["model_state"]
-    encoder = VAEEncoder(torch.load("output/cgat/cvae_model.pt", map_location="cpu")["model_state"])
+    state_dict = torch.load(str(OUTPUT_DIR / "cgat/cvae_model.pt"), map_location="cpu")["model_state"]
+    encoder = VAEEncoder(torch.load(str(OUTPUT_DIR / "cgat/cvae_model.pt"), map_location="cpu")["model_state"])
     encoder.to(device)
     encoder.eval()
     print(f"[LOAD] Encoder loaded on {device}")
@@ -87,16 +93,16 @@ def load_cvae_encoder(device: torch.device) -> VAEEncoder:
 
 def load_transition_data(device: torch.device) -> Tuple[torch.Tensor, torch.Tensor, np.ndarray]:
     """Load latent space, transition scores, and labels."""
-    latent = torch.from_numpy(np.load("output/scvi_latent.npy")).to(device, dtype=torch.float32)
-    scores = torch.from_numpy(np.load("output/csgt_transition_scores.npy")).to(device, dtype=torch.float32)
-    labels = np.load("output/nn_y.npy")
+    latent = torch.from_numpy(np.load(str(OUTPUT_DIR / "scvi_latent.npy"))).to(device, dtype=torch.float32)
+    scores = torch.from_numpy(np.load(str(OUTPUT_DIR / "csgt_transition_scores.npy"))).to(device, dtype=torch.float32)
+    labels = np.load(str(OUTPUT_DIR / "nn_y.npy"))
     return latent, scores, labels
 
 
 def load_expression_matrix(device: torch.device) -> Tuple[torch.Tensor, np.ndarray]:
     """Load raw gene expression matrix and gene names."""
-    X = torch.from_numpy(np.load("output/nn_X.npy")).to(device, dtype=torch.float32)
-    gene_names = np.loadtxt("output/nn_gene_names.tsv", dtype=str, delimiter='\t')
+    X = torch.from_numpy(np.load(str(OUTPUT_DIR / "nn_X.npy"))).to(device, dtype=torch.float32)
+    gene_names = np.loadtxt(str(OUTPUT_DIR / "nn_gene_names.tsv"), dtype=str, delimiter='\t')
     gene_names = [g.split('\t')[-1] for g in gene_names]
     return X, np.array(gene_names)
 
@@ -122,7 +128,7 @@ class VirtualKnockoutEngine:
         self.labels = labels  # (N,)
         self.gene_names = gene_names
         self.device = device
-        self.N, self.G = X.shape if (X := torch.load("output/nn_X.npy", map_location="cpu")).shape else (15000, 2500)
+        self.N, self.G = X.shape if (X := torch.load(str(OUTPUT_DIR / "nn_X.npy"), map_location="cpu")).shape else (15000, 2500)
         
     def compute_network_collapse(
         self,
@@ -266,11 +272,11 @@ def main():
     results.sort(key=lambda x: x["collapse_score"], reverse=True)
     
     # Export
-    Path("output").mkdir(exist_ok=True)
-    with open("output/single_ko_results.json", "w") as f:
+    OUTPUT_DIR.mkdir(exist_ok=True)
+    with open(str(OUTPUT_DIR / "single_ko_results.json"), "w") as f:
         json.dump(results, f, indent=2)
     
-    with open("output/single_ko_summary.tsv", "w") as f:
+    with open(str(OUTPUT_DIR / "single_ko_summary.tsv"), "w") as f:
         f.write("rank\tgene\tcollapse_score\n")
         for i, r in enumerate(results, 1):
             f.write(f"{i}\t{r['gene']}\t{r['collapse_score']:.6f}\n")

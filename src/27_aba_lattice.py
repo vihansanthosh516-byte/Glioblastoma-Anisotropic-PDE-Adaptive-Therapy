@@ -20,11 +20,6 @@ from typing import Dict, List, Tuple
 
 # Resolve project root from this script's location (src/ -> project root)
 
-from pathlib import Path as _Path
-PROJECT_ROOT = _Path(__file__).resolve().parent.parent
-OUTPUT_DIR = PROJECT_ROOT / "output"
-OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 OUTPUT_DIR = PROJECT_ROOT / "output"
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
@@ -61,6 +56,15 @@ class CellularAutomaton:
         self.morphogen = torch.zeros(grid_size, dtype=torch.float32, device=self.device)
         self.velocity_field = torch.zeros(grid_size, dtype=torch.float32, device=self.device)
         
+# --- Oxygen field (from Martinez-Gonzalez 2012 model) ---
+        # 1.0 = normal oxygenation (periphery/boundary), 0.0 = anoxic
+        self.sigma = torch.ones(grid_size, dtype=torch.float32, device=self.device)
+        # Parameters scaled for 512x512 grid at 5 µm/pixel, 1 step = 1 hour
+        self.D_sigma = 0.15          # oxygen diffusion coefficient
+        self.lambda_consumption = 0.007   # oxygen consumption per tumor cell per hour (moderate)
+        self.sigma_necrotic = 0.25       # necrosis threshold (25% of normal)
+        self.sigma_hypoxic = 0.4     # hypoxia threshold for migration
+        
         # Load velocity gradient magnitude from Month 1
         self._load_velocity_field()
         
@@ -71,18 +75,17 @@ class CellularAutomaton:
         # 512x512 at 5µm/pixel, transition rates [0.5, 0.8]
         # FIXED: Balanced rates for sustained invasion wavefront
         self.rules = {
-            'healthy_proliferate': 0.12,
-            'healthy_to_periphery_base': 0.10,
-            'healthy_velocity_sensitivity': 0.10,
-            'periphery_proliferate': 0.18,
-            'periphery_to_core_base': 0.08,
-            'periphery_velocity_sensitivity': 0.08,
-            'periphery_secrete_morphogen': 0.25,
-            'core_proliferate': 0.06,
-            'core_necrose': 0.0015,
-            'diffusion_rate': 0.12,
-            # Healthy homeostasis - stronger replenishment
-            'healthy_replenish_rate': 0.08,
+            'healthy_proliferate': 0.2,
+            'healthy_to_periphery_base': 0.15,
+            'healthy_velocity_sensitivity': 0.15,
+            'periphery_proliferate': 0.3,
+            'periphery_to_core_base': 0.12,
+            'periphery_velocity_sensitivity': 0.12,
+            'periphery_secrete_morphogen': 0.3,
+            'core_proliferate': 0.1,
+            'core_necrose': 0.0015,  # DEPRECATED
+            'diffusion_rate': 0.3,
+            'healthy_replenish_rate': 0.12,
         }
         
         # Neighborhood offsets
@@ -139,24 +142,39 @@ class CellularAutomaton:
         return [(-1, -1), (-1, 0), (-1, 1), (0, -1), (0, 1), (1, -1), (1, 0), (1, 1)]
     
     def _initialize_tissue(self, healthy_frac: float, core_frac: float) -> None:
-        """Initialize grid with healthy tissue and core tumor seed."""
-        n_cells = self.H * self.W
-        n_healthy = int(n_cells * healthy_frac)
-        n_core = int(n_cells * core_frac)
+        """Initialize grid with healthy tissue and central core tumor seed."""
+        # Create a fully healthy grid first
+        self.grid = torch.ones(self.grid_size, dtype=torch.int8, device=self.device)
         
-        # Random placement
-        flat = torch.zeros(n_cells, dtype=torch.int8, device=self.device)
-        flat[:n_healthy] = 1  # Healthy
-        flat[n_healthy:n_healthy + n_core] = 3  # Core
+        # Place core as a compact seed at the center
+        center_h, center_w = self.H // 2, self.W // 2
+        core_radius = int((core_frac * self.H * self.W / np.pi) ** 0.5)
         
-        # Shuffle
-        perm = torch.randperm(n_cells, device=self.device)
-        flat = flat[perm]
+        # Create coordinate grids
+        y = torch.arange(self.H, device=self.device).float() - center_h
+        x = torch.arange(self.W, device=self.device).float() - center_w
+        Y, X = torch.meshgrid(y, x, indexing='ij')
+        dist_sq = X**2 + Y**2
         
-        self.grid = flat.view(self.H, self.W)
+        # Core seed in center
+        core_mask = dist_sq <= core_radius**2
+        n_core_actual = int(core_mask.sum().item())
+        
+        self.grid[core_mask] = 3  # Core
+        
+        # Convert some healthy cells to empty to reach healthy_frac
+        total_cells = self.H * self.W
+        target_healthy = int(total_cells * healthy_frac)
+        current_healthy = total_cells - n_core_actual
+        if current_healthy > target_healthy:
+            n_to_empty = current_healthy - target_healthy
+            healthy_mask = (self.grid == 1)
+            healthy_indices = healthy_mask.nonzero(as_tuple=False)
+            perm = torch.randperm(len(healthy_indices), device=self.device)
+            empty_indices = healthy_indices[perm[:n_to_empty]]
+            self.grid[empty_indices[:, 0], empty_indices[:, 1]] = 0
         
         # Initialize morphogen at core locations
-        core_mask = (self.grid == 3)
         self.morphogen[core_mask] = 1.0
     
     def count_cells(self) -> Dict[str, int]:
@@ -180,8 +198,52 @@ class CellularAutomaton:
         """Execute one simulation step (no sub-stepping - base step)."""
         return self._execute_ca_step()
     
+    def _update_oxygen(self) -> None:
+        """Update oxygen field: diffusion + consumption by tumor cells.
+        
+        Oxygen sources:
+        - Healthy tissue (vasculature): grid == 1
+        - Live tumor rim: tumor cells within R_rim pixels of tumor boundary
+        """
+        # 1. Compute tumor boundary distance
+        tumor_mask = (self.grid >= 2).float()  # periphery + core
+        tumor_distance = torch.zeros_like(self.sigma)
+        
+        # Compute distance transform on CPU (no GPU distance_transform_edt)
+        # Use iterative BFS-like approach or approximate with convolution
+        # For now: tumor cells with healthy neighbors = boundary
+        padded = torch.nn.functional.pad(tumor_mask, (1, 1, 1, 1), mode='constant', value=0)
+        healthy_neighbors = (padded[:-2, 1:-1] + padded[2:, 1:-1] + 
+                           padded[1:-1, :-2] + padded[1:-1, 2:]) == 0
+        healthy_neighbors = healthy_neighbors.float()  # boundary if any healthy neighbor
+        
+        # Live rim: tumor cells adjacent to healthy tissue
+        live_rim_mask = tumor_mask * (healthy_neighbors > 0).float()
+        
+        # 2. Diffusion
+        padded_sigma = torch.nn.functional.pad(self.sigma, (1, 1, 1, 1), mode='constant', value=0)
+        laplacian = (
+            padded_sigma[:-2, 1:-1] + padded_sigma[2:, 1:-1] + 
+            padded_sigma[1:-1, :-2] + padded_sigma[1:-1, 2:] - 4 * self.sigma
+        )
+        self.sigma = self.sigma + self.D_sigma * laplacian
+        
+        # 3. Consumption by tumor cells
+        self.sigma = self.sigma - self.lambda_consumption * tumor_mask * self.sigma
+        
+        # 4. Oxygen sources: healthy tissue + live tumor rim
+        self.sigma = torch.where((self.grid == 1) | (live_rim_mask > 0), 
+                                 torch.ones_like(self.sigma), 
+                                 self.sigma)
+        
+        # 5. Clamp
+        self.sigma = torch.clamp(self.sigma, 0.0, 1.0)
+
     def _execute_ca_step(self) -> Dict[str, int]:
         """Execute a single CA step (core logic)."""
+        # Update oxygen field first (drives necrosis)
+        self._update_oxygen()
+        
         new_grid = self.grid.clone()
         changes = {'proliferation': 0, 'transition': 0, 'necrosis': 0, 'secretion': 0, 'replenish': 0}
         
@@ -203,7 +265,7 @@ class CellularAutomaton:
             vel_at_healthy = self.velocity_field * healthy_mask.float()
             
             # Healthy -> Periphery: base + velocity-coupled
-            morphogen_threshold = 0.25
+            morphogen_threshold = 0.15
             transition_prob = (
                 self.rules['healthy_to_periphery_base'] + 
                 self.rules['healthy_velocity_sensitivity'] * vel_at_healthy
@@ -264,8 +326,8 @@ class CellularAutomaton:
                 self._proliferate_cells(prolif_mask, 3, new_grid)
                 changes['proliferation'] += int(prolif_mask.sum().item())
             
-            # Necrosis (P0: core_necrose = 0.005)
-            necro_mask = core_mask & (torch.rand_like(self.grid.float()) < self.rules['core_necrose'])
+            # Necrosis: oxygen-driven (replaces random core_necrose)
+            necro_mask = core_mask & (self.sigma < self.sigma_necrotic)
             new_grid[necro_mask] = 4
             changes['necrosis'] += int(necro_mask.sum().item())
         
@@ -386,11 +448,11 @@ def main():
     print("MONTH 3 WEEK 1: STOCHASTIC AGENT-BASED INVASION ENGINE (CALIBRATED)")
     print("=" * 60)
     
-    # Run simulation
+    # Run simulation (150 steps = mid-growth phase with necrotic core, before boundary saturation)
     grid_hist, morph_hist, metrics = run_simulation(
-        n_steps=800,
+        n_steps=150,
         grid_size=(512, 512),
-        save_interval=20,
+        save_interval=10,
     )
     
     # Export

@@ -34,6 +34,12 @@ import torch.nn as nn
 # --------------------------------------------------------------------------- #
 # Per-zone baseline trace cache                                               #
 # --------------------------------------------------------------------------- #
+
+from pathlib import Path as _Path
+PROJECT_ROOT = _Path(__file__).resolve().parent.parent
+OUTPUT_DIR = PROJECT_ROOT / "output"
+OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+
 _ZONE_BASELINE_TRACES: Dict[int, float] = {}
 
 
@@ -116,34 +122,27 @@ def compute_network_collapse_score(
 def compute_therapeutic_index(
     tumor_collapse: float,
     healthy_collapse: float,
-    temperature: float = 0.15,
+    floor: float = 0.001,
 ) -> Tuple[float, float]:
     """
-    Calibrated Therapeutic Index (homeostatic-buffer + log-ratio):
+    Calibrated Therapeutic Index (log-ratio with floor):
 
-      healthy_impact     = max(0.0, healthy_collapse)
-      calibrated_healthy = 1.0 - exp(-healthy_impact / 0.15)
-      ti_score           = log2( max(0.01, tumor_collapse) /
-                                 max(0.05, calibrated_healthy) )
+      healthy_impact = max(0.0, healthy_collapse)
+      t_floored      = max(floor, tumor_collapse)
+      h_floored      = max(floor, healthy_impact)
+      ti_score       = log2(t_floored / h_floored)
 
-    The dual 0.01 / 0.05 floors guarantee a finite, well-posed log2 index
-    even when the encoder collapses healthy latents toward a near-constant
-    map (the source of the original `Healthy C = 1.0 -> TI = inf` pathology).
-    The 0.05 homeostatic floor sets the minimum tolerated healthy
-    disruption; anything below it is treated as noise and the TI is
-    measured relative to 0.05, not to a tiny denominator.
+    The floor prevents log(0) and handles cases where collapse is near zero.
+    TI > 0 means tumor collapse exceeds healthy disruption (good).
+    TI < 0 means healthy disruption exceeds tumor collapse (bad).
 
-    Returns (TI', calibrated_healthy_collapse).
+    Returns (TI, healthy_impact).
     """
     healthy_impact = max(0.0, float(healthy_collapse))
-    calibrated_healthy = 1.0 - float(np.exp(-healthy_impact / temperature))
-
-    t_floored = float(max(0.01, tumor_collapse))
-    h_floored = float(max(0.05, calibrated_healthy))
+    t_floored = float(max(floor, tumor_collapse))
+    h_floored = float(max(floor, healthy_impact))
     ti_score = float(np.log2(t_floored / h_floored))
-    # TI is a directed log-ratio: tumor >> healthy is positive (good).
-    # Negative TIs indicate net toxicity; keep them signed but bound.
-    return ti_score, calibrated_healthy
+    return ti_score, healthy_impact
 
 
 # --------------------------------------------------------------------------- #
@@ -151,29 +150,29 @@ def compute_therapeutic_index(
 # --------------------------------------------------------------------------- #
 def load_data(device: torch.device) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, List[str]]:
     """Load latent space, transition scores, labels, and gene names."""
-    latent = torch.from_numpy(np.load("output/scvi_latent.npy")).to(device, dtype=torch.float32)
-    scores = torch.from_numpy(np.load("output/csgt_transition_scores.npy")).to(device, dtype=torch.float32)
-    labels = torch.from_numpy(np.load("output/nn_y.npy")).to(device, dtype=torch.int64)
-    with open("output/te_gene_names.txt") as f:
+    latent = torch.from_numpy(np.load(str(OUTPUT_DIR / "scvi_latent.npy"))).to(device, dtype=torch.float32)
+    scores = torch.from_numpy(np.load(str(OUTPUT_DIR / "csgt_transition_scores.npy"))).to(device, dtype=torch.float32)
+    labels = torch.from_numpy(np.load(str(OUTPUT_DIR / "nn_y.npy"))).to(device, dtype=torch.int64)
+    with open(str(OUTPUT_DIR / "te_gene_names.txt")) as f:
         gene_names = [line.strip().split('\t')[-1] for line in f]
     return latent, scores, labels, gene_names
 
 
 def load_single_ko_results() -> List[Dict]:
     """Load single KO results."""
-    with open("output/single_ko_results.json") as f:
+    with open(str(OUTPUT_DIR / "single_ko_results.json")) as f:
         return json.load(f)
 
 
 def load_dual_ko_results() -> List[Dict]:
     """Load dual KO results."""
-    with open("output/dual_ko_results.json") as f:
+    with open(str(OUTPUT_DIR / "dual_ko_results.json")) as f:
         return json.load(f)
 
 
 def load_cvae_encoder(device: torch.device) -> nn.Module:
     """Load pre-trained cVAE encoder from checkpoint."""
-    model_data = torch.load("output/cgat/cvae_model.pt", map_location="cpu", weights_only=False)
+    model_data = torch.load(str(OUTPUT_DIR / "cgat/cvae_model.pt"), map_location="cpu", weights_only=False)
     state_dict = model_data["model_state"]
 
     class VAEEncoder(nn.Module):
@@ -232,8 +231,8 @@ def load_cvae_encoder(device: torch.device) -> nn.Module:
 
 def load_expression_data(device: torch.device) -> Tuple[torch.Tensor, List[str]]:
     """Load full expression matrix and gene names."""
-    X = torch.from_numpy(np.load("output/nn_X.npy")).to(device, dtype=torch.float32)
-    with open("output/te_gene_names.txt") as f:
+    X = torch.from_numpy(np.load(str(OUTPUT_DIR / "nn_X.npy"))).to(device, dtype=torch.float32)
+    with open(str(OUTPUT_DIR / "te_gene_names.txt")) as f:
         gene_names = [line.strip().split('\t')[-1] for line in f]
     return X, gene_names
 
@@ -471,20 +470,20 @@ def main():
     dual_ti.sort(key=lambda x: x['therapeutic_index'], reverse=True)
 
     # ----------------------- Export ------------------------------ #
-    Path("output").mkdir(exist_ok=True)
+    OUTPUT_DIR.mkdir(exist_ok=True)
 
-    with open("output/single_ko_ti.json", "w") as f:
+    with open(str(OUTPUT_DIR / "single_ko_ti.json"), "w") as f:
         json.dump(single_ti, f, indent=2)
-    with open("output/single_ko_ti.tsv", "w") as f:
+    with open(str(OUTPUT_DIR / "single_ko_ti.tsv"), "w") as f:
         f.write("rank\tgene\ttumor_collapse\thealthy_collapse\thealthy_collapse_raw\ttherapeutic_index\n")
         for i, r in enumerate(single_ti, 1):
             f.write(f"{i}\t{r['gene']}\t{r['tumor_collapse']:.6f}\t"
                     f"{r['healthy_collapse']:.6f}\t{r['healthy_collapse_raw']:.6f}\t"
                     f"{r['therapeutic_index']:.2f}\n")
 
-    with open("output/dual_ko_ti.json", "w") as f:
+    with open(str(OUTPUT_DIR / "dual_ko_ti.json"), "w") as f:
         json.dump(dual_ti, f, indent=2)
-    with open("output/dual_ko_ti.tsv", "w") as f:
+    with open(str(OUTPUT_DIR / "dual_ko_ti.tsv"), "w") as f:
         f.write("rank\tgene_A\tgene_B\ttumor_collapse\thealthy_collapse\t"
                 f"healthy_collapse_raw\ttherapeutic_index\tbliss_synergy\tloewe_synergy\n")
         for i, r in enumerate(dual_ti, 1):

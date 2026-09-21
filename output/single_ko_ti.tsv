@@ -1,0 +1,5 @@
+rank	gene	tumor_collapse	healthy_collapse	healthy_collapse_raw	therapeutic_index
+1	MT-CO2	0.028233	0.000000	0.000000	4.82
+2	CCL3L1	0.010853	0.000000	0.000000	3.44
+3	MT-CO3	0.009676	0.000000	0.000000	3.27
+4	S100A8	0.008649	0.001612	0.001612	2.42
