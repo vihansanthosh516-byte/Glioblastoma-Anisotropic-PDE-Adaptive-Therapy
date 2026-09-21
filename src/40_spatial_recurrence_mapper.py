@@ -70,7 +70,7 @@ def load_zone_data(zone: str) -> pd.DataFrame:
         "Infiltrating Tumor": "it",
     }
     suffix = suffix_map[zone]
-    path = Path(fstr(OUTPUT_DIR / "real_cohort_{suffix}.csv"))
+    path = OUTPUT_DIR / f"real_cohort_{suffix}.csv"
     df = pd.read_csv(path)
     print(f"  Loaded {zone}: {df.shape[0]} samples, {df['patient_id'].nunique()} patients")
     return df

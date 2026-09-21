@@ -83,6 +83,9 @@ def scan_data_directory(data_dir: Path) -> Dict[str, Optional[Path]]:
         "ivygap_expression": data_dir / "ivygap_expression.csv",
         "tcga_gbm_counts": data_dir / "tcga_gbm_counts.tsv",
         "tcga_gbm_clinical": data_dir / "tcga_gbm_clinical.tsv",
+        # Also check for .csv variants of TCGA files (our real data)
+        "tcga_gbm_counts_csv": data_dir / "tcga_gbm_counts.csv",
+        "tcga_gbm_clinical_csv": data_dir / "tcga_gbm_clinical.csv",
     }
 
     found = {}
@@ -93,6 +96,15 @@ def scan_data_directory(data_dir: Path) -> Dict[str, Optional[Path]]:
         else:
             found[key] = None
             print(f"  [MISSING] {key}: {path}")
+
+    # Fallback: if tcga_gbm_clinical.tsv not found but .csv exists, use it
+    if found.get("tcga_gbm_clinical") is None and found.get("tcga_gbm_clinical_csv"):
+        found["tcga_gbm_clinical"] = found["tcga_gbm_clinical_csv"]
+        print(f"  [FALLBACK] Using tcga_gbm_clinical_csv for tcga_gbm_clinical")
+    
+    if found.get("tcga_gbm_counts") is None and found.get("tcga_gbm_counts_csv"):
+        found["tcga_gbm_counts"] = found["tcga_gbm_counts_csv"]
+        print(f"  [FALLBACK] Using tcga_gbm_counts_csv for tcga_gbm_counts")
 
     return found
 
