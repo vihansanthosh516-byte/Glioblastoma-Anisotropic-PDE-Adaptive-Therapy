@@ -1,559 +1,221 @@
 #!/usr/bin/env python3
 """
-Month 6, Week 3: Spatial Recurrence & Microenvironment Mapping
+Month 6, Week 3: Recurrence Risk Mapper (adapted for TCGA-GBM molecular subtypes)
 
-Maps zone-stratified gene expression to Fisher-Kolmogorov PDE parameters,
-simulates tumor invasion front on 2D brain geometry, and generates
-spatial recurrence risk heatmaps.
+Original design: IvyGAP spatial zones (Leading Edge / Cellular Tumor / Infiltrating Tumor).
+Adapted design: molecular subtypes (Proneural / Classical / Mesenchymal / Neural) as
+pseudo-zones, since TCGA-GBM is bulk tumor (one sample per patient, no spatial dimensions).
+
+Reads:  output/real_cohort_proneural.csv, _classical.csv, _mesenchymal.csv, _neural.csv
+        output/penalized_survival_metrics.json (from script 39, for risk weights)
+Writes: output/subtype_recurrence_summary.json
+        output/subtype_recurrence_risk.png
+        output/subtype_risk_profile.png
+        output/subtype_invasion_scores.png
 """
 
 from __future__ import annotations
 
 import json
-import warnings
 from pathlib import Path
-from typing import Dict, List, Tuple
+from typing import Dict, List
 
+import numpy as np
+import pandas as pd
 import matplotlib
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
 
 from pathlib import Path as _Path
 PROJECT_ROOT = _Path(__file__).resolve().parent.parent
 OUTPUT_DIR = PROJECT_ROOT / "output"
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
-matplotlib.use('Agg')
-import matplotlib.pyplot as plt
-import numpy as np
-import pandas as pd
-from scipy.ndimage import gaussian_filter
-
-warnings.filterwarnings("ignore")
-
-
-# --------------------------------------------------------------------------- #
-# Constants
-# --------------------------------------------------------------------------- #
-TARGET_GENES = ["LST1", "S100A11", "S100A8", "ZNF106"]
-SPATIAL_ZONES = ["Leading Edge", "Cellular Tumor", "Infiltrating Tumor"]
-GRID_SIZE = 100
-DT = 0.1  # Time step
-N_STEPS = 1200  # Number of PDE steps (increased from 200 for full invasion)
-BASE_DIFFUSION = 0.05  # Base D (mm^2/day)
-BASE_PROLIFERATION = 0.03  # Base ρ (1/day)
-CARRYING_CAPACITY = 1.0
-SEED = 42
-
-# Zone-to-grid region mapping (y-slices on 100x100 grid)
-ZONE_REGIONS = {
-    "Cellular Tumor": (0, 33),      # Core: rows 0-32
-    "Infiltrating Tumor": (33, 66), # Middle: rows 33-65
-    "Leading Edge": (66, 100),      # Margin: rows 66-99
+# Molecular subtypes act as pseudo-zones
+SUBTYPES = ["Proneural", "Classical", "Mesenchymal", "Neural"]
+SUBTYPE_FILES = {
+    "Proneural": "real_cohort_proneural.csv",
+    "Classical": "real_cohort_classical.csv",
+    "Mesenchymal": "real_cohort_mesenchymal.csv",
+    "Neural": "real_cohort_neural.csv",
 }
 
-# Gene weights for invasion score (derived from literature/Month 4 TI)
-GENE_WEIGHTS = {
-    "S100A8": 1.5,    # Strong invasion driver at leading edge
-    "S100A11": 1.2,   # Inflammation/invasion
-    "LST1": 1.0,      # Immune/vascular
-    "ZNF106": -0.5,   # Transcriptional repressor (protective)
-}
+TARGET_GENES = ["S100A6", "S100A11", "S100A8", "CCL3L1"]
 
 
-# --------------------------------------------------------------------------- #
-# Data Loading
-# --------------------------------------------------------------------------- #
-def load_zone_data(zone: str) -> pd.DataFrame:
-    """Load zone-stratified cohort from Week 1."""
-    suffix_map = {
-        "Leading Edge": "le",
-        "Cellular Tumor": "ct",
-        "Infiltrating Tumor": "it",
-    }
-    suffix = suffix_map[zone]
-    path = OUTPUT_DIR / f"real_cohort_{suffix}.csv"
+def load_subtype_data(subtype: str) -> pd.DataFrame:
+    """Load subtype-stratified cohort."""
+    path = OUTPUT_DIR / SUBTYPE_FILES[subtype]
+    if not path.exists():
+        print(f"  [WARN] Missing {path}")
+        return pd.DataFrame()
     df = pd.read_csv(path)
-    print(f"  Loaded {zone}: {df.shape[0]} samples, {df['patient_id'].nunique()} patients")
+    print(f"  Loaded {subtype}: {len(df)} patients")
     return df
 
 
-def get_patient_expression(zone_df: pd.DataFrame, patient_id: str) -> Dict[str, float]:
-    """Extract target gene expressions for a patient in a zone."""
-    patient_data = zone_df[zone_df["patient_id"] == patient_id]
-    expr = {}
-    for gene in TARGET_GENES:
-        gene_data = patient_data[patient_data["gene"] == gene]
-        if len(gene_data) > 0:
-            expr[gene] = gene_data["expression_log2tpm"].values[0]
-        else:
-            expr[gene] = 0.0
-    return expr
-
-
-# --------------------------------------------------------------------------- #
-# PDE Parameter Coupling
-# --------------------------------------------------------------------------- #
-def compute_invasion_score(expression: Dict[str, float]) -> float:
+def compute_invasion_score(df: pd.DataFrame, weights: Dict[str, float]) -> float:
     """
-    Compute Zone Invasion Score (Z_inv) from gene expression.
-    Z_inv = sum(w_i * Expression_i)
+    Compute invasion/risk score from expression + penalized Cox weights.
+
+    Uses the coefficients from script 39's Elastic Net model.
     """
     score = 0.0
-    for gene, weight in GENE_WEIGHTS.items():
-        score += weight * expression.get(gene, 0.0)
+    for gene in TARGET_GENES:
+        if gene in df.columns:
+            mean_expr = df[gene].mean()
+            weight = weights.get(gene, 0.0)
+            score += weight * mean_expr
     return score
 
 
-def map_expression_to_pde_params(
-    zone_expressions: Dict[str, Dict[str, float]],
-) -> Tuple[np.ndarray, np.ndarray]:
-    """
-    Map patient-specific zone expressions to spatial D and ρ fields.
+def load_penalized_weights(path: Path = OUTPUT_DIR / "penalized_survival_metrics.json") -> Dict[str, float]:
+    """Load penalized Cox coefficients from script 39."""
+    if not path.exists():
+        print(f"  [WARN] {path} missing — using default weights")
+        return {g: 0.0 for g in TARGET_GENES}
+    with open(path) as f:
+        metrics = json.load(f)
+    return metrics.get("coefficients", {g: 0.0 for g in TARGET_GENES})
 
-    Returns:
-        D_field: (GRID_SIZE, GRID_SIZE) diffusion field
-        rho_field: (GRID_SIZE, GRID_SIZE) proliferation field
-    """
-    D_field = np.full((GRID_SIZE, GRID_SIZE), BASE_DIFFUSION, dtype=float)
-    rho_field = np.full((GRID_SIZE, GRID_SIZE), BASE_PROLIFERATION, dtype=float)
 
-    # Compute invasion score per zone
-    zone_scores = {}
-    for zone, expr in zone_expressions.items():
-        zone_scores[zone] = compute_invasion_score(expr)
-
-    # Map to grid regions
-    for zone, (y_start, y_end) in ZONE_REGIONS.items():
-        score = zone_scores.get(zone, 0.0)
-
-        # Normalize score to reasonable scaling factor
-        # Typical expression range ~4-8, weights ~1-1.5, so score ~10-30
-        # Scale to 0.5x - 3x base parameters
-        scale_factor = 1.0 + np.tanh(score / 15.0)  # Range ~0.5 to 2.0
-
-        # Apply to region
-        D_field[y_start:y_end, :] *= scale_factor
-        rho_field[y_start:y_end, :] *= scale_factor
-
-    # Add spatial smoothing (tissue continuity)
-    D_field = gaussian_filter(D_field, sigma=3.0)
-    rho_field = gaussian_filter(rho_field, sigma=3.0)
-
-    # Ensure positive
-    D_field = np.maximum(D_field, 1e-6)
-    rho_field = np.maximum(rho_field, 1e-6)
-
-    return D_field, rho_field
-
-
-# --------------------------------------------------------------------------- #
-# Fisher-Kolmogorov PDE Solver (Finite Difference)
-# --------------------------------------------------------------------------- #
-def fk_pde_step(
-    u: np.ndarray,
-    D_field: np.ndarray,
-    rho_field: np.ndarray,
-    dt: float = DT,
-    dx: float = 1.0,
-) -> np.ndarray:
-    """
-    One forward step of Fisher-Kolmogorov:
-    ∂u/∂t = ∇·(D∇u) + ρ u (1 - u/K)
-
-    Using finite differences with variable D.
-    """
-    # Laplacian with variable diffusion: ∇·(D∇u)
-    # Central differences
-    u_pad = np.pad(u, 1, mode='edge')
-
-    # D at cell faces (average of adjacent cells)
-    D_pad = np.pad(D_field, 1, mode='edge')
-    D_x_plus = 0.5 * (D_pad[1:-1, 2:] + D_pad[1:-1, 1:-1])
-    D_x_minus = 0.5 * (D_pad[1:-1, 1:-1] + D_pad[1:-1, :-2])
-    D_y_plus = 0.5 * (D_pad[2:, 1:-1] + D_pad[1:-1, 1:-1])
-    D_y_minus = 0.5 * (D_pad[1:-1, 1:-1] + D_pad[:-2, 1:-1])
-
-    # Flux differences
-    flux_x = D_x_plus * (u_pad[1:-1, 2:] - u_pad[1:-1, 1:-1]) - \
-             D_x_minus * (u_pad[1:-1, 1:-1] - u_pad[1:-1, :-2])
-    flux_y = D_y_plus * (u_pad[2:, 1:-1] - u_pad[1:-1, 1:-1]) - \
-             D_y_minus * (u_pad[1:-1, 1:-1] - u_pad[:-2, 1:-1])
-
-    laplacian = (flux_x + flux_y) / (dx * dx)
-
-    # Reaction term: ρ u (1 - u/K)
-    reaction = rho_field * u * (1.0 - u / CARRYING_CAPACITY)
-
-    # Forward Euler
-    u_new = u + dt * (laplacian + reaction)
-
-    # Clamp to [0, K]
-    u_new = np.clip(u_new, 0.0, CARRYING_CAPACITY)
-
-    return u_new
-
-
-def simulate_fk_pde(
-    D_field: np.ndarray,
-    rho_field: np.ndarray,
-    initial_condition: np.ndarray = None,
-    n_steps: int = N_STEPS,
-    dt: float = DT,
-    patient_id: str = None,
-) -> np.ndarray:
-    """
-    Run FK-PDE simulation to steady state or n_steps.
-    Returns final tumor density field.
-    """
-    if initial_condition is None:
-        # Start with small tumor at patient-specific core center
-        u = np.zeros((GRID_SIZE, GRID_SIZE))
-        
-        # Deterministic but patient-specific seed location
-        if patient_id is not None:
-            # Hash patient_id to get reproducible but varied seed
-            pid_hash = hash(patient_id) % 10000
-            rng = np.random.default_rng(pid_hash)
-            # Core zone is rows 0-32, so center around row 16
-            center_y = int(rng.normal(16, 4))
-            center_x = int(rng.normal(GRID_SIZE // 2, 8))
-            # Clamp to core region
-            center_y = np.clip(center_y, 5, 27)
-            center_x = np.clip(center_x, 10, 90)
-            radius = int(rng.integers(2, 5))
-        else:
-            center_y, center_x = GRID_SIZE // 4, GRID_SIZE // 2
-            radius = 3
-        
-        y_min, y_max = max(0, center_y - radius), min(GRID_SIZE, center_y + radius)
-        x_min, x_max = max(0, center_x - radius), min(GRID_SIZE, center_x + radius)
-        u[y_min:y_max, x_min:x_max] = 0.5
-    else:
-        u = initial_condition.copy()
-
-    for step in range(n_steps):
-        u = fk_pde_step(u, D_field, rho_field, dt)
-
-    return u
-
-
-def compute_recurrence_risk(
-    final_density: np.ndarray,
-    threshold: float = 0.1,
-) -> np.ndarray:
-    """
-    Compute recurrence risk map from final tumor density.
-    Risk = probability of tumor presence > threshold at each location.
-    """
-    # Risk increases sigmoidally with density
-    risk = 1.0 / (1.0 + np.exp(-20.0 * (final_density - threshold)))
-    return risk
-
-
-# --------------------------------------------------------------------------- #
-# Main Pipeline per Patient
-# --------------------------------------------------------------------------- #
-def process_patient(
-    patient_id: str,
-    zone_dfs: Dict[str, pd.DataFrame],
-) -> Dict:
-    """Process one patient: get expressions, map to PDE, simulate, return risk map."""
-    # Get expressions per zone
-    zone_expressions = {}
-    for zone in SPATIAL_ZONES:
-        zone_expressions[zone] = get_patient_expression(zone_dfs[zone], patient_id)
-
-    # Map to PDE parameters
-    D_field, rho_field = map_expression_to_pde_params(zone_expressions)
-
-    # Simulate with patient-specific tumor seed
-    final_density = simulate_fk_pde(D_field, rho_field, patient_id=patient_id)
-
-    # Compute risk
-    risk_map = compute_recurrence_risk(final_density)
-
-    return {
-        "patient_id": patient_id,
-        "D_field": D_field,
-        "rho_field": rho_field,
-        "final_density": final_density,
-        "risk_map": risk_map,
-        "zone_expressions": zone_expressions,
-    }
-
-
-# --------------------------------------------------------------------------- #
-# Visualization
-# --------------------------------------------------------------------------- #
-def plot_spatial_recurrence(
-    patient_results: List[Dict],
-    output_path: Path,
-) -> None:
-    """Generate multi-panel spatial recurrence heatmap."""
-    n_patients = len(patient_results)
-    n_cols = min(4, n_patients)
-    n_rows = (n_patients + n_cols - 1) // n_cols
-
-    fig, axes = plt.subplots(n_rows, n_cols, figsize=(4 * n_cols, 4 * n_rows))
-    if n_patients == 1:
-        axes = np.array([[axes]])
-    elif n_rows == 1:
-        axes = axes.reshape(1, -1)
-
-    axes = axes.flatten()
-
-    for idx, result in enumerate(patient_results):
-        ax = axes[idx]
-        risk = result["risk_map"]
-        patient_id = result["patient_id"]
-
-        im = ax.imshow(risk, cmap='hot_r', origin='lower', vmin=0, vmax=1,
-                       extent=[0, GRID_SIZE, 0, GRID_SIZE])
-
-        # Add zone boundaries
-        for zone, (y_start, y_end) in ZONE_REGIONS.items():
-            ax.axhline(y=y_start, color='cyan', linestyle='--', alpha=0.5, linewidth=0.8)
-            ax.axhline(y=y_end, color='cyan', linestyle='--', alpha=0.5, linewidth=0.8)
-        ax.text(5, 5, 'Core', color='cyan', fontsize=8, alpha=0.8)
-        ax.text(5, 38, 'Infiltrating', color='cyan', fontsize=8, alpha=0.8)
-        ax.text(5, 72, 'Leading Edge', color='cyan', fontsize=8, alpha=0.8)
-
-        ax.set_title(f'{patient_id}', fontsize=10)
-        ax.set_xlabel('X (mm)', fontsize=8)
-        ax.set_ylabel('Y (mm)', fontsize=8)
-
-    # Hide unused
-    for idx in range(n_patients, len(axes)):
-        axes[idx].set_visible(False)
-
-    plt.suptitle('Spatial Recurrence Risk Maps\n(Fisher-Kolmogorov PDE, Gene-Driven D/ρ Fields)',
-                 fontsize=13, fontweight='bold', y=1.01)
-    plt.tight_layout()
-    plt.savefig(output_path, dpi=300, bbox_inches='tight')
-    plt.close()
-    print(f"  [PLOT] Saved recurrence heatmap: {output_path}")
-
-
-def plot_pde_parameters(
-    patient_results: List[Dict],
-    output_path: Path,
-) -> None:
-    """Plot D and ρ fields for first few patients."""
-    n_show = min(3, len(patient_results))
-    fig, axes = plt.subplots(n_show, 2, figsize=(8, 4 * n_show))
-    if n_show == 1:
-        axes = axes.reshape(1, -1)
-
-    for idx in range(n_show):
-        result = patient_results[idx]
-        D_field = result["D_field"]
-        rho_field = result["rho_field"]
-        patient_id = result["patient_id"]
-
-        im0 = axes[idx, 0].imshow(D_field, cmap='viridis', origin='lower')
-        axes[idx, 0].set_title(f'{patient_id}: Diffusion (D)', fontsize=10)
-        plt.colorbar(im0, ax=axes[idx, 0], fraction=0.046, pad=0.04)
-
-        im1 = axes[idx, 1].imshow(rho_field, cmap='plasma', origin='lower')
-        axes[idx, 1].set_title(f'{patient_id}: Proliferation (ρ)', fontsize=10)
-        plt.colorbar(im1, ax=axes[idx, 1], fraction=0.046, pad=0.04)
-
-    plt.suptitle('PDE Parameter Fields (Gene-Driven)', fontsize=13, fontweight='bold')
-    plt.tight_layout()
-    plt.savefig(output_path, dpi=300, bbox_inches='tight')
-    plt.close()
-    print(f"  [PLOT] Saved PDE parameter fields: {output_path}")
-
-
-def plot_risk_profile_summary(
-    patient_results: List[Dict],
-    output_path: Path,
-) -> None:
-    """Plot aggregate risk profile across zones."""
-    fig, axes = plt.subplots(1, 2, figsize=(10, 4))
-
-    # Mean risk by zone
-    zone_names = list(ZONE_REGIONS.keys())
-    mean_risk_by_zone = {zone: [] for zone in zone_names}
-
-    for result in patient_results:
-        risk = result["risk_map"]
-        for zone, (y_start, y_end) in ZONE_REGIONS.items():
-            zone_risk = risk[y_start:y_end, :].mean()
-            mean_risk_by_zone[zone].append(zone_risk)
-
-    # Box plot
-    ax = axes[0]
-    data = [mean_risk_by_zone[zone] for zone in zone_names]
-    bp = ax.boxplot(data, tick_labels=zone_names, patch_artist=True)
-    colors = ['#2ecc71', '#f39c12', '#e74c3c']
-    for patch, color in zip(bp['boxes'], colors):
-        patch.set_facecolor(color)
-        patch.set_alpha(0.7)
-    ax.set_ylabel('Mean Recurrence Risk', fontsize=11)
-    ax.set_title('Risk Distribution by Spatial Zone', fontsize=12)
-    ax.grid(True, axis='y', alpha=0.3)
-
-    # Radial profile (distance from core center)
-    ax = axes[1]
-    center_y = ZONE_REGIONS["Cellular Tumor"][1]  # ~33
-    radial_risks = []
-
-    for result in patient_results:
-        risk = result["risk_map"]
-        radial = []
-        for y in range(GRID_SIZE):
-            dist = abs(y - center_y)
-            radial.append(risk[y, :].mean())
-        radial_risks.append(radial)
-
-    radial_risks = np.array(radial_risks)
-    mean_radial = radial_risks.mean(axis=0)
-    std_radial = radial_risks.std(axis=0)
-
-    y_vals = np.arange(GRID_SIZE)
-    ax.plot(mean_radial, y_vals, 'r-', linewidth=2, label='Mean Risk')
-    ax.fill_betweenx(y_vals, mean_radial - std_radial, mean_radial + std_radial,
-                     alpha=0.3, color='red', label='±1 STD')
-    ax.axhline(y=ZONE_REGIONS["Cellular Tumor"][1], color='green', linestyle='--', alpha=0.5, label='Core/Infiltrating')
-    ax.axhline(y=ZONE_REGIONS["Infiltrating Tumor"][1], color='orange', linestyle='--', alpha=0.5, label='Infiltrating/Leading')
-    ax.set_xlabel('Recurrence Risk', fontsize=11)
-    ax.set_ylabel('Distance from Core (grid units)', fontsize=11)
-    ax.set_title('Radial Risk Profile', fontsize=12)
-    ax.legend(fontsize=9)
-    ax.grid(True, alpha=0.3)
-    ax.invert_yaxis()
-
-    plt.suptitle('Spatial Recurrence Risk Analysis', fontsize=13, fontweight='bold')
-    plt.tight_layout()
-    plt.savefig(output_path, dpi=300, bbox_inches='tight')
-    plt.close()
-    print(f"  [PLOT] Saved risk profile summary: {output_path}")
-
-
-# --------------------------------------------------------------------------- #
-# Data Export
-# --------------------------------------------------------------------------- #
-def export_spatial_profiles(
-    patient_results: List[Dict],
-    output_path: Path,
-) -> None:
-    """Export grid coordinates and recurrence matrices to NPY."""
-    # Stack all patient risk maps
-    risk_stack = np.stack([r["risk_map"] for r in patient_results])  # (n_pat, 100, 100)
-    density_stack = np.stack([r["final_density"] for r in patient_results])
-    D_stack = np.stack([r["D_field"] for r in patient_results])
-    rho_stack = np.stack([r["rho_field"] for r in patient_results])
-
-    patient_ids = [r["patient_id"] for r in patient_results]
-
-    # Save as compressed NPZ
-    np.savez_compressed(
-        output_path,
-        patient_ids=np.array(patient_ids),
-        risk_maps=risk_stack,
-        density_maps=density_stack,
-        D_fields=D_stack,
-        rho_fields=rho_stack,
-        grid_size=np.array([GRID_SIZE, GRID_SIZE]),
-        zone_regions=np.array([list(v) for v in ZONE_REGIONS.values()]),
-        target_genes=np.array(TARGET_GENES),
-        gene_weights=np.array([GENE_WEIGHTS[g] for g in TARGET_GENES]),
-    )
-    print(f"  [EXPORT] Saved spatial profiles: {output_path}")
-
-
-def export_patient_summary(
-    patient_results: List[Dict],
-    output_path: Path,
-) -> None:
-    """Export per-patient summary metrics as JSON."""
-    summary = []
-    for result in patient_results:
-        risk = result["risk_map"]
-        zone_risks = {}
-        for zone, (y_start, y_end) in ZONE_REGIONS.items():
-            zone_risks[zone] = float(risk[y_start:y_end, :].mean())
-
-        summary.append({
-            "patient_id": result["patient_id"],
-            "zone_recurrence_risk": zone_risks,
-            "total_risk_mass": float(risk.sum()),
-            "max_risk": float(risk.max()),
-            "invasion_scores": {
-                zone: compute_invasion_score(expr)
-                for zone, expr in result["zone_expressions"].items()
-            },
-        })
-
-    with open(output_path, "w") as f:
-        json.dump(summary, f, indent=2, default=str)
-    print(f"  [EXPORT] Saved patient summary: {output_path}")
-
-
-# --------------------------------------------------------------------------- #
-# Main Pipeline
-# --------------------------------------------------------------------------- #
 def main():
     print("=" * 60)
-    print("MONTH 6 WEEK 3: SPATIAL RECURRENCE & MICROENVIRONMENT MAPPING")
+    print("RECURRENCE RISK MAPPER — TCGA-GBM MOLECULAR SUBTYPES")
     print("=" * 60)
+    print()
 
-    # 1. Load zone-stratified data
-    print("\n[LOAD] Reading zone-stratified cohorts...")
-    zone_dfs = {}
-    for zone in SPATIAL_ZONES:
-        zone_dfs[zone] = load_zone_data(zone)
+    # Load penalized Cox weights from script 39
+    print("[LOAD] Reading penalized survival weights...")
+    weights = load_penalized_weights()
+    print(f"  Weights: {weights}")
 
-    # Get common patient IDs
-    patient_ids = set(zone_dfs[SPATIAL_ZONES[0]]["patient_id"].unique())
-    for zone in SPATIAL_ZONES[1:]:
-        patient_ids &= set(zone_dfs[zone]["patient_id"].unique())
-    patient_ids = sorted(list(patient_ids))
-    print(f"  Common patients across all zones: {len(patient_ids)}")
+    print()
+    print("[LOAD] Reading subtype-stratified cohorts...")
+    subtype_dfs = {}
+    for subtype in SUBTYPES:
+        subtype_dfs[subtype] = load_subtype_data(subtype)
 
-    # Process first 8 patients for visualization (or all if fewer)
-    n_vis = min(8, len(patient_ids))
-    vis_patient_ids = patient_ids[:n_vis]
-    print(f"\n[PROCESS] Simulating PDE for {n_vis} patients...")
+    # Compute per-subtype invasion score
+    print()
+    print("[COMPUTE] Invasion scores per subtype")
+    subtype_scores = {}
+    for subtype in SUBTYPES:
+        df = subtype_dfs[subtype]
+        if df.empty:
+            subtype_scores[subtype] = 0.0
+            continue
+        score = compute_invasion_score(df, weights)
+        subtype_scores[subtype] = score
+        n_events = int(df["os_event"].sum()) if "os_event" in df.columns else 0
+        median_os = df["os_time_days"].median() if "os_time_days" in df.columns else float("nan")
+        print(f"  {subtype}: n={len(df)}, events={n_events}, "
+              f"median_OS={median_os:.0f}d, score={score:.4f}")
 
-    patient_results = []
-    for pid in vis_patient_ids:
-        print(f"  Processing {pid}...")
-        result = process_patient(pid, zone_dfs)
-        patient_results.append(result)
+    # Plot 1: Invasion score by subtype
+    fig, ax = plt.subplots(figsize=(8, 6))
+    subtypes_list = list(subtype_scores.keys())
+    scores_list = list(subtype_scores.values())
+    colors = ['green', 'blue', 'red', 'orange']
+    ax.bar(subtypes_list, scores_list, color=colors)
+    ax.set_ylabel('Invasion Score (weighted expression)')
+    ax.set_title('Invasion Score by Molecular Subtype (TCGA-GBM, real data)')
+    plt.xticks(rotation=15)
+    plt.tight_layout()
+    score_plot = OUTPUT_DIR / "subtype_invasion_scores.png"
+    plt.savefig(score_plot, dpi=300, bbox_inches="tight")
+    plt.close()
+    print(f"[SAVE] {score_plot}")
 
-    # 2. Visualizations
-    print("\n[PLOT] Generating spatial recurrence artifacts...")
-    output_dir = OUTPUT_DIR
-    output_dir.mkdir(exist_ok=True)
+    # Plot 2: Risk profile — expression heatmap by subtype
+    fig, axes = plt.subplots(1, 4, figsize=(16, 5))
+    for i, subtype in enumerate(SUBTYPES):
+        df = subtype_dfs[subtype]
+        if df.empty:
+            continue
+        means = [df[g].mean() for g in TARGET_GENES if g in df.columns]
+        stds = [df[g].std() for g in TARGET_GENES if g in df.columns]
+        present_genes = [g for g in TARGET_GENES if g in df.columns]
+        axes[i].bar(present_genes, means, yerr=stds, color=colors[i], capsize=5)
+        axes[i].set_title(f'{subtype} (n={len(df)})')
+        axes[i].set_ylabel('Expression (log2 TPM)')
+        axes[i].tick_params(axis='x', rotation=30)
+    plt.suptitle('Target Gene Expression by Molecular Subtype (Real TCGA-GBM)', fontsize=14)
+    plt.tight_layout()
+    profile_plot = OUTPUT_DIR / "subtype_risk_profile.png"
+    plt.savefig(profile_plot, dpi=300, bbox_inches="tight")
+    plt.close()
+    print(f"[SAVE] {profile_plot}")
 
-    plot_spatial_recurrence(patient_results, output_dir / "spatial_recurrence_risk.png")
-    plot_pde_parameters(patient_results, output_dir / "spatial_pde_parameters.png")
-    plot_risk_profile_summary(patient_results, output_dir / "spatial_risk_profile.png")
+    # Plot 3: Survival curves by subtype
+    fig, ax = plt.subplots(figsize=(8, 6))
+    for i, subtype in enumerate(SUBTYPES):
+        df = subtype_dfs[subtype]
+        if df.empty or "os_time_days" not in df.columns:
+            continue
+        t_g = df["os_time_days"].values
+        e_g = df["os_event"].values
+        order = np.argsort(t_g)
+        t_sorted = t_g[order]
+        e_sorted = e_g[order]
+        survival = 1.0
+        times = [0]
+        survs = [1.0]
+        for t in np.unique(t_sorted):
+            at_risk = (t_sorted >= t).sum()
+            events = ((t_sorted == t) & (e_sorted == 1)).sum()
+            if at_risk > 0 and events > 0:
+                survival *= (1 - events / at_risk)
+            times.append(t)
+            survs.append(survival)
+        ax.step(times, survs, where='post', label=f'{subtype} (n={len(df)})', color=colors[i])
 
-    # 3. Data export
-    print("\n[EXPORT] Saving spatial profile data...")
-    export_spatial_profiles(patient_results, output_dir / "spatial_recurrence_profiles.npz")
-    export_patient_summary(patient_results, output_dir / "spatial_recurrence_summary.json")
+    ax.set_xlabel('Time (days)')
+    ax.set_ylabel('Survival probability')
+    ax.set_title('Kaplan-Meier by Molecular Subtype (TCGA-GBM, real data)')
+    ax.legend(loc='best')
+    ax.grid(alpha=0.3)
+    plt.tight_layout()
+    risk_plot = OUTPUT_DIR / "subtype_recurrence_risk.png"
+    plt.savefig(risk_plot, dpi=300, bbox_inches="tight")
+    plt.close()
+    print(f"[SAVE] {risk_plot}")
 
-    # 4. Aggregate stats
-    print("\n[STATS] Aggregate recurrence risk by zone:")
-    for zone in SPATIAL_ZONES:
-        risks = []
-        for result in patient_results:
-            risk = result["risk_map"]
-            y_start, y_end = ZONE_REGIONS[zone]
-            risks.append(risk[y_start:y_end, :].mean())
-        print(f"  {zone}: mean={np.mean(risks):.4f}, std={np.std(risks):.4f}")
+    # Save summary
+    summary = {
+        "data_source": "Real TCGA-GBM (Xena expression + cBioPortal clinical)",
+        "n_subtypes": len(SUBTYPES),
+        "subtypes": SUBTYPES,
+        "target_genes": TARGET_GENES,
+        "penalized_weights": weights,
+        "subtype_stats": {
+            subtype: {
+                "n_patients": int(len(subtype_dfs[subtype])),
+                "n_events": int(subtype_dfs[subtype]["os_event"].sum())
+                if not subtype_dfs[subtype].empty else 0,
+                "median_os_days": float(subtype_dfs[subtype]["os_time_days"].median())
+                if not subtype_dfs[subtype].empty else None,
+                "invasion_score": float(subtype_scores[subtype]),
+            }
+            for subtype in SUBTYPES
+        },
+        "notes": "Spatial recurrence mapping adapted to molecular subtype stratification, "
+                 "since TCGA-GBM is bulk tumor (no IvyGAP spatial zones available).",
+    }
+    summary_path = OUTPUT_DIR / "subtype_recurrence_summary.json"
+    with open(summary_path, "w") as f:
+        json.dump(summary, f, indent=2, default=str)
+    print(f"[SAVE] {summary_path}")
 
-    print("\n" + "=" * 60)
-    print("[SUCCESS] Month 6 Week 3 Complete: Spatial Recurrence Mapping")
-    print("=" * 60)
-    print(f"  - output/spatial_recurrence_risk.png")
-    print(f"  - output/spatial_pde_parameters.png")
-    print(f"  - output/spatial_risk_profile.png")
-    print(f"  - output/spatial_recurrence_profiles.npz")
-    print(f"  - output/spatial_recurrence_summary.json")
+    print()
+    print("[STATS] Summary by subtype:")
+    for subtype in SUBTYPES:
+        s = summary["subtype_stats"][subtype]
+        print(f"  {subtype}: n={s['n_patients']}, events={s['n_events']}, "
+              f"median_OS={s['median_os_days']}, score={s['invasion_score']:.4f}")
+
+    print()
+    print("[SUCCESS] Subtype-stratified recurrence mapping complete")
 
 
 if __name__ == "__main__":
