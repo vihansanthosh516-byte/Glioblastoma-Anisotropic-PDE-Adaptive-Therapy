@@ -14,13 +14,19 @@ from pathlib import Path
 from typing import Dict, List, Any
 
 
-def load_survival_summary(path: str = "output/survival_stats_summary.json") -> Dict:
+
+from pathlib import Path as _Path
+PROJECT_ROOT = _Path(__file__).resolve().parent.parent
+OUTPUT_DIR = PROJECT_ROOT / "output"
+OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+
+def load_survival_summary(path: str = str(OUTPUT_DIR / "survival_stats_summary.json")) -> Dict:
     """Load the survival statistics summary."""
     with open(path, "r") as f:
         return json.load(f)
 
 
-def load_dual_ko_ti(path: str = "output/dual_ko_ti.json") -> List[Dict]:
+def load_dual_ko_ti(path: str = str(OUTPUT_DIR / "dual_ko_ti.json")) -> List[Dict]:
     """Load dual KO therapeutic index results."""
     with open(path, "r") as f:
         return json.load(f)
@@ -90,7 +96,7 @@ def format_spatial_therapeutic_table(dual_ko: List[Dict], top_n: int = 6) -> str
 def generate_report(
     survival_data: Dict,
     dual_ko: List[Dict],
-    output_path: str = "output/clinical_validation_report.md",
+    output_path: str = str(OUTPUT_DIR / "clinical_validation_report.md"),
 ) -> None:
     """Generate the full clinical validation report."""
     univariate = survival_data.get("univariate", [])
@@ -289,8 +295,8 @@ def main():
     print(f"  Loaded {len(dual_ko)} dual-KO pairs")
 
     print("\n[GENERATE] Compiling clinical validation report...")
-    output_path = "output/clinical_validation_report.md"
-    Path("output").mkdir(exist_ok=True)
+    output_path = str(OUTPUT_DIR / "clinical_validation_report.md")
+    OUTPUT_DIR.mkdir(exist_ok=True)
     generate_report(survival_data, dual_ko, output_path)
 
     print(f"\n[SUCCESS] Month 5 Week 3 Complete: Clinical Validation Report")

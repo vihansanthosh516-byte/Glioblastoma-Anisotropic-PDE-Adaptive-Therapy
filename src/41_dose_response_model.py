@@ -15,6 +15,12 @@ from pathlib import Path
 from typing import Dict, List, Tuple, Optional
 
 import matplotlib
+
+from pathlib import Path as _Path
+PROJECT_ROOT = _Path(__file__).resolve().parent.parent
+OUTPUT_DIR = PROJECT_ROOT / "output"
+OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import numpy as np
@@ -328,11 +334,11 @@ def main():
 
     # 1. Load data
     print("\n[LOAD] Reading spatial recurrence summary...")
-    spatial_summary = load_spatial_summary(Path("output/spatial_recurrence_summary.json"))
+    spatial_summary = load_spatial_summary(Path(str(OUTPUT_DIR / "spatial_recurrence_summary.json")))
     print(f"  Loaded {len(spatial_summary)} patients")
 
     print("\n[LOAD] Reading dual-KO therapeutic indices...")
-    with open(Path("output/dual_ko_ti.json"), "r") as f:
+    with open(Path(str(OUTPUT_DIR / "dual_ko_ti.json")), "r") as f:
         dual_ko_data = json.load(f)
     print(f"  Loaded {len(dual_ko_data)} dual-KO combinations")
 
@@ -433,7 +439,7 @@ def main():
     gating_df["rank"] = range(1, len(gating_df) + 1)
 
     # 6. Export CSV
-    output_dir = Path("output")
+    output_dir = OUTPUT_DIR
     output_dir.mkdir(exist_ok=True)
 
     csv_path = output_dir / "final_dose_response_matrix.csv"

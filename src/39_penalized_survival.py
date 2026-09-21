@@ -16,6 +16,12 @@ from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
 import matplotlib
+
+from pathlib import Path as _Path
+PROJECT_ROOT = _Path(__file__).resolve().parent.parent
+OUTPUT_DIR = PROJECT_ROOT / "output"
+OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import numpy as np
@@ -41,7 +47,7 @@ SEED = 42
 # --------------------------------------------------------------------------- #
 # Data Loading & Pivoting
 # --------------------------------------------------------------------------- #
-def load_aligned_cohort(path: Path = Path("output/real_cohort_aligned.csv")) -> pd.DataFrame:
+def load_aligned_cohort(path: Path = Path(str(OUTPUT_DIR / "real_cohort_aligned.csv"))) -> pd.DataFrame:
     """Load the unified long-format cohort from Week 1."""
     df = pd.read_csv(path)
     print(f"  Loaded {df.shape[0]} rows, {df.shape[1]} columns from {path}")
@@ -499,7 +505,7 @@ def main():
 
     # 4. Export metrics JSON
     print("\n[EXPORT] Saving metrics...")
-    output_dir = Path("output")
+    output_dir = OUTPUT_DIR
     output_dir.mkdir(exist_ok=True)
 
     metrics = {

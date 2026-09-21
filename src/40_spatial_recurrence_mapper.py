@@ -15,6 +15,12 @@ from pathlib import Path
 from typing import Dict, List, Tuple
 
 import matplotlib
+
+from pathlib import Path as _Path
+PROJECT_ROOT = _Path(__file__).resolve().parent.parent
+OUTPUT_DIR = PROJECT_ROOT / "output"
+OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import numpy as np
@@ -64,7 +70,7 @@ def load_zone_data(zone: str) -> pd.DataFrame:
         "Infiltrating Tumor": "it",
     }
     suffix = suffix_map[zone]
-    path = Path(f"output/real_cohort_{suffix}.csv")
+    path = Path(fstr(OUTPUT_DIR / "real_cohort_{suffix}.csv"))
     df = pd.read_csv(path)
     print(f"  Loaded {zone}: {df.shape[0]} samples, {df['patient_id'].nunique()} patients")
     return df
@@ -518,7 +524,7 @@ def main():
 
     # 2. Visualizations
     print("\n[PLOT] Generating spatial recurrence artifacts...")
-    output_dir = Path("output")
+    output_dir = OUTPUT_DIR
     output_dir.mkdir(exist_ok=True)
 
     plot_spatial_recurrence(patient_results, output_dir / "spatial_recurrence_risk.png")

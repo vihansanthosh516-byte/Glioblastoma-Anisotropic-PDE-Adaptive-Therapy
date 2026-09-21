@@ -20,6 +20,12 @@ import numpy as np
 import pandas as pd
 from scipy import stats
 
+
+from pathlib import Path as _Path
+PROJECT_ROOT = _Path(__file__).resolve().parent.parent
+OUTPUT_DIR = PROJECT_ROOT / "output"
+OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+
 warnings.filterwarnings("ignore")
 
 
@@ -416,8 +422,8 @@ def main():
 
     # Paths
     data_dir = Path("data")
-    output_dir = Path("output")
-    vocab_path = Path("output/nn_gene_names.tsv")
+    output_dir = OUTPUT_DIR
+    vocab_path = Path(str(OUTPUT_DIR / "nn_gene_names.tsv"))
 
     # 1. Scan data directory
     print("\n[SCAN] Checking data/ for raw files...")
