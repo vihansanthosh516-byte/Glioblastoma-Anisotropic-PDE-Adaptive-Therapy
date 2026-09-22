@@ -63,13 +63,17 @@ ZONE_REGIONS = {
     "Leading Edge": (66, 100),
 }
 
-# Base parameters (Week 1) — Phase 1 physical units (mm^2/day)
-D_WHITE = 0.013
-D_GRAY = 0.0013
-D_BASE = D_GRAY               # isotropic baseline outside tract
-D_PARALLEL_DEFAULT = D_WHITE  # along tract
-D_PERPENDICULAR_DEFAULT = 0.0013  # suppressed cross-tract (~D_white/10)
-RHO_0 = 0.02                  # proliferation baseline, /day
+# Base parameters — NOW FROM REAL MU-GLIOMA-POST COHORT
+# 154 real patients, rho median +0.00092/day, doubling time 208 days
+from mu_glioma_loader import real_cohort_stats
+_cohort = real_cohort_stats()
+
+RHO_0 = _cohort["rho_median"]              # median real growth rate
+D_BASE = abs(_cohort["rho_median"]) / 10.0 # FK relation: D ≈ rho/10
+D_GRAY = D_BASE
+D_WHITE = D_BASE * 10.0                    # white matter anisotropic (10x)
+D_PARALLEL_DEFAULT = D_WHITE
+D_PERPENDICULAR_DEFAULT = D_GRAY
 K_M = 0.2
 BETA = 1.5
 CARRYING_CAPACITY = 1.0
@@ -90,8 +94,9 @@ N_PATIENT_STEPS = 2000
 PATIENT_SAVE_INTERVAL = 250
 
 # Cohort patients (8 core patients from Month 6/7)
-COHORT_PATIENTS = [f"PAT_{i:04d}" for i in range(8)]
-
+# COHORT_PATIENTS is loaded at runtime from the spatial_recurrence_profiles.npz
+# (set to None here; populated in main() after the mapper loads)
+COHORT_PATIENTS = None
 
 # =========================================================================== #
 # PHASE 1: Tensor Field Builder (reusing Month 7 anisotropic tensor builder)
@@ -1703,7 +1708,10 @@ def run_week3_cohort_calibration(builder: TensorFieldBuilder):
 
     # Load mapper
     mapper = PatientParameterMapper()
-    mapper.load()
+    mapper.load()  # <-- THIS LINE was missing
+    global COHORT_PATIENTS
+    COHORT_PATIENTS = list(mapper.data["patient_ids"])
+    print(f"[COHORT] Loaded {len(COHORT_PATIENTS)} patients from npz: {COHORT_PATIENTS[:3]}...")
 
     # Run cohort
     cohort_sim = CohortSimulator(mapper, builder)
