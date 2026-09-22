@@ -185,7 +185,47 @@ def main() -> int:
     print(f"Indexed {len(metadata)} patients; {longitudinal} have at least two timepoints")
     print(f"Saved metadata to {args.output}")
     return 0
+def load_real_params_for_track_bc(
+    min_r2: float = 0.5,
+    require_growing: bool = False,
+    seed: int = 42,
+) -> list:
+    """
+    Load per-patient (rho, D, V0) from real MU-Glioma estimation.
+    
+    Args:
+        min_r2: minimum R^2 for fit quality filter (default 0.5)
+        require_growing: if True, only return growing tumors
+        seed: random seed (unused, for reproducibility documentation)
+    
+    Returns:
+        list of dicts with patient_id, rho_per_day, D_mm2_per_day, V0_mm3
+    """
+    import pandas as pd
+    path = Path("output/mu_glioma_params_real.csv")
+    if not path.exists():
+        raise FileNotFoundError(f"{path} not found. Run src/72_estimate_params_real.py first.")
+    df = pd.read_csv(path)
+    df = df[df["r_squared"] >= min_r2]
+    if require_growing:
+        df = df[df["trajectory"] == "growing"]
+    return df.to_dict(orient="records")
 
+
+def real_cohort_stats() -> dict:
+    """Summary stats of real MU-Glioma cohort for paper reporting."""
+    import pandas as pd
+    path = Path("output/mu_glioma_params_real.csv")
+    df = pd.read_csv(path)
+    return {
+        "n_total": len(df),
+        "n_growing": int((df["trajectory"] == "growing").sum()),
+        "n_shrinking": int((df["trajectory"] == "shrinking").sum()),
+        "n_high_quality": int((df["r_squared"] > 0.5).sum()),
+        "rho_median": float(df["rho_per_day"].median()),
+        "rho_range": [float(df["rho_per_day"].min()), float(df["rho_per_day"].max())],
+        "doubling_time_median_days": float(df["doubling_time_days"].median()),
+    }
 
 if __name__ == "__main__":
     raise SystemExit(main())
