@@ -90,7 +90,7 @@ DT_CHEMICAL = 0.01  # much smaller for chemical diffusion (D_G >> D_u)
 MASS_TEST_STEPS = 500
 
 # Time stepping for patient simulations
-N_PATIENT_STEPS = 2000
+N_PATIENT_STEPS = 5000
 PATIENT_SAVE_INTERVAL = 250
 
 # Cohort patients (8 core patients from Month 6/7)
@@ -978,7 +978,8 @@ class PatientParameterMapper:
 
         rho_patient = base_rho_field * scale_rho
         rho_patient = gaussian_filter(rho_patient, sigma=2.0)
-        rho_patient = np.maximum(rho_patient, 1e-6)
+        # Removed fixed clamp; rho_field retains per-patient variation
+        rho_patient = rho_patient
 
         return {
             "alpha_field": alpha_patient,
@@ -1052,7 +1053,8 @@ class CohortSimulator:
         original_chem_step = solver.chemical_step
 
         def spatial_michaelis(G: np.ndarray) -> np.ndarray:
-            return solver.rho_0 * (1.0 + solver.beta_field * G / (solver.K_m + G))
+            # Use the per-patient rho_field, not the scalar rho_0
+            return solver.rho_field * (1.0 + solver.beta_field * G / (solver.K_m + G))
 
         def spatial_chem_step(G: np.ndarray, u: np.ndarray, dt_chem: float) -> np.ndarray:
             laplacian = solver.chemical_laplacian(G)
