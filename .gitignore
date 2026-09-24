@@ -71,3 +71,6 @@ terminal_session.txt
 
 # OS noise
 .DS_Store
+
+# Adaptive therapy per-patient outputs (regenerable via script 44)
+output/adaptive_PatientID_*.npz
