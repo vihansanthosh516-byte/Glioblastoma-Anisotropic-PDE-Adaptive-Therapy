@@ -138,8 +138,9 @@ MTD_STEPS = 5000
 
 # Adaptive protocol
 ADAPTIVE_STEPS = 5000
-THRESHOLD_OFF = 0.80  # 80% of peak -> drug holiday
-THRESHOLD_ON = 1.0   # 100% of peak -> resume drug
+import os as _os
+THRESHOLD_OFF = float(_os.environ.get("ADAPTIVE_THRESHOLD_OFF", "0.80"))
+THRESHOLD_ON = float(_os.environ.get("ADAPTIVE_THRESHOLD_ON", "1.0"))
 
 # Cohort patients: filled at runtime from the real MU-Glioma-Post cohort in
 # output/spatial_recurrence_profiles.npz (same convention as
