@@ -229,6 +229,31 @@ def real_cohort_stats() -> dict:
         "rho_range": [float(df["rho_per_day"].min()), float(df["rho_per_day"].max())],
         "doubling_time_median_days": float(df["doubling_time_days"].median()),
     }
+def load_mu_glioma_params() -> dict:
+    """Load per-patient real MU-Glioma parameters as a dict keyed by patient_id.
 
+    Returns:
+        dict mapping patient_id -> {
+            rho_per_day, D_mm2_per_day, V0_mm3, trajectory, r_squared
+        }
+    """
+    import pandas as pd
+    path = PARAMS_CSV
+    if not path.exists():
+        raise FileNotFoundError(
+            f"{path} not found. Run src/72_estimate_params_real.py first."
+        )
+    df = pd.read_csv(path)
+    result = {}
+    for _, row in df.iterrows():
+        result[row["patient_id"]] = {
+            "rho_per_day": float(row["rho_per_day"]),
+            "D_mm2_per_day": float(row["D_mm2_per_day"])
+                if pd.notna(row["D_mm2_per_day"]) else None,
+            "V0_mm3": float(row["V0_mm3"]),
+            "trajectory": row["trajectory"],
+            "r_squared": float(row["r_squared"]),
+        }
+    return result
 if __name__ == "__main__":
     raise SystemExit(main())

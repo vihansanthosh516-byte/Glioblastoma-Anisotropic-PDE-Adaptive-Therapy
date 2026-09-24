@@ -1,7 +1,7 @@
 """Phase 2b: Global Sobol Sensitivity Analysis.
 
 Reduced-ODE evaluator + SALib Sobol indices + publication-ready tornado plot.
-N=500 base samples → ~3500 model evaluations.
+N=500 base samples -> ~3500 model evaluations.
 """
 import json
 import warnings
@@ -16,8 +16,23 @@ from SALib.sample import sobol as sobol_sample
 
 warnings.filterwarnings("ignore")
 
-OUTPUT_DIR = Path("output")
-OUTPUT_DIR.mkdir(exist_ok=True)
+from pathlib import Path as _Path
+PROJECT_ROOT = _Path(__file__).resolve().parent.parent
+OUTPUT_DIR = PROJECT_ROOT / "output"
+OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+
+# Load real MU-Glioma parameter distributions
+from mu_glioma_loader import load_mu_glioma_params, real_cohort_stats
+
+_params = load_mu_glioma_params()
+_rhos = [p["rho_per_day"] for p in _params.values() if p["rho_per_day"] > 0]
+_Ds = [p["D_mm2_per_day"] for p in _params.values() if p["D_mm2_per_day"]]
+
+print(f"[Cohort] Loaded {len(_params)} real MU-Glioma patients")
+print(f"[Cohort] rho_s range: [{min(_rhos):.5f}, {max(_rhos):.5f}] /day")
+print(f"[Cohort] D_white range: [{min(_Ds):.7f}, {max(_Ds):.7f}] mm^2/day")
+
+_cohort = real_cohort_stats()
 
 # Physical constants (Phase 1, mm / days / ug/mL)
 DT = 0.1
@@ -26,10 +41,15 @@ N_STEPS = int(SIM_DAYS / DT)
 
 RHO_R_BASE = 0.015
 K = 1.0
-K_EL = np.log(2) / 0.075   # ~9.24 /day
+K_EL = np.log(2) / 0.075
 C_PEAK = 10.0
 HILL_COEFF = 2.0
-E_MAX = 0.35              # reduced: drug suppresses but does not overwhelm growth
+
+# Same calibration as script 44: E_MAX_RATIO = 1000
+E_MAX_RATIO = 1000.0
+E_MAX = _cohort["rho_median"] * E_MAX_RATIO
+
+print(f"[Params] E_MAX = {E_MAX:.4f} /day (from E_MAX_RATIO=1000, rho_median={_cohort['rho_median']:.6f})")
 
 # TTP threshold: total cell mass fraction
 TTP_FRACTION = 0.4
@@ -38,41 +58,23 @@ problem = {
     "num_vars": 5,
     "names": ["rho_s", "aniso_ratio", "mu_r", "EC50", "D_white"],
     "bounds": [
-        [0.016, 0.024],   # rho_s: proliferation rate (/day)
-        [8.0, 12.0],      # aniso_ratio: D_parallel / D_perp
-        [8e-6, 1.2e-5],   # mu_r: mutation rate (per division)
-        [4.0, 6.0],       # EC50: TMZ half-max kill (ug/mL)
-        [0.0104, 0.0156], # D_white: white matter diffusivity (mm^2/day)
+        [min(_rhos), max(_rhos)],       # rho_s from real MU-Glioma cohort
+        [8.0, 12.0],                    # aniso_ratio: literature
+        [8e-6, 1.2e-5],                 # mu_r: literature
+        [4.0, 6.0],                     # EC50: literature (TMZ)
+        [min(_Ds), max(_Ds)],           # D_white from real cohort
     ],
 }
 
 
 def reduced_ode(params: np.ndarray) -> float:
-    """Reduced spatially-averaged ODE returning TTP (days).
-
-    All 5 Sobol parameters enter the dynamics:
-        rho_s       -> sensitive proliferation rate (/day, direct)
-        aniso_ratio -> amplifies effective growth (anisotropic invasion)
-        mu_r        -> resistant clone emergence rate
-        EC50        -> TMZ drug sensitivity (ug/mL)
-        D_white     -> white matter diffusivity (mm^2/day) -> effective growth
-
-    eff_rho_s = rho_s * (1 + k_diff * D_white) * (1 + k_aniso * (aniso_ratio - 1))
-
-    ODE system:
-        dM_s/dt = eff_rho_s * M_s * (1 - M_s - M_r) - gamma(C) * M_s
-        dM_r/dt = rho_r * M_r * (1 - M_s - M_r) + mu * eff_rho_s * M_s
-        dC/dt   = -k_el * C  (bolus, reset on dose days)
-
-    TTP = first time total mass >= TTP_FRACTION of carrying capacity.
-    """
+    """Reduced spatially-averaged ODE returning TTP (days)."""
     rho_s, aniso_ratio, mu_r, ec50, d_white = params
     rho_r = RHO_R_BASE
     mu = mu_r
 
-    # Effective sensitive growth: diffusion + anisotropy amplify invasion
-    k_diff = 15.0       # D_white coupling (mm^2/day -> day^-1)
-    k_aniso = 0.2       # aniso_ratio coupling
+    k_diff = 15.0
+    k_aniso = 0.2
     eff_rho_s = rho_s * (1.0 + k_diff * d_white) * (1.0 + k_aniso * (aniso_ratio - 1.0))
 
     M_s = 0.05
@@ -95,8 +97,6 @@ def reduced_ode(params: np.ndarray) -> float:
 
         total = M_s + M_r
         dMs = (eff_rho_s * M_s * (1.0 - total) - kill * M_s) * DT
-        # Resistant clone: emerges from sensitive mutation, grows with own rate.
-        # mu scaled up so mutation rate range produces meaningful resistant pop.
         dMr = (rho_r * M_r * (1.0 - total) + mu * 5e4 * eff_rho_s * M_s) * DT
 
         M_s = max(M_s + dMs, 0.0)
@@ -113,11 +113,7 @@ def run_simulation_and_get_ttp(params: np.ndarray) -> float:
 
 
 def plot_tornado(Si: dict, path: Path) -> None:
-    """Publication-ready tornado plot: horizontal bars of ST sorted descending.
-
-    Si values are numpy arrays indexed by parameter position; we map them
-    to names via `problem['names']`.
-    """
+    """Publication-ready tornado plot."""
     names = list(problem["names"])
     st_vals = np.asarray(Si["ST"])
     s1_vals = np.asarray(Si["S1"])
@@ -179,6 +175,15 @@ def main() -> None:
         "n_samples": N,
         "ttp_mean": float(Y.mean()),
         "ttp_std": float(Y.std()),
+        "E_MAX": float(E_MAX),
+        "E_MAX_RATIO": float(E_MAX_RATIO),
+        "cohort": {
+            "n_patients": len(_params),
+            "rho_min": float(min(_rhos)),
+            "rho_max": float(max(_rhos)),
+            "D_min": float(min(_Ds)),
+            "D_max": float(max(_Ds)),
+        },
     }
 
     out_path = OUTPUT_DIR / "sobol_sensitivity_results.json"
@@ -192,8 +197,4 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-<<<<<<< HEAD
     main()
-=======
-    main()
->>>>>>> 1be6df8e9737fb3a9f7ee274b3822d40fcc8b97c
