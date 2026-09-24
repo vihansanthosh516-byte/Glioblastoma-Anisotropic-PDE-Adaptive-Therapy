@@ -129,6 +129,7 @@ SPATIAL_METRICS_CACHE = OUTPUT_DIR / "spatial_metrics_cache.json"
 SOBOL_RESULTS_JSON  = OUTPUT_DIR / "sobol_sensitivity_results.json"
 SOBOL_TORNADO_PNG   = OUTPUT_DIR / "sobol_tornado_plot.png"
 DUAL_DRUG_JSON      = OUTPUT_DIR / "dual_drug_comparison.json"
+RECURRENCE_NPZ      = OUTPUT_DIR / "spatial_recurrence_profiles.npz"
 
 # Phase 3 spatial metrics cache (anisotropic vs isotropic comparison per patient)
 SPATIAL_METRICS_CACHE = OUTPUT_DIR / "spatial_metrics_cache.json"
@@ -137,6 +138,7 @@ SPATIAL_METRICS_CACHE = OUTPUT_DIR / "spatial_metrics_cache.json"
 SOBOL_RESULTS_JSON  = OUTPUT_DIR / "sobol_sensitivity_results.json"
 SOBOL_TORNADO_PNG   = OUTPUT_DIR / "sobol_tornado_plot.png"
 DUAL_DRUG_JSON      = OUTPUT_DIR / "dual_drug_comparison.json"
+RECURRENCE_NPZ      = OUTPUT_DIR / "spatial_recurrence_profiles.npz"
 
 # Per-phase required schema keys (rigorous ingestion assertions).
 PHASE1_REQUIRED = [
@@ -1647,6 +1649,17 @@ def write_audit_log(master: Dict[str, Any],
 # =========================================================================== #
 # STEP D.2 — Research Executive Summary & Technical Dossier
 # =========================================================================== #
+def _real_cohort_ids() -> List[str]:
+    """Patient IDs of the real MU-Glioma-Post cohort (recurrence-profile npz)."""
+    if not RECURRENCE_NPZ.exists():
+        return []
+    try:
+        with np.load(RECURRENCE_NPZ, allow_pickle=True) as d:
+            return [str(pid) for pid in d["patient_ids"]]
+    except (OSError, KeyError, ValueError):
+        return []
+
+
 def write_research_dossier(master: Dict[str, Any],
                             stats: Dict[str, Any],
                             path: Path = DOSSIER_MD) -> None:
@@ -1667,6 +1680,19 @@ def write_research_dossier(master: Dict[str, Any],
                   for p in master["patients"]]
     df_lo = min(df_p1_vals)
     df_hi = max(df_p1_vals)
+
+    real_ids = _real_cohort_ids()
+    if real_ids:
+        cohort_line = (
+            f"- **Cohort**: {len(real_ids)} real MU-Glioma-Post patients "
+            f"({real_ids[0]}–{real_ids[-1]}), per-patient growth rates fitted to "
+            "longitudinal tumor volumes.\n"
+        )
+    else:
+        cohort_line = (
+            "- **Cohort**: real-cohort recurrence profiles unavailable "
+            f"({RECURRENCE_NPZ.name} not found).\n"
+        )
 
     mean_ttp_low = st["mean_ttp_mtd_by_tier"]["Low"]
     mean_ttp_mid = st["mean_ttp_mtd_by_tier"]["Mid"]
@@ -1755,8 +1781,8 @@ def write_research_dossier(master: Dict[str, Any],
         "- **Method**: Fisher-Kolmogorov PDE with DTI-derived diffusion tensor "
         "field D(x) = D_iso * (I + κ * v ⊗ v) where v is principal eigenvector "
         "from tractography.\n"
-        f"- **Cohort**: 8 virtual patients (PAT_0000–PAT_0007), synthetic tract "
-        "mask ensuring reproducibility.\n"
+        + cohort_line
+        + "- **Seed geometry**: synthetic tract mask ensuring reproducibility.\n"
         f"- **Fractal dimension (Phase 1)**: Df ∈ [{df_lo:.2f}, {df_hi:.2f}], "
         f"bounds [1.0, 2.0]; all patients in-range.\n"
         f"- **Tract alignment**: Anisotropic mean = "

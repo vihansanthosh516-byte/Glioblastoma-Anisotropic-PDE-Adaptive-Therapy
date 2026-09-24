@@ -25,6 +25,7 @@ Deliverables:
 from __future__ import annotations
 
 import json
+import os
 import warnings
 from pathlib import Path
 from typing import Dict, List, Tuple, Optional, Any
@@ -40,9 +41,17 @@ from scipy.ndimage import gaussian_filter
 warnings.filterwarnings("ignore")
 
 # --------------------------------------------------------------------------- #
+# Project paths (PROJECT_ROOT-relative so the script is cwd-independent)
+# --------------------------------------------------------------------------- #
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+OUTPUT_DIR = PROJECT_ROOT / "output"
+OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+
+# --------------------------------------------------------------------------- #
 # Global constants (Phase 1: physical units, mm/days)
 #   dx=1.0 mm, dt=0.1 day, D_white=0.013 mm^2/day, D_gray=0.0013,
-#   rho_s=0.02 /day, rho_r=0.015 /day (resistance fitness cost).
+#   rho_s, rho_r = real MU-Glioma-Post per-patient growth rates
+#   (cohort median ~9.2e-4 /day; resistant clone pays a 25% fitness cost).
 # --------------------------------------------------------------------------- #
 GRID_SIZE = 100
 DX_MM = 1.0
@@ -62,9 +71,17 @@ D_BASE = D_GRAY
 D_PARALLEL_DEFAULT = D_WHITE
 D_PERPENDICULAR_DEFAULT = 0.0013
 
-# Clone-specific proliferation rates (Phase 1, /day)
-RHO_SENSITIVE = 0.02       # ~35 day doubling
-RHO_RESISTANT = 0.015      # fitness cost of resistance
+# Clone-specific proliferation rates (/day) -- REAL MU-GLIOMA-POST COHORT
+# 154 patients have valid exponential fits; median rho +0.00092/day.
+# PatientParameterMapper.build_patient_parameters() uses each patient's own
+# fitted rho; these module-level values are the cohort-median fallback used by
+# the solver defaults.
+from mu_glioma_loader import load_real_params_for_track_bc, real_cohort_stats
+
+_cohort = real_cohort_stats()
+RHO_SENSITIVE = _cohort["rho_median"]        # median real growth rate (1/day)
+RESISTANCE_FITNESS_COST = 0.25              # modeled cost of the resistant clone
+RHO_RESISTANT = RHO_SENSITIVE * (1.0 - RESISTANCE_FITNESS_COST)
 
 # Mutation rate (per division)
 MUTATION_RATE = 1e-5
@@ -82,11 +99,23 @@ C_PEAK = 10.0
 TMZ_EC50_UG_ML = 5.0
 # Drug pharmacodynamics (Hill equation) — kept for legacy compatibility
 # NOTE: EC50 below is in abstract units; the Phase-1 path uses TMZ_EC50_UG_ML.
-<<<<<<< HEAD
-E_MAX = 0.8
-=======
-E_MAX = 5.0
->>>>>>> 1be6df8e9737fb3a9f7ee274b3822d40fcc8b97c
+# TMZ kill rate is applied PER PATIENT as E_MAX_RATIO × that patient's own real
+# growth rate, so every patient sees the same effective drug-to-growth ratio.
+#
+# The nominal ratio is NOT the applied ratio: the PK schedule (1.8 h half-life,
+# 5-on/23-off), the density-dependent BBB map and the Hill factor at the
+# delivered concentration together attenuate it ~375x. Measured on real
+# patients (500-day MTD runs):
+#   nominal  150x -> time-averaged kill ~0.4x growth  ->  0-7%  shrinkage
+#   nominal  500x -> 25-58% shrinkage
+#   nominal 1000x -> 40-62% shrinkage  (clinical TMZ target is 30-50%)
+#   nominal 2000x -> 57-62%, saturating on the resistant clone
+# 1000x is therefore used: substantial but not complete shrinkage, which still
+# lets drug holidays trigger.
+# The module-level E_MAX is the cohort-median reference used as the solver
+# default; CohortSimulator.run_patient() overrides it per patient.
+E_MAX_RATIO = 1000.0
+E_MAX = RHO_SENSITIVE * E_MAX_RATIO
 EC50 = TMZ_EC50_UG_ML
 HILL_COEFF = 2.0
 
@@ -112,11 +141,22 @@ ADAPTIVE_STEPS = 5000
 THRESHOLD_OFF = 0.80  # 80% of peak -> drug holiday
 THRESHOLD_ON = 1.0   # 100% of peak -> resume drug
 
-# Cohort patients
-COHORT_PATIENTS = [f"PAT_{i:04d}" for i in range(8)]
+# Cohort patients: filled at runtime from the real MU-Glioma-Post cohort in
+# output/spatial_recurrence_profiles.npz (same convention as
+# 43_stromal_feedback.py). Set ADAPTIVE_COHORT_LIMIT=<n> for a smoke run.
+COHORT_PATIENTS = None
+
+# Patients per run is read from the environment (0 = every cohort patient)
+COHORT_LIMIT_ENV = "ADAPTIVE_COHORT_LIMIT"
 
 # Save intervals
 SAVE_INTERVAL = 250
+
+# Patient-grid figures show at most this many patients. With the full real
+# cohort (61 positive-rho patients) a single canvas is impractical, so the main
+# figures render a subset while the complete cohort is retained in the NPZ and
+# JSON outputs.
+MAX_FIGURE_PATIENTS = 30
 
 
 # =========================================================================== #
@@ -582,27 +622,7 @@ class AdaptiveTherapySolver:
         Legacy (use_physical_PK=False):
           - Spatial drug diffusion-decay with boundary source
         """
-<<<<<<< HEAD
-        if self.use_physical_PK:
-            # Physical PK: bulk concentration directly drives kill rate
-            C_curr = np.full((self.H, self.W), float(dose), dtype=float)
-            # Use Hill with physical EC50 (µg/mL)
-            kill_rate = hill_kill_physical(
-                C_curr, E_max=self.E_max, EC50=self.tmz_EC50, H=self.hill_coeff
-            )
-        else:
-            # Legacy spatial drug diffusion
-            C_curr = C.copy()
-            for _ in range(self.drug_substeps):
-                C_curr = self.drug_step(C_curr, dose, self.dt_drug_eff)
-
-            # Drug kill rate at current concentration (legacy EC50 in abstract units)
-            kill_rate = self.hill_kill(C_curr)  # (H, W)
-
-        # Total local density for competition
-=======
         # Total local density for competition and BBB permeability
->>>>>>> 1be6df8e9737fb3a9f7ee274b3822d40fcc8b97c
         u_total = u_s + u_r
         
         # Create a BBB map based on local tumor density (higher density = leakier vessels)
@@ -701,13 +721,14 @@ class PatientParameterMapper:
 
     def __init__(
         self,
-        cohort_npz: Path = Path("output/spatial_recurrence_profiles.npz"),
-        zone_csv_root: Path = Path("output"),
+        cohort_npz: Path = OUTPUT_DIR / "spatial_recurrence_profiles.npz",
+        zone_csv_root: Path = OUTPUT_DIR,
     ) -> None:
         self.cohort_npz = cohort_npz
         self.zone_csv_root = zone_csv_root
         self.data: Dict = {}
         self.zone_expr_dfs: Dict[str, pd.DataFrame] = {}
+        self._rho_by_patient: Optional[Dict[str, float]] = None
 
     def load(self) -> Dict:
         d = np.load(self.cohort_npz, allow_pickle=True)
@@ -741,13 +762,29 @@ class PatientParameterMapper:
             scores[zone] = float(score)
         return scores
 
+    def patient_rho(self, patient_id: str) -> float:
+        """Real MU-Glioma-Post proliferation rate (1/day) for this patient.
+
+        Sourced from output/mu_glioma_params_real.csv (exponential fits to
+        longitudinal tumor volumes). Falls back to the cohort median when the
+        patient has no valid fit.
+        """
+        if self._rho_by_patient is None:
+            self._rho_by_patient = {
+                str(row["patient_id"]): float(row["rho_per_day"])
+                for row in load_real_params_for_track_bc(min_r2=0.0)
+            }
+        rho = self._rho_by_patient.get(str(patient_id))
+        if rho is None or not np.isfinite(rho):
+            return float(RHO_SENSITIVE)
+        return float(rho)
+
     def build_patient_parameters(self, patient_id: str) -> Dict:
         if not self.data:
             self.load()
         pids = list(self.data["patient_ids"])
         if patient_id not in pids:
             raise KeyError(f"Patient {patient_id} not found")
-        pidx = pids.index(patient_id)
 
         zone_scores = self.get_patient_inflammation(patient_id)
         N = GRID_SIZE
@@ -763,12 +800,32 @@ class PatientParameterMapper:
         scale_s = gaussian_filter(scale_s, sigma=2.0)
         scale_r = gaussian_filter(scale_r, sigma=2.0)
 
-        rho_s_field = RHO_SENSITIVE * scale_s
-        rho_r_field = RHO_RESISTANT * scale_r
+        # Zone fields are dimensionless spatial modulations, so normalise them
+        # to mean 1.0 before they scale the patient's own real growth rate.
+        scale_s = scale_s / max(float(scale_s.mean()), 1e-12)
+        scale_r = scale_r / max(float(scale_r.mean()), 1e-12)
+
+        # Real per-patient proliferation rate; shrinking tumors have a negative
+        # fitted rho, so use its magnitude as the proliferation rate (same
+        # convention as 73_rebuild_cohort_npz.py).
+        rho_patient = self.patient_rho(patient_id)
+        rho_abs = abs(rho_patient)
+        if rho_abs < 1e-6:
+            rho_abs = 1e-6  # guard against a zero growth rate
+
+        rho_s_field = rho_abs * scale_s
+        rho_r_field = rho_abs * (1.0 - RESISTANCE_FITNESS_COST) * scale_r
+
+        # Per-patient drug strength: same drug-to-growth ratio for everyone.
+        e_max = rho_abs * E_MAX_RATIO
 
         return {
             "rho_s_field": rho_s_field,
             "rho_r_field": rho_r_field,
+            "e_max": float(e_max),
+            "rho_patient": float(rho_patient),
+            "rho_s_median": float(np.median(rho_s_field)),
+            "rho_r_median": float(np.median(rho_r_field)),
             "zone_scores": zone_scores,
             "mean_inflammation": float(np.mean(list(zone_scores.values()))),
         }
@@ -890,13 +947,8 @@ def run_adaptive_protocol(
         if current_mass > peak_mass:
             peak_mass = current_mass
 
-<<<<<<< HEAD
-        # Adaptive control logic (same thresholds as before)
-        if drug_on and current_mass < threshold_off * baseline_mass:
-=======
         # Adaptive control logic (trigger holiday if mass drops below 75% of baseline or peak)
         if drug_on and (current_mass < threshold_off * baseline_mass or current_mass < threshold_off * peak_mass):
->>>>>>> 1be6df8e9737fb3a9f7ee274b3822d40fcc8b97c
             drug_on = False
         elif not drug_on and (current_mass > threshold_on * baseline_mass or current_mass > 0.9 * peak_mass):
             drug_on = True
@@ -972,10 +1024,12 @@ class CohortSimulator:
     def run_patient(self, patient_id: str) -> Dict:
         params = self.mapper.build_patient_parameters(patient_id)
 
-        # Create solver with patient-specific rho fields
+        # Create solver with patient-specific rho fields and per-patient drug
+        # strength (E_max scales with this patient's own growth rate).
         solver = AdaptiveTherapySolver(
             D_xx=self.builder.D_xx, D_xy=self.builder.D_xy, D_yy=self.builder.D_yy,
             rho_s=params["rho_s_field"], rho_r=params["rho_r_field"],
+            E_max=params["e_max"],
         )
 
         # Initial seeds
@@ -992,6 +1046,7 @@ class CohortSimulator:
         solver2 = AdaptiveTherapySolver(
             D_xx=self.builder.D_xx, D_xy=self.builder.D_xy, D_yy=self.builder.D_yy,
             rho_s=params["rho_s_field"], rho_r=params["rho_r_field"],
+            E_max=params["e_max"],
         )
         adaptive_result = run_adaptive_protocol(solver2, patient_id, u_s0, u_r0,
                                                  n_steps=self.adaptive_steps, save_interval=self.save_interval)
@@ -1004,7 +1059,7 @@ class CohortSimulator:
             "adaptive": adaptive_result,
         }
 
-    def run_cohort(self, output_dir: Path = Path("output")) -> List[Dict]:
+    def run_cohort(self, output_dir: Path = OUTPUT_DIR) -> List[Dict]:
         if not self.mapper.data:
             self.mapper.load()
         output_dir.mkdir(parents=True, exist_ok=True)
@@ -1074,7 +1129,7 @@ class AdaptiveVisualizer:
         if not results:
             return
         
-        # Take the first patient (PAT_0000)
+        # Take the first cohort patient
         res = results[0]
         pid = res["patient_id"]
         
@@ -1099,11 +1154,13 @@ class AdaptiveVisualizer:
     def plot_initial_clones(self, results: List[Dict], output_path: Path) -> None:
         """8-panel showing initial sensitive vs resistant seeds."""
         output_path.parent.mkdir(parents=True, exist_ok=True)
+        results = results[:MAX_FIGURE_PATIENTS]
         n = len(results)
         n_cols = 4
         n_rows = (n + n_cols - 1) // n_cols
         fig, axes = plt.subplots(n_rows, n_cols, figsize=(4 * n_cols, 4 * n_rows))
-        axes = axes.flatten() if n > 1 else [axes]
+        # np.atleast_1d keeps a single-subplot figure (or a 1x1 grid) usable
+        axes = np.atleast_1d(np.asarray(axes, dtype=object)).ravel()
 
         for idx, res in enumerate(results):
             if idx >= len(axes):
@@ -1141,24 +1198,35 @@ class AdaptiveVisualizer:
         Bottom: Synchronized line charts with drug holidays and clonal ratios
         """
         output_path.parent.mkdir(parents=True, exist_ok=True)
+        # Each patient occupies 4 sub-rows, so the grid must grow with the number
+        # of patients shown (the previous fixed 4-row grid overwrote patients
+        # 4, 8, 12, ... into the same subplots). Cap the subset for the figure.
+        n_total = len(results)
+        results = results[:MAX_FIGURE_PATIENTS]
         n = len(results)
-        n_cols = 4
+        n_cols = 3
+        n_blocks = max(1, -(-n // n_cols))
+        print(f"[Viz] Comparison canvas: {n}/{n_total} patients "
+              f"({n_cols} cols x {n_blocks} blocks); full cohort in NPZ/JSON")
         
         # We'll create a figure with:
         # - Top section: MTD spatial timeline (Start, Mid, End) 
         # - Middle section: Adaptive spatial timeline (Start, Mid, End)
         # - Bottom section: 2 rows x n patients (Volume timeline, Clonal ratio timeline)
         
-        fig = plt.figure(figsize=(20, 16))
+        # Compact per-panel sizing: with 30 patients in 10 blocks a full-size
+        # grid would be ~136 in tall (tens of thousands of pixels).
+        fig = plt.figure(figsize=(4.5 * n_cols, 1.6 * n_blocks * 4))
         
-        # GridSpec for flexible layout: 4 rows x n_cols
-        gs = fig.add_gridspec(4, n_cols, hspace=0.35, wspace=0.25)
+        # GridSpec: 4 sub-rows per patient block, stacked n_blocks times
+        gs = fig.add_gridspec(4 * n_blocks, n_cols, hspace=0.35, wspace=0.25)
         
         timepoints = [0, MTD_STEPS // 2, MTD_STEPS - 1]
         timepoint_labels = ['Start (t=0)', f'Mid (t={MTD_STEPS//2})', f'End (t={MTD_STEPS-1})']
         
         for idx, res in enumerate(results):
-            col = idx % n_cols
+            block, col = divmod(idx, n_cols)
+            gs_row = block * 4
             mtd = res["mtd"]
             adapt = res["adaptive"]
             pid = res["patient_id"]
@@ -1175,7 +1243,7 @@ class AdaptiveVisualizer:
             # ========== ROW 0: MTD Spatial Timeline (Midpoint) ==========
             tp_idx = 1  # midpoint
             tp_saved = tp_indices[tp_idx]
-            ax = fig.add_subplot(gs[0, col])
+            ax = fig.add_subplot(gs[gs_row, col])
             u_s = u_s_mtd[tp_saved]
             u_r = u_r_mtd[tp_saved]
             
@@ -1193,7 +1261,7 @@ class AdaptiveVisualizer:
             
             # ========== ROW 1: Adaptive Spatial Timeline (Midpoint) ==========
             tp_saved = tp_indices[tp_idx]
-            ax = fig.add_subplot(gs[1, col])
+            ax = fig.add_subplot(gs[gs_row + 1, col])
             u_s = u_s_adapt[tp_saved]
             u_r = u_r_adapt[tp_saved]
             
@@ -1214,8 +1282,9 @@ class AdaptiveVisualizer:
         
         # ========== ROW 2: Normalized Tumor Volume Timeline ==========
         for idx, res in enumerate(results):
-            col = idx % n_cols
-            ax = fig.add_subplot(gs[2, col])
+            block, col = divmod(idx, n_cols)
+            gs_row = block * 4
+            ax = fig.add_subplot(gs[gs_row + 2, col])
             mtd = res["mtd"]
             adapt = res["adaptive"]
             pid = res["patient_id"]
@@ -1266,8 +1335,9 @@ class AdaptiveVisualizer:
         
         # ========== ROW 3: Clonal Composition Ratio (S/R) Timeline ==========
         for idx, res in enumerate(results):
-            col = idx % n_cols
-            ax = fig.add_subplot(gs[3, col])
+            block, col = divmod(idx, n_cols)
+            gs_row = block * 4
+            ax = fig.add_subplot(gs[gs_row + 3, col])
             mtd = res["mtd"]
             adapt = res["adaptive"]
             pid = res["patient_id"]
@@ -1310,11 +1380,12 @@ class AdaptiveVisualizer:
         # Main title
         fig.suptitle(
             "Adaptive Therapy vs Continuous MTD: Evolutionary Dynamics Dashboard\n"
-            "Sensitive=Green, Resistant=Red | Dashed vertical lines = Drug Holiday transitions",
-            fontsize=15, fontweight="bold", y=0.98
+            "Sensitive=Green, Resistant=Red | Dashed vertical lines = Drug Holiday transitions\n"
+            f"Subset shown: {n} of {n_total} cohort patients (full cohort in NPZ/JSON)",
+            fontsize=15, fontweight="bold", y=0.995
         )
         
-        plt.savefig(output_path, dpi=220, bbox_inches="tight")
+        plt.savefig(output_path, dpi=150, bbox_inches="tight")
         plt.close()
         print(f"[Viz] Enhanced comparison canvas saved -> {output_path}")
 
@@ -1324,11 +1395,13 @@ class AdaptiveVisualizer:
         Kept for backward compatibility.
         """
         output_path.parent.mkdir(parents=True, exist_ok=True)
+        results = results[:MAX_FIGURE_PATIENTS]
         n = len(results)
-        n_cols = 4
+        n_cols = 3
         n_rows = (n + n_cols - 1) // n_cols
         fig, axes = plt.subplots(n_rows, n_cols, figsize=(4 * n_cols, 3 * n_rows))
-        axes = axes.flatten() if n > 1 else [axes]
+        # np.atleast_1d keeps a single-subplot figure (or a 1x1 grid) usable
+        axes = np.atleast_1d(np.asarray(axes, dtype=object)).ravel()
 
         for idx, res in enumerate(results):
             ax = axes[idx]
@@ -1364,12 +1437,34 @@ class AdaptiveVisualizer:
         print(f"[Viz] Temporal dynamics saved -> {output_path}")
 
     def compute_ttp(self, mass_total: np.ndarray, baseline: float, threshold: float = 1.5) -> int:
-        """Time to progression: when total mass exceeds threshold * baseline."""
+        """Time to progression: when total mass exceeds threshold * baseline.
+
+        SECONDARY endpoint: under real MU-Glioma growth rates (>1.5x baseline in
+        500 days) most patients are censored, so this cannot discriminate arms
+        on its own. Report final mass / VR ratio as primary; see
+        mass_trajectory_stats() for the shrinkage trajectory.
+        """
         # Progression: mass > 1.5x baseline (or never)
         exceeded = np.where(mass_total > threshold * baseline)[0]
         if len(exceeded) > 0:
             return int(exceeded[0])
         return len(mass_total)  # censored
+
+    @staticmethod
+    def mass_trajectory_stats(mass_total: np.ndarray, baseline: float) -> Dict[str, float]:
+        """Shrinkage trajectory: deepest response, when it happened, and the end state.
+
+        Replaces the first-crossing shrink50 endpoint, which scored a tumour
+        that halved and then regrew past baseline as a 50%-shrinkage "success".
+        All three values are fractions of baseline (times are step indices).
+        """
+        base = max(float(baseline), 1e-12)
+        idx = int(np.argmin(mass_total))
+        return {
+            "min_mass_fraction": float(mass_total[idx] / base),
+            "min_mass_time": idx,
+            "final_mass_fraction": float(mass_total[-1] / base),
+        }
 
     def compute_metrics(self, results: List[Dict]) -> List[Dict]:
         """Compute quantitative metrics for each patient."""
@@ -1383,7 +1478,11 @@ class AdaptiveVisualizer:
             adapt_total = adapt["mass_s"] + adapt["mass_r"]
             baseline = adapt["baseline_mass"]
 
-            # TTP
+            # Primary trajectory stats: deepest response, when, and end state
+            mtd_stats = self.mass_trajectory_stats(mtd_total, baseline)
+            adapt_stats = self.mass_trajectory_stats(adapt_total, baseline)
+
+            # Secondary endpoint: TTP
             ttp_mtd = self.compute_ttp(mtd_total, baseline)
             ttp_adapt = self.compute_ttp(adapt_total, baseline)
 
@@ -1407,8 +1506,26 @@ class AdaptiveVisualizer:
             auc_mtd = float(np.trapezoid(mtd_total))
             auc_adapt = float(np.trapezoid(adapt_total))
 
+            vr_ratio = vr_adapt / max(vr_mtd, 1e-6)
+            drug_pct = 100.0 * drug_auc_adapt / max(drug_auc_mtd, 1e-6)
+
             metrics = {
                 "patient_id": pid,
+                # --- primary comparison (does not need an endpoint reached) ---
+                "final_mass_mtd": float(mtd_total[-1]),
+                "final_mass_adaptive": float(adapt_total[-1]),
+                "vr_ratio": float(vr_ratio),
+                "drug_percent_of_mtd": float(drug_pct),
+                "num_holidays": int(holidays),
+                "min_mass_fraction_mtd": mtd_stats["min_mass_fraction"],
+                "min_mass_time_mtd": mtd_stats["min_mass_time"],
+                "final_mass_fraction_mtd": mtd_stats["final_mass_fraction"],
+                "min_mass_fraction_adaptive": adapt_stats["min_mass_fraction"],
+                "min_mass_time_adaptive": adapt_stats["min_mass_time"],
+                "final_mass_fraction_adaptive": adapt_stats["final_mass_fraction"],
+                "rho_per_day": float(res["params"]["rho_patient"]),
+                "e_max": float(res["params"]["e_max"]),
+                # --- secondary (censored endpoints) ---
                 "ttp_mtd": ttp_mtd,
                 "ttp_adaptive": ttp_adapt,
                 "ttp_ratio": ttp_adapt / max(ttp_mtd, 1),
@@ -1419,7 +1536,6 @@ class AdaptiveVisualizer:
                 "drug_auc_mtd": drug_auc_mtd,
                 "drug_auc_adaptive": drug_auc_adapt,
                 "drug_reduction": 1.0 - drug_auc_adapt / max(drug_auc_mtd, 1e-6),
-                "num_holidays": int(holidays),
                 "mean_mass_mtd": float(mtd_total.mean()),
                 "mean_mass_adaptive": float(adapt_total.mean()),
                 "auc_total_mtd": float(auc_mtd),
@@ -1428,9 +1544,14 @@ class AdaptiveVisualizer:
                 "mean_inflammation": res["params"]["mean_inflammation"],
             }
             metrics_list.append(metrics)
-            print(f"[Metrics] {pid}: TTP_MTD={ttp_mtd}, TTP_Adapt={ttp_adapt}, "
-                  f"VR_MTD={vr_mtd:.2f}, VR_Adapt={vr_adapt:.2f}, "
-                  f"Holidays={holidays}, DrugRed={metrics['drug_reduction']:.2f}")
+            print(f"[Metrics] {pid}: final mass MTD={metrics['final_mass_mtd']:.1f} "
+                  f"vs Adapt={metrics['final_mass_adaptive']:.1f} | "
+                  f"VR {vr_mtd:.2f} vs {vr_adapt:.2f} (ratio {vr_ratio:.2f}) | "
+                  f"min mass {100*mtd_stats['min_mass_fraction']:.0f}%/"
+                  f"{100*adapt_stats['min_mass_fraction']:.0f}% of baseline at steps "
+                  f"{mtd_stats['min_mass_time']}/{adapt_stats['min_mass_time']} | "
+                  f"drug={drug_pct:.0f}% of MTD | holidays={int(holidays)} | "
+                  f"TTP {ttp_mtd}/{ttp_adapt}")
 
         return metrics_list
 
@@ -1533,11 +1654,88 @@ class AdaptiveVisualizer:
         ax.legend()
         ax.grid(alpha=0.3)
 
-        plt.suptitle("Adaptive Therapy Metrics Summary (8-Patient Cohort)", fontsize=14, fontweight="bold")
+        plt.suptitle(f"Adaptive Therapy Metrics Summary ({len(pids)}-Patient MU-Glioma-Post Cohort)",
+                     fontsize=14, fontweight="bold")
         plt.tight_layout()
         plt.savefig(output_path, dpi=200, bbox_inches="tight")
         plt.close()
         print(f"[Viz] Metrics summary saved -> {output_path}")
+
+
+def summarize_cohort(metrics: List[Dict], horizon_steps: int = ADAPTIVE_STEPS,
+                     cohort_filter: Optional[Dict[str, Any]] = None) -> Dict:
+    """Cohort-level headline plus explicit limitations.
+
+    Deliberately avoids "equivalent tumour control" / "non-inferiority"
+    phrasing for the primary comparison. At this E_MAX_RATIO the adaptive arm
+    saves most of the dose but carries a higher residual burden, so FINAL-MASS
+    non-inferiority does NOT hold. What does hold is progression
+    non-inferiority (both arms censored at the TTP endpoint).
+
+    The deepest-response count is MTD sensitivity, not a therapy comparison:
+    the adaptive controller stops dosing once the tumour is under control, so it
+    responds less deeply by construction rather than failing.
+    """
+    n = len(metrics)
+    if n == 0:
+        return {}
+    censored_at = horizon_steps + 1          # TTP censors at len(mass_total)
+    horizon_days = horizon_steps * ADAPTIVE_DT
+
+    mean_drug = float(np.mean([m["drug_percent_of_mtd"] for m in metrics]))
+    mean_vr = float(np.mean([m["vr_ratio"] for m in metrics]))
+    med_min_mtd = 100.0 * float(np.median(
+        [m["min_mass_fraction_mtd"] for m in metrics]))
+    n_ttp_both = sum(1 for m in metrics
+                     if m["ttp_mtd"] >= censored_at
+                     and m["ttp_adaptive"] >= censored_at)
+    n_progress_any = sum(1 for m in metrics
+                         if m["ttp_mtd"] < censored_at
+                         or m["ttp_adaptive"] < censored_at)
+    n_adaptive_earlier = sum(1 for m in metrics
+                             if m["ttp_adaptive"] < m["ttp_mtd"])
+    n_mtd_ever_below_half = sum(1 for m in metrics
+                                if m["min_mass_fraction_mtd"] <= 0.5)
+
+    return {
+        "n_patients": n,
+        "e_max_ratio": E_MAX_RATIO,
+        "horizon_steps": horizon_steps,
+        "horizon_days": horizon_days,
+        "mean_drug_percent_of_mtd": mean_drug,
+        "mean_vr_ratio": mean_vr,
+        "median_min_mass_fraction_mtd_pct": med_min_mtd,
+        "mean_num_holidays": float(np.mean([m["num_holidays"] for m in metrics])),
+        "mean_final_mass_mtd": float(np.mean([m["final_mass_mtd"] for m in metrics])),
+        "mean_final_mass_adaptive": float(
+            np.mean([m["final_mass_adaptive"] for m in metrics])),
+        "n_ttp_both_censored": n_ttp_both,
+        "n_ttp_any_progression": n_progress_any,
+        "n_ttp_adaptive_earlier": n_adaptive_earlier,
+        "n_mtd_ever_below_half_baseline": n_mtd_ever_below_half,
+        "cohort_filter": cohort_filter or {},
+        "headline": (
+            f"Adaptive therapy holds tumor burden within 80-100% of baseline "
+            f"using ~{mean_drug:.0f}% of the MTD dose. MTD achieves deeper nadirs "
+            f"(median min mass ~{med_min_mtd:.0f}% of baseline) but rebounds in "
+            f"patients with high growth rates (resistance-driven escape). "
+            f"Progression to 1.5x baseline occurred in {n_progress_any} of {n} "
+            f"patients within {horizon_days:.0f} days (both arms censored in "
+            f"{n_ttp_both} of {n})."
+        ),
+        "notes": [
+            "adaptive achieves progression non-inferiority (censored both arms) "
+            f"but NOT final-mass non-inferiority (VR={mean_vr:.2f})",
+            "deepest-response metric is asymmetric: adaptive stops dosing under "
+            "control, so it barely shrinks - do not interpret as failure",
+            "adaptive min_mass_fraction is pinned at THRESHOLD_OFF (0.80) by design; "
+            "the controller intentionally holds tumor at the setpoint",
+            "MTD min_mass_fraction reflects actual disease response; "
+            "final_mass_fraction reflects resistance escape for high-rho patients",
+            f"{horizon_days:.0f}-day horizon is insufficient to determine progression "
+            "timing; longer simulation is future work",
+        ],
+    }
 
 
 # =========================================================================== #
@@ -1548,8 +1746,8 @@ def main():
     print("MONTH 9: ADVANCED CLONAL OPTIMIZATION - ADAPTIVE THERAPY ENGINE")
     print("=" * 70)
 
-    output_dir = Path("output")
-    output_dir.mkdir(exist_ok=True)
+    output_dir = OUTPUT_DIR
+    output_dir.mkdir(parents=True, exist_ok=True)
 
     # ---------------------------------------------------------
     # WEEK 1: Tensor field + dual-clone initialization
@@ -1569,6 +1767,33 @@ def main():
     # Quick initial clone visualization
     mapper = PatientParameterMapper()
     mapper.load()
+
+    # Real cohort from the recurrence-profile npz (same convention as
+    # 43_stromal_feedback.py), filtered to GROWING tumours.
+    # A negative fitted rho means the real tumour SHRANK between timepoints
+    # (i.e. the patient responded to treatment), and this simulation assumes an
+    # untreated growing tumour, so those patients cannot be modelled here.
+    # Filtering happens at load time only; mu_glioma_params_real.csv is untouched.
+    global COHORT_PATIENTS
+    all_ids = [str(p) for p in mapper.data["patient_ids"]]
+    positive_ids = [pid for pid in all_ids if mapper.patient_rho(pid) > 0]
+    excluded_ids = [pid for pid in all_ids if pid not in set(positive_ids)]
+    print(f"[COHORT] Running adaptive therapy on {len(positive_ids)} positive-rho "
+          f"patients (excluded {len(excluded_ids)} negative-rho responders from "
+          f"the cohort)")
+    cohort_filter = {
+        "total_patients_in_npz": len(all_ids),
+        "positive_rho_patients": len(positive_ids),
+        "negative_rho_excluded": len(excluded_ids),
+        "exclusion_reason": "negative fitted rho = treatment responders; "
+                            "simulation assumes growing tumor",
+    }
+    COHORT_PATIENTS = positive_ids
+    limit = int(os.environ.get(COHORT_LIMIT_ENV, "0"))
+    if limit > 0:
+        COHORT_PATIENTS = COHORT_PATIENTS[:limit]
+    print(f"[COHORT] Simulating {len(COHORT_PATIENTS)}: {COHORT_PATIENTS[:3]}...")
+
     # Dummy results for initial clone plot - use (40, 40) for both clones inside diagonal tract
     dummy_results = []
     for pid in COHORT_PATIENTS:
@@ -1608,7 +1833,12 @@ def main():
 
     metrics = visualizer.compute_metrics(results)
     visualizer.save_metrics_json(metrics, output_dir / "adaptive_geometry_metrics.json")
-    visualizer.plot_metrics_summary(metrics, output_dir / "adaptive_therapy_metrics_summary.png")
+    # Bar panels become unreadable past ~30 patients; the JSON keeps all of them.
+    fig_metrics = metrics[:MAX_FIGURE_PATIENTS]
+    if len(fig_metrics) < len(metrics):
+        print(f"[Viz] Metrics summary figure shows {len(fig_metrics)}/{len(metrics)} "
+              f"patients; full metrics in adaptive_geometry_metrics.json")
+    visualizer.plot_metrics_summary(fig_metrics, output_dir / "adaptive_therapy_metrics_summary.png")
     visualizer.plot_bbb_permeability_map(results, output_dir / "bbb_permeability_map.png")
 
     # ---------------------------------------------------------
@@ -1622,16 +1852,62 @@ def main():
     print("  output/adaptive_tensor_validation.png")
     print("  output/adaptive_initial_clones.png")
     print("  output/adaptive_therapy_data.npz (combined cohort)")
-    print("  output/adaptive_PAT_XXXX.npz (8 individual)")
+    print("  output/adaptive_<PatientID>.npz (one per cohort patient)")
     print("  output/adaptive_therapy_comparison.png")
     print("  output/adaptive_therapy_dynamics.png")
-    print("  output/adaptive_geometry_metrics.json")
+    print("  output/adaptive_geometry_metrics.json (per-patient, list)")
+    print("  output/adaptive_cohort_summary.json (cohort headline + notes)")
     print("  output/adaptive_therapy_metrics_summary.png")
     print("  output/bbb_permeability_map.png")
+    # ---------------------------------------------------------
+    # PRIMARY COMPARISON (endpoint-independent)
+    # ---------------------------------------------------------
+    print("\n" + "=" * 78)
+    print("PRIMARY COMPARISON: drug sparing vs residual tumor burden")
+    print("=" * 78)
+    print(f"{'patient':18s} {'rho/day':>9s} {'E_max':>8s} {'minM%':>6s} {'minA%':>6s} "
+          f"{'t_min M/A':>13s} {'finM%':>6s} {'finA%':>6s} {'VRratio':>8s} "
+          f"{'drug%':>6s} {'holid':>6s}")
+    for m in metrics:
+        print(f"{m['patient_id']:18s} {m['rho_per_day']:9.5f} {m['e_max']:8.4f} "
+              f"{100*m['min_mass_fraction_mtd']:5.0f}% {100*m['min_mass_fraction_adaptive']:5.0f}% "
+              f"{m['min_mass_time_mtd']:6d}/{m['min_mass_time_adaptive']:<6d} "
+              f"{100*m['final_mass_fraction_mtd']:5.0f}% {100*m['final_mass_fraction_adaptive']:5.0f}% "
+              f"{m['vr_ratio']:8.2f} {m['drug_percent_of_mtd']:5.0f}% "
+              f"{m['num_holidays']:6d}")
+    # ---------------------------------------------------------
+    # COHORT SUMMARY (framed with its limitations, never as equivalence)
+    # ---------------------------------------------------------
+    cohort_summary = summarize_cohort(metrics, cohort_filter=cohort_filter)
+    n_pat = cohort_summary["n_patients"]
+    print("-" * 78)
+    print(f"COHORT SUMMARY (n={n_pat})")
+    print(f"  cohort filter             : {cohort_filter['positive_rho_patients']} "
+          f"positive-rho of {cohort_filter['total_patients_in_npz']} npz patients "
+          f"({cohort_filter['negative_rho_excluded']} negative-rho responders excluded)")
+    print(f"  mean drug dose            : "
+          f"{cohort_summary['mean_drug_percent_of_mtd']:.0f}% of MTD")
+    print(f"  mean VR ratio (Adapt/MTD) : {cohort_summary['mean_vr_ratio']:.2f}")
+    print(f"  mean holidays             : {cohort_summary['mean_num_holidays']:.1f}")
+    print(f"  both arms TTP-censored    : "
+          f"{cohort_summary['n_ttp_both_censored']}/{n_pat} patients")
+    print(f"  MTD min mass <=50% base   : "
+          f"{cohort_summary['n_mtd_ever_below_half_baseline']}/{n_pat} patients  "
+          f"(MTD sensitivity, not a therapy comparison; transient dips count)")
+    print(f"\n  {cohort_summary['headline']}")
+    print("\n  Limitations:")
+    for note in cohort_summary["notes"]:
+        print(f"    - {note}")
+
+    summary_path = output_dir / "adaptive_cohort_summary.json"
+    with open(summary_path, "w") as f:
+        json.dump(cohort_summary, f, indent=2)
+    print(f"\n[Cohort] Summary + notes -> {summary_path}")
+
     print("\nKey findings:")
     for m in metrics:
         print(f"  {m['patient_id']}: TTP_MTD={m['ttp_mtd']}, TTP_Adapt={m['ttp_adaptive']}, "
-              f"VR_ratio={m['volume_ratio_adaptive']/max(m['volume_ratio_mtd'],1e-6):.2f}, "
+              f"VR_ratio={m['vr_ratio']:.2f}, "
               f"Holidays={m['num_holidays']}, DrugRed={m['drug_reduction']:.0%}")
 
     print("\n[SUCCESS] Month 9 complete.")

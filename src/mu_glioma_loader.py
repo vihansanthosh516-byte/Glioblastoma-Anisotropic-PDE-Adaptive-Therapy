@@ -10,8 +10,11 @@ from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 import numpy as np
 
-DEFAULT_DATA_ROOT = Path("data/tcia/MU-Glioma-Post")
-DEFAULT_CLINICAL_EXCEL = Path("data/tcia/MU-Glioma-Post_ClinicalData-July2025.xlsx")
+# Resolve defaults against the repository root so callers are cwd-independent.
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+DEFAULT_DATA_ROOT = PROJECT_ROOT / "data/tcia/MU-Glioma-Post"
+DEFAULT_CLINICAL_EXCEL = PROJECT_ROOT / "data/tcia/MU-Glioma-Post_ClinicalData-July2025.xlsx"
+PARAMS_CSV = PROJECT_ROOT / "output/mu_glioma_params_real.csv"
 
 
 @dataclass(frozen=True)
@@ -202,7 +205,7 @@ def load_real_params_for_track_bc(
         list of dicts with patient_id, rho_per_day, D_mm2_per_day, V0_mm3
     """
     import pandas as pd
-    path = Path("output/mu_glioma_params_real.csv")
+    path = PARAMS_CSV
     if not path.exists():
         raise FileNotFoundError(f"{path} not found. Run src/72_estimate_params_real.py first.")
     df = pd.read_csv(path)
@@ -215,7 +218,7 @@ def load_real_params_for_track_bc(
 def real_cohort_stats() -> dict:
     """Summary stats of real MU-Glioma cohort for paper reporting."""
     import pandas as pd
-    path = Path("output/mu_glioma_params_real.csv")
+    path = PARAMS_CSV
     df = pd.read_csv(path)
     return {
         "n_total": len(df),
