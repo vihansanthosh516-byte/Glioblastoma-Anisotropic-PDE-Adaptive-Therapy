@@ -74,3 +74,6 @@ terminal_session.txt
 
 # Adaptive therapy per-patient outputs (regenerable via script 44)
 output/adaptive_PatientID_*.npz
+
+# Vault RAG index (regenerable via tools/vault_index.py)
+tools/.vault_index/
