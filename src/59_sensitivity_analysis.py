@@ -30,7 +30,8 @@ from scipy.stats.qmc import LatinHypercube, Sobol
 
 # Import Phase 5 components
 import sys
-sys.path.insert(0, str(Path(__file__).parent))
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(PROJECT_ROOT / "src"))
 
 # We'll reuse the FastPDESolver, GbmTherapyEnv, PolicyNetwork from Phase 5
 # by importing them dynamically
@@ -59,7 +60,9 @@ PARAM_RANGES = {
 # Fixed parameters
 D_WHITE_BASE = 0.013
 D_GRAY_BASE = 0.0013
-RHO_BASE = 0.02
+from mu_glioma_loader import real_cohort_stats
+_cohort = real_cohort_stats()
+RHO_BASE = _cohort["rho_median"]
 K_CARRY = 1.0
 GAMMA_CHEMO = 0.05
 GAMMA_RAD = 0.08
@@ -69,7 +72,7 @@ COMBO_TOX_PER_RL_STEP = 0.08
 SEED_SIGMA_MM = 5.0
 SEED_AMPLITUDE = 0.8
 
-OUTPUT_DIR = Path("output")
+OUTPUT_DIR = PROJECT_ROOT / "output"
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
 # --------------------------------------------------------------------------- #
