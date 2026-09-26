@@ -406,6 +406,7 @@ def run_stupp_protocol(env: GbmTherapyEnv) -> Dict:
     obs, _ = env.reset()
     trajectory = []
     env.solver.u *= 0.1
+    env.solver.initial_volume = float(env.solver.u.sum() * env.solver.dx**3)
 
     for step in range(env.max_steps):
         day = step + 1
@@ -429,6 +430,8 @@ def run_stupp_protocol(env: GbmTherapyEnv) -> Dict:
 def run_rl_adaptive(env: GbmTherapyEnv, policy: Optional["PolicyNetwork"] = None) -> Dict:
     obs, _ = env.reset()
     trajectory = []
+    env.solver.u *= 0.1
+    env.solver.initial_volume = float(env.solver.u.sum() * env.solver.dx**3)
 
     initial_vol = env.solver.initial_volume
 
@@ -443,7 +446,6 @@ def run_rl_adaptive(env: GbmTherapyEnv, policy: Optional["PolicyNetwork"] = None
             with torch.no_grad():
                 action = policy(obs_tensor).probs.argmax().item()
         else:
-            # Heuristic policy: aggressive combo when tumor > 5%
             if norm_vol > 0.05:
                 action = 3
             elif norm_vol > 0.01:
@@ -608,7 +610,7 @@ def compute_sensitivity_metrics(results: List[Dict[str, Any]]) -> Dict[str, Any]
     
     # Determine top sensitive parameter for RL outcome
     importance = metrics["parameter_importance_ranking"]["rl_volume"]
-    metrics["top_sensitive_parameter"] = max(importance, key=importance.get)
+    metrics["top_sensitive_parameter"] = min(importance, key=importance.get)
     
     return metrics
 
