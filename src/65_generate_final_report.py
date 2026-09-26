@@ -1,442 +1,234 @@
 #!/usr/bin/env python3
 """
-Phase 9: Final Executive Summary & Publication Artifact Synthesis
-==================================================================
-Aggregates all metrics from previous phases and generates:
-1. Unified executive summary JSON (output/final_executive_summary.json)
-2. Master synthesis figure (output/65_master_summary_figure.png) - 4-panel publication-ready dashboard
+Script 65: Track C Final Report (equal-drug-budget framework)
+=============================================================
+Aggregates the Track C outputs into
+  output/final_executive_summary.json
+  output/65_master_summary_figure.png
+
+Inputs (a missing or unreadable input is recorded as such, never defaulted):
+  51 inverse_est_metrics.json            inverse parameter estimation
+  52 robust_mpc_benchmark.json           robust MPC benchmark
+  59 phase6_sensitivity_metrics.json     drug-budget sensitivity sweep
+  60 ablation_and_baselines_metrics.json equal-budget baselines + ablation
+  62 biomarker_stability_metrics.json    early-vs-delayed start rho threshold
+  64 phase8_cohort_metrics.json          equal-budget virtual cohort
+  66 rl_equal_budget/evaluate.json       RL equal-budget study
+
+Every treatment comparison must use the same drug budget as the shared arms
+module (src/rl/equal_budget_arms.py); the report checks this.
 """
 from __future__ import annotations
 
 import json
-import warnings
+import sys
 from pathlib import Path
-from typing import Dict, List, Any, Optional
+from typing import Any, Dict, Optional
 
 import numpy as np
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
-warnings.filterwarnings("ignore")
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(PROJECT_ROOT / "src"))
+from rl.equal_budget_arms import ARMS, STUPP_BUDGET  # noqa: E402
 
-# --------------------------------------------------------------------------- #
-# Configuration
-# --------------------------------------------------------------------------- #
-OUTPUT_DIR = Path("output")
+OUTPUT_DIR = PROJECT_ROOT / "output"
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
-METRIC_FILES = [
-    "phase5_adaptive_metrics.json",
-    "biomarker_correlation_metrics.json",
-    "uncertainty_quantification_metrics.json",
-    "biomarker_stability_metrics.json",
-    "reward_sensitivity_metrics.json",
-    "phase8_cohort_metrics.json",
-    "phase6_sensitivity_metrics.json",
-    "ablation_and_baselines_metrics.json",
-    "rl_convergence_metrics.json",
-    "phase6_sensitivity_metrics.json",
-]
+INPUTS = {
+    "51_inverse_estimation": "inverse_est_metrics.json",
+    "52_robust_mpc": "robust_mpc_benchmark.json",
+    "59_drug_budget_sensitivity": "phase6_sensitivity_metrics.json",
+    "60_ablation_and_baselines": "ablation_and_baselines_metrics.json",
+    "62_early_start_threshold": "biomarker_stability_metrics.json",
+    "64_virtual_cohort": "phase8_cohort_metrics.json",
+    "66_rl_equal_budget": "rl_equal_budget/evaluate.json",
+}
+ARM_LABELS = {"heuristic_budgeted": "Budgeted heuristic (59)", "ppo": "RL: PPO (66)",
+              "dagger_oracle": "DAgger oracle (66)"}
+S66_ARM_NAMES = {"heuristic_budgeted": "heuristic59", "ppo": "ppo_final_s0", "dagger_oracle": "bc_dagger_final"}
 
-# --------------------------------------------------------------------------- #
-# Metrics Loading & Aggregation
-# --------------------------------------------------------------------------- #
-def load_all_metrics() -> Dict[str, Any]:
-    """Load all available metric files from output directory."""
-    metrics = {}
-    for fname in METRIC_FILES:
-        fpath = OUTPUT_DIR / fname
-        if fpath.exists():
-            try:
-                with open(fpath, "r") as f:
-                    metrics[fname.replace(".json", "")] = json.load(f)
-                print(f"[Phase 9] Loaded: {fname}")
-            except Exception as e:
-                print(f"[Phase 9] Warning: Failed to load {fname}: {e}")
+
+def load_inputs() -> (Dict[str, Any], Dict[str, str]):
+    data, status = {}, {}
+    for key, rel in INPUTS.items():
+        path = OUTPUT_DIR / rel
+        if not path.exists():
+            status[key] = "missing"
+        elif path.stat().st_size == 0:
+            status[key] = "empty"
         else:
-            print(f"[Phase 9] Note: {fname} not found")
-    return metrics
+            try:
+                data[key] = json.loads(path.read_text())
+                status[key] = "ok"
+            except json.JSONDecodeError as e:
+                status[key] = f"unreadable: {e}"
+        print(f"  {key:28s} {rel:40s} {status[key]}")
+    return data, status
 
 
-def aggregate_executive_summary(metrics: Dict[str, Any]) -> Dict[str, Any]:
-    """Create unified executive summary from all metrics."""
-    
-    # Phase 5: RL Adaptive vs Stupp
-    phase5 = metrics.get("phase5_adaptive_metrics", {})
-    
-    # Phase 8: Cohort Validation
-    phase8 = metrics.get("phase8_cohort_metrics", {})
-    
-    # Phase 6: Sensitivity
-    phase6 = metrics.get("phase6_sensitivity_metrics", {})
-    
-    # Reward Sensitivity
-    reward_sens = metrics.get("reward_sensitivity_metrics", {})
-    
-    # Ablation Study
-    ablation = metrics.get("ablation_and_baselines_metrics", {})
-    
-    # RL Convergence
-    rl_conv = metrics.get("rl_convergence_metrics", {})
-    
-    # Biomarker Stability
-    bio_stab = metrics.get("biomarker_stability_metrics", {})
-    
-    # Phase 6 Sensitivity (older)
-    phase6_old = metrics.get("phase6_sensitivity_metrics", {})
+def arm_row(win: float, log_ratio: float, auc_ratio: float) -> Dict[str, float]:
+    return {"win_rate_vs_stupp_pct": win, "mean_log_ratio_final_vs_stupp": log_ratio,
+            "drug_auc_ratio_vs_stupp": auc_ratio}
 
-    # Extract optimal reward weights from reward sensitivity
-    optimal_weights = reward_sens.get("best_config", {
-        "lambda_vol": 15.0,
-        "lambda_den": 5.0,
-        "lambda_tox": 0.01,
-    })
 
-    # Global sensitivity top feature
-    global_sens_top = phase6.get("top_sensitive_parameter", "alpha_sens")
-    
-    # Ablation impacts
-    ablation_impacts = ablation.get("ablations", {}).get("relative_drops_pct", {})
-
-    # Build executive summary
-    summary = {
-        "pipeline_completion_status": "SUCCESS",
-        "total_virtual_cohort_size": phase8.get("cohort_size", 20),
-        
-        # Primary efficacy
-        "rl_adaptive_vs_stupp_p_value": phase8.get("paired_t_test_p_value", 0.0),
-        "wilcoxon_p_value": phase8.get("wilcoxon_p_value", 0.0),
-        "cohens_d_effect_size": phase8.get("cohens_d", 0.0),
-        "rl_mean_final_volume_mm3": phase8.get("rl_mean_final_volume_mm3", 0.0),
-        "stupp_mean_final_volume_mm3": phase8.get("stupp_mean_final_volume_mm3", 0.0),
-        "volume_reduction_pct": ((phase8.get("stupp_mean_final_volume_mm3", 1) - phase8.get("rl_mean_final_volume_mm3", 0)) / 
-                                  max(phase8.get("stupp_mean_final_volume_mm3", 1), 1e-6)) * 100,
-        
-        # Progression-free
-        "rl_progression_free_rate": phase8.get("rl_progression_free_rate", 0.0),
-        "stupp_progression_free_rate": phase8.get("stupp_progression_free_rate", 0.0),
-        "progression_difference": phase8.get("progression_difference", 0.0),
-        "mcnemar_p_value": phase8.get("mcnemar_p_value", 1.0),
-        "cohens_kappa_progression": phase8.get("cohens_kappa", 0.0),
-        
-        # Optimal RL configuration
-        "optimal_reward_weights": optimal_weights,
-        
-        # Sensitivity analysis
-        "global_sensitivity_top_feature": global_sens_top,
-        "parameter_importance_ranking": phase6.get("parameter_importance_ranking", {}),
-        
-        # Biomarker threshold
-        "biomarker_rho_crit_mean": bio_stab.get("mean_rho_crit", 0.0),
-        "biomarker_rho_crit_ci_95": [bio_stab.get("ci_95_lower", 0.0), bio_stab.get("ci_95_upper", 0.0)],
-        "biomarker_logistic_threshold": bio_stab.get("logistic_threshold_rho_crit", 0.0),
-        
-        # Ablation study
-        "ablation_impact_no_dti_pct": ablation_impacts.get("No DTI (Isotropic)", 0.0),
-        "ablation_impact_no_mechanics_pct": ablation_impacts.get("No Mechanics", 0.0),
-        "ablation_impact_pure_rd_pct": ablation_impacts.get("Pure Reaction-Diffusion", 0.0),
-        
-        # RL convergence
-        "rl_convergence_rate": rl_conv.get("convergence_rate_per_episode", 0.0),
-        "rl_cv_final_volume": rl_conv.get("cv_final_volume", 0.0),
-        "rl_seeds_tested": len(rl_conv.get("seeds", [])),
-        
-        # Reward sensitivity
-        "reward_sensitivity_cv_volume": reward_sens.get("cv_final_volume", 0.0),
-        "reward_weight_correlations": reward_sens.get("correlations", {}),
-        
-        # Baseline comparison
-        "best_baseline": ablation.get("summary", {}).get("best_baseline", "RL Adaptive"),
-        "rl_vs_stupp_improvement_pct": ablation.get("baselines", {}).get("rl_vs_stupp_improvement_pct", 0.0),
-        "rl_vs_threshold_improvement_pct": ablation.get("baselines", {}).get("rl_vs_threshold_improvement_pct", 0.0),
-        
-        # Metadata
-        "phases_completed": list(range(1, 9)),
-        "total_execution_time_estimate_sec": 1800,
-        "output_files_generated": [
-            "phase5_adaptive_metrics.json",
-            "phase5_adaptive_steering.png",
-            "phase6_sensitivity_metrics.json",
-            "phase6_sensitivity_analysis.png",
-            "phase8_cohort_metrics.json",
-            "phase8_cohort_analysis.png",
-            "rl_convergence_metrics.json",
-            "rl_convergence_diagnostics.png",
-            "biomarker_stability_metrics.json",
-            "biomarker_stability.png",
-            "reward_sensitivity_metrics.json",
-            "reward_sensitivity_figure.png",
-            "ablation_and_baselines_metrics.json",
-            "ablation_study_figure.png",
-            "rl_convergence_metrics.json",
-            "rl_convergence_diagnostics.png",
-            "final_executive_summary.json",
-            "65_master_summary_figure.png",
-        ],
+def build_summary(d: Dict[str, Any], status: Dict[str, str]) -> Dict[str, Any]:
+    s: Dict[str, Any] = {
+        "report_framework": "equal drug budget (Stupp AUC) for every treatment arm",
+        "budget_drug_auc": STUPP_BUDGET,
+        "arms": list(ARMS),
+        "input_status": status,
+        "missing_inputs": [k for k, v in status.items() if v != "ok"],
+        "pipeline_status": "COMPLETE" if all(v == "ok" for v in status.values()) else "INCOMPLETE",
     }
-    
-    return summary
+
+    budgets = {}
+    if "59_drug_budget_sensitivity" in d:
+        m = d["59_drug_budget_sensitivity"]
+        budgets["59"] = m.get("mean_stupp_drug_auc")
+        s["59_drug_budget_sensitivity"] = {k: m.get(k) for k in (
+            "rl_win_rate_pct", "mean_rl_volume_mm3", "mean_stupp_volume_mm3", "mean_rl_drug_auc",
+            "mean_stupp_drug_auc", "drug_auc_ratio", "top_sensitive_parameter")}
+    if "60_ablation_and_baselines" in d:
+        m = d["60_ablation_and_baselines"]
+        budgets["60"] = m.get("budget_drug_auc")
+        arms = m["baselines"]["arms"]
+        s["60_ablation_and_baselines"] = {
+            "n_scenarios": m["n_scenarios"],
+            "arms_full_model": {a: arm_row(arms[a]["win_rate_vs_stupp_pct"], arms[a]["mean_log_ratio_final_vs_stupp"],
+                                           arms[a]["drug_auc_ratio_vs_stupp"]) for a in ARM_LABELS},
+            "summary": m["summary"], "notes": m.get("notes", [])}
+    if "62_early_start_threshold" in d:
+        m = d["62_early_start_threshold"]
+        budgets["62"] = m.get("budget_drug_auc")
+        s["62_early_start_threshold"] = {"cohort_n": m["cohort"]["n_patients"], **m["summary"]}
+    if "64_virtual_cohort" in d:
+        m = d["64_virtual_cohort"]
+        budgets["64"] = m.get("budget_drug_auc")
+        s["64_virtual_cohort"] = {
+            "cohort_size": m["cohort_size"],
+            "arms": {a: {**arm_row(m["arms"][a]["win_rate_vs_stupp_pct"], m["arms"][a]["mean_log_ratio_final_vs_stupp"],
+                                   m["arms"][a]["drug_auc_ratio_vs_stupp"]),
+                         "mean_log_ratio_ci95": m["arms"][a]["mean_log_ratio_final_vs_stupp_ci95"],
+                         "wilcoxon_p_value": m["arms"][a]["wilcoxon_p_value"]} for a in ARM_LABELS}}
+    if "66_rl_equal_budget" in d:
+        m = d["66_rl_equal_budget"]
+        budgets["66"] = m.get("budget")
+        s["66_rl_equal_budget"] = {
+            set_name: {a: arm_row(blk[n]["win_rate_final_pct"], blk[n]["mean_log_ratio_final_vs_stupp"],
+                                  blk[n]["drug_auc_ratio_vs_stupp"]) for a, n in S66_ARM_NAMES.items()}
+            for set_name, blk in m["sets"].items()}
+    if "52_robust_mpc" in d:
+        s["52_robust_mpc"] = d["52_robust_mpc"]
+    if "51_inverse_estimation" in d:
+        s["51_inverse_estimation"] = d["51_inverse_estimation"]
+
+    s["budget_consistency"] = {
+        "per_study_budget": budgets,
+        "all_equal_to_arms_module": bool(budgets) and all(
+            b is not None and abs(float(b) - STUPP_BUDGET) < 1e-9 for b in budgets.values()),
+    }
+    return s
 
 
-# --------------------------------------------------------------------------- #
-# Master Synthesis Figure Generation
-# --------------------------------------------------------------------------- #
-def create_master_figure(metrics: Dict[str, Any], summary: Dict[str, Any], output_path: Path):
-    """Create 4-panel master synthesis figure (300 DPI, publication-ready)."""
-    fig = plt.figure(figsize=(16, 12), dpi=300)
-    
-    # Colors
-    RL_COLOR = '#1f77b4'
-    STUPP_COLOR = '#d62728'
-    THRESH_COLOR = '#ff7f0e'
-    
-    # ========================================================================
-    # Panel A: Treatment Trajectory (RL Adaptive vs Stupp Protocol)
-    # ========================================================================
-    ax1 = plt.subplot(2, 2, 1)
-    
-    # Use Phase 8 cohort data for trajectories if available
-    phase8 = metrics.get("phase8_cohort_metrics", {})
-    patient_details = phase8.get("patient_details", [])
-    
-    if patient_details:
-        # Reconstruct mean trajectories from patient details (approximate)
-        # We'll generate synthetic trajectories that match the final volumes
-        days = np.arange(0, 91)
-        
-        # For Stupp: exponential growth with treatment suppression
-        rl_final = summary.get("rl_mean_final_volume_mm3", 1.0)
-        stupp_final = summary.get("stupp_mean_final_volume_mm3", 11.0)
-        
-        # Generate smooth trajectories that match final volumes
-        # RL: aggressive early control
-        rl_traj = np.maximum(1e-6, rl_final + (100 - rl_final) * np.exp(-days / 20))
-        # Stupp: delayed control (surgery day 0, RT day 20-50)
-        stupp_traj = np.maximum(1e-6, stupp_final + (200 - stupp_final) * np.exp(-days / 30))
-        stupp_traj[:20] = stupp_traj[:20] * np.linspace(0.1, 1.0, 20)  # Surgery debulking
-        
-        ax1.plot(days, rl_traj, color=RL_COLOR, linewidth=3, label='RL Adaptive', alpha=0.9)
-        ax1.plot(days, stupp_traj, color=STUPP_COLOR, linewidth=3, linestyle='--', label='Stupp Protocol', alpha=0.9)
-        
-        # Shaded regions for uncertainty
-        rl_unc = rl_traj * 0.3
-        stupp_unc = stupp_traj * 0.3
-        ax1.fill_between(days, rl_traj - rl_unc, rl_traj + rl_unc, color=RL_COLOR, alpha=0.15)
-        ax1.fill_between(days, stupp_traj - stupp_unc, stupp_traj + stupp_unc, color=STUPP_COLOR, alpha=0.15)
-        
+def create_master_figure(d: Dict[str, Any], s: Dict[str, Any], path: Path):
+    fig, axes = plt.subplots(2, 2, figsize=(18, 13))
+    studies = []
+    if "66_rl_equal_budget" in s:
+        studies += [("66 LHS-30", s["66_rl_equal_budget"]["lhs30"]), ("66 real test", s["66_rl_equal_budget"]["real_test"])]
+    if "60_ablation_and_baselines" in s:
+        studies.append(("60 full model", s["60_ablation_and_baselines"]["arms_full_model"]))
+    if "64_virtual_cohort" in s:
+        studies.append(("64 virtual cohort", s["64_virtual_cohort"]["arms"]))
+
+    for ax, key, ylabel, title in (
+            (axes[0, 0], "win_rate_vs_stupp_pct", "win rate vs Stupp (%)", "A. Win rate vs Stupp at equal drug"),
+            (axes[0, 1], "mean_log_ratio_final_vs_stupp", "mean log(V_arm / V_Stupp)  (< 0 better)",
+             "B. Effect size vs Stupp at equal drug")):
+        x = np.arange(len(studies))
+        for i, a in enumerate(ARM_LABELS):
+            ax.bar(x + (i - 1) * 0.27, [st[a][key] for _, st in studies], 0.27, label=ARM_LABELS[a])
+        ax.set_xticks(x)
+        ax.set_xticklabels([n for n, _ in studies])
+        ax.axhline(0, color="k", lw=0.8)
+        ax.set_ylabel(ylabel)
+        ax.set_title(title)
+        ax.legend(fontsize=9)
+        ax.grid(alpha=0.3, axis="y")
+    axes[0, 0].axhline(50, color="gray", ls=":", lw=1)
+
+    ax = axes[1, 0]
+    if "62_early_start_threshold" in d:
+        m = d["62_early_start_threshold"]
+        cur = m["model_threshold"]["benefit_curve"]
+        ax.plot(cur["rho"], cur["benefit_final"], "k-", label="model")
+        pr = [p["rho"] for p in m["patients"]]
+        pb = [p["benefit_final"] for p in m["patients"]]
+        ax.scatter(pr, pb, c=["green" if b > 0 else "firebrick" for b in pb], edgecolors="black", s=30, zorder=3,
+                   label=f"MU-Glioma patients (n={len(pr)})")
+        rs = m["summary"]["rho_star_model_per_day"]
+        ax.axvline(rs, color="purple", ls="--", label=f"rho* = {rs:.4f}/day")
+        if m["summary"]["rho_star_ci95_per_day"]:
+            ax.axvspan(*m["summary"]["rho_star_ci95_per_day"], color="purple", alpha=0.15, label="bootstrap 95% CI")
+        ax.axhline(0, color="gray", lw=0.8)
+        ax.legend(fontsize=9)
     else:
-        # Fallback synthetic data
-        days = np.arange(0, 91)
-        rl_traj = np.exp(-days / 15) * 100 + 1
-        stupp_traj = np.exp(-days / 25) * 200 + 10
-        ax1.plot(days, rl_traj, color=RL_COLOR, linewidth=3, label='RL Adaptive')
-        ax1.plot(days, stupp_traj, color=STUPP_COLOR, linewidth=3, linestyle='--', label='Stupp Protocol')
-    
-    ax1.set_xlabel('Day', fontsize=12)
-    ax1.set_ylabel('Tumor Volume (mm³)', fontsize=12)
-    ax1.set_title('Panel A: Treatment Trajectory\nRL Adaptive vs. Stupp Protocol', fontsize=13, fontweight='bold')
-    ax1.set_yscale('log')
-    ax1.set_ylim(0.5, 5000)
-    ax1.set_xlim(0, 90)
-    ax1.legend(loc='upper right', fontsize=11)
-    ax1.grid(True, which='both', alpha=0.3)
-    
-    # ========================================================================
-    # Panel B: Reward Sensitivity Heatmap
-    # ========================================================================
-    ax2 = plt.subplot(2, 2, 2)
-    
-    reward_sens = metrics.get("reward_sensitivity_metrics", {})
-    results = reward_sens.get("all_results", [])
-    
-    if results:
-        lambda_vols = sorted(set(r["lambda_vol"] for r in results))
-        lambda_dens = sorted(set(r["lambda_den"] for r in results))
-        
-        heatmap_data = np.full((len(lambda_vols), len(lambda_dens)), np.nan)
-        for r in results:
-            i = lambda_vols.index(r["lambda_vol"])
-            j = lambda_dens.index(r["lambda_den"])
-            mask = (np.array([x["lambda_vol"] for x in results]) == r["lambda_vol"]) & \
-                   (np.array([x["lambda_den"] for x in results]) == r["lambda_den"])
-            if np.any(mask):
-                heatmap_data[i, j] = np.mean([results[k]["final_volume_mm3"] for k in np.where(mask)[0]])
-        
-        im = ax2.imshow(heatmap_data, cmap='RdYlGn_r', aspect='auto', origin='lower',
-                        vmin=np.nanmin(heatmap_data), vmax=np.nanmax(heatmap_data))
-        ax2.set_xticks(range(len(lambda_dens)))
-        ax2.set_xticklabels([str(d) for d in lambda_dens], fontsize=10)
-        ax2.set_yticks(range(len(lambda_vols)))
-        ax2.set_yticklabels([str(v) for v in lambda_vols], fontsize=10)
-        ax2.set_xlabel('Density Weight (λ_den)', fontsize=12)
-        ax2.set_ylabel('Volume Weight (λ_vol)', fontsize=12)
-        ax2.set_title('Panel B: Reward Sensitivity Heatmap\n(Final Volume vs λ_vol, λ_den)', fontsize=13, fontweight='bold')
-        cbar = plt.colorbar(im, ax=ax2, label='Final Volume (mm³)', shrink=0.8)
-        cbar.ax.tick_params(labelsize=9)
-        
-        # Annotate cells
-        for i in range(len(lambda_vols)):
-            for j in range(len(lambda_dens)):
-                if not np.isnan(heatmap_data[i, j]):
-                    ax2.text(j, i, f'{heatmap_data[i,j]:.1f}', ha='center', va='center', 
-                            fontsize=9, color='white' if heatmap_data[i,j] > np.nanmedian(heatmap_data) else 'black')
-    else:
-        ax2.text(0.5, 0.5, 'Reward sensitivity data\nnot available', ha='center', va='center', 
-                transform=ax2.transAxes, fontsize=12)
-        ax2.set_title('Panel B: Reward Sensitivity Heatmap', fontsize=13, fontweight='bold')
-    
-    ax2.set_xlabel('Density Weight (λ_den)', fontsize=12)
-    ax2.set_ylabel('Volume Weight (λ_vol)', fontsize=12)
-    ax2.grid(False)
-    
-    # ========================================================================
-    # Panel C: Virtual Cohort Paired Response (N=20)
-    # ========================================================================
-    ax3 = plt.subplot(2, 2, 3)
-    
-    phase8 = metrics.get("phase8_cohort_metrics", {})
-    patient_details = phase8.get("patient_details", [])
-    
-    if patient_details:
-        stupp_finals = np.array([p["stupp_final_volume_mm3"] for p in patient_details])
-        rl_finals = np.array([p["rl_final_volume_mm3"] for p in patient_details])
-        
-        max_vol = max(np.max(stupp_finals), np.max(rl_finals)) * 1.2
-        ax3.plot([0, max_vol], [0, max_vol], 'k--', alpha=0.4, linewidth=1.5, label='Identity (Equal)')
-        
-        # Color by who wins
-        colors = np.where(rl_finals < stupp_finals, '#1f77b4', '#d62728')
-        ax3.scatter(stupp_finals, rl_finals, c=colors, s=100, alpha=0.8, 
-                   edgecolors='black', linewidth=0.8, zorder=5)
-        
-        # Highlight special cases
-        for i, p in enumerate(patient_details):
-            if p.get("stupp_progressed", False) and not p.get("rl_progressed", False):
-                ax3.scatter(stupp_finals[i], rl_finals[i], c='green', s=200, marker='*', 
-                           edgecolors='black', linewidth=1.5, zorder=10, label='RL rescue' if i == 0 else '')
-            elif p.get("rl_progressed", False) and not p.get("stupp_progressed", False):
-                ax3.scatter(stupp_finals[i], rl_finals[i], c='orange', s=200, marker='*', 
-                           edgecolors='black', linewidth=1.5, zorder=10)
-        
-        ax3.set_xlim(0, max_vol)
-        ax3.set_ylim(0, max_vol)
-        ax3.set_xscale('log')
-        ax3.set_yscale('log')
-        ax3.set_xlabel('Stupp Final Volume (mm³)', fontsize=12)
-        ax3.set_ylabel('RL Adaptive Final Volume (mm³)', fontsize=12)
-        ax3.set_title('Panel C: Virtual Cohort Paired Response\n(N=20 Patient-Level Final Volumes)', fontsize=13, fontweight='bold')
-        ax3.legend(loc='lower right', fontsize=10)
-        ax3.grid(True, which='both', alpha=0.3)
-        
-        # Add diagonal annotation
-        ax3.annotate('RL Better →', xy=(max_vol*0.3, max_vol*0.7), xytext=(max_vol*0.5, max_vol*0.3),
-                    arrowprops=dict(arrowstyle='->', color='blue', lw=2), color='blue', fontsize=11, fontweight='bold')
-        ax3.annotate('Stupp Better →', xy=(max_vol*0.7, max_vol*0.3), xytext=(max_vol*0.5, max_vol*0.7),
-                    arrowprops=dict(arrowstyle='->', color='red', lw=2), color='red', fontsize=11, fontweight='bold')
-    else:
-        ax3.text(0.5, 0.5, 'Cohort data not available', ha='center', va='center', 
-                transform=ax3.transAxes, fontsize=12)
-        ax3.set_title('Panel C: Virtual Cohort Paired Response', fontsize=13, fontweight='bold')
-    
-    # ========================================================================
-    # Panel D: Parameter Sensitivity Index Rankings
-    # ========================================================================
-    ax4 = plt.subplot(2, 2, 4)
-    
-    phase6 = metrics.get("phase6_sensitivity_metrics", {})
-    importance_ranking = phase6.get("parameter_importance_ranking", {}).get("rl_volume", {})
-    
-    if importance_ranking:
-        params = list(importance_ranking.keys())
-        ranks = [importance_ranking[p] for p in params]
-        
-        # Get correlation values for bar heights
-        corr_data = metrics.get("phase6_sensitivity_metrics", {}).get("parameter_correlations_with_rl_volume", {})
-        pearson_vals = [abs(corr_data.get(p, {}).get("pearson_r", 0)) for p in params]
-        
-        # Sort by rank
-        sorted_idx = np.argsort(ranks)
-        params_sorted = [params[i] for i in sorted_idx]
-        pearson_sorted = [pearson_vals[i] for i in sorted_idx]
-        
-        colors = ['#1f77b4', '#ff7f0e', '#2ca02c'][:len(params_sorted)]
-        bars = ax4.barh(params_sorted, pearson_sorted, color=colors, alpha=0.8, edgecolor='black', height=0.6)
-        
-        for bar, val, rank in zip(bars, pearson_sorted, [1, 2, 3][:len(params_sorted)]):
-            ax4.text(bar.get_width() + 0.01, bar.get_y() + bar.get_height()/2, 
-                    f'Rank {rank}: |r|={val:.3f}', ha='left', va='center', fontsize=11, fontweight='bold')
-        
-        ax4.set_xlabel('Absolute Pearson Correlation |r|', fontsize=12)
-        ax4.set_ylabel('Biophysical Parameter', fontsize=12)
-        ax4.set_title('Panel D: Global Sensitivity Rankings\n(Biomarker Impact on RL Outcome)', fontsize=13, fontweight='bold')
-        ax4.set_xlim(0, max(pearson_sorted) * 1.3)
-        ax4.grid(True, axis='x', alpha=0.3)
-        
-        # Add biomarker threshold annotation
-        biomarker_info = f"Decision Threshold: ρ > {metrics.get('biomarker_stability_metrics', {}).get('logistic_threshold_rho_crit', 0.024):.3f} day⁻¹"
-        ax4.text(0.02, 0.02, biomarker_info, transform=ax4.transAxes, fontsize=10,
-                bbox=dict(boxstyle='round,pad=0.3', facecolor='lightyellow', edgecolor='orange', alpha=0.8))
-    else:
-        ax4.text(0.5, 0.5, 'Sensitivity data not available', ha='center', va='center', 
-                transform=ax4.transAxes, fontsize=12)
-        ax4.set_title('Panel D: Parameter Sensitivity Rankings', fontsize=13, fontweight='bold')
-    
-    # Overall title
-    plt.suptitle('Phase 9: Final Executive Summary — Biophysical GBM Modeling & RL Adaptive Therapy Framework', 
-                 fontsize=16, fontweight='bold', y=0.98)
-    
-    plt.tight_layout(rect=[0, 0, 1, 0.96])
-    plt.savefig(output_path, dpi=300, bbox_inches='tight', facecolor='white')
+        ax.text(0.5, 0.5, "script 62 output missing", ha="center", transform=ax.transAxes)
+    ax.set_xlabel("rho (1/day)")
+    ax.set_ylabel("log(V_Stupp / V_early) at day 90")
+    ax.set_title("C. Script 62: when does starting early win at equal drug?")
+    ax.grid(alpha=0.3)
+
+    ax = axes[1, 1]
+    ax.axis("off")
+    lines = [f"Budget (every arm): drug AUC = {STUPP_BUDGET:g}",
+             f"Budget consistent across studies: {s['budget_consistency']['all_equal_to_arms_module']}",
+             f"Pipeline status: {s['pipeline_status']}"]
+    if s["missing_inputs"]:
+        lines.append("Missing / unreadable inputs: " + ", ".join(s["missing_inputs"]))
+    if "59_drug_budget_sensitivity" in s:
+        m = s["59_drug_budget_sensitivity"]
+        lines.append(f"59: heuristic win {m['rl_win_rate_pct']:.0f}% at AUC ratio {m['drug_auc_ratio']:.3f}")
+    if "60_ablation_and_baselines" in s:
+        m = s["60_ablation_and_baselines"]["summary"]
+        lines.append(f"60: PPO win {m['rl_win_rate_pct']:.0f}%, ablation impact no-DTI {m['ablation_impact_no_dti_pct']:+.2f}%,"
+                     f" pure RD {m['ablation_impact_pure_rd_pct']:+.2f}%")
+    if "62_early_start_threshold" in s:
+        m = s["62_early_start_threshold"]
+        lines.append(f"62: rho* {m['rho_star_model_per_day']:.4f}/day, early start better for "
+                     f"{m['n_early_start_better_final']}/{m['cohort_n']} patients (day 90), "
+                     f"{m['pct_early_start_better_burden']:.0f}% (burden)")
+    if "64_virtual_cohort" in s:
+        m = s["64_virtual_cohort"]["arms"]["ppo"]
+        lines.append(f"64: PPO win {m['win_rate_vs_stupp_pct']:.0f}%, log-ratio {m['mean_log_ratio_final_vs_stupp']:+.3f}"
+                     f" CI {['%+.3f' % v for v in m['mean_log_ratio_ci95']]}, Wilcoxon p {m['wilcoxon_p_value']:.2g}")
+    if "52_robust_mpc" in s:
+        m = s["52_robust_mpc"]
+        lines.append(f"52: robust vs standard MPC final volume {m['robust']['final_volume_mean_std'][0]:.4f} vs "
+                     f"{m['standard']['final_volume_mean_std'][0]:.4f}; variance reduction {m['variance_reduction_pct']:.1f}%")
+    ax.text(0.0, 1.0, "D. Summary\n\n" + "\n\n".join(lines), va="top", fontsize=10, family="monospace", wrap=True)
+
+    plt.suptitle("Track C Final Report: every arm at equal drug budget", fontsize=16, fontweight="bold")
+    plt.tight_layout()
+    plt.savefig(path, dpi=200, bbox_inches="tight")
     plt.close()
-    print(f"[Phase 9] Master synthesis figure saved -> {output_path}")
+    print(f"[Plot] Saved -> {path}")
 
 
-# --------------------------------------------------------------------------- #
-# Main Pipeline
-# --------------------------------------------------------------------------- #
 def main():
     print("=" * 70)
-    print("PHASE 9: FINAL EXECUTIVE SUMMARY & PUBLICATION ARTIFACT SYNTHESIS")
+    print("SCRIPT 65: TRACK C FINAL REPORT (EQUAL DRUG BUDGET)")
     print("=" * 70)
-    
-    # 1. Load all metrics
-    print("\n[Phase 9] Loading metrics from all phases...")
-    all_metrics = load_all_metrics()
-    
-    # 2. Aggregate executive summary
-    print("\n[Phase 9] Aggregating executive summary...")
-    summary = aggregate_executive_summary(all_metrics)
-    
-    # 3. Save executive summary JSON
-    summary_path = OUTPUT_DIR / "final_executive_summary.json"
-    with open(summary_path, "w") as f:
-        json.dump(summary, f, indent=2)
-    print(f"[Phase 9] Executive summary saved -> {summary_path}")
-    
-    # 4. Generate master synthesis figure
-    print("\n[Phase 9] Generating master synthesis figure (300 DPI)...")
-    create_master_figure(metrics=all_metrics, summary=summary, output_path=OUTPUT_DIR / "65_master_summary_figure.png")
-    
-    # 5. Final summary
-    print("\n" + "=" * 70)
-    print("PHASE 9 COMPLETE - FINAL EXECUTIVE SUMMARY GENERATED")
-    print("=" * 70)
-    print(f"Pipeline Status: {summary['pipeline_completion_status']}")
-    print(f"Cohort Size: {summary['total_virtual_cohort_size']}")
-    print(f"RL vs Stupp p-value: {summary['rl_adaptive_vs_stupp_p_value']:.4f}")
-    print(f"Cohen's d Effect Size: {summary['cohens_d_effect_size']:.3f}")
-    print(f"Volume Reduction: {summary['volume_reduction_pct']:.1f}%")
-    print(f"Biomarker Threshold (ρ_crit): {summary['biomarker_logistic_threshold']:.4f} day⁻¹")
-    print(f"95% CI: [{summary['biomarker_rho_crit_ci_95'][0]:.4f}, {summary['biomarker_rho_crit_ci_95'][1]:.4f}]")
-    print(f"RL Progression-Free Rate: {summary['rl_progression_free_rate']:.1%}")
-    print(f"Stupp Progression-Free Rate: {summary['stupp_progression_free_rate']:.1%}")
-    print(f"Optimal Reward Weights: {summary['optimal_reward_weights']}")
-    print(f"Global Sensitivity Top Feature: {summary['global_sensitivity_top_feature']}")
-    print(f"\nOutputs saved to {OUTPUT_DIR}/")
-    print("  - final_executive_summary.json")
-    print("  - 65_master_summary_figure.png (300 DPI)")
-    print(f"\nTotal output files: {len(summary['output_files_generated'])}")
+    data, status = load_inputs()
+    summary = build_summary(data, status)
+    path = OUTPUT_DIR / "final_executive_summary.json"
+    path.write_text(json.dumps(summary, indent=2))
+    print(f"[Summary] Saved -> {path}")
+    create_master_figure(data, summary, OUTPUT_DIR / "65_master_summary_figure.png")
+    print(f"\nPipeline status: {summary['pipeline_status']}   missing: {summary['missing_inputs']}")
+    print(f"Budget consistency: {summary['budget_consistency']}")
 
 
 if __name__ == "__main__":
