@@ -1,17 +1,25 @@
 #!/usr/bin/env python3
 """
-Phase 8: Multi-Patient Virtual Cohort Validation
-==================================================
-Validates RL Adaptive Therapy against Standard Stupp Protocol across
-a virtual cohort of 20 patients with clinically sampled parameters.
+Script 64: 20-Patient Virtual Cohort at an EQUAL DRUG BUDGET
+============================================================
+Every arm gets the same total drug AUC (Stupp's) and the same seed tumour.
+Arms come from src/rl/equal_budget_arms.py (shared with 60, 62, 65):
+  Stupp | budgeted 59 heuristic | RL = PPO policy (script 66) | DAgger oracle (script 66)
+
+Physics is this script's own FastPDESolver. Virtual patients differ in rho,
+D_white and in their own kill rates (gamma_chemo, alpha_rt), so the most
+drug-efficient action differs between patients. Neither script-66 policy saw
+patient-specific kill rates in training.
 
 Outputs:
-  - output/phase8_cohort_analysis.png (4-panel figure)
-  - output/phase8_cohort_metrics.json (statistical metrics)
+  - output/phase8_cohort_metrics.json
+  - output/phase8_cohort_analysis.png
 """
 from __future__ import annotations
 
 import json
+import sys
+import time
 import warnings
 from pathlib import Path
 from typing import Dict, List, Tuple, Any, Optional
@@ -21,7 +29,10 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from scipy import stats
-from scipy.stats import norm
+
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(PROJECT_ROOT / "src"))
+from rl.equal_budget_arms import ARMS, STUPP_BUDGET, evaluate_arms, s66, validate_against_numpy  # noqa: E402
 
 warnings.filterwarnings("ignore")
 
@@ -29,11 +40,14 @@ warnings.filterwarnings("ignore")
 # Configuration
 # --------------------------------------------------------------------------- #
 N_PATIENTS = 20
+COHORT_SEED = 42
 EVAL_GRID = (64, 64, 64)
 T_MAX_DAYS = 90
 DT_RL_DAYS = 1.0
 DT_PDE_EVAL = 0.2
 N_PDE_SUBSTEPS_EVAL = 5
+PROGRESSION_THRESHOLD_MM3 = 500.0
+BOOTSTRAP_SAMPLES = 2000
 
 # Clinical parameter distributions
 RHO_MEAN, RHO_STD = 0.025, 0.005        # 1/day
@@ -51,21 +65,9 @@ RAD_TOX_PER_RL_STEP = 0.05
 COMBO_TOX_PER_RL_STEP = 0.08
 SEED_SIGMA_MM = 5.0
 SEED_AMPLITUDE = 0.8
-DT_RL_DAYS = 1.0
-DT_PDE_EVAL = 0.2
-N_PDE_SUBSTEPS_EVAL = 5
 
-OUTPUT_DIR = Path("output")
+OUTPUT_DIR = PROJECT_ROOT / "output"
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-
-# RL Reward Weights (tuned from Phase 7)
-RL_REWARD_WEIGHTS = {
-    "lambda_vol": 15.0,
-    "lambda_den": 5.0,
-    "lambda_tox": 0.01,
-    "lambda_shrink": 100.0,
-    "lambda_clear": 200.0,
-}
 
 # --------------------------------------------------------------------------- #
 # Fast PDE Solver (Self-contained)
@@ -277,166 +279,6 @@ class FastPDESolver:
         return self.step_count >= 90
 
 
-# --------------------------------------------------------------------------- #
-# Gym Environment
-# --------------------------------------------------------------------------- #
-class GbmTherapyEnv:
-    def __init__(self, solver: FastPDESolver, reward_weights: Dict[str, float]):
-        self.solver = solver
-        self.max_steps = 90
-        self.trajectory = []
-        self.reward_weights = reward_weights
-
-    def reset(self, seed: Optional[int] = None, options: Optional[Dict] = None):
-        self.solver.reset()
-        self.trajectory = []
-        return self.solver.get_observation(), {}
-
-    def step(self, action: int):
-        result = self.solver.rl_step(action)
-        obs = self.solver.get_observation()
-
-        norm_vol = result["norm_volume"]
-        u_max = result["u_max"]
-        delta_vol = result["delta_volume"]
-
-        action_cost = 1.0 if action > 0 else 0.0
-        lambda_vol = self.reward_weights["lambda_vol"]
-        lambda_den = self.reward_weights["lambda_den"]
-        lambda_tox = self.reward_weights["lambda_tox"]
-        
-        reward = -lambda_vol * norm_vol - lambda_den * u_max - lambda_tox * action_cost
-        if delta_vol > 0:
-            reward += self.reward_weights.get("lambda_shrink", 100.0) * max(delta_vol / max(self.solver.initial_volume, 1e-6), 0.0)
-
-        terminated = self.solver.is_done()
-        if terminated and norm_vol < 0.01:
-            reward += self.reward_weights.get("lambda_clear", 200.0)
-
-        return obs, float(reward), terminated, False, {}
-
-
-# --------------------------------------------------------------------------- #
-# Policy Network (Heuristic fallback - same as Phase 5/6/7)
-# --------------------------------------------------------------------------- #
-try:
-    import torch
-    import torch.nn as nn
-    import torch.optim as optim
-    from torch.distributions import Categorical
-    HAS_TORCH = True
-except ImportError:
-    HAS_TORCH = False
-    torch = None
-    nn = None
-    optim = None
-    Categorical = None
-
-class PolicyNetwork(nn.Module):
-    def __init__(self, obs_dim: int = 5, n_actions: int = 4, hidden: int = 64):
-        super().__init__()
-        self.net = nn.Sequential(
-            nn.Linear(obs_dim, hidden),
-            nn.ReLU(),
-            nn.Linear(hidden, hidden),
-            nn.ReLU(),
-            nn.Linear(hidden, n_actions),
-        )
-        self._init_action_bias()
-
-    def _init_action_bias(self):
-        with torch.no_grad():
-            torch.nn.init.constant_(self.net[-1].bias, 0.0)
-            self.net[-1].bias.data[2] = 0.5
-            self.net[-1].bias.data[3] = 1.0
-
-    def forward(self, x):
-        logits = self.net(x)
-        return Categorical(logits=logits)
-
-
-# --------------------------------------------------------------------------- #
-# Baseline Protocols
-# --------------------------------------------------------------------------- #
-def run_stupp_protocol(env: GbmTherapyEnv) -> Dict:
-    obs, _ = env.reset()
-    trajectory = []
-    env.solver.u *= 0.1
-
-    for step in range(env.max_steps):
-        day = step + 1
-        if 20 <= day < 50:
-            action = 3
-        elif 50 <= day <= 90:
-            action = 1 if (int(day) % 28) < 5 else 0
-        else:
-            action = 0
-        obs, reward, terminated, truncated, _ = env.step(action)
-        trajectory.append({
-            "step": step, "day": day, "action": action,
-            "volume_mm3": env.solver.u.sum() * env.solver.dx**3,
-            "u_max": float(env.solver.u.max()),
-            "reward": reward,
-        })
-        if terminated:
-            break
-    return {
-        "trajectory": trajectory,
-        "final_volume_mm3": trajectory[-1]["volume_mm3"],
-        "peak_u_max": max(t.get("u_max", 0) for t in trajectory) if trajectory else 0,
-        "progressed": trajectory[-1]["volume_mm3"] > 500,
-    }
-
-
-def run_rl_adaptive(env: GbmTherapyEnv, policy=None) -> Dict:
-    obs, _ = env.reset()
-    trajectory = []
-
-    initial_vol = env.solver.initial_volume
-
-    for step in range(env.max_steps):
-        if policy is not None and HAS_TORCH:
-            obs_tensor = torch.FloatTensor(obs).unsqueeze(0)
-            with torch.no_grad():
-                action = policy(obs_tensor).probs.argmax().item()
-        else:
-            # Heuristic RL policy (same as Phase 5/6/7)
-            current_vol = env.solver.u.sum() * env.solver.dx**3
-            norm_vol = current_vol / max(env.solver.initial_volume, 1e-6)
-
-            if norm_vol > 0.05:
-                action = 3
-            elif norm_vol > 0.01:
-                action = 2
-            else:
-                action = 0
-
-        # Guardrail
-        current_vol = env.solver.u.sum() * env.solver.dx**3
-        if action == 0 and current_vol > 0.05 * env.solver.initial_volume:
-            action = 3
-
-        obs, reward, terminated, truncated, _ = env.step(action)
-        u_max = float(env.solver.u.max())
-        trajectory.append({
-            "step": step, "day": step + 1, "action": action,
-            "volume_mm3": env.solver.u.sum() * env.solver.dx**3,
-            "u_max": u_max,
-            "reward": reward,
-        })
-        if terminated:
-            break
-    return {
-        "trajectory": trajectory,
-        "final_volume_mm3": trajectory[-1]["volume_mm3"],
-        "peak_u_max": max(t.get("u_max", 0) for t in trajectory) if trajectory else 0,
-        "progressed": trajectory[-1]["volume_mm3"] > 500,
-    }
-
-
-# --------------------------------------------------------------------------- #
-# Main Pipeline
-# --------------------------------------------------------------------------- #
 def generate_virtual_cohort(n_patients: int = N_PATIENTS, seed: int = 12345) -> List[Dict[str, float]]:
     """Generate virtual patient cohort with clinically sampled parameters."""
     np.random.seed(seed)
@@ -459,371 +301,186 @@ def generate_virtual_cohort(n_patients: int = N_PATIENTS, seed: int = 12345) -> 
     return cohort
 
 
-def evaluate_patient(patient_params: Dict[str, float], rl_policy=None, patient_id: int = 0) -> Dict[str, Any]:
-    """Evaluate a single patient with both Stupp and RL Adaptive protocols."""
-    solver = FastPDESolver(
-        grid_size=EVAL_GRID,
-        dt_pde=DT_PDE_EVAL,
-        rho=patient_params["rho"],
-        D_white=patient_params["D_white"],
-        alpha_sens=1.0,
-        gamma_chemo=patient_params["gamma_chemo"],
-        alpha_rt=patient_params["alpha_rt"],
-        is_training=False,
-    )
-    env = GbmTherapyEnv(solver, RL_REWARD_WEIGHTS)
+# --------------------------------------------------------------------------- #
+# Equal-budget cohort evaluation
+# --------------------------------------------------------------------------- #
+ARM_LABELS = {"stupp": "Stupp", "heuristic_budgeted": "Budgeted heuristic (59)",
+              "ppo": "RL: PPO (66)", "dagger_oracle": "DAgger oracle (66)"}
+ACTION_NAMES = ["off", "chemo", "rad", "combo"]
 
-    # Evaluate Stupp
-    stupp_result = run_stupp_protocol(env)
-    
-    # Recreate environment for RL evaluation (fresh solver state)
-    solver_rl = FastPDESolver(
-        grid_size=EVAL_GRID,
-        dt_pde=DT_PDE_EVAL,
-        rho=patient_params["rho"],
-        D_white=patient_params["D_white"],
-        alpha_sens=1.0,
-        gamma_chemo=patient_params["gamma_chemo"],
-        alpha_rt=patient_params["alpha_rt"],
-        is_training=False,
-    )
-    env_rl = GbmTherapyEnv(solver_rl, RL_REWARD_WEIGHTS)
-    rl_result = run_rl_adaptive(env_rl, rl_policy)
 
-    return {
-        "patient_id": patient_id,
-        "params": {
-            "rho": patient_params["rho"],
-            "D_white": patient_params["D_white"],
-            "gamma_chemo": patient_params["gamma_chemo"],
-            "alpha_rt": patient_params["alpha_rt"],
-        },
-        "stupp": {
-            "final_volume_mm3": stupp_result["final_volume_mm3"],
-            "peak_u_max": stupp_result["peak_u_max"],
-            "progressed": stupp_result["progressed"],
-            "trajectory": stupp_result["trajectory"],
-        },
-        "rl_adaptive": {
-            "final_volume_mm3": rl_result["final_volume_mm3"],
-            "peak_u_max": rl_result["peak_u_max"],
-            "progressed": rl_result["progressed"],
-            "trajectory": rl_result["trajectory"],
-        },
+def kill_row(p: Dict[str, float]) -> List[float]:
+    """Kill rate per action exactly as FastPDESolver.rl_step computes it (alpha_sens = 1)."""
+    return [0.0, p["gamma_chemo"], p["alpha_rt"], p["gamma_chemo"] + p["alpha_rt"]]
+
+
+def make_solver(p: Dict[str, float]) -> "FastPDESolver":
+    return FastPDESolver(grid_size=EVAL_GRID, dt_pde=DT_PDE_EVAL, rho=p["rho"], D_white=p["D_white"],
+                         alpha_sens=1.0, gamma_chemo=p["gamma_chemo"], alpha_rt=p["alpha_rt"])
+
+
+def arm_stats(arm: Dict[str, list], ref: Dict[str, list], rng: np.random.Generator) -> Dict[str, Any]:
+    f, fs = np.array(arm["final_volume_mm3"]), np.array(ref["final_volume_mm3"])
+    b, bs = np.array(arm["mean_burden_mm3"]), np.array(ref["mean_burden_mm3"])
+    v0 = np.array(arm["initial_volume_mm3"])
+    lr = np.log(f / fs)
+    boot = np.array([lr[rng.integers(0, len(lr), len(lr))].mean() for _ in range(BOOTSTRAP_SAMPLES)])
+    out = {
+        "mean_final_volume_mm3": float(f.mean()), "std_final_volume_mm3": float(f.std(ddof=1)),
+        "median_final_volume_mm3": float(np.median(f)),
+        "mean_drug_auc": float(np.mean(arm["drug_auc"])),
+        "drug_auc_ratio_vs_stupp": float(np.mean(arm["drug_auc"]) / np.mean(ref["drug_auc"])),
+        "win_rate_vs_stupp_pct": float((f < fs).mean() * 100),
+        "mean_log_ratio_final_vs_stupp": float(lr.mean()),
+        "mean_log_ratio_final_vs_stupp_ci95": [float(np.percentile(boot, 2.5)), float(np.percentile(boot, 97.5))],
+        "burden_win_rate_vs_stupp_pct": float((b < bs).mean() * 100),
+        "mean_log_ratio_burden_vs_stupp": float(np.log(b / bs).mean()),
+        "n_progressed_v90_gt_500mm3": int((f > PROGRESSION_THRESHOLD_MM3).sum()),
+        "n_grew_over_90_days": int((f > v0).sum()),
+        "wilcoxon_p_value": None, "paired_t_p_value_log": None, "cohens_d_log": None,
     }
+    if np.any(lr != 0):
+        out["wilcoxon_p_value"] = float(stats.wilcoxon(np.log(f), np.log(fs)).pvalue)
+        out["paired_t_p_value_log"] = float(stats.ttest_rel(np.log(f), np.log(fs)).pvalue)
+        if lr.std(ddof=1) > 0:
+            out["cohens_d_log"] = float(lr.mean() / lr.std(ddof=1))
+    return out
 
 
-# --------------------------------------------------------------------------- #
-# Statistical Analysis
-# --------------------------------------------------------------------------- #
-def compute_statistics(results: List[Dict[str, Any]]) -> Dict[str, Any]:
-    """Compute statistical metrics from cohort results."""
-    stupp_volumes = np.array([r["stupp"]["final_volume_mm3"] for r in results])
-    rl_volumes = np.array([r["rl_adaptive"]["final_volume_mm3"] for r in results])
-    stupp_progressed = np.array([r["stupp"]["progressed"] for r in results])
-    rl_progressed = np.array([r["rl_adaptive"]["progressed"] for r in results])
-    
-    # Paired t-test
-    t_stat, p_value = stats.ttest_rel(rl_volumes, stupp_volumes)
-    
-    # Wilcoxon signed-rank (non-parametric)
-    wilcoxon_stat, wilcoxon_p = stats.wilcoxon(rl_volumes, stupp_volumes)
-    
-    # Progression-free rates
-    stupp_pf_rate = float(np.mean(~stupp_progressed))
-    rl_pf_rate = float(np.mean(~rl_progressed))
-    
-    # McNemar's test for progression rates
-    both_progressed = np.sum(stupp_progressed & rl_progressed)
-    stupp_only = np.sum(stupp_progressed & ~rl_progressed)
-    rl_only = np.sum(rl_progressed & ~stupp_progressed)
-    neither = np.sum(~stupp_progressed & ~rl_progressed)
-    
-    # Effect size (Cohen's d)
-    diff = rl_volumes - stupp_volumes
-    cohens_d = float(np.mean(diff) / np.std(diff)) if np.std(diff) > 0 else 0.0
-    
-    # Cohen's kappa for progression agreement
-    # Agreement matrix:
-    # both_progressed, stupp_only, rl_only, neither
-    both_prog = both_progressed
-    stupp_only_prog = stupp_only
-    rl_only_prog = rl_only
-    neither_prog = neither
-    total = len(results)
-    
-    po = (both_prog + neither_prog) / total  # observed agreement
-    pe = ((both_prog + stupp_only_prog) * (both_prog + rl_only_prog) + 
-          (stupp_only_prog + neither_prog) * (rl_only_prog + neither_prog)) / (total * total)  # expected agreement
-    cohens_kappa = float((po - pe) / max(1 - pe, 1e-10)) if pe < 1 else 1.0
+def create_visualization(cohort, res, arm_summary, output_path: Path):
+    fig, axes = plt.subplots(2, 2, figsize=(16, 12))
+    stupp_f = np.array(res["stupp"]["final_volume_mm3"])
+    ids = np.arange(len(cohort))
 
-    return {
-        "cohort_size": len(results),
-        "rl_mean_final_volume_mm3": float(np.mean(rl_volumes)),
-        "rl_std_final_volume_mm3": float(np.std(rl_volumes)),
-        "stupp_mean_final_volume_mm3": float(np.mean(stupp_volumes)),
-        "stupp_std_final_volume_mm3": float(np.std(stupp_volumes)),
-        "paired_t_test_p_value": float(p_value),
-        "wilcoxon_p_value": float(wilcoxon_p),
-        "cohens_d": cohens_d,
-        "rl_progression_free_rate": rl_pf_rate,
-        "stupp_progression_free_rate": stupp_pf_rate,
-        "progression_difference": float(rl_pf_rate - stupp_pf_rate),
-        "mcnemar_chi2": float((abs(stupp_only - rl_only) - 1)**2 / max(stupp_only + rl_only, 1)) if (stupp_only + rl_only) > 0 else 0.0,
-        "mcnemar_p_value": float(stats.chi2.sf((abs(stupp_only - rl_only) - 1)**2 / max(stupp_only + rl_only, 1), 1)) if (stupp_only + rl_only) > 0 else 1.0,
-        "cohens_kappa": cohens_kappa,
-    }
+    ax = axes[0, 0]
+    for i, arm in enumerate(res):
+        ax.bar(ids + (i - 1.5) * 0.2, res[arm]["final_volume_mm3"], 0.2, label=ARM_LABELS[arm])
+    ax.set_xlabel("patient")
+    ax.set_ylabel("final volume (mm^3)")
+    ax.set_title("Panel 1: Per-patient day-90 volume (equal drug budget)")
+    ax.set_xticks(ids)
+    ax.legend(fontsize=8)
+    ax.grid(alpha=0.3, axis="y")
 
+    ax = axes[0, 1]
+    arms = [a for a in res if a != "stupp"]
+    for i, arm in enumerate(arms):
+        lr = np.log(np.array(res[arm]["final_volume_mm3"]) / stupp_f)
+        ax.scatter(np.full(len(lr), i) + np.random.default_rng(i).uniform(-0.12, 0.12, len(lr)), lr, s=30,
+                   edgecolors="black", alpha=0.8)
+        lo, hi = arm_summary[arm]["mean_log_ratio_final_vs_stupp_ci95"]
+        ax.errorbar(i + 0.3, lr.mean(), yerr=[[lr.mean() - lo], [hi - lr.mean()]], fmt="D", color="black", capsize=5)
+        ax.text(i, max(lr) + 0.02, f"win {arm_summary[arm]['win_rate_vs_stupp_pct']:.0f}%",
+                ha="center", fontsize=9)
+    ax.axhline(0, color="k", lw=0.8)
+    ax.set_xticks(range(len(arms)))
+    ax.set_xticklabels([ARM_LABELS[a] for a in arms])
+    ax.set_ylabel("log(V_arm / V_Stupp) at day 90   (< 0 beats Stupp)")
+    ax.set_title("Panel 2: Paired effect vs Stupp (mean + bootstrap 95% CI)")
+    ax.grid(alpha=0.3, axis="y")
 
-# --------------------------------------------------------------------------- #
-# Visualization
-# --------------------------------------------------------------------------- #
-def create_visualization(results: List[Dict[str, Any]], stats: Dict[str, Any], output_path: Path):
-    """Create 4-panel cohort analysis figure."""
-    fig = plt.figure(figsize=(16, 12))
+    ax = axes[1, 0]
+    eff = np.array([[k / i for k, i in zip(kill_row(p)[1:], [0.5, 0.75, 1.0])] for p in cohort])
+    best = eff.argmax(1) + 1
+    lr_ppo = np.log(np.array(res["ppo"]["final_volume_mm3"]) / stupp_f)
+    for a, col in ((1, "#fdae61"), (2, "#abd9e9"), (3, "#2c7bb6")):
+        m = best == a
+        if m.any():
+            ax.scatter(np.array([p["rho"] for p in cohort])[m], lr_ppo[m], color=col, s=60, edgecolors="black",
+                       label=f"most kill per unit drug: {ACTION_NAMES[a]} (n={m.sum()})")
+    ax.axhline(0, color="k", lw=0.8)
+    ax.set_xlabel("rho (1/day)")
+    ax.set_ylabel("PPO: log(V_PPO / V_Stupp)")
+    ax.set_title("Panel 3: PPO effect by patient drug-efficiency profile")
+    ax.legend(fontsize=8)
+    ax.grid(alpha=0.3)
 
-    # Extract trajectory data
-    days = np.arange(1, 91)
-    
-    # Collect trajectories
-    stupp_trajs = []
-    rl_trajs = []
-    for r in results:
-        stupp_traj = [t["volume_mm3"] for t in r["stupp"]["trajectory"]]
-        rl_traj = [t["volume_mm3"] for t in r["rl_adaptive"]["trajectory"]]
-        if len(stupp_traj) == 90:
-            stupp_trajs.append(stupp_traj)
-        if len(rl_traj) == 90:
-            rl_trajs.append(rl_traj)
-    
-    stupp_trajs = np.array(stupp_trajs)  # (N, 90)
-    rl_trajs = np.array(rl_trajs)
-    
-    # Panel 1: Population Volume Trajectories (Mean ± 95% CI)
-    ax1 = plt.subplot(2, 2, 1)
-    if len(stupp_trajs) > 0 and len(rl_trajs) > 0:
-        days = np.arange(1, 91)
-        
-        stupp_mean = np.mean(stupp_trajs, axis=0)
-        stupp_std = np.std(stupp_trajs, axis=0)
-        stupp_ci_lower = stupp_mean - 1.96 * stupp_std / np.sqrt(len(stupp_trajs))
-        stupp_ci_upper = stupp_mean + 1.96 * stupp_std / np.sqrt(len(stupp_trajs))
-        
-        rl_mean = np.mean(rl_trajs, axis=0)
-        rl_std = np.std(rl_trajs, axis=0)
-        rl_ci_lower = rl_mean - 1.96 * rl_std / np.sqrt(len(rl_trajs))
-        rl_ci_upper = rl_mean + 1.96 * rl_std / np.sqrt(len(rl_trajs))
-        
-        ax1.plot(days, stupp_mean, 'r-', linewidth=2, label='Stupp (Mean)')
-        ax1.fill_between(days, stupp_ci_lower, stupp_ci_upper, color='red', alpha=0.2, label='Stupp 95% CI')
-        
-        ax1.plot(days, rl_mean, 'b-', linewidth=2, label='RL Adaptive (Mean)')
-        ax1.fill_between(days, rl_ci_lower, rl_ci_upper, color='blue', alpha=0.2, label='RL 95% CI')
-        
-        ax1.set_xlabel('Day')
-        ax1.set_ylabel('Tumor Volume (mm³)')
-        ax1.set_title('Panel 1: Population Volume Trajectories\n(Mean ± 95% CI)')
-        ax1.set_yscale('log')
-        ax1.set_ylim(0.5, 5000)
-        ax1.legend(loc='upper right')
-        ax1.grid(alpha=0.3)
-    
-    # Panel 2: Patient-Level Final Volume Comparison (Paired Scatter/Box Plot)
-    ax2 = plt.subplot(2, 2, 2)
-    stupp_finals = np.array([r["stupp"]["final_volume_mm3"] for r in results])
-    rl_finals = np.array([r["rl_adaptive"]["final_volume_mm3"] for r in results])
-    
-    # Scatter with identity line
-    max_vol = max(np.max(stupp_finals), np.max(rl_finals)) * 1.1
-    ax2.plot([0, max_vol], [0, max_vol], 'k--', alpha=0.5, label='Identity')
-    ax2.scatter(stupp_finals, rl_finals, c='purple', s=80, alpha=0.7, edgecolors='black', linewidth=0.5)
-    
-    # Highlight patients who progressed on Stupp but not RL
-    for i, r in enumerate(results):
-        if r["stupp"]["progressed"] and not r["rl_adaptive"]["progressed"]:
-            ax2.scatter(r["stupp"]["final_volume_mm3"], r["rl_adaptive"]["final_volume_mm3"], 
-                       c='green', s=120, marker='*', edgecolors='black', linewidth=1.5, zorder=10)
-        elif r["rl_adaptive"]["progressed"] and not r["stupp"]["progressed"]:
-            ax2.scatter(r["stupp"]["final_volume_mm3"], r["rl_adaptive"]["final_volume_mm3"], 
-                       c='orange', s=120, marker='*', edgecolors='black', linewidth=1.5, zorder=10)
-    
-    ax2.set_xlabel('Stupp Final Volume (mm³)')
-    ax2.set_ylabel('RL Adaptive Final Volume (mm³)')
-    ax2.set_title('Panel 2: Patient-Level Final Volume\n(RL vs Stupp)')
-    ax2.set_xscale('log')
-    ax2.set_yscale('log')
-    ax2.legend(loc='upper left')
-    ax2.grid(alpha=0.3)
-    
-    # Add box plot inset
-    ax2_inset = ax2.inset_axes([0.6, 0.1, 0.35, 0.35])
-    box_data = [stupp_finals, rl_finals]
-    bp = ax2_inset.boxplot(box_data, labels=['Stupp', 'RL'], patch_artist=True,
-                           showfliers=True, widths=0.5)
-    colors = ['red', 'blue']
-    for patch, color in zip(bp['boxes'], colors):
-        patch.set_facecolor(color)
-        patch.set_alpha(0.5)
-    ax2_inset.set_yscale('log')
-    ax2_inset.set_ylabel('Volume (mm³)')
-    ax2_inset.set_title('Distribution')
-    
-    # Panel 3: Toxicity vs Efficacy Trade-off
-    ax3 = plt.subplot(2, 2, 3)
-    for r in results:
-        stupp_result = r["stupp"]
-        rl_result = r["rl_adaptive"]
-        # Compute cumulative toxicity
-        stupp_traj = stupp_result["trajectory"]
-        rl_traj = rl_result["trajectory"]
-        
-        stupp_tox = sum(1 for t in stupp_traj if t["action"] > 0) / 90.0
-        rl_tox = sum(1 for t in rl_traj if t["action"] > 0) / 90.0
-        
-        stupp_vol = stupp_result["final_volume_mm3"]
-        rl_vol = rl_result["final_volume_mm3"]
-        
-        ax3.scatter(stupp_tox, stupp_vol, c='red', s=60, alpha=0.6, edgecolors='black', marker='o')
-        ax3.scatter(rl_tox, rl_vol, c='blue', s=60, alpha=0.6, edgecolors='black', marker='s')
-        
-        # Connect paired points
-        ax3.plot([stupp_tox, rl_tox], [stupp_vol, rl_vol], 'k-', alpha=0.3, linewidth=0.5)
-    
-    ax3.set_xlabel('Cumulative Toxicity Exposure (fraction of days with therapy)')
-    ax3.set_ylabel('Final Tumor Volume (mm³)')
-    ax3.set_title('Panel 3: Toxicity vs Efficacy Trade-off\n(Red=Stupp, Blue=RL Adaptive)')
-    ax3.set_yscale('log')
-    ax3.legend(['Stupp', 'RL Adaptive'], loc='upper right')
-    ax3.grid(alpha=0.3)
-    
-    # Panel 4: Kaplan-Meier Progression-Free Survival
-    ax4 = plt.subplot(2, 2, 4)
-    
-    # Progression = volume > 500 mm³
-    # Compute time-to-progression for each patient
-    def get_ttp(trajectory):
-        for t in trajectory:
-            if t["volume_mm3"] > 500:
-                return t["day"]
-        return 90  # censored at 90 days
-    
-    stupp_ttp = np.array([get_ttp(r["stupp"]["trajectory"]) for r in results])
-    rl_ttp = np.array([get_ttp(r["rl_adaptive"]["trajectory"]) for r in results])
-    
-    # Kaplan-Meier curves
-    for label, ttp_data, color in [("Stupp", stupp_ttp, 'red'), ("RL Adaptive", rl_ttp, 'blue')]:
-        # Sort by time
-        sorted_idx = np.argsort(ttp_data)
-        sorted_ttp = ttp_data[sorted_idx]
-        
-        # Kaplan-Meier estimator
-        n_at_risk = len(ttp_data)
-        survival = np.ones(n_at_risk)
-        for i, t in enumerate(sorted_ttp):
-            if t < 90:  # progression event
-                survival[i:] = survival[i:] * (n_at_risk - i - 1) / max(n_at_risk - i, 1)
-        
-        ax4.step(sorted_ttp, survival, where='post', color=color, linewidth=2, label=label)
-    
-    ax4.set_xlabel('Day')
-    ax4.set_ylabel('Progression-Free Probability')
-    ax4.set_title('Panel 4: Kaplan-Meier Progression-Free Survival\n(Progression = Volume > 500 mm³)')
-    ax4.set_xlim(0, 90)
-    ax4.set_ylim(0, 1.05)
-    ax4.legend(loc='lower left')
-    ax4.grid(alpha=0.3)
-    
-    plt.suptitle('Phase 8: Multi-Patient Virtual Cohort Validation\n(20 Patients, 90-Day Horizon)', 
-                 fontsize=16, fontweight='bold')
+    ax = axes[1, 1]
+    days = np.arange(1, T_MAX_DAYS + 1)
+    for arm in res:
+        V = np.array(res[arm]["volume_history_mm3"])
+        ax.plot(days, np.exp(np.log(V).mean(0)), lw=2, label=ARM_LABELS[arm])
+    ax.set_yscale("log")
+    ax.set_xlabel("day")
+    ax.set_ylabel("geometric-mean volume (mm^3)")
+    ax.set_title("Panel 4: Cohort trajectories")
+    ax.legend(fontsize=8)
+    ax.grid(alpha=0.3, which="both")
+
+    plt.suptitle(f"Script 64: {len(cohort)}-patient virtual cohort at equal drug budget (AUC = {STUPP_BUDGET:g})",
+                 fontsize=15, fontweight="bold")
     plt.tight_layout()
-    plt.savefig(OUTPUT_DIR / "phase8_cohort_analysis.png", dpi=200, bbox_inches="tight")
+    plt.savefig(output_path, dpi=200, bbox_inches="tight")
     plt.close()
     print(f"[Plot] Saved -> {output_path}")
 
 
-# --------------------------------------------------------------------------- #
-# Main Pipeline
-# --------------------------------------------------------------------------- #
 def main():
     print("=" * 70)
-    print("PHASE 8: MULTI-PATIENT VIRTUAL COHORT VALIDATION")
+    print("SCRIPT 64: VIRTUAL COHORT AT EQUAL DRUG BUDGET")
     print("=" * 70)
+    cohort = generate_virtual_cohort(N_PATIENTS, seed=COHORT_SEED)
+    kills = [kill_row(p) for p in cohort]
+    val_err = validate_against_numpy(make_solver(cohort[0]), kills[0])
+    assert val_err < 1e-9, f"batched solver disagrees with numpy solver: {val_err}"
 
-    # 1. Generate virtual cohort
-    print(f"\n[Phase 8] Generating virtual cohort of {N_PATIENTS} patients...")
-    cohort = generate_virtual_cohort(N_PATIENTS, seed=42)
-    for p in cohort:
-        print(f"  Patient {p['patient_id']}: rho={p['rho']:.4f}, D_white={p['D_white']:.4f}, "
-              f"gamma_chemo={p['gamma_chemo']:.3f}, alpha_rt={p['alpha_rt']:.3f}")
+    t0 = time.time()
+    res = evaluate_arms([lambda p=p: make_solver(p) for p in cohort], kills, chunk=N_PATIENTS)
+    print(f"  evaluated {len(ARMS)} arms x {len(cohort)} patients in {time.time() - t0:.0f}s (validation err {val_err:.1e})")
 
-    # 2. Evaluate each patient
-    print(f"\n[Phase 8] Evaluating cohort (Stupp vs RL Adaptive)...")
-    results = []
-    for patient in cohort:
-        print(f"  Patient {patient['patient_id']:2d}: rho={patient['rho']:.4f}, "
-              f"D_white={patient['D_white']:.4f}...", end=" ", flush=True)
-        result = evaluate_patient(patient, rl_policy=None, patient_id=patient["patient_id"])
-        results.append(result)
-        winner = "RL" if result["rl_adaptive"]["final_volume_mm3"] < result["stupp"]["final_volume_mm3"] else "Stupp"
-        print(f"RL: {result['rl_adaptive']['final_volume_mm3']:.2f} mm³, "
-              f"Stupp: {result['stupp']['final_volume_mm3']:.2f} mm³ -> {winner} wins")
+    rng = np.random.default_rng(64)
+    arm_summary = {arm: arm_stats(r, res["stupp"], rng) for arm, r in res.items()}
+    patients = []
+    for i, p in enumerate(cohort):
+        eff = {ACTION_NAMES[a]: kills[i][a] / s66.s59.ACTION_INTENSITY[a] for a in (1, 2, 3)}
+        row = {"patient_id": int(p["patient_id"]), "params": {k: float(v) for k, v in p.items() if k != "patient_id"},
+               "kill_per_unit_drug": eff, "most_efficient_action": max(eff, key=eff.get)}
+        for arm, r in res.items():
+            acts = r["action_history"][i]
+            row[arm] = {"final_volume_mm3": r["final_volume_mm3"][i], "drug_auc": r["drug_auc"][i],
+                        "mean_burden_mm3": r["mean_burden_mm3"][i],
+                        "action_days": {ACTION_NAMES[a]: int(acts.count(a)) for a in range(4)},
+                        "beats_stupp": bool(r["final_volume_mm3"][i] < res["stupp"]["final_volume_mm3"][i])}
+        patients.append(row)
 
-    # 3. Statistics
-    print("\n[Phase 8] Computing statistics...")
-    stats = compute_statistics(results)
-
-    # 4. Save metrics
+    ppo = arm_summary["ppo"]
     metrics = {
-        "cohort_size": N_PATIENTS,
-        "rl_mean_final_volume_mm3": float(stats["rl_mean_final_volume_mm3"]),
-        "stupp_mean_final_volume_mm3": float(stats["stupp_mean_final_volume_mm3"]),
-        "rl_std_final_volume_mm3": float(stats["rl_std_final_volume_mm3"]),
-        "stupp_std_final_volume_mm3": float(stats["stupp_std_final_volume_mm3"]),
-        "paired_t_test_p_value": float(stats["paired_t_test_p_value"]),
-        "wilcoxon_p_value": float(stats["wilcoxon_p_value"]),
-        "cohens_d": float(stats["cohens_d"]),
-        "rl_progression_free_rate": float(stats["rl_progression_free_rate"]),
-        "stupp_progression_free_rate": float(stats["stupp_progression_free_rate"]),
-        "progression_difference": float(stats["progression_difference"]),
-        "mcnemar_p_value": float(stats["mcnemar_p_value"]),
-        "cohens_kappa": float(stats["cohens_kappa"]),
-        "patient_details": [
-            {
-                "patient_id": int(r["patient_id"]),
-                "params": {k: float(v) for k, v in r["params"].items()},
-                "stupp_final_volume_mm3": float(r["stupp"]["final_volume_mm3"]),
-                "rl_final_volume_mm3": float(r["rl_adaptive"]["final_volume_mm3"]),
-                "stupp_progressed": bool(r["stupp"]["progressed"]),
-                "rl_progressed": bool(r["rl_adaptive"]["progressed"]),
-            }
-            for r in results
+        "framework": "equal drug budget; arms from src/rl/equal_budget_arms.py",
+        "budget_drug_auc": STUPP_BUDGET,
+        "cohort_size": len(cohort),
+        "cohort_seed": COHORT_SEED,
+        "rl_column": "ppo",
+        "validation_max_rel_err_vs_numpy_solver": val_err,
+        "arms": arm_summary,
+        # flat keys kept for script 65
+        "rl_mean_final_volume_mm3": ppo["mean_final_volume_mm3"],
+        "rl_std_final_volume_mm3": ppo["std_final_volume_mm3"],
+        "stupp_mean_final_volume_mm3": arm_summary["stupp"]["mean_final_volume_mm3"],
+        "stupp_std_final_volume_mm3": arm_summary["stupp"]["std_final_volume_mm3"],
+        "rl_win_rate_pct": ppo["win_rate_vs_stupp_pct"],
+        "rl_drug_auc_ratio_vs_stupp": ppo["drug_auc_ratio_vs_stupp"],
+        "wilcoxon_p_value": ppo["wilcoxon_p_value"],
+        "paired_t_test_p_value": ppo["paired_t_p_value_log"],
+        "cohens_d": ppo["cohens_d_log"],
+        "patient_details": patients,
+        "notes": [
+            f"Progression (V90 > {PROGRESSION_THRESHOLD_MM3:g} mm^3, the original definition) is reported as counts;"
+            " McNemar/kappa on progression were dropped.",
+            "Statistics compare log volumes (paired); win = lower day-90 volume than Stupp for the same patient.",
+            "Kill rates are patient-specific here; script-66 policies were trained with fixed kill rates.",
         ],
     }
+    path = OUTPUT_DIR / "phase8_cohort_metrics.json"
+    path.write_text(json.dumps(metrics, indent=2))
+    print(f"[Metrics] Saved -> {path}")
+    create_visualization(cohort, res, arm_summary, OUTPUT_DIR / "phase8_cohort_analysis.png")
 
-    with open(OUTPUT_DIR / "phase8_cohort_metrics.json", "w") as f:
-        json.dump(metrics, f, indent=2)
-    print(f"[Metrics] Saved -> {OUTPUT_DIR / 'phase8_cohort_metrics.json'}")
-
-    # 5. Visualization
-    print("\n[Phase 8] Generating cohort analysis visualization...")
-    create_visualization(results, stats, OUTPUT_DIR / "phase8_cohort_analysis.png")
-
-    # Summary
     print("\n" + "=" * 70)
-    print("PHASE 8 COMPLETE")
-    print("=" * 70)
-    print(f"Cohort Size: {N_PATIENTS}")
-    print(f"RL Mean Volume: {stats['rl_mean_final_volume_mm3']:.2f} ± {stats['rl_std_final_volume_mm3']:.2f} mm³")
-    print(f"Stupp Mean Volume: {stats['stupp_mean_final_volume_mm3']:.2f} ± {stats['stupp_std_final_volume_mm3']:.2f} mm³")
-    print(f"Paired t-test p-value: {stats['paired_t_test_p_value']:.4f}")
-    print(f"Wilcoxon p-value: {stats['wilcoxon_p_value']:.4f}")
-    print(f"Cohen's d: {stats['cohens_d']:.3f}")
-    print(f"RL Progression-Free Rate: {stats['rl_progression_free_rate']:.1%}")
-    print(f"Stupp Progression-Free Rate: {stats['stupp_progression_free_rate']:.1%}")
-    print(f"McNemar's p-value: {stats['mcnemar_p_value']:.4f}")
-    print(f"\nOutputs saved to {OUTPUT_DIR}/")
-    print("  - phase8_cohort_metrics.json")
-    print("  - phase8_cohort_analysis.png")
+    for arm, s in arm_summary.items():
+        print(f"  {ARM_LABELS[arm]:26s} mean {s['mean_final_volume_mm3']:7.2f} +/- {s['std_final_volume_mm3']:6.2f}  "
+              f"win {s['win_rate_vs_stupp_pct']:5.1f}%  log-ratio {s['mean_log_ratio_final_vs_stupp']:+.3f} "
+              f"CI {['%+.3f' % x for x in s['mean_log_ratio_final_vs_stupp_ci95']]}  "
+              f"AUC x{s['drug_auc_ratio_vs_stupp']:.3f}  p_wilcoxon {s['wilcoxon_p_value']}")
 
 
 if __name__ == "__main__":
