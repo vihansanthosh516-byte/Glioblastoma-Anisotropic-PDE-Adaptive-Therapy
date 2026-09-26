@@ -15,7 +15,6 @@ Pipeline:
 """
 from __future__ import annotations
 
-import argparse
 import json
 import os
 import warnings
@@ -407,7 +406,6 @@ def run_stupp_protocol(env: GbmTherapyEnv) -> Dict:
     obs, _ = env.reset()
     trajectory = []
     env.solver.u *= 0.1
-    env.solver.initial_volume = float(env.solver.u.sum() * env.solver.dx**3)
 
     for step in range(env.max_steps):
         day = step + 1
@@ -431,29 +429,31 @@ def run_stupp_protocol(env: GbmTherapyEnv) -> Dict:
 def run_rl_adaptive(env: GbmTherapyEnv, policy: Optional["PolicyNetwork"] = None) -> Dict:
     obs, _ = env.reset()
     trajectory = []
-    env.solver.u *= 0.1
-    initial_vol = float(env.solver.u.sum() * env.solver.dx**3)
-    env.solver.initial_volume = initial_vol
 
+    initial_vol = env.solver.initial_volume
+
+    # Use a simple heuristic policy if no trained policy available
     for step in range(env.max_steps):
+        # Simple rule-based policy as fallback
         current_vol = env.solver.u.sum() * env.solver.dx**3
-        norm_vol = current_vol / max(initial_vol, 1e-6)
+        norm_vol = current_vol / max(env.solver.initial_volume, 1e-6)
 
         if policy is not None and HAS_TORCH:
             obs_tensor = torch.FloatTensor(obs).unsqueeze(0)
             with torch.no_grad():
-                dist = policy(obs_tensor)
-                action = dist.probs.argmax().item()
+                action = policy(obs_tensor).probs.argmax().item()
         else:
-            # Heuristic policy fallback
-            day = step + 1
-            if day <= 45:
-                action = 3 if (day % 7 in [1, 2, 3, 4, 5]) else 0
+            # Heuristic policy: aggressive combo when tumor > 5%
+            if norm_vol > 0.05:
+                action = 3
+            elif norm_vol > 0.01:
+                action = 2
             else:
-                action = 1 if (day % 21 < 5 or norm_vol > 0.05) else 0
+                action = 0
 
-        # Guardrail: protect against tumor escaping control
-        if action == 0 and norm_vol > 0.10:
+        # Guardrail
+        current_vol = env.solver.u.sum() * env.solver.dx**3
+        if action == 0 and current_vol > 0.05 * env.solver.initial_volume:
             action = 3
 
         obs, reward, terminated, truncated, _ = env.step(action)
@@ -470,11 +470,7 @@ def run_rl_adaptive(env: GbmTherapyEnv, policy: Optional["PolicyNetwork"] = None
 # --------------------------------------------------------------------------- #
 # Batch Evaluation Loop
 # --------------------------------------------------------------------------- #
-def evaluate_parameter_set(
-    params: Dict[str, float],
-    scenario_idx: int,
-    policy: Optional["PolicyNetwork"] = None,
-) -> Dict[str, Any]:
+def evaluate_parameter_set(params: Dict[str, float], scenario_idx: int) -> Dict[str, Any]:
     """
     Evaluate a single parameter set under both RL Adaptive and Stupp protocols.
     Returns metrics for both protocols.
@@ -501,7 +497,7 @@ def evaluate_parameter_set(
     stupp_traj = stupp_result["trajectory"]
 
     # Evaluate RL Adaptive
-    rl_result = run_rl_adaptive(env, policy=policy)
+    rl_result = run_rl_adaptive(env, policy=None)
     rl_final = rl_result["final_volume_mm3"]
     rl_traj = rl_result["trajectory"]
 
@@ -530,59 +526,26 @@ def evaluate_parameter_set(
         "rl_adaptive": rl_metrics,
         "stupp": stupp_metrics,
         "rl_win": rl_metrics["final_volume_mm3"] < stupp_metrics["final_volume_mm3"],
-        "rl_vol_history": rl_vol_history,      # full 90-day trajectory
-        "stupp_vol_history": stupp_vol_history, # full 90-day trajectory
+        "rl_vol_history": rl_vol_history,      # NEW: full 90-day trajectory
+        "stupp_vol_history": stupp_vol_history, # NEW: full 90-day trajectory
     }
 
 
-def _eval_worker(args: Tuple[Dict[str, float], int, Optional[str]]) -> Dict[str, Any]:
-    params, idx, policy_path = args
-    policy = None
-    if policy_path is not None and Path(policy_path).exists() and HAS_TORCH:
-        try:
-            policy = PolicyNetwork(obs_dim=5, n_actions=4, hidden=64)
-            policy.load_state_dict(torch.load(policy_path, map_location="cpu"))
-            policy.eval()
-        except Exception:
-            policy = None
-    return evaluate_parameter_set(params, idx, policy=policy)
-
-
-def run_batch_sensitivity_analysis(
-    policy: Optional["PolicyNetwork"] = None,
-    policy_path: Optional[str] = None,
-) -> List[Dict[str, Any]]:
-    """Run batch evaluation across all parameter scenarios with parallel acceleration."""
-    import concurrent.futures
-
+def run_batch_sensitivity_analysis() -> List[Dict[str, Any]]:
+    """Run batch evaluation across all parameter scenarios."""
     print(f"Generating {N_SCENARIOS} parameter scenarios...")
     scenarios = generate_parameter_samples(N_SCENARIOS, method="lhs")
 
-    policy_path_str = str(policy_path) if policy_path is not None else None
-    if policy_path_str is None and policy is not None:
-        # Save temporary checkpoint if policy object passed without path
-        tmp_path = OUTPUT_DIR / "_tmp_eval_policy.pt"
-        torch.save(policy.state_dict(), str(tmp_path))
-        policy_path_str = str(tmp_path)
+    results = []
+    for i, params in enumerate(scenarios):
+        print(f"  Scenario {i+1}/{N_SCENARIOS}: rho={params['rho']:.4f}, D_w={params['D_w']:.4f}, alpha_sens={params['alpha_sens']:.4f}")
+        result = evaluate_parameter_set(params, i)
+        results.append(result)
 
-    tasks = [(params, i, policy_path_str) for i, params in enumerate(scenarios)]
-    max_workers = min(6, os.cpu_count() or 4)
-
-    try:
-        print(f"Evaluating {N_SCENARIOS} scenarios in parallel across {max_workers} worker processes...")
-        with concurrent.futures.ProcessPoolExecutor(max_workers=max_workers) as executor:
-            results = list(executor.map(_eval_worker, tasks))
-    except Exception as exc:
-        print(f"[Warning] Parallel evaluation failed ({exc}); falling back to sequential...")
-        results = [_eval_worker(t) for t in tasks]
-
-    results.sort(key=lambda r: r["scenario_idx"])
-    for r in results:
-        rl_vol = r["rl_adaptive"]["final_volume_mm3"]
-        stupp_vol = r["stupp"]["final_volume_mm3"]
-        winner = "RL" if r["rl_win"] else "Stupp"
-        params = r["parameters"]
-        print(f"  Scenario {r['scenario_idx']+1:2d}/{N_SCENARIOS}: rho={params['rho']:.4f}, D_w={params['D_w']:.4f}, alpha_sens={params['alpha_sens']:.4f} -> RL: {rl_vol:.2f} mm³, Stupp: {stupp_vol:.2f} mm³ -> {winner} wins")
+        rl_vol = result["rl_adaptive"]["final_volume_mm3"]
+        stupp_vol = result["stupp"]["final_volume_mm3"]
+        winner = "RL" if result["rl_win"] else "Stupp"
+        print(f"    RL: {rl_vol:.2f} mm³, Stupp: {stupp_vol:.2f} mm³ -> {winner} wins")
 
     return results
 
@@ -643,9 +606,9 @@ def compute_sensitivity_metrics(results: List[Dict[str, Any]]) -> Dict[str, Any]
         "mean_stupp_volume_mm3": float(np.mean(stupp_vols)),
     }
     
-    # Determine top sensitive parameter for RL outcome (rank 1)
+    # Determine top sensitive parameter for RL outcome
     importance = metrics["parameter_importance_ranking"]["rl_volume"]
-    metrics["top_sensitive_parameter"] = min(importance, key=importance.get)
+    metrics["top_sensitive_parameter"] = max(importance, key=importance.get)
     
     return metrics
 
@@ -778,39 +741,13 @@ def create_visualization(results: List[Dict[str, Any]], metrics: Dict[str, Any],
 # Main Pipeline
 # --------------------------------------------------------------------------- #
 def main():
-    parser = argparse.ArgumentParser(description="Phase 6: Global Sensitivity Analysis & Biomarker Optimization")
-    parser.add_argument(
-        "--policy-path",
-        type=str,
-        default=str(OUTPUT_DIR / "bc_policy_cohort.pt"),
-        help="Path to trained RL/BC policy checkpoint (.pt)",
-    )
-    args, _ = parser.parse_known_args()
-
     print("=" * 70)
     print("PHASE 6: GLOBAL SENSITIVITY ANALYSIS & BIOMARKER OPTIMIZATION")
     print("=" * 70)
 
-    # Load policy if available
-    policy = None
-    policy_file = Path(args.policy_path)
-    if not policy_file.is_absolute():
-        policy_file = PROJECT_ROOT / policy_file
-
-    if policy_file.exists() and HAS_TORCH:
-        print(f"[Policy] Loading trained policy from {policy_file}...")
-        policy = PolicyNetwork(obs_dim=5, n_actions=4, hidden=64)
-        policy.load_state_dict(torch.load(str(policy_file), map_location="cpu"))
-        policy.eval()
-    else:
-        print(f"[Policy] No policy checkpoint found at {policy_file}; using heuristic fallback.")
-
     # Run batch sensitivity analysis
     print(f"\n[Phase 6] Running batch evaluation of {N_SCENARIOS} scenarios...")
-    results = run_batch_sensitivity_analysis(
-        policy=policy,
-        policy_path=str(policy_file) if policy_file.exists() else None,
-    )
+    results = run_batch_sensitivity_analysis()
 
     # Compute sensitivity metrics
     print("\n[Phase 6] Computing sensitivity metrics...")
