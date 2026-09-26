@@ -75,6 +75,9 @@ SEED_AMPLITUDE = 0.8
 OUTPUT_DIR = PROJECT_ROOT / "output"
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
+# Drug intensity per action, used for AUC accounting and budget enforcement
+ACTION_INTENSITY = {0: 0.0, 1: 0.5, 2: 0.75, 3: 1.0}
+
 # --------------------------------------------------------------------------- #
 # Parameter Sampling Engine
 # --------------------------------------------------------------------------- #
@@ -407,6 +410,7 @@ def run_stupp_protocol(env: GbmTherapyEnv) -> Dict:
     trajectory = []
     env.solver.u *= 0.1
     env.solver.initial_volume = float(env.solver.u.sum() * env.solver.dx**3)
+    drug_auc = 0.0
 
     for step in range(env.max_steps):
         day = step + 1
@@ -416,6 +420,7 @@ def run_stupp_protocol(env: GbmTherapyEnv) -> Dict:
             action = 1 if (int(day) % 28) < 5 else 0
         else:
             action = 0
+        drug_auc += ACTION_INTENSITY[action] * DT_RL_DAYS
         obs, reward, terminated, truncated, _ = env.step(action)
         trajectory.append({
             "step": step, "day": day, "action": action,
@@ -424,16 +429,19 @@ def run_stupp_protocol(env: GbmTherapyEnv) -> Dict:
         })
         if terminated:
             break
-    return {"trajectory": trajectory, "final_volume_mm3": trajectory[-1]["volume_mm3"]}
+    return {"trajectory": trajectory, "final_volume_mm3": trajectory[-1]["volume_mm3"],
+            "drug_auc": drug_auc}
 
 
-def run_rl_adaptive(env: GbmTherapyEnv, policy: Optional["PolicyNetwork"] = None) -> Dict:
+def run_rl_adaptive(env: GbmTherapyEnv, policy: Optional["PolicyNetwork"] = None,
+                     drug_budget: Optional[float] = None) -> Dict:
     obs, _ = env.reset()
     trajectory = []
     env.solver.u *= 0.1
     env.solver.initial_volume = float(env.solver.u.sum() * env.solver.dx**3)
 
     initial_vol = env.solver.initial_volume
+    drug_auc = 0.0
 
     # Use a simple heuristic policy if no trained policy available
     for step in range(env.max_steps):
@@ -458,6 +466,14 @@ def run_rl_adaptive(env: GbmTherapyEnv, policy: Optional["PolicyNetwork"] = None
         if action == 0 and current_vol > 0.05 * env.solver.initial_volume:
             action = 3
 
+        # Drug budget enforcement: force a drug holiday if the chosen action
+        # would exceed the total AUC allotted to this arm.
+        if drug_budget is not None:
+            if drug_auc + ACTION_INTENSITY[action] * DT_RL_DAYS > drug_budget:
+                action = 0
+
+        drug_auc += ACTION_INTENSITY[action] * DT_RL_DAYS
+
         obs, reward, terminated, truncated, _ = env.step(action)
         trajectory.append({
             "step": step, "day": step + 1, "action": action,
@@ -466,7 +482,8 @@ def run_rl_adaptive(env: GbmTherapyEnv, policy: Optional["PolicyNetwork"] = None
         })
         if terminated:
             break
-    return {"trajectory": trajectory, "final_volume_mm3": trajectory[-1]["volume_mm3"]}
+    return {"trajectory": trajectory, "final_volume_mm3": trajectory[-1]["volume_mm3"],
+            "drug_auc": drug_auc}
 
 
 # --------------------------------------------------------------------------- #
@@ -498,8 +515,8 @@ def evaluate_parameter_set(params: Dict[str, float], scenario_idx: int) -> Dict[
     stupp_final = stupp_result["final_volume_mm3"]
     stupp_traj = stupp_result["trajectory"]
 
-    # Evaluate RL Adaptive
-    rl_result = run_rl_adaptive(env, policy=None)
+    # Evaluate RL Adaptive under the same total drug budget as Stupp used
+    rl_result = run_rl_adaptive(env, policy=None, drug_budget=stupp_result["drug_auc"])
     rl_final = rl_result["final_volume_mm3"]
     rl_traj = rl_result["trajectory"]
 
@@ -522,14 +539,22 @@ def evaluate_parameter_set(params: Dict[str, float], scenario_idx: int) -> Dict[
     stupp_metrics = compute_metrics(stupp_traj)
     rl_metrics = compute_metrics(rl_traj)
 
+    # Action sequences (first 28 days)
+    stupp_actions_28 = [t["action"] for t in stupp_traj[:28]]
+    rl_actions_28 = [t["action"] for t in rl_traj[:28]]
+
     return {
         "scenario_idx": scenario_idx,
         "parameters": params,
         "rl_adaptive": rl_metrics,
         "stupp": stupp_metrics,
         "rl_win": rl_metrics["final_volume_mm3"] < stupp_metrics["final_volume_mm3"],
-        "rl_vol_history": rl_vol_history,      # NEW: full 90-day trajectory
-        "stupp_vol_history": stupp_vol_history, # NEW: full 90-day trajectory
+        "rl_vol_history": rl_vol_history,
+        "stupp_vol_history": stupp_vol_history,
+        "rl_drug_auc": rl_result["drug_auc"],
+        "stupp_drug_auc": stupp_result["drug_auc"],
+        "stupp_actions_28": stupp_actions_28,
+        "rl_actions_28": rl_actions_28,
     }
 
 
@@ -606,6 +631,10 @@ def compute_sensitivity_metrics(results: List[Dict[str, Any]]) -> Dict[str, Any]
         "rl_win_rate_pct": float(sum(1 for r in results if r["rl_win"]) / len(results) * 100),
         "mean_rl_volume_mm3": float(np.mean(rl_vols)),
         "mean_stupp_volume_mm3": float(np.mean(stupp_vols)),
+        "mean_rl_drug_auc": float(np.mean([r["rl_drug_auc"] for r in results])),
+        "mean_stupp_drug_auc": float(np.mean([r["stupp_drug_auc"] for r in results])),
+        "drug_auc_ratio": float(np.mean([r["rl_drug_auc"] for r in results]) /
+                                max(np.mean([r["stupp_drug_auc"] for r in results]), 1e-9)),
     }
     
     # Determine top sensitive parameter for RL outcome
@@ -767,6 +796,19 @@ def main():
         results, metrics, OUTPUT_DIR / "phase6_sensitivity_analysis.png"
     )
 
+    # Print action sequences for scenario 0
+    action_names = {0: "off", 1: "chemo", 2: "rad", 3: "combo"}
+    s0 = results[0]
+    print("\n  Action sequences for scenario 0 (days 1-28):")
+    stupp_seq = " ".join(str(a) for a in s0["stupp_actions_28"])
+    rl_seq = " ".join(str(a) for a in s0["rl_actions_28"])
+    print(f"    Stupp:  [{stupp_seq}]")
+    print(f"    RL:     [{rl_seq}]")
+    stupp_named = " ".join(action_names[a] for a in s0["stupp_actions_28"])
+    rl_named = " ".join(action_names[a] for a in s0["rl_actions_28"])
+    print(f"    Stupp (named): [{stupp_named}]")
+    print(f"    RL    (named): [{rl_named}]")
+
     # Summary
     print("\n" + "=" * 70)
     print("PHASE 6 COMPLETE")
@@ -776,6 +818,9 @@ def main():
     print(f"  RL win rate: {metrics['rl_win_rate_pct']:.1f}%")
     print(f"  Mean RL volume: {metrics['mean_rl_volume_mm3']:.2f} mm³")
     print(f"  Mean Stupp volume: {metrics['mean_stupp_volume_mm3']:.2f} mm³")
+    print(f"  Mean RL drug AUC: {metrics['mean_rl_drug_auc']:.1f} day-units")
+    print(f"  Mean Stupp drug AUC: {metrics['mean_stupp_drug_auc']:.1f} day-units")
+    print(f"  Drug AUC ratio (RL/Stupp): {metrics['drug_auc_ratio']:.3f}")
     print(f"\n  Parameter importance (RL volume):")
     for param, rank in metrics["parameter_importance_ranking"]["rl_volume"].items():
         corr = metrics["parameter_correlations_with_rl_volume"][param]["pearson_r"]
