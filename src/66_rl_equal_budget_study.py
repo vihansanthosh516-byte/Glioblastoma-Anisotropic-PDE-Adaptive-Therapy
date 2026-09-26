@@ -631,7 +631,7 @@ def train_ppo(cfg: Dict, train_rho: np.ndarray, val: Dict, seed: int, iters: int
                 pl = -torch.min(ratio * advf[mb], ratio.clamp(0.8, 1.2) * advf[mb]).mean()
                 ent = dist.entropy().mean()
                 opt_pi.zero_grad()
-                (pl - 0.01 * ent).backward()
+                (pl - cfg.get("ent_coef", 0.01) * ent).backward()
                 torch.nn.utils.clip_grad_norm_(net.pi.parameters(), 0.5)
                 opt_pi.step()
                 vl = F.mse_loss(net.v(f[mb]).squeeze(1), ret[mb])
@@ -650,25 +650,45 @@ def train_ppo(cfg: Dict, train_rho: np.ndarray, val: Dict, seed: int, iters: int
     return net, {"curve": curve, "stats": stats}
 
 
-def train_bc(teacher_sched: List[List[int]], train_rho: List[float], seed: int, epochs: int = 400) -> ActorCritic:
+def oracle_feedback_teacher(objective: str) -> Callable:
+    """State-feedback form of the structured oracle (combo block, budget-exact):
+    'final' -> spend the budget as late as possible (combo once days left <= budget left);
+    'burden' -> spend it as early as possible. Defined in every state, so usable for DAgger."""
+    def pol(obs):
+        left = obs["budget"] - obs["auc"]
+        if objective == "burden":
+            return torch.full_like(left, 3, dtype=torch.long)
+        days_left = N_DAYS - obs["day"]
+        return torch.where(days_left * float(obs["intensity"][3]) <= left + 1e-9, 3, 0)
+    return pol
+
+
+def train_bc(objective: str, train_rho: List[float], seed: int, rounds: int = 6, epochs: int = 400) -> ActorCritic:
+    """Behavioural cloning + DAgger: round 0 rolls out the teacher, later rounds roll out
+    the student and label every visited state with the teacher's action."""
     torch.manual_seed(seed)
     net = ActorCritic()
-    S = torch.tensor(teacher_sched)
-    buf = {"f": [], "m": []}
-
-    def pol(obs):
-        buf["f"].append(features(obs)); buf["m"].append(action_mask(obs))
-        return S[:, obs["day"]]
-
-    res = rollout(ReactionSim(train_rho), pol)
-    f = torch.stack(buf["f"], 1).flatten(0, 1)
-    m = torch.stack(buf["m"], 1).flatten(0, 1)
-    y = res["actions"].flatten()
+    teacher = oracle_feedback_teacher(objective)
+    F_all, M_all, Y_all = [], [], []
     opt = torch.optim.Adam(net.pi.parameters(), lr=3e-3)
-    for _ in range(epochs):
-        loss = F.cross_entropy(net.pi(f).masked_fill(~m, -1e9), y)
-        opt.zero_grad(); loss.backward(); opt.step()
-    net.bc_train_acc = float((net.pi(f).masked_fill(~m, -1e9).argmax(1) == y).double().mean())
+    net.dagger_log = []
+    for r in range(rounds):
+        student = greedy_policy(net)
+
+        def pol(obs, r=r):
+            m, y = action_mask(obs), teacher(obs)
+            y = torch.where(m.gather(1, y.view(-1, 1)).squeeze(1), y, torch.zeros_like(y))
+            F_all.append(features(obs)); M_all.append(m); Y_all.append(y)
+            return teacher(obs) if r == 0 else student(obs)
+
+        rollout(ReactionSim(train_rho), pol)
+        f, m, y = torch.cat(F_all), torch.cat(M_all), torch.cat(Y_all)
+        for _ in range(epochs):
+            loss = F.cross_entropy(net.pi(f).masked_fill(~m, -1e9), y)
+            opt.zero_grad(); loss.backward(); opt.step()
+        acc = float((net.pi(f).masked_fill(~m, -1e9).argmax(1) == y).double().mean())
+        net.dagger_log.append({"round": r, "n_labels": len(y), "train_acc": acc})
+    net.bc_train_acc = net.dagger_log[-1]["train_acc"]
     return net
 
 
@@ -680,6 +700,10 @@ PPO_RUNS = [
     ("ppo_final_drug0.05_s0", {"reward": "final_rel", "drug_penalty": 0.05}, 0),
     ("ppo_final_drug0.20_s0", {"reward": "final_rel", "drug_penalty": 0.20}, 0),
     ("ppo_legacy59_s0", {"reward": "legacy59"}, 0),
+    # entropy 0.01 collapses by ~iter 45 onto "combo from day 1"; retry with more exploration
+    ("ppo_final_ent0.05_s0", {"reward": "final_rel", "ent_coef": 0.05}, 0),
+    ("ppo_final_ent0.05_s1", {"reward": "final_rel", "ent_coef": 0.05}, 1),
+    ("ppo_final_ent0.05_s2", {"reward": "final_rel", "ent_coef": 0.05}, 2),
 ]
 
 
@@ -703,21 +727,25 @@ def stage_train(iters: int = 150, batch: int = 128, runs: Optional[List[str]] = 
         t0 = time.time()
         net, log = train_ppo(cfg, train_rho, val, seed, iters, batch)
         torch.save(net.state_dict(), OUTPUT_DIR / f"{name}.pt")
-        log.update({"cfg": cfg, "seed": seed, "seconds": time.time() - t0})
+        log.update({"cfg": cfg, "seed": seed, "iters": iters, "batch": batch, "seconds": time.time() - t0})
         out["runs"][name] = log
         last = log["curve"][-1]
         print(f"  {name:24s} {time.time()-t0:5.0f}s  lhs30 final log-ratio {last['lhs30']['final_log_ratio']:+.4f} "
               f"win {last['lhs30']['win_final_pct']:5.1f}%  real_test {last['real_test']['final_log_ratio']:+.4f}")
         out_path.write_text(json.dumps(out, indent=2))
 
-    if not runs or "bc_oracle" in runs:
-        oracle = json.loads((OUTPUT_DIR / "oracle.json").read_text())
-        net = train_bc(oracle["real_train"]["final_best_sched"], train_rho.tolist(), seed=0)
-        torch.save(net.state_dict(), OUTPUT_DIR / "bc_oracle.pt")
-        out["runs"]["bc_oracle"] = {"train_acc": net.bc_train_acc,
-                                    "curve": [{"iter": 0, **{k: eval_reaction(greedy_policy(net), *v)
-                                                             for k, v in val.items()}}]}
-        print(f"  bc_oracle train acc {net.bc_train_acc:.3f}  {out['runs']['bc_oracle']['curve'][0]}")
+    out["runs"].pop("bc_oracle", None)
+    (OUTPUT_DIR / "bc_oracle.pt").unlink(missing_ok=True)
+    for obj in ("final", "burden"):
+        name = f"bc_dagger_{obj}"
+        if runs and name not in runs:
+            continue
+        net = train_bc(obj, train_rho.tolist(), seed=0)
+        torch.save(net.state_dict(), OUTPUT_DIR / f"{name}.pt")
+        out["runs"][name] = {"teacher": f"oracle feedback form ({obj})", "dagger": net.dagger_log,
+                             "curve": [{"iter": 0, **{k: eval_reaction(greedy_policy(net), *v)
+                                                      for k, v in val.items()}}]}
+        print(f"  {name} acc {net.bc_train_acc:.4f}  {out['runs'][name]['curve'][0]}")
     out_path.write_text(json.dumps(out, indent=2))
     print(f"[saved] {out_path}")
 
@@ -822,10 +850,13 @@ def stage_report():
     names = [n for n in lhs if n != "stupp"]
     vals = [lhs[n]["mean_log_ratio_final_vs_stupp"] for n in names]
     bars = c.barh(names, vals, color=["green" if v < 0 else "firebrick" for v in vals])
+    xmax = 0.3
     for bar, n in zip(bars, names):
-        c.text(bar.get_width(), bar.get_y() + bar.get_height() / 2,
-               f"  win {lhs[n]['win_rate_final_pct']:.0f}%  AUC x{lhs[n]['drug_auc_ratio_vs_stupp']:.2f}",
-               va="center", fontsize=8)
+        w = bar.get_width()
+        c.text(min(w, xmax) if w > 0 else 0.0, bar.get_y() + bar.get_height() / 2,
+               f"  {'(off-scale %+.2f) ' % w if w > xmax else ''}win {lhs[n]['win_rate_final_pct']:.0f}%  "
+               f"AUC x{lhs[n]['drug_auc_ratio_vs_stupp']:.2f}", va="center", fontsize=8)
+    c.set_xlim(-0.3, xmax)
     c.axvline(0, color="k", lw=0.8)
     c.axvline(theory["composition_ceiling_log_gain_vs_stupp"] * -1, color="purple", ls="--",
               label="composition-only bound (total log-kill)")
@@ -837,7 +868,7 @@ def stage_report():
     # D: action rasters, scenario 0
     d = ax[1, 1]
     show = [n for n in ("stupp", "heuristic59", "ppo_final_s0", "ppo_burden_s0", "oracle_final",
-                        "oracle_burden", "bc_oracle") if n in lhs]
+                        "oracle_burden", "bc_dagger_final") if n in lhs]
     R = np.array([lhs[n]["actions_scenario0_all"] for n in show])
     cmap = matplotlib.colors.ListedColormap(["#f0f0f0", "#fdae61", "#abd9e9", "#2c7bb6"])
     d.imshow(R, aspect="auto", cmap=cmap, vmin=-0.5, vmax=3.5, interpolation="nearest",
