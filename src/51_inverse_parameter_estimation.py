@@ -60,6 +60,12 @@ from scipy.stats import norm
 
 warnings.filterwarnings("ignore")
 
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+OUTPUT_DIR = PROJECT_ROOT / "output"
+COHORT_JSON = OUTPUT_DIR / "mu_glioma_cohort.json"          # scan volumes + days (mu_glioma_loader)
+PARAMS_72_CSV = OUTPUT_DIR / "mu_glioma_params_real.csv"     # script 72 log-linear fits, cross-check
+METRICS_JSON = OUTPUT_DIR / "inverse_est_metrics.json"
+
 # Physiological bounds (per plan specification — Tier 1 identifiability)
 # Volume-only inverse problems are underdetermined; these bounded priors
 # restrict the feasible space to physiologically plausible regimes.
@@ -319,7 +325,8 @@ def validate_with_synthetic_data(
     print(f"Time interval: dt = {delta_t:.1f} days")
     print(f"Trials per noise level: {n_trials}")
     print(f"{'='*70}\n")
-    
+    np.random.seed(51)
+
     # Generate synthetic follow-up volume
     V1_true = surrogate_ode_model(true_rho, true_D, V0, delta_t)
     print(f"Synthetic V1 (noise-free): {V1_true:.2f} mm3\n")
@@ -397,6 +404,255 @@ def validate_with_synthetic_data(
     return results
 
 
+# --------------------------------------------------------------------------- #
+# Cohort mode: every MU-Glioma patient with >= 2 scans, all scans fitted jointly
+# --------------------------------------------------------------------------- #
+WIDE_BOUNDS = [(1e-5, 0.2), (D_MIN, D_MAX)]   # sensitivity: rho floor far below the physiological 0.005
+C_DIFF = (36.0 * np.pi) ** (1.0 / 3.0)
+
+
+def simulate_trajectory(rho: float, D: float, V0: float, t: np.ndarray) -> np.ndarray:
+    """surrogate_ode_model integrated continuously from V0 through scan days t (t[0] = 0)."""
+    out, V = [V0], V0
+    for dt in np.diff(t):
+        V = surrogate_ode_model(rho, D, V, float(dt))
+        out.append(V)
+    return np.array(out)
+
+
+def fit_trajectory(days: List[float], vols: List[float],
+                   bounds: List[Tuple[float, float]]) -> Dict[str, Any]:
+    """Least squares on log volume over all follow-up scans, V(t0) = first observed
+    volume. Parameters are optimised in log space (rho and D differ by orders of
+    magnitude) from a 3x3 grid of starts. Returns fit, Gauss-Newton 95% CIs when
+    there are more follow-up scans than parameters, and identifiability diagnostics."""
+    t = np.asarray(days, float) - days[0]
+    v = np.asarray(vols, float)
+    lb = [(np.log(lo), np.log(hi)) for lo, hi in bounds]
+
+    def resid(x):
+        sim = simulate_trajectory(np.exp(x[0]), np.exp(x[1]), v[0], t)
+        return np.log(np.maximum(sim[1:], 1e-9)) - np.log(v[1:])
+
+    def f(x):
+        return float(np.sum(resid(x) ** 2))
+
+    best = None
+    for a in np.linspace(lb[0][0], lb[0][1], 3):
+        for b in np.linspace(lb[1][0], lb[1][1], 3):
+            r = minimize(f, np.array([a, b]), method="L-BFGS-B", bounds=lb, options={"maxiter": 1000})
+            if best is None or r.fun < best.fun:
+                best = r
+    x = best.x
+    h = 1e-4
+    J = np.stack([(resid(x + h * e) - resid(x - h * e)) / (2 * h) for e in np.eye(2)], 1)
+    n_obs = len(v) - 1
+    dof = n_obs - 2
+    at_lo = [bool(x[i] - lb[i][0] < 1e-6) for i in range(2)]
+    at_hi = [bool(lb[i][1] - x[i] < 1e-6) for i in range(2)]
+    JTJ = J.T @ J
+    cond = float(np.linalg.cond(JTJ)) if np.all(np.isfinite(JTJ)) else float("inf")
+    ci = {"rho_ci95": None, "D_ci95": None}
+    if dof > 0 and cond < 1e12 and not any(at_lo + at_hi):
+        cov = best.fun / dof * np.linalg.inv(JTJ)
+        se = np.sqrt(np.maximum(np.diag(cov), 0))
+        ci = {"rho_ci95": [float(np.exp(x[0] - 1.96 * se[0])), float(np.exp(x[0] + 1.96 * se[0]))],
+              "D_ci95": [float(np.exp(x[1] - 1.96 * se[1])), float(np.exp(x[1] + 1.96 * se[1]))]}
+    rho, D = float(np.exp(x[0])), float(np.exp(x[1]))
+    growth = rho * v[0] * (1 - v[0] / K_DEFAULT)
+    diff = C_DIFF * D * v[0] ** (1 / 3)
+    return {"rho": rho, "D": D, "sse_log": float(best.fun), "rmse_log": float(np.sqrt(best.fun / n_obs)),
+            "n_followup_scans": n_obs, "converged": bool(best.success), "n_iterations": int(best.nit),
+            "rho_at_lower_bound": at_lo[0], "rho_at_upper_bound": at_hi[0],
+            "D_at_lower_bound": at_lo[1], "D_at_upper_bound": at_hi[1],
+            "fisher_condition_number": cond,
+            "diffusion_share_of_initial_growth": float(diff / (growth + diff)) if growth + diff > 0 else None,
+            **ci}
+
+
+def load_scan_series() -> List[Dict[str, Any]]:
+    cohort = json.loads(COHORT_JSON.read_text())
+    out = []
+    for p in cohort:
+        tps = sorted((tp["day_from_diagnosis"], tp["volume_mm3"]) for tp in p["timepoints"]
+                     if tp["volume_mm3"] is not None and tp["day_from_diagnosis"] is not None)
+        if len(tps) >= 2:
+            out.append({"patient_id": p["patient_id"], "days": [d for d, _ in tps], "volumes": [v for _, v in tps]})
+    return out
+
+
+def synthetic_identifiability(rng: np.random.Generator, n_trials: int = 20) -> Dict[str, Any]:
+    """Recovery of known (rho, D) from surrogate trajectories: 2, 3 and 5 scans over
+    180 days, 0/5/10% multiplicative noise, at a small (1 cm^3) and a cohort-sized
+    (50 cm^3) tumour."""
+    true_rho, true_D = 0.02, 0.015
+    out = {"true_rho": true_rho, "true_D": true_D, "cases": []}
+    for V0 in (1.0e3, 5.0e4):
+        for n_scans in (2, 3, 5):
+            t = np.linspace(0, 180, n_scans)
+            clean = simulate_trajectory(true_rho, true_D, V0, t)
+            for noise in (0.0, 0.05, 0.10):
+                er, ed, dbound = [], [], 0
+                for _ in range(n_trials if noise > 0 else 1):
+                    obs = clean * np.exp(rng.normal(0, noise, n_scans))
+                    obs[0] = V0
+                    fit = fit_trajectory(t.tolist(), obs.tolist(), [(RHO_MIN, RHO_MAX), (D_MIN, D_MAX)])
+                    er.append(abs(fit["rho"] - true_rho) / true_rho)
+                    ed.append(abs(fit["D"] - true_D) / true_D)
+                    dbound += fit["D_at_lower_bound"] or fit["D_at_upper_bound"]
+                out["cases"].append({"V0_mm3": V0, "n_scans": n_scans, "noise": noise, "n_trials": len(er),
+                                     "rho_median_rel_err": float(np.median(er)),
+                                     "D_median_rel_err": float(np.median(ed)),
+                                     "D_at_bound_pct": 100.0 * dbound / len(er),
+                                     "diffusion_share_of_initial_growth": fit["diffusion_share_of_initial_growth"]})
+    return out
+
+
+def diagnose_legacy_fit(series: List[Dict[str, Any]], patient_id: str = "PatientID_0003") -> Dict[str, Any]:
+    """Reproduce the old per-patient fit (first two scans only, estimate_patient_parameters)
+    and explain why it stops at iteration 1 with a zero-width CI."""
+    legacy_path = per_patient_path(patient_id)
+    legacy = json.loads(legacy_path.read_text()) if legacy_path.exists() else None
+    if legacy is not None and "fit" in legacy:      # already rewritten by a cohort run
+        legacy = None
+    s = next(x for x in series if x["patient_id"] == patient_id)
+    V0, V1, dt = s["volumes"][0], s["volumes"][1], s["days"][1] - s["days"][0]
+    np.random.seed(51)
+    rep = estimate_patient_parameters(V0, V1, dt)
+    floor_pred = surrogate_ode_model(RHO_MIN, D_MIN, V0, dt)
+    h = 1e-8
+    f0 = objective_function(np.array([RHO_MIN, D_MIN]), V0, V1, dt)
+    grad = [float((objective_function(np.array([RHO_MIN, D_MIN]) + h * e, V0, V1, dt) - f0) / h) for e in np.eye(2)]
+    obs_rate = float(np.log(V1 / V0) / dt)
+    return {
+        "patient_id": patient_id,
+        "legacy_file_contents": legacy,
+        "scans_used_by_legacy_fit": {"days": s["days"][:2], "volumes_mm3": [V0, V1]},
+        "scans_ignored_by_legacy_fit": {"days": s["days"][2:], "volumes_mm3": s["volumes"][2:]},
+        "observed_growth_rate_per_day": obs_rate,
+        "rho_lower_bound_per_day": RHO_MIN,
+        "lower_bound_over_observed_rate": RHO_MIN / obs_rate if obs_rate > 0 else None,
+        "prediction_at_lower_bounds_mm3": floor_pred,
+        "residual_at_lower_bounds_mm3": floor_pred - V1,
+        "reproduced_fit": {k: v for k, v in rep.items() if k != "bootstrap_samples"},
+        "objective_gradient_at_lower_corner": grad,
+        "cause": ("Not a convergence failure. The observed growth over the two scans used "
+                  f"({obs_rate:.5f}/day) is below the model floor rho >= {RHO_MIN}/day with D >= {D_MIN}, "
+                  "so even the slowest allowed parameters over-predict the second volume. The "
+                  "objective gradient at the (rho_min, D_min) corner is positive in both parameters, "
+                  "i.e. it points out of the feasible box, so the projected gradient is zero and "
+                  "L-BFGS-B stops after one iteration at the bound (message: projected gradient <= pgtol). "
+                  "Every 10%-noise bootstrap target is also below the floor, so all bootstrap fits land "
+                  "on the same corner and the CI has zero width. The fit used only the first two of the "
+                  "patient's scans."),
+    }
+
+
+def per_patient_path(patient_id: str) -> Path:
+    return OUTPUT_DIR / f"inverse_est_{patient_id}.json"
+
+
+def fit_cohort(series: List[Dict[str, Any]]) -> None:
+    """Fit every patient on all scans and write output/inverse_est_<patient_id>.json."""
+    phys = [(RHO_MIN, RHO_MAX), (D_MIN, D_MAX)]
+    for s in series:
+        fit = fit_trajectory(s["days"], s["volumes"], phys)
+        wide = fit_trajectory(s["days"], s["volumes"], WIDE_BOUNDS)
+        rec = {**s, "observed_log_change": float(np.log(s["volumes"][-1] / s["volumes"][0])),
+               "fit": fit, "fit_wide_bounds": wide}
+        per_patient_path(s["patient_id"]).write_text(json.dumps(rec, indent=2))
+        print(f"  {s['patient_id']}: {len(s['days'])} scans  rho {fit['rho']:.5f}  D {fit['D']:.5f}  "
+              f"rmse_log {fit['rmse_log']:.3f}  rho@lo {fit['rho_at_lower_bound']}")
+
+
+def aggregate(legacy_diagnosis: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    """Combine every output/inverse_est_PatientID_*.json into one metrics dict. Files
+    in the old two-scan format (no 'fit' block) are counted and listed, not mixed in."""
+    import pandas as pd
+    from scipy.stats import spearmanr
+
+    files = sorted(OUTPUT_DIR.glob("inverse_est_PatientID_*.json"))
+    patients, legacy_files = [], []
+    for f in files:
+        rec = json.loads(f.read_text())
+        if "fit" in rec:
+            patients.append(rec)
+        else:
+            legacy_files.append(f.name)
+    if not patients:
+        raise RuntimeError("no cohort-format inverse_est_PatientID_*.json files; run with --cohort")
+
+    fits = [p["fit"] for p in patients]
+    n = len(fits)
+    rho_lo = np.array([f["rho_at_lower_bound"] for f in fits])
+    rho_hi = np.array([f["rho_at_upper_bound"] for f in fits])
+    D_bound = np.array([f["D_at_lower_bound"] or f["D_at_upper_bound"] for f in fits])
+    shrank = np.array([p["observed_log_change"] < 0 for p in patients])
+    interior = ~rho_lo & ~rho_hi
+    rho_int = np.array([f["rho"] for f in fits])[interior]
+    with_ci = [f for f in fits if f["D_ci95"] is not None]
+    D_ci_ratio = np.array([f["D_ci95"][1] / f["D_ci95"][0] for f in with_ci])
+    share = np.array([f["diffusion_share_of_initial_growth"] for f in fits])
+
+    ref = pd.read_csv(PARAMS_72_CSV).set_index("patient_id")["rho_per_day"]
+    ids_int = [p["patient_id"] for p, ok in zip(patients, interior) if ok and p["patient_id"] in ref.index]
+    r72 = [ref[i] for i in ids_int]
+    r51 = [p["fit"]["rho"] for p in patients if p["patient_id"] in ids_int]
+    cross = spearmanr(r51, r72) if len(ids_int) > 2 else None
+
+    wide = [p["fit_wide_bounds"] for p in patients]
+    summary = {
+        "n_per_patient_files": len(files),
+        "n_legacy_format_files": len(legacy_files),
+        "n_patients_with_2plus_scans": n,
+        "n_shrinking_first_to_last_scan": int(shrank.sum()),
+        "n_rho_at_lower_bound": int(rho_lo.sum()),
+        "n_rho_at_lower_bound_among_shrinking": int((rho_lo & shrank).sum()),
+        "n_rho_at_upper_bound": int(rho_hi.sum()),
+        "n_rho_interior": int(interior.sum()),
+        "rho_interior_median_per_day": float(np.median(rho_int)) if len(rho_int) else None,
+        "rho_interior_iqr_per_day": [float(np.percentile(rho_int, 25)), float(np.percentile(rho_int, 75))]
+        if len(rho_int) else None,
+        "n_D_at_bound": int(D_bound.sum()),
+        "n_with_gauss_newton_ci": len(with_ci),
+        "D_ci95_median_upper_over_lower": float(np.median(D_ci_ratio)) if len(D_ci_ratio) else None,
+        "diffusion_share_of_initial_growth_median": float(np.median(share)),
+        "median_rmse_log": float(np.median([f["rmse_log"] for f in fits])),
+        "convergence_rate": float(np.mean([f["converged"] for f in fits])),
+        "wide_bounds_n_rho_at_lower_bound": int(sum(w["rho_at_lower_bound"] for w in wide)),
+        "cross_check_script72_spearman_rho": float(cross.correlation) if cross is not None else None,
+        "cross_check_script72_n": len(ids_int),
+    }
+    synth = synthetic_identifiability(np.random.default_rng(51))
+    # D counts as identifiable if a cohort-sized tumour with 5 scans and 5% noise recovers D
+    # within 50% (median), and diffusion is at least 1% of growth in the real cohort.
+    ref_case = [c for c in synth["cases"] if c["V0_mm3"] == 5.0e4 and c["n_scans"] == 5 and c["noise"] == 0.05][0]
+    summary["D_synthetic_median_rel_err_cohort_size"] = ref_case["D_median_rel_err"]
+    summary["D_identifiable_from_volumes"] = bool(ref_case["D_median_rel_err"] < 0.5
+                                                  and summary["diffusion_share_of_initial_growth_median"] >= 0.01)
+    if legacy_diagnosis is not None:
+        summary["legacy_PatientID_0003_cause"] = "rho floor above observed growth; optimum is the bound corner"
+    return {"model": "surrogate ODE dV/dt = rho V (1 - V/K) + (36 pi)^(1/3) D V^(1/3), K = 1e6 mm^3",
+            "fit": "least squares on log volume over all follow-up scans; log-parameter L-BFGS-B, 3x3 multistart",
+            "bounds_physiological": {"rho": [RHO_MIN, RHO_MAX], "D": [D_MIN, D_MAX]},
+            "bounds_wide_sensitivity": {"rho": list(WIDE_BOUNDS[0]), "D": list(WIDE_BOUNDS[1])},
+            "data": str(COHORT_JSON.relative_to(PROJECT_ROOT)),
+            "summary": summary,
+            "legacy_fit_diagnosis": legacy_diagnosis,
+            "legacy_format_files": legacy_files,
+            "synthetic_identifiability": synth,
+            "patients": patients,
+            "notes": [
+                "The surrogate cannot shrink (rho >= 0.005, D >= 0.001), so treated tumours that shrank "
+                "between scans pin rho at its lower bound; they are counted, not fitted.",
+                "D_identifiable_from_volumes is computed: the cohort-sized synthetic case (5 scans, 5% "
+                "noise) must recover D within 50% and diffusion must be >= 1% of initial growth.",
+                "Per-patient files are rewritten by --cohort from all scans; the six older two-scan files "
+                "(fits at both lower bounds after one iteration) are replaced. legacy_fit_diagnosis "
+                "reproduces the PatientID_0003 case from the data.",
+            ]}
+
+
 def main():
     """Main entry point for inverse parameter estimation."""
     parser = argparse.ArgumentParser(
@@ -406,6 +662,17 @@ def main():
         "--test",
         action="store_true",
         help="Run synthetic validation tests",
+    )
+    parser.add_argument(
+        "--cohort",
+        action="store_true",
+        help="Fit every MU-Glioma patient with >= 2 scans (writes inverse_est_PatientID_*.json), "
+             f"then aggregate into {METRICS_JSON.name}",
+    )
+    parser.add_argument(
+        "--aggregate",
+        action="store_true",
+        help=f"Only combine existing inverse_est_PatientID_*.json into {METRICS_JSON.name}",
     )
     parser.add_argument(
         "--t0-volume",
@@ -430,13 +697,32 @@ def main():
     )
     
     args = parser.parse_args()
-    
+
+    def resolve(p: str) -> Path:
+        p = Path(p)
+        return p if p.is_absolute() else PROJECT_ROOT / p
+
+    if args.cohort or args.aggregate:
+        print(f"\n{'='*70}\nINVERSE ESTIMATION - MU-GLIOMA COHORT\n{'='*70}")
+        series = load_scan_series()
+        diagnosis = diagnose_legacy_fit(series)   # before --cohort rewrites the legacy file
+        print(f"Legacy PatientID_0003 fit: {diagnosis['cause']}")
+        if args.cohort:
+            fit_cohort(series)
+        results = aggregate(diagnosis)
+        output_path = resolve(args.output) if args.output else METRICS_JSON
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        output_path.write_text(json.dumps(results, indent=2))
+        print(json.dumps(results["summary"], indent=2))
+        print(f"Results saved to: {output_path}")
+        return 0
+
     if args.test:
         # Run validation
         results = validate_with_synthetic_data()
-        
+
         if args.output:
-            output_path = Path(args.output)
+            output_path = resolve(args.output)
             output_path.parent.mkdir(parents=True, exist_ok=True)
             with open(output_path, "w") as f:
                 json.dump(results, f, indent=2)
@@ -473,7 +759,7 @@ def main():
         print(f"{'='*70}\n")
         
         if args.output:
-            output_path = Path(args.output)
+            output_path = resolve(args.output)
             output_path.parent.mkdir(parents=True, exist_ok=True)
             # Remove non-serializable bootstrap samples for JSON output
             result_json = {k: v for k, v in result.items() if k != "bootstrap_samples"}
@@ -486,6 +772,7 @@ def main():
     # No arguments provided - show help
     parser.print_help()
     print("\nExamples:")
+    print("  python src/51_inverse_parameter_estimation.py --cohort")
     print("  python src/51_inverse_parameter_estimation.py --test")
     print("  python src/51_inverse_parameter_estimation.py --t0-volume 1000 --t1-volume 1200 --delta-t 30")
     return 0
