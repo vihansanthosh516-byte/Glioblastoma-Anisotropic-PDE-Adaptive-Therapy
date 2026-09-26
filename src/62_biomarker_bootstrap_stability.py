@@ -1,14 +1,30 @@
 #!/usr/bin/env python3
 """
-Phase 7: Biomarker Threshold Bootstrap Stability
-=================================================
-Addresses Reviewer Concern #5: Biomarker Rule Stability - Quantifying the 
-statistical robustness and 95% Confidence Interval for the ρ > 0.024 
-decision threshold.
+Script 62: Who benefits from starting treatment early at equal drug?
+====================================================================
+Reframed after script 66. At an equal drug budget (Stupp's AUC), compare
+  early start  = PPO arm from script 66 (combo from day 1 until the budget is spent)
+  delayed start = Stupp (nothing until day 20)
+Arms come from src/rl/equal_budget_arms.py; physics is this script's FastPDESolver.
+
+benefit_i = log(V_Stupp,i / V_early,i) at day 90  (> 0: early start wins)
+
+Cohort: MU-Glioma growing tumours with fit R^2 >= 0.5
+(load_real_params_for_track_bc(min_r2=0.5, require_growing=True)): 64 patients.
+
+Threshold rho*: benefit crosses zero. Reported three ways:
+  - model rho*: dense rho grid on the same PDE (the ground truth of this model)
+  - cohort rho*: estimated from the 64 patients alone
+  - bootstrap 95% CI of the cohort estimate (1000 resamples of patients)
+In this model a patient's outcome is a deterministic function of rho (diffusion
+is negligible, same seed tumour), so the bootstrap measures how well the
+cohort's rho values pin the threshold down, not biological noise.
 """
 from __future__ import annotations
 
 import json
+import sys
+import time
 import warnings
 from pathlib import Path
 from typing import Dict, List, Tuple, Any, Optional
@@ -17,34 +33,23 @@ import numpy as np
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
-from scipy import stats
-from scipy.stats import gaussian_kde
+
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(PROJECT_ROOT / "src"))
+from rl.equal_budget_arms import STUPP_BUDGET, ppo, stupp, evaluate_arms, validate_against_numpy  # noqa: E402
+from mu_glioma_loader import load_real_params_for_track_bc  # noqa: E402
 
 warnings.filterwarnings("ignore")
 
 # --------------------------------------------------------------------------- #
 # Configuration
 # --------------------------------------------------------------------------- #
-N_SCENARIOS = 30
 BOOTSTRAP_SAMPLES = 1000
+BOOTSTRAP_SEED = 62
 EVAL_GRID = (64, 64, 64)
 T_MAX_DAYS = 90
-DT_PDE_EVAL = 0.2
-
-OUTPUT_DIR = Path("output")
-OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-
-# Phase 6 parameter ranges (from Phase 6 config)
-PARAM_RANGES = {
-    "rho": (0.005, 0.035),        # 1/day
-    "D_w": (0.001, 0.008),        # cm^2/day
-    "alpha_sens": (0.5, 1.5),     # multiplier
-}
-
-# Fixed parameters
 D_WHITE_BASE = 0.013
 D_GRAY_BASE = 0.0013
-RHO_BASE = 0.02
 K_CARRY = 1.0
 GAMMA_CHEMO = 0.05
 GAMMA_RAD = 0.08
@@ -56,8 +61,10 @@ SEED_AMPLITUDE = 0.8
 DT_RL_DAYS = 1.0
 DT_PDE_EVAL = 0.2
 N_PDE_SUBSTEPS_EVAL = 5
+KILL_ROW = [0.0, GAMMA_CHEMO, GAMMA_RAD, GAMMA_CHEMO + GAMMA_RAD]
+EARLY_VS_DELAYED = {"stupp": stupp, "ppo": ppo}
 
-OUTPUT_DIR = Path("output")
+OUTPUT_DIR = PROJECT_ROOT / "output"
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
 
@@ -260,364 +267,193 @@ class FastPDESolver:
 
 
 # --------------------------------------------------------------------------- #
-# Environment & Protocols
+# Early vs delayed start at equal drug
 # --------------------------------------------------------------------------- #
-class GbmTherapyEnv:
-    def __init__(self, solver: FastPDESolver):
-        self.solver = solver
-        self.max_steps = 90
-        self.trajectory = []
-
-    def reset(self, seed: Optional[int] = None, options: Optional[Dict] = None):
-        self.solver.reset()
-        self.trajectory = []
-        return self.solver.get_observation(), {}
-
-    def step(self, action: int):
-        result = self.solver.rl_step(action)
-        obs = self.solver.get_observation()
-
-        norm_vol = result["norm_volume"]
-        u_max = result["u_max"]
-        delta_vol = result["delta_volume"]
-
-        action_cost = 1.0 if action > 0 else 0.0
-        reward = -15.0 * norm_vol - 8.0 * u_max - 0.02 * action_cost
-        if delta_vol > 0:
-            reward += 100.0 * max(delta_vol / max(self.solver.initial_volume, 1e-6), 0.0)
-
-        terminated = self.solver.is_done()
-        if terminated and norm_vol < 0.01:
-            reward += 200.0
-
-        self.trajectory.append({
-            "step": self.solver.step_count,
-            "action": action,
-            "volume_mm3": result["volume_mm3"],
-            "u_max": result["u_max"],
-            "reward": reward,
-        })
-
-        return obs, float(reward), terminated, False, {}
+def run_patients(params: List[Dict[str, float]]) -> Dict[str, np.ndarray]:
+    makers = [lambda p=p: FastPDESolver(grid_size=EVAL_GRID, dt_pde=DT_PDE_EVAL, rho=p["rho"], D_white=p["D_w"])
+              for p in params]
+    res = evaluate_arms(makers, [KILL_ROW] * len(params), arms=EARLY_VS_DELAYED)
+    s, e = res["stupp"], res["ppo"]
+    arr = lambda d, k: np.array(d[k])
+    return {"benefit_final": np.log(arr(s, "final_volume_mm3") / arr(e, "final_volume_mm3")),
+            "benefit_burden": np.log(arr(s, "mean_burden_mm3") / arr(e, "mean_burden_mm3")),
+            "stupp_final": arr(s, "final_volume_mm3"), "early_final": arr(e, "final_volume_mm3"),
+            "stupp_auc": arr(s, "drug_auc"), "early_auc": arr(e, "drug_auc")}
 
 
-def run_stupp_protocol(env: GbmTherapyEnv) -> Dict:
-    obs, _ = env.reset()
-    trajectory = []
-    env.solver.u *= 0.1
-
-    for step in range(env.max_steps):
-        day = step + 1
-        if 20 <= day < 50:
-            action = 3
-        elif 50 <= day <= 90:
-            action = 1 if (int(day) % 28) < 5 else 0
-        else:
-            action = 0
-        obs, reward, terminated, truncated, _ = env.step(action)
-        trajectory.append({
-            "step": step, "day": day, "action": action,
-            "volume_mm3": env.solver.u.sum() * env.solver.dx**3,
-            "reward": reward,
-        })
-        if terminated:
-            break
-    return {"trajectory": trajectory, "final_volume_mm3": trajectory[-1]["volume_mm3"]}
+def interp_crossing(rho: np.ndarray, benefit: np.ndarray) -> float:
+    """Linear interpolation between the last sorted rho with benefit > 0 and the
+    first with benefit <= 0. NaN when the sample has no patient on one side."""
+    order = np.argsort(rho, kind="stable")
+    r, b = rho[order], benefit[order]
+    neg = np.flatnonzero(b <= 0)
+    if len(neg) == 0 or neg[0] == 0:
+        return float("nan")
+    j = neg[0]
+    i = j - 1
+    return float(r[i] + (r[j] - r[i]) * b[i] / (b[i] - b[j]))
 
 
-def run_rl_adaptive(env: GbmTherapyEnv) -> Dict:
-    obs, _ = env.reset()
-    trajectory = []
-
-    for step in range(env.max_steps):
-        # Heuristic policy (same as Phase 5/6)
-        current_vol = env.solver.u.sum() * env.solver.dx**3
-        norm_vol = current_vol / max(env.solver.initial_volume, 1e-6)
-
-        if norm_vol > 0.05:
-            action = 3
-        elif norm_vol > 0.01:
-            action = 2
-        else:
-            action = 0
-
-        # Guardrail
-        if action == 0 and current_vol > 0.05 * env.solver.initial_volume:
-            action = 3
-
-        obs, reward, terminated, truncated, _ = env.step(action)
-        trajectory.append({
-            "step": step, "day": step + 1, "action": action,
-            "volume_mm3": env.solver.u.sum() * env.solver.dx**3,
-            "reward": reward,
-        })
-        if terminated:
-            break
-    return {"trajectory": trajectory, "final_volume_mm3": trajectory[-1]["volume_mm3"]}
+def quadratic_crossing(rho: np.ndarray, benefit: np.ndarray, lo: float = 0.0, hi: float = 0.3) -> float:
+    """Root of a least-squares quadratic benefit(rho) where the fit crosses downward.
+    Can extrapolate past the largest sampled rho."""
+    c = np.polyfit(rho, benefit, 2)
+    roots = [r.real for r in np.roots(c) if abs(r.imag) < 1e-12 and lo < r.real < hi
+             and np.polyval(np.polyder(c), r.real) < 0]
+    return float(min(roots)) if roots else float("nan")
 
 
-# --------------------------------------------------------------------------- #
-# Phase 6 Scenario Generation (replicate Phase 6 sampling)
-# --------------------------------------------------------------------------- #
-from scipy.stats.qmc import LatinHypercube
-
-def generate_phase6_scenarios(n_samples: int = N_SCENARIOS) -> List[Dict[str, float]]:
-    """Replicate Phase 6 parameter sampling with fixed seed."""
-    param_names = list(PARAM_RANGES.keys())
-    bounds = np.array([PARAM_RANGES[p] for p in param_names])
-
-    sampler = LatinHypercube(d=len(param_names), seed=42)
-    samples = sampler.random(n=n_samples)
-    scaled = bounds[:, 0] + samples * (bounds[:, 1] - bounds[:, 0])
-
-    param_list = []
-    for i in range(n_samples):
-        param_list.append({
-            "rho": float(scaled[i, 0]),
-            "D_w": float(scaled[i, 1]),
-            "alpha_sens": float(scaled[i, 2]),
-        })
-    return param_list
+def ci(samples: np.ndarray) -> Dict[str, Any]:
+    ok = samples[np.isfinite(samples)]
+    if len(ok) == 0:
+        return {"identifiable_fraction": 0.0, "ci95": None, "median": None}
+    return {"identifiable_fraction": float(len(ok) / len(samples)),
+            "ci95": [float(np.percentile(ok, 2.5)), float(np.percentile(ok, 97.5))],
+            "median": float(np.median(ok))}
 
 
-def evaluate_scenario(params: Dict[str, float]) -> Dict[str, float]:
-    """Evaluate single scenario with both RL and Stupp."""
-    solver = FastPDESolver(
-        grid_size=EVAL_GRID,
-        dt_pde=DT_PDE_EVAL,
-        rho=params["rho"],
-        D_white=params["D_w"],
-        alpha_sens=params["alpha_sens"],
-        is_training=False,
-    )
-    env = GbmTherapyEnv(solver)
-
-    rl_result = run_rl_adaptive(env)
-    stupp_result = run_stupp_protocol(env)
-
-    return {
-        "rl_volume": rl_result["final_volume_mm3"],
-        "stupp_volume": stupp_result["final_volume_mm3"],
-        "rl_wins": rl_result["final_volume_mm3"] < stupp_result["final_volume_mm3"],
-        "rho": params["rho"],
-        "D_w": params["D_w"],
-        "alpha_sens": params["alpha_sens"],
-    }
-
-
-# --------------------------------------------------------------------------- #
-# Bootstrap Engine
-# --------------------------------------------------------------------------- #
-def find_critical_rho(scenarios: List[Dict[str, float]]) -> Optional[float]:
-    """
-    Find the critical rho threshold where RL starts outperforming Stupp.
-    Uses a simple decision boundary: RL wins when rho > threshold.
-    """
-    # Sort by rho
-    sorted_scenarios = sorted(scenarios, key=lambda x: x["rho"])
-    
-    # Find the boundary where RL starts consistently winning
-    # Use a simple approach: find the rho value that best separates wins/losses
-    best_threshold = None
-    best_accuracy = 0
-    
-    rho_vals = np.array([s["rho"] for s in sorted_scenarios])
-    rl_wins = np.array([s["rl_wins"] for s in sorted_scenarios])
-    
-    # Try thresholds at midpoints between sorted rho values
-    for i in range(1, len(rho_vals)):
-        threshold = (rho_vals[i-1] + rho_vals[i]) / 2
-        predictions = rho_vals > threshold
-        accuracy = np.mean(predictions == rl_wins)
-        if accuracy > best_accuracy:
-            best_accuracy = accuracy
-            best_threshold = threshold
-    
-    return best_threshold
-
-
-def bootstrap_rho_crit(scenarios: List[Dict[str, float]], n_bootstrap: int = BOOTSTRAP_SAMPLES) -> List[float]:
-    """Perform bootstrap resampling to estimate rho_crit distribution."""
-    n = len(scenarios)
-    boot_thresholds = []
-    
-    for i in range(n_bootstrap):
-        # Resample with replacement
-        indices = np.random.choice(n, size=n, replace=True)
-        boot_sample = [scenarios[j] for j in indices]
-        
-        threshold = find_critical_rho(boot_sample)
-        if threshold is not None:
-            boot_thresholds.append(threshold)
-        
-        if (i + 1) % 200 == 0:
-            print(f"  Bootstrap {i+1}/{n_bootstrap}...")
-    
-    return boot_thresholds
-
-
-# --------------------------------------------------------------------------- #
-# Main Pipeline
-# --------------------------------------------------------------------------- #
 def main():
     print("=" * 70)
-    print("PHASE 7: BIOMARKER THRESHOLD BOOTSTRAP STABILITY")
+    print("SCRIPT 62: EARLY vs DELAYED START AT EQUAL DRUG - rho THRESHOLD")
     print("=" * 70)
+    rows = load_real_params_for_track_bc(min_r2=0.5, require_growing=True)
+    rows = sorted(rows, key=lambda r: r["patient_id"])
+    cohort = [{"id": r["patient_id"], "rho": float(r["rho_per_day"]), "D_w": float(r["D_mm2_per_day"])} for r in rows]
+    rho = np.array([p["rho"] for p in cohort])
+    print(f"  cohort: {len(cohort)} growing MU-Glioma patients (R^2 >= 0.5), rho {rho.min():.4f}-{rho.max():.4f}/day")
 
-    # 1. Generate Phase 6 scenarios (reproducible)
-    print(f"\n[Phase 7] Generating {N_SCENARIOS} Phase 6 scenarios...")
-    scenarios_params = generate_phase6_scenarios(N_SCENARIOS)
+    val_err = validate_against_numpy(FastPDESolver(rho=cohort[0]["rho"], D_white=cohort[0]["D_w"]), KILL_ROW)
+    assert val_err < 1e-9, f"batched solver disagrees with numpy solver: {val_err}"
 
-    # 2. Evaluate all scenarios
-    print(f"[Phase 7] Evaluating {N_SCENARIOS} scenarios (RL vs Stupp)...")
-    scenario_results = []
-    for i, params in enumerate(scenarios_params):
-        print(f"  Scenario {i+1}/{N_SCENARIOS}: rho={params['rho']:.4f}, D_w={params['D_w']:.4f}, alpha={params['alpha_sens']:.4f}")
-        result = evaluate_scenario(params)
-        scenario_results.append(result)
-        winner = "RL" if result["rl_wins"] else "Stupp"
-        print(f"    RL: {result['rl_volume']:.2f} mm³, Stupp: {result['stupp_volume']:.2f} mm³ -> {winner} wins")
+    # Model ground truth: dense rho grid (D_w = rho/10, the cohort's convention), then refine
+    t0 = time.time()
+    grid = np.linspace(0.002, 0.12, 30)
+    g = run_patients([{"rho": r, "D_w": r / 10} for r in grid])
+    coarse = interp_crossing(grid, g["benefit_final"])
+    fine_grid = np.linspace(coarse - 0.004, coarse + 0.004, 17)
+    gf = run_patients([{"rho": r, "D_w": r / 10} for r in fine_grid])
+    model_rho_star = interp_crossing(fine_grid, gf["benefit_final"])
+    curve_rho = np.concatenate([grid, fine_grid])
+    order = np.argsort(curve_rho)
+    curve_b = np.concatenate([g["benefit_final"], gf["benefit_final"]])[order]
+    curve_bb = np.concatenate([g["benefit_burden"], gf["benefit_burden"]])[order]
+    curve_rho = curve_rho[order]
+    print(f"  model rho* = {model_rho_star:.5f}/day  (grid runs {time.time() - t0:.0f}s)")
+    print(f"  burden benefit over grid: min {curve_bb.min():+.3f}  max {curve_bb.max():+.3f}")
 
-    # 3. Bootstrap analysis
-    print(f"\n[Phase 7] Running {BOOTSTRAP_SAMPLES} bootstrap resamples...")
-    boot_thresholds = bootstrap_rho_crit(scenario_results, BOOTSTRAP_SAMPLES)
+    t0 = time.time()
+    c = run_patients(cohort)
+    b = c["benefit_final"]
+    print(f"  cohort runs {time.time() - t0:.0f}s; early start better (final) for {(b > 0).sum()}/{len(b)}")
 
-    # 4. Statistics
-    boot_thresholds = np.array(boot_thresholds)
-    mean_rho_crit = float(np.mean(boot_thresholds))
-    ci_lower = float(np.percentile(boot_thresholds, 2.5))
-    ci_upper = float(np.percentile(boot_thresholds, 97.5))
-    std_threshold = float(np.std(boot_thresholds))
+    cohort_interp = interp_crossing(rho, b)
+    cohort_quad = quadratic_crossing(rho, b)
+    rng = np.random.default_rng(BOOTSTRAP_SEED)
+    boot_i, boot_q = np.empty(BOOTSTRAP_SAMPLES), np.empty(BOOTSTRAP_SAMPLES)
+    for k in range(BOOTSTRAP_SAMPLES):
+        idx = rng.integers(0, len(rho), len(rho))
+        boot_i[k] = interp_crossing(rho[idx], b[idx])
+        boot_q[k] = quadratic_crossing(rho[idx], b[idx])
+    bi, bq = ci(boot_i), ci(boot_q)
+    above = [p for p, bf in zip(cohort, b) if p["rho"] > model_rho_star]
 
-    # Point estimate from full dataset
-    point_threshold = find_critical_rho(scenario_results)
-    
-    # Additional statistics
-    median_threshold = float(np.median(boot_thresholds))
-    iqr = float(np.percentile(boot_thresholds, 75) - np.percentile(boot_thresholds, 25))
-
-    # Additional analysis: logistic regression for more robust threshold
-    from scipy.optimize import curve_fit
-    
-    # Fit logistic: P(RL wins) = 1 / (1 + exp(-k*(rho - rho_crit)))
-    rho_vals = np.array([s["rho"] for s in scenario_results])
-    rl_wins = np.array([1.0 if s["rl_wins"] else 0.0 for s in scenario_results])
-    
-    def logistic(x, k, x0):
-        return 1 / (1 + np.exp(-k * (x - x0)))
-    
-    try:
-        popt, pcov = curve_fit(logistic, rho_vals, rl_wins, p0=[200, 0.024], maxfev=5000)
-        logistic_threshold = float(popt[1])
-        logistic_k = float(popt[0])
-    except:
-        logistic_threshold = point_threshold
-        logistic_k = 0.0
-
-    # 5. Compile metrics
     metrics = {
-        "bootstrap_samples": BOOTSTRAP_SAMPLES,
-        "n_scenarios": len(scenario_results),
-        "point_estimate_rho_crit": point_threshold,
-        "logistic_threshold_rho_crit": logistic_threshold,
-        "logistic_steepness_k": logistic_k,
-        "mean_rho_crit": mean_rho_crit,
-        "median_rho_crit": median_threshold,
-        "std_rho_crit": std_threshold,
-        "ci_95_lower": ci_lower,
-        "ci_95_upper": ci_upper,
-        "iqr": iqr,
-        "bootstrap_thresholds": boot_thresholds.tolist()[:100],  # Store first 100 for reference
-        "full_bootstrap_thresholds": boot_thresholds.tolist(),  # Store all
+        "question": "At equal drug (Stupp AUC), which patients benefit from starting treatment early?",
+        "framework": "equal drug budget; arms from src/rl/equal_budget_arms.py",
+        "budget_drug_auc": STUPP_BUDGET,
+        "early_start_arm": "ppo (script 66: combo from day 1 until budget spent)",
+        "delayed_start_arm": "stupp (first treatment day 20)",
+        "benefit_definition": "log(V_stupp / V_early) at day 90; > 0 means early start wins",
+        "cohort": {"source": "output/mu_glioma_params_real.csv", "filter": "trajectory == growing and r_squared >= 0.5",
+                   "n_patients": len(cohort), "rho_range": [float(rho.min()), float(rho.max())],
+                   "note": "No filter of the real cohort yields 61 patients; this is the loader's default quality filter."},
+        "validation_max_rel_err_vs_numpy_solver": val_err,
+        "model_threshold": {"rho_star_per_day": model_rho_star, "resolution_per_day": float(fine_grid[1] - fine_grid[0]),
+                            "benefit_curve": {"rho": curve_rho.tolist(), "benefit_final": curve_b.tolist(),
+                                              "benefit_burden": curve_bb.tolist()}},
+        "cohort_threshold": {"interpolated_rho_star": cohort_interp, "quadratic_fit_rho_star": cohort_quad},
+        "bootstrap": {"n_resamples": BOOTSTRAP_SAMPLES, "seed": BOOTSTRAP_SEED,
+                      "interpolated": bi, "quadratic_fit": bq},
+        "patients": [{"id": p["id"], "rho": p["rho"], "benefit_final": float(bf), "benefit_burden": float(bb),
+                      "early_start_better_final": bool(bf > 0), "stupp_final_mm3": float(sf), "early_final_mm3": float(ef),
+                      "stupp_auc": float(sa), "early_auc": float(ea)}
+                     for p, bf, bb, sf, ef, sa, ea in zip(cohort, b, c["benefit_burden"], c["stupp_final"],
+                                                          c["early_final"], c["stupp_auc"], c["early_auc"])],
+        "summary": {
+            "rho_star_model_per_day": model_rho_star,
+            "rho_star_cohort_per_day": cohort_interp,
+            "rho_star_ci95_per_day": bi["ci95"],
+            "ci_identifiable_fraction": bi["identifiable_fraction"],
+            "n_patients_above_rho_star": len(above),
+            "patients_above_rho_star": [p["id"] for p in above],
+            "n_early_start_better_final": int((b > 0).sum()),
+            "pct_early_start_better_final": float((b > 0).mean() * 100),
+            "pct_early_start_better_burden": float((c["benefit_burden"] > 0).mean() * 100),
+            "mean_benefit_final": float(b.mean()),
+            "mean_benefit_burden": float(c["benefit_burden"].mean()),
+            "drug_auc_early_mean": float(c["early_auc"].mean()), "drug_auc_stupp_mean": float(c["stupp_auc"].mean()),
+        },
+        "notes": [
+            "Outcome is a deterministic function of rho in this model (diffusion negligible, identical seed tumour);"
+            " the bootstrap CI reflects how densely the cohort samples rho near the threshold.",
+            "Above rho*, delaying treatment lowers day-90 volume because logistic saturation slows untreated growth;"
+            " early start still lowers mean 90-day burden for every patient.",
+            "Real rho values are net growth rates fitted to clinically treated tumours, used here as intrinsic rho.",
+        ],
     }
+    path = OUTPUT_DIR / "biomarker_stability_metrics.json"
+    path.write_text(json.dumps(metrics, indent=2))
+    print(f"[Metrics] Saved -> {path}")
 
-    # 6. Save metrics
-    with open(OUTPUT_DIR / "biomarker_stability_metrics.json", "w") as f:
-        json.dump(metrics, f, indent=2)
-    print(f"\n[Metrics] Saved -> {OUTPUT_DIR / 'biomarker_stability_metrics.json'}")
+    fig, axes = plt.subplots(1, 3, figsize=(20, 6))
+    ax = axes[0]
+    ax.plot(curve_rho, curve_b, "k-", lw=1.5, label="model (dense rho grid)")
+    ax.scatter(rho, b, c=np.where(b > 0, "green", "firebrick"), s=35, edgecolors="black", zorder=3,
+               label=f"patients (n={len(rho)})")
+    ax.axhline(0, color="gray", lw=0.8)
+    ax.axvline(model_rho_star, color="purple", ls="--", label=f"model rho* = {model_rho_star:.4f}")
+    if bi["ci95"]:
+        ax.axvspan(*bi["ci95"], color="purple", alpha=0.15, label="bootstrap 95% CI")
+    ax.set_xlabel("rho (1/day)")
+    ax.set_ylabel("log(V_Stupp / V_early) at day 90")
+    ax.set_title("Panel 1: Day-90 benefit of starting early (equal drug)")
+    ax.legend(fontsize=8)
+    ax.grid(alpha=0.3)
 
-    # 7. Visualization
-    print("\n[Phase 7] Generating biomarker stability visualization...")
-    
-    fig, axes = plt.subplots(1, 2, figsize=(14, 6))
+    ax = axes[1]
+    ax.plot(curve_rho, curve_bb, "k-", lw=1.5, label="model")
+    ax.scatter(rho, c["benefit_burden"], color="green", s=35, edgecolors="black", zorder=3, label="patients")
+    ax.axhline(0, color="gray", lw=0.8)
+    ax.set_xlabel("rho (1/day)")
+    ax.set_ylabel("log(burden_Stupp / burden_early)")
+    ax.set_title("Panel 2: Mean 90-day burden benefit of starting early")
+    ax.legend(fontsize=8)
+    ax.grid(alpha=0.3)
 
-    # Panel 1: Histogram + KDE
-    ax1 = axes[0]
-    n, bins, patches = ax1.hist(boot_thresholds, bins=40, density=True, alpha=0.6, 
-                                 color='#1f77b4', edgecolor='black', linewidth=0.5,
-                                 label='Bootstrap samples')
-    
-    # KDE overlay
-    kde = gaussian_kde(boot_thresholds)
-    x_kde = np.linspace(min(boot_thresholds), max(boot_thresholds), 200)
-    ax1.plot(x_kde, kde(x_kde), 'r-', linewidth=2, label='KDE')
-    
-    # Markers
-    ax1.axvline(mean_rho_crit, color='red', linestyle='--', linewidth=2, 
-                label=f'Mean: {mean_rho_crit:.4f}')
-    ax1.axvline(median_threshold, color='orange', linestyle='--', linewidth=2,
-                label=f'Median: {median_threshold:.4f}')
-    ax1.axvline(ci_lower, color='red', linestyle=':', linewidth=2,
-                label=f'95% CI: [{ci_lower:.4f}, {ci_upper:.4f}]')
-    ax1.axvline(ci_upper, color='red', linestyle=':', linewidth=2)
-    if point_threshold:
-        ax1.axvline(point_threshold, color='black', linestyle='-', linewidth=2,
-                    label=f'Full-data estimate: {point_threshold:.4f}')
-    if logistic_threshold:
-        ax1.axvline(logistic_threshold, color='green', linestyle='-.', linewidth=2,
-                    label=f'Logistic fit: {logistic_threshold:.4f}')
-    
-    ax1.set_xlabel('Critical Proliferation Rate ρ_crit (1/day)')
-    ax1.set_ylabel('Density')
-    ax1.set_title('Panel 1: Bootstrap Distribution of Critical ρ Threshold\n(Where RL Outperforms Stupp)')
-    ax1.legend(loc='upper left', fontsize=9)
-    ax1.grid(alpha=0.3)
-
-    # Panel 2: Q-Q plot / Empirical CDF
-    ax2 = axes[1]
-    sorted_thresholds = np.sort(boot_thresholds)
-    n = len(sorted_thresholds)
-    ecdf = np.arange(1, n+1) / n
-    ax2.plot(sorted_thresholds, ecdf, 'b-', linewidth=2, label='Empirical CDF')
-    
-    # Normal approximation
-    from scipy.stats import norm
-    norm_cdf = norm.cdf(sorted_thresholds, mean_rho_crit, std_threshold)
-    ax2.plot(sorted_thresholds, norm_cdf, 'r--', linewidth=1.5, label='Normal approx.')
-    
-    ax2.axvline(mean_rho_crit, color='red', linestyle='--', label=f'Mean: {mean_rho_crit:.4f}')
-    ax2.axvline(ci_lower, color='red', linestyle=':', label=f'95% CI')
-    ax2.axvline(ci_upper, color='red', linestyle=':')
-    
-    ax2.set_xlabel('Critical Proliferation Rate ρ_crit (1/day)')
-    ax2.set_ylabel('Cumulative Probability')
-    ax2.set_title('Panel 2: Empirical CDF of Bootstrap Thresholds')
-    ax2.legend(loc='lower right')
-    ax2.grid(alpha=0.3)
-
-    plt.suptitle('Phase 7: Biomarker Threshold Bootstrap Stability\n(Critical ρ where RL > Stupp)', fontsize=16, fontweight='bold')
+    ax = axes[2]
+    for s, lab, col in ((boot_i, "interpolated", "#1f77b4"), (boot_q, "quadratic fit", "#ff7f0e")):
+        ok = s[np.isfinite(s)]
+        if len(ok):
+            ax.hist(ok, bins=40, alpha=0.6, color=col, label=f"{lab} ({len(ok)}/{len(s)} identifiable)")
+    ax.axvline(model_rho_star, color="purple", ls="--", label="model rho*")
+    ax.set_xlabel("rho* estimate (1/day)")
+    ax.set_ylabel("bootstrap count")
+    ax.set_title(f"Panel 3: Bootstrap of rho* ({BOOTSTRAP_SAMPLES} resamples)")
+    ax.legend(fontsize=8)
+    ax.grid(alpha=0.3)
+    plt.suptitle("Script 62: Who benefits from early treatment at equal drug?", fontsize=15, fontweight="bold")
     plt.tight_layout()
-    plt.savefig(OUTPUT_DIR / "biomarker_stability.png", dpi=200, bbox_inches="tight")
+    fig_path = OUTPUT_DIR / "biomarker_stability.png"
+    plt.savefig(fig_path, dpi=200, bbox_inches="tight")
     plt.close()
-    print(f"[Plot] Saved -> {OUTPUT_DIR / 'biomarker_stability.png'}")
+    print(f"[Plot] Saved -> {fig_path}")
 
-    # 8. Summary
+    s = metrics["summary"]
     print("\n" + "=" * 70)
-    print("PHASE 7: BIOMARKER THRESHOLD BOOTSTRAP STABILITY COMPLETE")
-    print("=" * 70)
-    print(f"Bootstrap samples: {BOOTSTRAP_SAMPLES}")
-    print(f"Point estimate (full data): {point_threshold:.4f} day⁻¹")
-    print(f"Logistic fit threshold: {logistic_threshold:.4f} day⁻¹ (k={logistic_k:.1f})")
-    print(f"Bootstrap mean: {mean_rho_crit:.4f} ± {std_threshold:.4f} day⁻¹")
-    print(f"95% CI: [{ci_lower:.4f}, {ci_upper:.4f}] day⁻¹")
-    print(f"Median: {median_threshold:.4f}, IQR: {iqr:.4f}")
-    print(f"\nClinical Interpretation:")
-    print(f"  If patient ρ > {ci_upper:.4f}: RL Adaptive strongly recommended")
-    print(f"  If patient ρ < {ci_lower:.4f}: Standard Stupp likely sufficient")
-    print(f"  Ambiguous zone: ρ ∈ [{ci_lower:.4f}, {ci_upper:.4f}]")
-    print(f"\nOutputs saved to {OUTPUT_DIR}/")
-    print("  - biomarker_stability_metrics.json")
-    print("  - biomarker_stability.png")
+    print(f"model rho* {s['rho_star_model_per_day']:.5f}  cohort rho* {s['rho_star_cohort_per_day']:.5f}  "
+          f"95% CI {s['rho_star_ci95_per_day']}  identifiable {s['ci_identifiable_fraction']:.2f}")
+    print(f"early start better (final) {s['n_early_start_better_final']}/{len(cohort)}; "
+          f"better on burden {s['pct_early_start_better_burden']:.0f}%; above rho*: {s['patients_above_rho_star']}")
 
 
 if __name__ == "__main__":
