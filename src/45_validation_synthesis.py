@@ -436,7 +436,7 @@ def _fractal_dimension_boxcount(u: np.ndarray, threshold: float = SEED_THRESHOLD
     padded = np.zeros((P, P), dtype=np.uint8)
     padded[:H, :W] = mask
     sizes = np.unique(
-        np.floor(np.logspace(np.log2(2), np.log2(P / 2), 18)).astype(int))
+        np.floor(np.logspace(np.log2(2), np.log2(P / 2), 18, base=2)).astype(int))
     sizes = sizes[sizes >= 2]
     counts, inv_eps = [], []
     for s in sizes:
