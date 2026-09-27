@@ -17,13 +17,17 @@ Data
 
 Stage "atlas": fit a diffusion tensor to each UCSF-PDGM patient's raw DWI, check the gradient
 sign convention with a fibre-coherence index, register native FA to the patient's SRI24 FA
-(12-parameter affine, normalised cross-correlation), rotate the tensors into SRI24 space
-(finite-strain reorientation) and average them over patients with tumour voxels excluded.
-The result is a population DTI atlas at 2 mm.
+(12-parameter affine, normalised cross-correlation, then a SyN deformable refinement),
+rotate the tensors into SRI24 space (finite-strain reorientation, spatially-varying Jacobian
+from the affine plus the local deformable warp gradient) and average them over patients with
+tumour voxels excluded. The result is a population DTI atlas at 2 mm.
 
 Stage "forecast": for every MU-Glioma-Post patient with two scans and a positive interval,
-solve du/dt = div(D grad u) + rho u (1 - u) on the 2 mm grid (brain domain, no-flux
-boundary, full-tensor flux discretisation) from u0 = scan-1 mask and threshold u > 0.5.
+solve du/dt = div(D grad u) + rho u (1 - u) - (alpha C(t) + beta R(t)) u on the 2 mm grid
+(brain domain, no-flux boundary, full-tensor flux discretisation) from u0 = scan-1 mask and
+threshold u > 0.5. C(t) and R(t) are the patient's TMZ concentration and radiation dose rate
+from the MU-Glioma-Post clinical schedule (alpha, beta fixed at the repo-wide defaults in
+src/treatment_aware_pde.py; patients without a recorded schedule get no kill term).
 Arms:
   anisotropic  D = d * T_atlas / MD_ref, optional anisotropy sharpening r (Jbabdi 2005)
   iso_same     isotropic, same local mean diffusivity and the same (rho, d) chosen for the
@@ -50,6 +54,9 @@ import numpy as np
 import torch
 from scipy import ndimage, optimize, stats
 
+from src.radiation_model import RadiationSchedule
+from src.treatment_aware_pde import TreatmentSchedule
+
 PROJECT_ROOT = Path(__file__).resolve().parent
 OUT_DIR = PROJECT_ROOT / "output" / "forecast_validation"
 UCSF_DIR = Path(os.environ.get("UCSF_PDGM_DIR", r"C:\Users\vihan\Downloads\ucsf-pdgm-grade23"))
@@ -71,6 +78,8 @@ GRID2 = (120, 120, 77)        # 2 mm grid (last 1 mm slice dropped)
 RHOS = [0.0, 0.01, 0.03, 0.1]            # 1/day
 DS = [0.01, 0.03, 0.1, 0.3]              # mm^2/day, brain-median mean diffusivity
 SHARPEN = [1.0, 10.0]                    # anisotropy sharpening factor r
+ALPHA_TMZ = 0.08                         # 1/day per unit TMZ concentration, treatment_aware_pde.py default
+BETA_RT = 0.03                           # 1/day per Gy/day, treatment_aware_pde.py default
 U_VISIBLE = 0.5
 MARGIN_VOX = 20                          # crop margin around scan-1 tumour (2 mm voxels)
 ATLAS_MIN_COUNT = 10
@@ -181,17 +190,30 @@ class TensorFK:
             out = out + (Fp.narrow(dim, 1, Fp.shape[dim] - 1) - Fp.narrow(dim, 0, Fp.shape[dim] - 1)) / self.h
         return out
 
-    def run(self, u0: np.ndarray, rhos, t_end: float, max_dt: float = 0.5):
-        """Integrate a batch (one member per rho) to t_end; returns (B, X, Y, Z) numpy."""
+    def run(self, u0: np.ndarray, rhos, t_end: float, max_dt: float = 0.5,
+            kill_schedule: TreatmentSchedule | None = None, t_start: float = 0.0,
+            alpha: float = ALPHA_TMZ, beta: float = BETA_RT):
+        """Integrate a batch (one member per rho) to t_end; returns (B, X, Y, Z) numpy.
+
+        kill_schedule adds a spatially uniform -( alpha*C(t) + beta*R(t) )*u sink, C and R the
+        TMZ concentration and radiation dose rate at simulation day t_start + elapsed time."""
         rho = torch.as_tensor(np.asarray(rhos, dtype=np.float32))[:, None, None, None]
         u = torch.as_tensor(u0.astype(np.float32))[None].repeat(len(rhos), 1, 1, 1) * self.m
+        kmax = 0.0
+        if kill_schedule is not None:
+            rt_max = kill_schedule.radiation.corrected_dose_per_fraction if kill_schedule.radiation else 0.0
+            kmax = alpha + beta * rt_max
         dt_max = min(max_dt, 0.9 * self.h ** 2 / (6.0 * self.lam_max),
-                     0.05 / max(float(rho.max()), 1e-6))
+                     0.05 / max(float(rho.max()) + kmax, 1e-6))
         n = max(1, math.ceil(t_end / dt_max))
         dt = t_end / n
         with torch.no_grad():
-            for _ in range(n):
-                u = (u + dt * (self.div_flux(u) + rho * u * (1 - u))).clamp_(0.0, 1.0) * self.m
+            for step in range(n):
+                kill = 0.0
+                if kill_schedule is not None:
+                    t = t_start + step * dt
+                    kill = alpha * kill_schedule.tmz_concentration(t) + beta * kill_schedule.radiation_dose_rate(t)
+                u = (u + dt * (self.div_flux(u) + rho * u * (1 - u) - kill * u)).clamp_(0.0, 1.0) * self.m
         return u.numpy(), n
 
 
@@ -255,6 +277,36 @@ def selftest() -> dict:
     b = np.zeros((10, 10), bool); b[2:7] = True
     res["dice_known_value"] = dice(a, b)                     # 2*30/(50+50) = 0.6
     res["dice_pass"] = abs(res["dice_known_value"] - 0.6) < 1e-12
+    # 5. treatment kill term matches closed-form exponential decay (no diffusion, rho = 0)
+    shp5 = (6, 6, 6)
+    mask5 = np.ones(shp5, bool)
+    zero_tensor = np.zeros(shp5 + (6,), np.float32)
+    sched = TreatmentSchedule(tmz_bolus_days=(),
+                              radiation=RadiationSchedule(0.0, 50.0, dose_per_fraction_gy=2.0, fractions_per_week=7))
+    s = TensorFK(zero_tensor, mask5)
+    u0 = np.full(shp5, 0.8, np.float32)
+    t_end5 = 10.0
+    u, _ = s.run(u0, [0.0], t_end5, kill_schedule=sched, t_start=0.0)
+    k = BETA_RT * 2.0                                        # constant daily radiation dose rate
+    expected = 0.8 * math.exp(-k * t_end5)
+    res["kill_term_numeric"] = float(u[0].mean())
+    res["kill_term_analytic"] = expected
+    res["kill_term_rel_err"] = abs(res["kill_term_numeric"] / expected - 1)
+    res["kill_term_pass"] = res["kill_term_rel_err"] < 0.02
+    # 6. deformable registration recovers a smooth synthetic warp (residual drops by > half)
+    shp6 = (48, 48, 32)
+    zz6, yy6, xx6 = np.meshgrid(*[np.arange(n) for n in shp6], indexing="ij")
+    fixed6 = np.exp(-((xx6 - 24) ** 2 + (yy6 - 24) ** 2 + (zz6 - 16) ** 2) / 60.0).astype(np.float64)
+    moving6 = ndimage.shift(fixed6, (1.5, -1.0, 0.5), order=1, mode="constant")
+    field6 = register_deformable(fixed6, moving6)
+    idx6 = np.stack(np.meshgrid(*[np.arange(n) for n in shp6], indexing="ij"), -1).astype(np.float64)
+    sample6 = (idx6 + field6).reshape(-1, 3).T
+    warped6 = ndimage.map_coordinates(moving6, sample6, order=1, mode="constant").reshape(shp6)
+    err_before = float(np.abs(fixed6 - moving6).sum())
+    err_after = float(np.abs(fixed6 - warped6).sum())
+    res["deformable_err_before"] = err_before
+    res["deformable_err_after"] = err_after
+    res["deformable_pass"] = err_after < 0.5 * err_before
     res["all_pass"] = all(v for k, v in res.items() if k.endswith("_pass"))
     return res
 
@@ -355,6 +407,19 @@ def register_affine(fixed: np.ndarray, moving: np.ndarray, A0: np.ndarray, t0: n
     return A, t, -float(r.fun)
 
 
+def register_deformable(fixed: np.ndarray, moving: np.ndarray) -> np.ndarray:
+    """SyN displacement field on `fixed`'s own index grid: for grid index i, moving sampled at
+    i + field[i] should match fixed[i] (both images already share the same grid, e.g. moving is
+    the affine-resampled native FA on the fixed 2 mm grid). Corrects residual local misalignment
+    (fibre tract curvature, mass effect) left over after the global affine."""
+    from dipy.align.imwarp import SymmetricDiffeomorphicRegistration
+    from dipy.align.metrics import CCMetric
+    metric = CCMetric(3, sigma_diff=2.0, radius=4)
+    sdr = SymmetricDiffeomorphicRegistration(metric, level_iters=[25, 10])
+    mapping = sdr.optimize(fixed.astype(np.float64), moving.astype(np.float64))
+    return mapping.get_forward_field().astype(np.float32)
+
+
 def _rot(ax: int, deg: float) -> np.ndarray:
     c, s_ = math.cos(math.radians(deg)), math.sin(math.radians(deg))
     i, j = [k for k in range(3) if k != ax]
@@ -433,17 +498,27 @@ def atlas_patient(pid: str) -> dict:
     fa_s2 = to_2mm(fa_s1)
     A, t, ncc = register_affine(fa_s2, ndimage.gaussian_filter(fa_n, 0.7), A, t, 2.0)
 
-    # resample tensor components and reorient (finite strain)
-    n_idx = (s1 @ A.T + t).T
+    # deformable refinement: correct residual local misalignment left after the global affine
+    n_idx_affine = (s1 @ A.T + t).T
+    mov_fa_2mm = ndimage.map_coordinates(ndimage.gaussian_filter(fa_n, 0.7), n_idx_affine,
+                                         order=1, mode="constant").reshape(GRID2)
+    disp2mm = register_deformable(fa_s2, mov_fa_2mm)
+    s1c = s1 + 2.0 * disp2mm.reshape(-1, 3)
+
+    # resample tensor components and reorient (finite strain, spatially-varying Jacobian:
+    # affine J times the local Jacobian of the deformable warp)
+    n_idx = (s1c @ A.T + t).T
     T6 = mat_to_six(Tn)
     comps = np.stack([ndimage.map_coordinates(T6[..., i], n_idx, order=1, mode="constant")
                       for i in range(6)], -1).reshape(GRID2 + (6,))
     inside = ndimage.map_coordinates(brain_n.astype(np.float32), n_idx, order=1,
                                      mode="constant").reshape(GRID2) > 0.99
-    J = np.diag(vox_n) @ A
-    U, _, Vt = np.linalg.svd(J)
+    J_affine = np.diag(vox_n) @ A
+    jac_disp = np.stack([np.stack(np.gradient(disp2mm[..., c]), -1) for c in range(3)], -2)
+    Jtot = J_affine @ (np.eye(3) + jac_disp)
+    U, _, Vt = np.linalg.svd(Jtot)
     R = U @ Vt
-    Ts = R.T @ six_to_mat(comps) @ R
+    Ts = np.swapaxes(R, -1, -2) @ six_to_mat(comps) @ R
     ws, vs = np.linalg.eigh(Ts)
     fa_new, md_new = fa_md(np.clip(ws, 0, None))
     brain2 = (fa_s2 > 0.02) & inside
@@ -456,9 +531,12 @@ def atlas_patient(pid: str) -> dict:
     tum = ndimage.binary_dilation(to_2mm(seg) > 0, iterations=2)
     valid = brain2 & ~tum & (md_new > 0) & np.isfinite(ws).all(-1) & (ws[..., 0] >= 0)
     good = ncc > 0.5 and fa_corr > 0.5
+    disp_mm = H * np.linalg.norm(disp2mm[brain2], axis=-1)  # 2 mm-grid index units -> mm
     rec = {"patient_id": pid, "gradient_flip_by_coherence": best_flip, "fibre_coherence": fci,
            "registration_ncc_init_4mm": ncc_init, "registration_ncc_2mm": ncc,
            "fa_corr_vs_provided_sri24": fa_corr, "cc_fraction_left_right": cc_lr,
+           "deformable_disp_median_mm": float(np.median(disp_mm)) if disp_mm.size else None,
+           "deformable_disp_p90_mm": float(np.percentile(disp_mm, 90)) if disp_mm.size else None,
            "n_valid_voxels": int(valid.sum()), "included": bool(good), "seconds": round(time.time() - t0_, 1)}
     CACHE_DIR.mkdir(parents=True, exist_ok=True)
     tmp = CACHE_DIR / f"atlas_{pid}.tmp.npz"
@@ -544,6 +622,17 @@ def arm_tensor(atlas, arm: str, r: float, box) -> np.ndarray:
     raise ValueError(arm)
 
 
+def build_schedule(treatment: dict | None) -> TreatmentSchedule:
+    """TreatmentSchedule from a cohort record's treatment_schedule dict (radiation_start_day,
+    radiation_end_day, tmz_start_day, tmz_end_day); missing fields give an untreated schedule."""
+    treatment = treatment or {}
+    rs, re_ = treatment.get("radiation_start_day"), treatment.get("radiation_end_day")
+    radiation = RadiationSchedule(rs, re_) if rs is not None and re_ is not None and re_ > rs else None
+    ts, te = treatment.get("tmz_start_day"), treatment.get("tmz_end_day")
+    tmz_days = tuple(float(d) for d in range(int(ts), int(te) + 1)) if ts is not None and te is not None and te >= ts else ()
+    return TreatmentSchedule(tmz_bolus_days=tmz_days, radiation=radiation)
+
+
 def forecast_pairs():
     cohort = json.loads(COHORT_JSON.read_text())
     pairs, excluded = [], []
@@ -559,7 +648,8 @@ def forecast_pairs():
         if dt <= 0:
             excluded.append((p["patient_id"], f"non-positive interval {dt}"))
             continue
-        pairs.append({"patient_id": p["patient_id"], "tp1": a["number"], "tp2": b["number"], "dt_days": dt})
+        pairs.append({"patient_id": p["patient_id"], "tp1": a["number"], "tp2": b["number"], "dt_days": dt,
+                      "t1_day": a["day_from_diagnosis"], "treatment": p.get("treatment_schedule")})
     return pairs, excluded
 
 
@@ -592,6 +682,7 @@ def forecast_patient(pair, atlas):
     rec["dice_volume_matched"] = {"uniform_dilation": dice(dist <= np.sort(dist.ravel())[n2 - 1], tum2)}
     rec["dice"]["grid"] = {}
     rec["dice_volume_matched"]["grid"] = {}
+    schedule = build_schedule(pair.get("treatment"))
     runs = [("aniso", r) for r in SHARPEN] + [("iso_same", 1.0), ("iso_homog", 1.0)]
     steps = 0
     for arm, r in runs:
@@ -599,7 +690,7 @@ def forecast_patient(pair, atlas):
         T0[tum1[box] & ~atlas["tissue"][box]] = np.array([1, 1, 1, 0, 0, 0], np.float32)
         for dval in DS:
             solver = TensorFK(T0 * dval, dom)
-            u, n = solver.run(u0, RHOS, pair["dt_days"])
+            u, n = solver.run(u0, RHOS, pair["dt_days"], kill_schedule=schedule, t_start=pair["t1_day"])
             steps += n
             for i, rho in enumerate(RHOS):
                 key = f"{arm}|r={r:g}|d={dval:g}|rho={rho:g}"
@@ -715,7 +806,7 @@ def holm(pvals: dict) -> dict:
 def atlas_dispersion_qc() -> dict:
     """How much anisotropy the population average lost: FA of the mean tensor vs the mean of
     each patient's own FA, over atlas tissue voxels. A large drop means fibre orientations
-    disagree across registered patients (affine registration only)."""
+    disagree across registered patients (after affine + deformable registration)."""
     z = np.load(ATLAS_NPZ)
     tissue = (z["count"] >= int(z["min_count"])).ravel()
     fsum = np.zeros(tissue.size)
@@ -780,9 +871,12 @@ def stage_report() -> None:
                  "excluded_pairs": g["excluded"], "skipped_patients": skipped,
                  "interval_days_median": float(np.median([r["dt_days"] for r in recs])),
                  "interval_days_range": [float(min(r["dt_days"] for r in recs)),
-                                         float(max(r["dt_days"] for r in recs))]},
+                                         float(max(r["dt_days"] for r in recs))],
+                 "n_with_radiation_schedule": int(sum(bool(build_schedule(r.get("treatment")).radiation) for r in recs)),
+                 "n_with_tmz_schedule": int(sum(bool(build_schedule(r.get("treatment")).tmz_bolus_days) for r in recs))},
         "parameter_grid": {"rho_per_day": g["rhos"], "d_mm2_per_day": g["ds_mm2_per_day"],
-                           "anisotropy_sharpening_r": g["sharpen"], "u_visible": g["u_visible"]},
+                           "anisotropy_sharpening_r": g["sharpen"], "u_visible": g["u_visible"],
+                           "kill_term": {"alpha_tmz_per_day": ALPHA_TMZ, "beta_rt_per_gy_per_day": BETA_RT}},
         "primary_dice_out_of_fold": primary,
         "primary_tests": tests,
         "best_arm_by_mean_dice": best_arm,
@@ -794,12 +888,15 @@ def stage_report() -> None:
         "solver_selftest": st,
         "limitations": [
             "MU-Glioma-Post has no DTI; the anisotropic arm uses a population DTI atlas built from 62 "
-            "UCSF-PDGM patients registered to the same SRI24 space, not each patient's own tensors, and "
-            "ignores mass-effect deformation.",
-            "Averaging affinely registered tensors loses anisotropy (see dti_atlas_orientation_dispersion): "
-            "fibre directions do not line up exactly across patients. The sharpening factor r = 10 was offered "
-            "to compensate; cross-validation did not select it.",
-            "The growth model has no treatment term; scan pairs are post-operative and under therapy.",
+            "UCSF-PDGM patients registered to the same SRI24 space (affine + SyN deformable), not each "
+            "patient's own tensors, and ignores mass-effect deformation.",
+            "Averaging registered tensors can still lose anisotropy (see dti_atlas_orientation_dispersion): "
+            "fibre directions do not line up exactly across patients even after deformable refinement. The "
+            "sharpening factor r = 10 was offered to compensate; cross-validation did not select it.",
+            "The growth model has a treatment kill term (alpha*TMZ concentration + beta*radiation dose rate) "
+            "driven by each patient's recorded radiation/TMZ start-end days; patients missing those clinical "
+            "fields (see dti_atlas_qc / cohort coverage) get no kill term for that interval. alpha and beta are "
+            "fixed at repo-wide literature defaults, not refit per patient.",
             "Whole-tumour masks (all labels) are forecast; sub-regions are not scored separately.",
             "The volume-matched secondary analysis uses the observed scan-2 volume and is a shape test, "
             "not a forecast.",
