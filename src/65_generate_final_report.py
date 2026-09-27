@@ -14,6 +14,8 @@ Inputs (a missing or unreadable input is recorded as such, never defaulted):
   62 biomarker_stability_metrics.json    early-vs-delayed start rho threshold
   64 phase8_cohort_metrics.json          equal-budget virtual cohort
   66 rl_equal_budget/evaluate.json       RL equal-budget study
+  67 rl_kill_conditioned/evaluate.json   policies conditioned on patient drug sensitivity
+  68 ttp_equal_budget/evaluate.json      time-to-progression endpoint
 
 Every treatment comparison must use the same drug budget as the shared arms
 module (src/rl/equal_budget_arms.py); the report checks this.
@@ -45,7 +47,12 @@ INPUTS = {
     "62_early_start_threshold": "biomarker_stability_metrics.json",
     "64_virtual_cohort": "phase8_cohort_metrics.json",
     "66_rl_equal_budget": "rl_equal_budget/evaluate.json",
+    "67_kill_conditioned": "rl_kill_conditioned/evaluate.json",
+    "68_time_to_progression": "ttp_equal_budget/evaluate.json",
 }
+S67_ARMS = ["efficiency_rule", "dagger_cond", "ppo_cond_ft", "ppo_cond", "dagger_blind", "ppo_blind_ft", "ppo66",
+            "oracle"]
+S68_ARMS = ["heuristic59", "efficiency_rule", "dagger_cond_day90", "ppo_cond_ft_day90", "dagger_ttp", "ttp_oracle"]
 ARM_LABELS = {"heuristic_budgeted": "Budgeted heuristic (59)", "ppo": "RL: PPO (66)",
               "dagger_oracle": "DAgger oracle (66)"}
 S66_ARM_NAMES = {"heuristic_budgeted": "heuristic59", "ppo": "ppo_final_s0", "dagger_oracle": "bc_dagger_final"}
@@ -123,7 +130,33 @@ def build_summary(d: Dict[str, Any], status: Dict[str, str]) -> Dict[str, Any]:
     if "52_robust_mpc" in d:
         s["52_robust_mpc"] = d["52_robust_mpc"]
     if "51_inverse_estimation" in d:
-        s["51_inverse_estimation"] = d["51_inverse_estimation"]
+        s["51_inverse_estimation"] = d["51_inverse_estimation"]["summary"]
+    if "67_kill_conditioned" in d:
+        m = d["67_kill_conditioned"]
+        budgets["67"] = m.get("budget")
+        s["67_kill_conditioned"] = {
+            set_name: {"n": blk["n"], "arms": {a: {
+                "win_rate_vs_stupp_pct": blk["arms"][a]["win_rate_vs_stupp_pct"],
+                "mean_log_ratio_final_vs_stupp": blk["arms"][a]["mean_log_ratio_final_vs_stupp"],
+                "mean_log_ratio_final_vs_stupp_ci95": blk["arms"][a]["mean_log_ratio_final_vs_stupp_ci95"],
+                "mean_log_ratio_final_vs_oracle": blk["arms"][a]["mean_log_ratio_final_vs_oracle"],
+                "wilcoxon_p_vs_stupp": blk["arms"][a]["wilcoxon_p_vs_stupp"],
+                "max_drug_auc": blk["arms"][a]["max_drug_auc"]} for a in S67_ARMS}}
+            for set_name, blk in m["sets"].items()}
+    if "68_time_to_progression" in d:
+        m = d["68_time_to_progression"]
+        budgets["68"] = m.get("budget")
+        s["68_time_to_progression"] = {
+            "horizon_day": m["horizon_day"], "progression_factor": m["progression_factor"],
+            "sets": {set_name: {"n": blk["n"], "stupp_rmst_days": blk["arms"]["stupp"]["rmst_days"], "arms": {a: {
+                k: blk["arms"][a][k] for k in ("rmst_days", "ttp_minus_stupp_days_mean", "ttp_minus_stupp_days_ci95",
+                                               "n_longer_ttp", "n_equal_ttp", "n_shorter_ttp", "wilcoxon_p_vs_stupp",
+                                               "max_drug_auc")} for a in S68_ARMS}}
+                     for set_name, blk in m["sets"].items()},
+            "full_pde_check_cohort64_max_ttp_diff_days": max(
+                a["ttp_max_abs_diff_vs_reaction_days"] for a in m["full_pde_check_cohort64"]["arms"].values()),
+            "note": "ttp_oracle is the best of structured candidates; unstructured CEM beat it on 2/9 check "
+                    "patients (see output/ttp_equal_budget/oracle.json), so it is a lower bound on the optimum."}
 
     s["budget_consistency"] = {
         "per_study_budget": budgets,
@@ -204,6 +237,20 @@ def create_master_figure(d: Dict[str, Any], s: Dict[str, Any], path: Path):
         m = s["64_virtual_cohort"]["arms"]["ppo"]
         lines.append(f"64: PPO win {m['win_rate_vs_stupp_pct']:.0f}%, log-ratio {m['mean_log_ratio_final_vs_stupp']:+.3f}"
                      f" CI {['%+.3f' % v for v in m['mean_log_ratio_ci95']]}, Wilcoxon p {m['wilcoxon_p_value']:.2g}")
+    if "67_kill_conditioned" in s:
+        m = s["67_kill_conditioned"]["cohort64"]["arms"]["dagger_cond"]
+        lines.append(f"67: sensitivity-conditioned DAgger on 64 cohort: win {m['win_rate_vs_stupp_pct']:.0f}%, "
+                     f"log-ratio {m['mean_log_ratio_final_vs_stupp']:+.3f}, gap to oracle "
+                     f"{m['mean_log_ratio_final_vs_oracle']:+.4f}")
+    if "68_time_to_progression" in s:
+        m = s["68_time_to_progression"]["sets"]
+        lines.append("68: TTP oracle - Stupp (days): " + ", ".join(
+            f"{k} {v['arms']['ttp_oracle']['ttp_minus_stupp_days_mean']:+.1f}" for k, v in m.items()))
+    if "51_inverse_estimation" in s:
+        m = s["51_inverse_estimation"]
+        lines.append(f"51: {m['n_rho_interior']}/{m['n_patients_with_2plus_scans']} interior rho fits "
+                     f"(median {m['rho_interior_median_per_day']:.4f}/day); D identifiable: "
+                     f"{m['D_identifiable_from_volumes']}")
     if "52_robust_mpc" in s:
         m = s["52_robust_mpc"]
         lines.append(f"52: robust vs standard MPC final volume {m['robust']['final_volume_mean_std'][0]:.4f} vs "
