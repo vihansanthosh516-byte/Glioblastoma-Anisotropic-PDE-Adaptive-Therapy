@@ -77,3 +77,12 @@ output/adaptive_PatientID_*.npz
 
 # Vault RAG index (regenerable via tools/vault_index.py)
 tools/.vault_index/
+
+# Python bytecode
+**/__pycache__/
+
+# Forecast validation: per-patient checkpoints, derived atlas, run logs (regenerable via run_improved_aniso.py)
+output/forecast_validation/cache/
+output/forecast_validation/dti_atlas_2mm.npz
+output/forecast_validation/*.log
+output/forecast_validation/*.err
