@@ -6,7 +6,7 @@
 | # | Negative | Correct test | Effort | P(positive) | Outcome | Recommendation |
 |---|---|---|---|---|---|---|
 | B1 | Forecast: no model beats no-change | Sub-region (FLAIR vs enhancing) scoring | 6-8 h (4.5 h compute) | Low | Not run; data analysis below | Document as data limitation |
-| B2 | Ablation < 0.01% | Spatial endpoints + length-scale check (script 77) | 1 h | Low | **Stays null: structural** | Document as model-resolution property |
+| B2 | Ablation < 0.01% | Spatial endpoints (script 77); horizon x D x grid sweep (script 78) | 1 h + 21 h compute | Low -> High | **Parameter artifact, not structural.** Script 60 D is ~10x below the literature; at D = 0.1 the DTI effect is 8% Dice at 90 d, same at 1 mm | Report script 78; re-check script 60 at D = 0.1-0.13 |
 | B3 | Script 42 blocked; D_f aniso vs iso | Matched-isotropic paired test (script 74) | 2 h | Medium | D_f: significant, wrong direction, not a valid metric. **Elongation: strongly positive** | Report elongation; drop D_f |
 | C1 | Unconditioned PPO 25% | Probe-then-commit, kill rates inferred (script 75) | 2 h | Medium | **Positive noise-free (100%), fails at realistic noise** | Report both; limitation |
 | C2 | Drug-budget artifact 100% -> 10% | Paced heuristic, day-90 and TTP (script 75) | 1 h | High | **Positive on TTP in 4/4 sets; negative on day-90** | Report: pacing extends TTP |
@@ -31,15 +31,19 @@ Options:
 | Treatment kill term | - | Already done; regressed | Done, negative |
 | Sub-regions (FLAIR vs enhancing) | Swanson 2008 thresholds (T2 ~16%, T1Gd ~80% of max density); anisotropic invasion appears on T2/FLAIR | Masks carry labels (`*_tumorMask.nii.gz`, currently `> 0`) | Best remaining option, but low probability. Shrinkage dominates whole-tumour change and would dominate sub-regions too |
 
-## B2 - Ablation: structural, not a null (script 77, commit 564d24b)
+## B2 - Ablation: parameter artifact, not structural (scripts 77 and 78)
 
-- Script 60 scores total volume ∑u. Diffusion conserves mass, so D can affect ∑u only through the logistic term (seed peak 0.08 K).
-- Spatial endpoints (visible volume, extent, mask Dice) **do not rescue it**:
-  - No DTI vs full: Dice 0.994 and extent 2.28 vs 2.26 mm.
-  - The oracle-vs-Stupp ranking is identical under every ablation.
-- Cause: over 90 d the diffusion length is **0.46-1.18 mm** and the Fisher front travels **0.66-2.85 mm**, while one voxel is **2 mm**. DTI cannot move cells across one voxel.
-- Sobol S1(rho) = 0.998 is the same fact seen from the other side: on this grid and horizon, the model is per-voxel logistic growth.
-- Adding resistance (C3) changes the reaction term, not the transport length, so it cannot make DTI matter here.
+Full write-up: [Script-78-Horizon-Crossover.md](Script-78-Horizon-Crossover.md).
+
+- Script 60 scores total volume ∑u. Diffusion conserves mass, so volume is insensitive to D by construction. Script 77 confirmed that spatial endpoints (mask Dice 0.994, extent) also show no effect at script 60's settings.
+- Script 77 attributed that to the length scale: over 90 d the diffusion length is 0.46-1.18 mm against a 2 mm voxel. That is correct **for D_white = 0.013 mm²/d, which is ~10x below the Swanson-type 0.13** (D_gray 0.0013 vs 0.013). Script 60's values match the cm²/d numbers read as mm²/d.
+- Script 78 (D x horizon x grid sweep, 16 cells, endpoints fixed in the header):
+  - Dice(full vs matched-isotropic, 2 mm, 90 d): 0.997 (D 0.01), 0.985 (0.03), **0.923 (0.1), 0.838 (0.3)**.
+  - Crossover (Dice < 0.95) at 90 d for D ≥ 0.1; none for D ≤ 0.03.
+  - 1 mm grid gives the same effect (0.943 at D 0.1, 0.848 at D 0.3), so it is physics, not resolution.
+  - The effect is largest early and shrinks at 365-900 d (the tumour fills the domain).
+- Caveats: modest effect (Dice 0.92-0.95 at D = 0.1), no noise comparison, rho 0.01 cells censored at 90 d (mask under threshold), elongation not monotone. Details in the script-78 note.
+- Verdict: the earlier "structural" label was wrong. Anything concluded from script 60 about DTI (including Sobol S1(rho) = 0.998) used a diffusivity 10x too low.
 
 ## B3 - Script 42 + anisotropic vs isotropic (commits b2a395a, 109e0d4)
 
