@@ -86,3 +86,4 @@ output/forecast_validation/cache/
 output/forecast_validation/dti_atlas_2mm.npz
 output/forecast_validation/*.log
 output/forecast_validation/*.err
+output/resistance_adaptive/cells/
