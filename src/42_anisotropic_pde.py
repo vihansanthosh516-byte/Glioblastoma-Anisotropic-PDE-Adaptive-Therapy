@@ -44,7 +44,7 @@ from pathlib import Path
 from typing import Dict, List, Tuple, Optional
 
 # Ensure project root is on sys.path for src.* imports
-PROJECT_ROOT = Path(__file__).parent.parent
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
 import matplotlib
@@ -347,13 +347,10 @@ class TensorFieldBuilder:
             units_dx_mm=np.array(DX_MM),
             units_diffusion=np.array("mm^2/day"),
             units_time=np.array("day"),
-<<<<<<< HEAD
             # Atlas DTI metadata
             atlas_mode=np.array(self.atlas_mode),
-            atlas_lam1=np.array(self.atlas_lam1) if self.atlas_lam1 is not None else None,
-            atlas_lam2=np.array(self.atlas_lam2) if self.atlas_lam2 is not None else None,
-=======
->>>>>>> 1be6df8e9737fb3a9f7ee274b3822d40fcc8b97c
+            atlas_lam1=np.array(self.atlas_lam1 if self.atlas_lam1 is not None else np.nan),
+            atlas_lam2=np.array(self.atlas_lam2 if self.atlas_lam2 is not None else np.nan),
         )
         print(f"[Phase1] Saved tensor profiles -> {path}")
 
@@ -736,8 +733,8 @@ class PatientParameterMapper:
 
     def __init__(
         self,
-        cohort_npz: Path = Path("output/spatial_recurrence_profiles.npz"),
-        zone_csv_root: Path = Path("output"),
+        cohort_npz: Path = PROJECT_ROOT / "output" / "spatial_recurrence_profiles.npz",
+        zone_csv_root: Path = PROJECT_ROOT / "output",
     ) -> None:
         self.cohort_npz = cohort_npz
         self.zone_csv_root = zone_csv_root
@@ -950,7 +947,7 @@ class CohortSimulator:
     def run_cohort(
         self,
         base_builder: TensorFieldBuilder,
-        output_dir: Path = Path("output"),
+        output_dir: Path = PROJECT_ROOT / "output",
     ) -> List[Dict]:
         if not self.mapper.data:
             self.mapper.load()
@@ -1067,7 +1064,7 @@ class AnisotropicVisualizer:
         padded = np.zeros((P, P), dtype=np.uint8)
         padded[:H, :W] = mask
 
-        sizes = np.unique(np.floor(np.logspace(np.log2(2), np.log2(P / 2), 18)).astype(int))
+        sizes = np.unique(np.floor(np.logspace(np.log2(2), np.log2(P / 2), 18, base=2)).astype(int))
         sizes = sizes[sizes >= 2]
         counts = []
         inv_eps = []
@@ -1401,8 +1398,8 @@ def main():
     parser.add_argument(
         "--output-dir",
         type=str,
-        default="output",
-        help="Output directory (default: output)"
+        default=str(PROJECT_ROOT / "output"),
+        help="Output directory (default: <project>/output)"
     )
     parser.add_argument(
         "--use-real-only",
@@ -1477,24 +1474,6 @@ def main():
     print("\n" + "#" * 70)
     print("# PHASE 1: Tensor Matrix Field Construction")
     print("#" * 70)
-<<<<<<< HEAD
-    # Use atlas mode by default to demonstrate atlas-based DTI replacement
-    # (per 2025 study: DSC 0.95-0.97 equivalence to patient-specific DTI)
-    builder = TensorFieldBuilder(
-        grid_size=GRID_SIZE,
-        d_parallel=D_PARALLEL_DEFAULT,
-        d_perpendicular=D_PERPENDICULAR_DEFAULT,
-        d_base=D_BASE,
-        tract_angle_deg=45.0,
-        tract_width=15,
-        atlas_mode="atlas",  # atlas-based DTI: eliminates noise/artifacts
-        atlas_lam1=0.013,    # D_white from population atlas (mm^2/day)
-        atlas_lam2=0.0013,   # D_perpendicular from population atlas (mm^2/day)
-    )
-    builder.build_tract_mask()
-    builder.build_orientation_field()
-    builder.build_tensor_field()
-=======
     
     # Determine which tensor field to use
     use_real_tensor = has_real_tensor or has_real_patient or has_dti_patient
@@ -1538,7 +1517,9 @@ def main():
             builder._compute_eigenvalues()
             print("  Using real DTI tensor field (standalone file)")
     else:
-        # Synthetic tensor field (original behavior)
+        # Synthetic tensor field. Atlas mode by default to demonstrate
+        # atlas-based DTI replacement (per 2025 study: DSC 0.95-0.97
+        # equivalence to patient-specific DTI).
         builder = TensorFieldBuilder(
             grid_size=args.grid_size,
             d_parallel=D_PARALLEL_DEFAULT,
@@ -1546,13 +1527,15 @@ def main():
             d_base=D_BASE,
             tract_angle_deg=45.0,
             tract_width=15,
+            atlas_mode="atlas",  # atlas-based DTI: eliminates noise/artifacts
+            atlas_lam1=0.013,    # D_white from population atlas (mm^2/day)
+            atlas_lam2=0.0013,   # D_perpendicular from population atlas (mm^2/day)
         )
         builder.build_tract_mask()
         builder.build_orientation_field()
         builder.build_tensor_field()
         print("  Using synthetic tract tensor field")
     
->>>>>>> 1be6df8e9737fb3a9f7ee274b3822d40fcc8b97c
     val_metrics = builder.validate_tensor()
     builder.save_npz(output_dir / "anisotropic_tensor_profiles.npz")
     builder.plot_validation(output_dir / "anisotropic_tensor_validation.png")
@@ -1571,10 +1554,6 @@ def main():
         save_plot_path=output_dir / "anisotropic_solver_mass_test.png",
     )
     mass_test_metrics = test_result["metrics"]
-<<<<<<< HEAD
-
-    # ------------------ PHASE 3: Location-Dependent Anisotropy Stratification -------------------------------
-=======
     
     if args.use_real_only and (has_real_mask or has_real_patient):
         # Run single real patient simulation
@@ -1634,15 +1613,13 @@ def main():
         print("=" * 70)
         return
     
-    # ------------------ PHASE 3 (Original Cohort) -------------------------------
->>>>>>> 1be6df8e9737fb3a9f7ee274b3822d40fcc8b97c
+    # ------------------ PHASE 3: Location-Dependent Anisotropy Stratification -------------------------------
     print("\n" + "#" * 70)
     print("# PHASE 3: Location-Dependent Anisotropy Stratification")
     print("#" * 70)
-<<<<<<< HEAD
     # Load clinical cohort with tumor location data
     import csv
-    clinical_path = Path("output/clinical_mapped_cohort_with_location.csv")
+    clinical_path = output_dir / "clinical_mapped_cohort_with_location.csv"
     patient_locations = {}
     if clinical_path.exists():
         with open(clinical_path, 'r', newline='') as f:
@@ -1692,60 +1669,11 @@ def main():
     base_builder.build_orientation_field()
     base_builder.build_tensor_field()
 
-    # Run simulations for each location group
-    all_results = []
-    location_metrics = {}
-
-    for loc_name, pids in location_groups.items():
-        if not pids:
-            print(f"  Skipping {loc_name}: no patients assigned")
-            continue
-        print(f"\n--- Simulating {loc_name} ({len(pids)} patients) ---")
-        # Create mapper for these patients
-        mapper = PatientParameterMapper(cohort_npz=Path("output/spatial_recurrence_profiles.npz"))
-        mapper.load()
-        
-        # Filter mapper to only these patients
-        # (PatientParameterMapper already loads all, we just filter by patient_id)
-        cohort_sim = CohortSimulator(
-            mapper=mapper,
-            n_steps=N_PATIENT_STEPS,
-            save_interval=PATIENT_SAVE_INTERVAL,
-            dt=DT_DEFAULT,
-        )
-        
-        # Run simulations for patients in this location group
-        loc_results = []
-        for pid in pids[:4]:  # Limit to first 4 patients per group for demo
-            try:
-                res = cohort_sim.run_patient(pid, base_builder)
-                loc_results.append(res)
-                print(f"  {pid}: final mass={res['mass_history'][-1]:.3f}, "
-                      f"front_radius={res['front_history'][-1]:.2f}")
-            except Exception as e:
-                print(f"  {pid}: ERROR - {e}")
-        
-        all_results.extend(loc_results)
-        
-        # Compute geometry metrics for this location group
-        viz = AnisotropicVisualizer(base_builder)
-        if loc_results:
-            metrics = viz.compute_all_metrics(loc_results)
-            location_metrics[loc_name] = {
-                "patient_count": len(loc_results),
-                "mean_fractal_dimension": float(np.mean([m["fractal_dimension"] for m in metrics])),
-                "mean_perimeter_area": float(np.mean([m["perimeter_to_area_ratio"] for m in metrics])),
-                "mean_branch_count": float(np.mean([m["branch_count"] for m in metrics])),
-                "mean_tract_alignment": float(np.mean([m["tract_alignment_fraction"] for m in metrics])),
-            }
-            print(f"  {loc_name} metrics: D_f={location_metrics[loc_name]['mean_fractal_dimension']:.3f}, "
-                  f"P/A={location_metrics[loc_name]['mean_perimeter_area']:.3f}, "
-                  f"branches={location_metrics[loc_name]['mean_branch_count']:.1f}, "
-                  f"align={location_metrics[loc_name]['mean_tract_alignment']:.3f}")
-
-    # ------------------ PHASE 4: Deep Branching Visualization & Geometry Metrics -------------------------------
-=======
-    mapper = PatientParameterMapper()
+    # Simulate every patient in the cohort NPZ. The location CSV may use a
+    # different ID scheme (PAT_xxxx) than the NPZ (PatientID_xxxx); location
+    # groups are then summarised only over the patients present in both.
+    mapper = PatientParameterMapper(cohort_npz=output_dir / "spatial_recurrence_profiles.npz",
+                                    zone_csv_root=output_dir)
     mapper.load()
     cohort_sim = CohortSimulator(
         mapper=mapper,
@@ -1753,10 +1681,34 @@ def main():
         save_interval=PATIENT_SAVE_INTERVAL,
         dt=DT_DEFAULT,
     )
-    results = cohort_sim.run_cohort(builder, output_dir=output_dir)
-    
-    # ------------------ PHASE 4 -------------------------------
->>>>>>> 1be6df8e9737fb3a9f7ee274b3822d40fcc8b97c
+    all_results = cohort_sim.run_cohort(base_builder, output_dir=output_dir)
+    print(f"  Simulated {len(all_results)} cohort patients")
+    by_pid = {r["patient_id"]: r for r in all_results}
+    location_overlap = sum(pid in by_pid for pids in location_groups.values() for pid in pids)
+    if location_overlap == 0:
+        print("  WARNING: no location-CSV patient IDs match the cohort NPZ; "
+              "location stratification is empty")
+
+    location_metrics = {}
+    viz = AnisotropicVisualizer(base_builder)
+    for loc_name, pids in location_groups.items():
+        loc_results = [by_pid[pid] for pid in pids if pid in by_pid]
+        if not loc_results:
+            continue
+        metrics = viz.compute_all_metrics(loc_results)
+        location_metrics[loc_name] = {
+            "patient_count": len(loc_results),
+            "mean_fractal_dimension": float(np.mean([m["fractal_dimension"] for m in metrics])),
+            "mean_perimeter_area": float(np.mean([m["perimeter_to_area_ratio"] for m in metrics])),
+            "mean_branch_count": float(np.mean([m["branch_count"] for m in metrics])),
+            "mean_tract_alignment": float(np.mean([m["tract_alignment_fraction"] for m in metrics])),
+        }
+        print(f"  {loc_name} metrics: D_f={location_metrics[loc_name]['mean_fractal_dimension']:.3f}, "
+              f"P/A={location_metrics[loc_name]['mean_perimeter_area']:.3f}, "
+              f"branches={location_metrics[loc_name]['mean_branch_count']:.1f}, "
+              f"align={location_metrics[loc_name]['mean_tract_alignment']:.3f}")
+
+    # ------------------ PHASE 4: Deep Branching Visualization & Geometry Metrics -------------------------------
     print("\n" + "#" * 70)
     print("# PHASE 4: Deep Branching Visualization & Geometry Metrics")
     print("#" * 70)
@@ -1785,19 +1737,15 @@ def main():
                     "other_region": len(location_groups['other_region']),
                 },
                 "location_metrics": location_metrics,
+                "location_ids_matched_in_cohort": location_overlap,
             },
         }
         json.dump(full_report, f, indent=2, default=str)
     print(f"[Phase4] Saved metrics JSON -> {output_dir / 'anisotropic_geometry_metrics.json'}")
     
     # Save combined evolution npz
-<<<<<<< HEAD
     save_all_evolution(all_results, output_dir / "anisotropic_evolution_all_patients.npz")
 
-=======
-    save_all_evolution(results, output_dir / "anisotropic_evolution_all_patients.npz")
-    
->>>>>>> 1be6df8e9737fb3a9f7ee274b3822d40fcc8b97c
     # ------------------ SUMMARY --------------------------------
     print("\n" + "=" * 70)
     print("[SUMMARY] Month 7 Anisotropic Tensor Diffusion Engineering")
@@ -1810,7 +1758,6 @@ def main():
     mean_pa = float(np.mean([m["perimeter_to_area_ratio"] for m in metrics]))
     print(f"  Mean fractal dimension      : {mean_fd:.3f}")
     print(f"  Mean perimeter/area ratio   : {mean_pa:.3f}")
-<<<<<<< HEAD
     print(f"  Branching (D_f > 1.2)       : "
           f"{sum(m['fractal_dimension'] > 1.2 for m in metrics)} / {len(metrics)}")
 
@@ -1821,19 +1768,10 @@ def main():
               f"branches={lm['mean_branch_count']:.1f}, "
               f"align={lm['mean_tract_alignment']:.3f}")
 
-=======
-    print(f"  Branching (D_f > 1.2)       : {sum(m['fractal_dimension'] > 1.2 for m in metrics)} / {len(metrics)}")
-    
->>>>>>> 1be6df8e9737fb3a9f7ee274b3822d40fcc8b97c
     print("\nDeliverables:")
     print("  output/anisotropic_tensor_profiles.npz")
     print("  output/anisotropic_tensor_validation.png")
     print("  output/anisotropic_solver_mass_test.png")
-<<<<<<< HEAD
-=======
-    for r in results:
-        print(f"  output/anisotropic_evolution_{r['patient_id']}.npz")
->>>>>>> 1be6df8e9737fb3a9f7ee274b3822d40fcc8b97c
     print("  output/anisotropic_recurrence_maps.png")
     print("  output/anisotropic_geometry_summary.png")
     print("  output/anisotropic_geometry_metrics.json")
