@@ -45,11 +45,9 @@ MPC optimal control, and a 3D volumetric extension.
 
 ## Script 46 — Sobol Sensitivity Analysis
 
-- **154-patient** cohort, 5-parameter Sobol analysis
-- **6000 ODE evaluations** (500 Saltelli samples)
-- **rho_s: S1 = 0.998** (95% CI ± 0.086) — proliferation rate dominates TTP variance
-- All other parameters: **ST < 0.015** (aniso_ratio, mu_r, EC50, D_white)
-- **Source:** `output/sobol_sensitivity_results.json`
+- **Correction (2026-10-03):** the original result below, rho_s S1 = 0.998, came from a reduced ODE (no PDE solve) with an arbitrary coupling (`k_diff` = 15) and D_white held within ±20% of 0.013 mm²/day, so rho dominated by construction. It is an artifact and should not be cited as a property of the PDE model.
+- **Sobol (real PDE, script 80):** α_sens dominates volume variance (S1 = 0.43), followed by ρ_s (S1 = 0.20). D_w contributes negligibly to volume (S1 = 0.000) at both the old and the Swanson-range diffusivity. Total-order indices sum above 1 (interactions). N = 128 base samples, wide CIs. Source: `output/sobol_pde_swanson_vs_legacy.json`, detail in [[Script-60-66-Swanson-D]].
+- *Original (superseded) reduced-ODE result:* 154-patient cohort, 5-parameter Sobol, 6000 ODE evaluations (500 Saltelli samples); rho_s S1 = 0.998 (95% CI ± 0.086); other parameters ST < 0.015. Source: `output/sobol_sensitivity_results.json`
 
 ## Script 47 — MPC Optimal Control
 
@@ -83,10 +81,10 @@ MPC optimal control, and a 3D volumetric extension.
 - **0/61 patients** show the reverse
 - Mechanism: preserving the drug-sensitive clone through dose holidays, competitive suppression of the resistant clone
 
-### 2. Proliferation rate dominates outcome variance
+### 2. Kill-rate scale and proliferation drive volume variance (corrected 2026-10-03)
 
-- Sobol S1 = **0.998** for rho_s (the other 4 parameters combined contribute < 2%)
-- Interpretation: TTP under any dosing regimen is determined almost entirely by tumor proliferation rate, not by anisotropy, mutation rate, or drug PK
+- Real-PDE Sobol (script 80): α_sens S1 = 0.43, ρ_s S1 = 0.20, D_w S1 = 0.000 for day-90 volume under Stupp. The earlier claim that ρ_s dominates (S1 = 0.998) came from a reduced ODE with an arbitrary coupling and was an artifact.
+- Interpretation: day-90 volume is set mainly by drug kill and proliferation, not by diffusivity; DTI affects the spatial shape of the tumour (script 78/80), not total volume.
 
 ### 3. Dose sparing is inversely correlated with rho
 
