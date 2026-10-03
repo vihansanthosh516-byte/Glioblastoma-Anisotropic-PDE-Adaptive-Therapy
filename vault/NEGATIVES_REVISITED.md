@@ -8,6 +8,7 @@
 | B1 | Forecast: no model beats no-change | Sub-region (FLAIR vs enhancing) scoring | 6-8 h (4.5 h compute) | Low | Not run; data analysis below | Document as data limitation |
 | B2 | Ablation < 0.01% | Spatial endpoints (script 77); horizon x D x grid sweep (script 78) | 1 h + 21 h compute | Low -> High | **Parameter artifact, not structural.** Script 60 D is ~10x below the literature; at D = 0.1 the DTI effect is 8% Dice at 90 d, same at 1 mm | Report script 78; re-check script 60 at D = 0.1-0.13 |
 | B3 | Script 42 blocked; D_f aniso vs iso | Matched-isotropic paired test (script 74) | 2 h | Medium | D_f: significant, wrong direction, not a valid metric. **Elongation: strongly positive** | Report elongation; drop D_f |
+| B1b | Forecast: pre-specified stratification (script 79) | Predict growth from scan0->1 history + treatment timing, forecast predicted growers; 108 pts | 2 h + 7 h compute | Low | **Negative: the classifier fails (AUC 0.46), so stratification does nothing. No arm beats no-change.** | Report as finding; B1 stays a data limitation |
 | C1 | Unconditioned PPO 25% | Probe-then-commit, kill rates inferred (script 75) | 2 h | Medium | **Positive noise-free (100%), fails at realistic noise** | Report both; limitation |
 | C2 | Drug-budget artifact 100% -> 10% | Paced heuristic, day-90 and TTP (script 75) | 1 h | High | **Positive on TTP in 4/4 sets; negative on day-90** | Report: pacing extends TTP |
 | C3 | No adaptive structure | Sensitive + resistant LV model + same-window controls (script 76) | 4 h (+12 h compute) | Medium | **Stays negative for real patients; resistance-driven gain only in 2/384 synthetic rows** | Document as limitation; do not retrain RL |
@@ -30,6 +31,17 @@ Options:
 | Patient-specific DTI (UCSF-PDGM) | Jbabdi 2005; Painter & Hillen 2013 | One scan per patient, so no forecast target | Not feasible |
 | Treatment kill term | - | Already done; regressed | Done, negative |
 | Sub-regions (FLAIR vs enhancing) | Swanson 2008 thresholds (T2 ~16%, T1Gd ~80% of max density); anisotropic invasion appears on T2/FLAIR | Masks carry labels (`*_tumorMask.nii.gz`, currently `> 0`) | Best remaining option, but low probability. Shrinkage dominates whole-tumour change and would dominate sub-regions too |
+
+## B1b - Pre-specified stratification (script 79, MU-Glioma-Post, 108 patients with 3+ scans)
+
+Scan 1 -> scan 2 here means the second to the third scan; the history scan 0 -> 1 feeds a growth classifier. Design, features and endpoints are in the script header (fixed before the run). Forecast pipeline unchanged from `run_improved_aniso.py`.
+
+- **Classifier fails.** Out-of-fold accuracy 0.593 and AUC 0.458, against always-predict-grow 0.630 and persistence 0.481. 98 of 108 are "predicted to grow" (PPV 0.62), so the stratum is nearly the whole cohort. Scan 0->1 trend and treatment timing do not predict later growth in this cohort.
+- **Intention-to-forecast, all 108** (out-of-fold Dice): anisotropic 0.599, iso_same 0.599, iso_homog 0.600, **no_change 0.620**. Anisotropic - no_change -0.021 (CI -0.044 to -0.003, Wilcoxon p = 0.13).
+- **Primary endpoints, predicted-to-grow (n = 98):** P1 aniso vs no-change -0.016 (p = 0.17, Holm 0.33); P2 aniso vs iso_same -0.0002 (p = 0.58). Neither significant.
+- Outcome-selected, descriptive only (grew, n = 68): aniso - no-change -0.018, aniso better in 56% of patients (p = 0.001 on the paired signed-rank), mean still lower. Aniso - iso_same = 0.0000.
+- Shape-only secondary (uses scan-2 volume, n = 98): aniso - iso_same +0.0001 (p = 0.46); aniso - uniform dilation +0.0017 (p = 0.029 uncorrected, CI crosses 0).
+- **Verdict:** a defensible pre-forecast stratification is not available from these features, and the forecast does not beat no-change in any stratum. DTI orientation adds nothing (aniso = iso_same to 4 decimals). B1 stays a data limitation. Treatment-conditioned models with dose information (TaDiff-class) remain the field route.
 
 ## B2 - Ablation: parameter artifact, not structural (scripts 77 and 78)
 
