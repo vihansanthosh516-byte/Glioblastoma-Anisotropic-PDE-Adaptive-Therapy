@@ -36,12 +36,12 @@ import torch.nn.functional as F
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_ROOT / "src"))
-OUTPUT_DIR = PROJECT_ROOT / "output" / "rl_equal_budget"
-OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-
 _spec = spec_from_file_location("s59", PROJECT_ROOT / "src" / "59_sensitivity_analysis.py")
 s59 = module_from_spec(_spec)
 _spec.loader.exec_module(s59)
+# legacy-D outputs stay in rl_equal_budget; the Swanson-D re-run writes to its own directory
+OUTPUT_DIR = PROJECT_ROOT / "output" / ("rl_equal_budget" if s59.D_REGIME == "legacy" else "rl_equal_budget_swanson")
+OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
 torch.set_default_dtype(torch.float64)
 N_DAYS = 90

@@ -51,15 +51,23 @@ DT_PDE_TRAIN = 0.5
 DT_PDE_EVAL = 0.2
 
 # Parameter ranges for sampling
+# Diffusivity regime. The solver grid is in mm, so D is in mm^2/day. Scripts 59-77 originally ran
+# with D_w in (0.001, 0.008) and D_gray = 0.0013, numbers that are cm^2/day values (Swanson 2000)
+# used as mm^2/day: 16-130x below the literature 0.13 / 0.013 mm^2/day (script 78 audit). The
+# default regime "swanson" converts the declared D_w range to mm^2/day (x100) and uses the
+# Swanson-type D_gray; GBM_D_REGIME=legacy reproduces every pre-2026-10-03 output unchanged.
+D_REGIME = os.environ.get("GBM_D_REGIME", "swanson")
+assert D_REGIME in ("swanson", "legacy"), D_REGIME
+_D_W_RANGE = (0.1, 0.8) if D_REGIME == "swanson" else (0.001, 0.008)   # mm^2/day
 PARAM_RANGES = {
     "rho": (0.005, 0.035),        # 1/day
-    "D_w": (0.001, 0.008),        # cm^2/day
+    "D_w": _D_W_RANGE,            # mm^2/day
     "alpha_sens": (0.5, 1.5),     # multiplier
 }
 
-# Fixed parameters
-D_WHITE_BASE = 0.013
-D_GRAY_BASE = 0.0013
+# Fixed parameters (mm^2/day)
+D_WHITE_BASE = 0.13 if D_REGIME == "swanson" else 0.013
+D_GRAY_BASE = 0.013 if D_REGIME == "swanson" else 0.0013
 from mu_glioma_loader import real_cohort_stats
 _cohort = real_cohort_stats()
 RHO_BASE = _cohort["rho_median"]

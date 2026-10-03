@@ -47,8 +47,9 @@ DT_RL_DAYS = 1.0
 DT_PDE_EVAL = 0.2
 N_PDE_SUBSTEPS_EVAL = int(DT_RL_DAYS / DT_PDE_EVAL)
 
-D_WHITE_BASE = 0.013
-D_GRAY_BASE = 0.0013
+D_WHITE_BASE = s66.s59.D_WHITE_BASE   # mm^2/day; regime set in script 59 (GBM_D_REGIME)
+D_GRAY_BASE = s66.s59.D_GRAY_BASE
+_SUFFIX = "" if s66.s59.D_REGIME == "legacy" else "_swanson"
 K_CARRY = 1.0
 GAMMA_CHEMO = 0.05
 GAMMA_RAD = 0.08
@@ -374,7 +375,7 @@ def main():
             "The old threshold-adaptive baseline and 40-episode REINFORCE policy were removed; they were unbudgeted.",
         ],
     }
-    path = OUTPUT_DIR / "ablation_and_baselines_metrics.json"
+    path = OUTPUT_DIR / f"ablation_and_baselines_metrics{_SUFFIX}.json"
     path.write_text(json.dumps(metrics, indent=2))
     print(f"\n[Metrics] Saved -> {path}")
 
@@ -406,7 +407,7 @@ def main():
     ax.grid(alpha=0.3, axis="y")
     plt.suptitle("Script 60: Baselines & Ablation at Equal Drug Budget", fontsize=15, fontweight="bold")
     plt.tight_layout()
-    fig_path = OUTPUT_DIR / "ablation_study_figure.png"
+    fig_path = OUTPUT_DIR / f"ablation_study_figure{_SUFFIX}.png"
     plt.savefig(fig_path, dpi=200, bbox_inches="tight")
     plt.close()
     print(f"[Plot] Saved -> {fig_path}")

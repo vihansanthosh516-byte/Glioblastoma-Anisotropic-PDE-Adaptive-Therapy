@@ -9,6 +9,7 @@
 | B2 | Ablation < 0.01% | Spatial endpoints (script 77); horizon x D x grid sweep (script 78) | 1 h + 21 h compute | Low -> High | **Parameter artifact, not structural.** Script 60 D is ~10x below the literature; at D = 0.1 the DTI effect is 8% Dice at 90 d, same at 1 mm | Report script 78; re-check script 60 at D = 0.1-0.13 |
 | B3 | Script 42 blocked; D_f aniso vs iso | Matched-isotropic paired test (script 74) | 2 h | Medium | D_f: significant, wrong direction, not a valid metric. **Elongation: strongly positive** | Report elongation; drop D_f |
 | B1b | Forecast: pre-specified stratification (script 79) | Predict growth from scan0->1 history + treatment timing, forecast predicted growers; 108 pts | 2 h + 7 h compute | Low | **Negative: the classifier fails (AUC 0.46), so stratification does nothing. No arm beats no-change.** | Report as finding; B1 stays a data limitation |
+| B2b | Re-run scripts 60/66 at Swanson D (script 80 Sobol) | D_w 0.1-0.8, D_gray 0.013 | 6 h compute | Medium | **Spatial ablation effect is real (Dice 0.994 -> 0.886); volume ablation stays flat (PPO +0.27%); script 66 conclusions hold; PDE Sobol: rho S1 0.20, alpha_sens 0.43, D_w 0.000, so the ODE 0.998 does not carry over** | See Script-60-66-Swanson-D.md |
 | C1 | Unconditioned PPO 25% | Probe-then-commit, kill rates inferred (script 75) | 2 h | Medium | **Positive noise-free (100%), fails at realistic noise** | Report both; limitation |
 | C2 | Drug-budget artifact 100% -> 10% | Paced heuristic, day-90 and TTP (script 75) | 1 h | High | **Positive on TTP in 4/4 sets; negative on day-90** | Report: pacing extends TTP |
 | C3 | No adaptive structure | Sensitive + resistant LV model + same-window controls (script 76) | 4 h (+12 h compute) | Medium | **Stays negative for real patients; resistance-driven gain only in 2/384 synthetic rows** | Document as limitation; do not retrain RL |
@@ -55,7 +56,7 @@ Full write-up: [Script-78-Horizon-Crossover.md](Script-78-Horizon-Crossover.md).
   - 1 mm grid gives the same effect (0.943 at D 0.1, 0.848 at D 0.3), so it is physics, not resolution.
   - The effect is largest early and shrinks at 365-900 d (the tumour fills the domain).
 - Caveats: modest effect (Dice 0.92-0.95 at D = 0.1), no noise comparison, rho 0.01 cells censored at 90 d (mask under threshold), elongation not monotone. Details in the script-78 note.
-- Verdict: the earlier "structural" label was wrong. Anything concluded from script 60 about DTI (including Sobol S1(rho) = 0.998) used a diffusivity 10x too low.
+- Verdict: the earlier "structural" label was wrong. Anything concluded from script 60 about DTI used a diffusivity 10x too low. (Correction 2026-10-03: the S1(rho) = 0.998 is from archived script 46's reduced ODE, not script 60; see [Script-60-66-Swanson-D.md](Script-60-66-Swanson-D.md).)
 
 ## B3 - Script 42 + anisotropic vs isotropic (commits b2a395a, 109e0d4)
 

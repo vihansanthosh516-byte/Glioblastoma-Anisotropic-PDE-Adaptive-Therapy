@@ -43,7 +43,8 @@ import torch
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_ROOT / "src"))
-OUT_JSON = PROJECT_ROOT / "output" / "ablation_spatial_endpoints.json"
+OUT_JSON = PROJECT_ROOT / "output" / ("ablation_spatial_endpoints.json" if __import__("os").environ.get("GBM_D_REGIME") == "legacy"
+                                     else "ablation_spatial_endpoints_swanson.json")  # default regime: Swanson D (script 59)
 
 from rl.equal_budget_arms import BatchedSolver, s66  # noqa: E402
 
