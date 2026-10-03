@@ -87,3 +87,15 @@ output/forecast_validation/dti_atlas_2mm.npz
 output/forecast_validation/*.log
 output/forecast_validation/*.err
 output/resistance_adaptive/cells/
+
+# PyTorch model checkpoints (regenerable)
+output/**/*.pt
+
+# Training/evaluation caches
+output/forecast_stratified/cache/
+output/rl_equal_budget/*.pt
+output/rl_kill_conditioned/*.pt
+output/ttp_equal_budget/*.pt
+
+# Graphify output
+graphify-out/
