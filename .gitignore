@@ -106,3 +106,8 @@ graphify-out/
 emails_to_professors*.md
 reports/
 research_notes/
+
+# Coding agent worktrees (isolated copies, not part of main repo)
+.claude/worktrees/
+.kilo/worktrees/
+track_a_metrics.zip
