@@ -97,7 +97,7 @@ mindmap
 
 **Shared calibration (see [[Decisions]])**
 - `E_MAX_RATIO = 1000` → `E_max = ρ × 1000`
-- Adaptive holidays: `THRESHOLD_OFF` (0.80 primary; 0.50 under test)
+- Adaptive holidays: `THRESHOLD_OFF` (0.80 retained; 0.50 tested: 43% drug, 5.8 holidays)
 - Real params via `src/mu_glioma_loader.py` (`load_mu_glioma_params`, `real_cohort_stats`)
 
 ### Track C / Phase 3D+ — Inverse, robust MPC, DTI, CDSS
@@ -227,7 +227,7 @@ Locked decisions → [[Decisions]]
 | Source | Claim |
 |--------|--------|
 | [[Script-44-Adaptive-Therapy]] | Resistance: MTD median 99.2% vs adaptive 30.6%; 54/61 MTD selects more resistance; dose ~32% of MTD |
-| [[Script-46-Sensitivity]] | rho_s S1=0.998 dominates TTP variance; all other parameters ST < 0.015 |
+| [[Script-46-Sensitivity]] | Real PDE Sobol (script 80): α_sens S1=0.43, ρ_s S1=0.20, D_w S1=0.000. Reduced-ODE 0.998 was an artifact. |
 | [[Script-47-Optimal-Control]] | Dual-agent MPC rescues single-agent; Rf ≤0.05 for 6/8; fails at extreme ρ (0123) |
 | [[Script-48-3D-Extension]] | Low-ρ MTD → 0 mm³; adaptive residual + high dose sparing; sparing collapses as ρ↑ |
 | [[Project-State]] | 27/28/29 invasion physics verified; 43 stromal 14× mass variation |
