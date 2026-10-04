@@ -6,6 +6,7 @@
 | # | Negative | Correct test | Effort | P(positive) | Outcome | Recommendation |
 |---|---|---|---|---|---|---|
 | B1 | Forecast: no model beats no-change | Sub-region (FLAIR vs enhancing) scoring | 6-8 h (4.5 h compute) | Low | Not run; data analysis below | Document as data limitation |
+| B1c | Forecast on the correct target: cellular tumour core, cavity and edema excluded (script 81) | Same pipeline, masks = labels {1,3}; 152 pairs, 133 seedable | 4 h + 12 h compute | Medium | **Positive vs no-change: Dice 0.259 vs 0.233 (+0.026, Holm p = 0.0015). DTI orientation still adds nothing (aniso - iso_same -0.001).** | Report; target definition is the fix |
 | B2 | Ablation < 0.01% | Spatial endpoints (script 77); horizon x D x grid sweep (script 78) | 1 h + 21 h compute | Low -> High | **Parameter artifact, not structural.** Script 60 D is ~10x below the literature; at D = 0.1 the DTI effect is 8% Dice at 90 d, same at 1 mm | Report script 78; re-check script 60 at D = 0.1-0.13 |
 | B3 | Script 42 blocked; D_f aniso vs iso | Matched-isotropic paired test (script 74) | 2 h | Medium | D_f: significant, wrong direction, not a valid metric. **Elongation: strongly positive** | Report elongation; drop D_f |
 | B1b | Forecast: pre-specified stratification (script 79) | Predict growth from scan0->1 history + treatment timing, forecast predicted growers; 108 pts | 2 h + 7 h compute | Low | **Negative: the classifier fails (AUC 0.46), so stratification does nothing. No arm beats no-change.** | Report as finding; B1 stays a data limitation |
@@ -43,6 +44,17 @@ Scan 1 -> scan 2 here means the second to the third scan; the history scan 0 -> 
 - Outcome-selected, descriptive only (grew, n = 68): aniso - no-change -0.018, aniso better in 56% of patients (p = 0.001 on the paired signed-rank), mean still lower. Aniso - iso_same = 0.0000.
 - Shape-only secondary (uses scan-2 volume, n = 98): aniso - iso_same +0.0001 (p = 0.46); aniso - uniform dilation +0.0017 (p = 0.029 uncorrected, CI crosses 0).
 - **Verdict:** a defensible pre-forecast stratification is not available from these features, and the forecast does not beat no-change in any stratum. DTI orientation adds nothing (aniso = iso_same to 4 decimals). B1 stays a data limitation. Treatment-conditioned models with dose information (TaDiff-class) remain the field route.
+
+## B1c - Forecast on the correct tumour target (script 81, MU-Glioma-Post, 152 pairs)
+
+`mask > 0` scored the resection cavity (label 4, collapses after surgery) and edema (label 2) as tumour. Script 81 keeps the pipeline identical (atlas, parameter grid, kill term, 5-fold CV, u > 0.5) and changes only the masks to the cellular core, labels {1, 3} (NETC + ET). The target is justified by the BraTS-GLI post-treatment label definitions. A volumes-only probe (core grew 61% vs 47% for mask > 0) was read before the design was written; every target definition is reported in the script header, and the whole-tumour-without-cavity secondary (`--target wt`) has **not** been run.
+
+- 133 of 152 patients scored (19 skipped: empty core at scan 1, cannot be seeded). 83 core volumes grew, 50 shrank or stayed.
+- Out-of-fold Dice, all 133: anisotropic 0.259 [0.221, 0.299], iso_same 0.260, iso_homog 0.261, **no_change 0.233** [0.195, 0.274].
+- **P1** anisotropic vs no_change: +0.026 (95% CI 0.008 to 0.044), Wilcoxon p = 0.0007, **Holm 0.0015**. Better in 55% of patients.
+- **P2** anisotropic vs iso_same: -0.001 (CI -0.002 to 0.000), p = 0.97. DTI orientation adds nothing. Homogeneous isotropic is as good as the DTI model, so the gain comes from PDE growth plus the kill term, not from fibre tracts.
+- Descriptive subgroups: grew (n = 83) +0.065 vs no_change (p < 0.001); shrank or same (n = 50) -0.039 (p = 0.001). The model still loses on shrinking cores.
+- Caveats: absolute Dice is low (0.26) and the gain is modest (+11% relative); the earlier `mask > 0` negative stands for that target; subgroups are outcome-selected and descriptive only.
 
 ## B2 - Ablation: parameter artifact, not structural (scripts 77 and 78)
 
