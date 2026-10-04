@@ -1,5 +1,7 @@
 # Script 46 — Sobol Sensitivity Analysis
 
+> **SUPERSEDED (2026-10-03):** the S1=0.998 result came from a reduced ODE, not the PDE. Real PDE Sobol: α_sens S1=0.43, ρ_s S1=0.20, D_w S1=0.000. See [[Script-60-66-Swanson-D]].
+
 **Status:** Committed
 
 ## Method
