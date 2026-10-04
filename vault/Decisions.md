@@ -12,7 +12,10 @@ dosing, so adaptive degenerates to MTD.
 **Test:** Rerun with THRESHOLD_OFF=0.50. If high-rho patients now show real 
 holidays and preserved sensitive clone, artifact. If not, real biology.
 
-**Decision criteria:**
+**Result (resolved):** At 0.50, drug use rose to 43% of MTD and mean holidays fell to 5.8 (vs 32% and 48.9 at 0.80). Holidays were not restored, so the artifact hypothesis is not supported. 0.80 retained.
+Source: output/adaptive_cohort_summary.json.
+
+**Decision criteria (original):**
 - Artifact → rerun primary with 0.50, update committed result
 - Real biology → report stratified finding: "adaptive works for rho < 0.02"
 
