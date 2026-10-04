@@ -13,9 +13,9 @@ on Track B (adaptive therapy).
   Resistance: median 99.2% MTD vs 30.6% adaptive. 
   54/61 select more resistance under MTD, 0/61 under adaptive.
 
-## Currently running
-- Threshold test: rerun script 44 with THRESHOLD_OFF=0.50 to see if high-rho 
-  failure is a setpoint artifact or real biology
+## Resolved
+- Threshold test (script 44, THRESHOLD_OFF=0.50): 43% drug use, 5.8 mean holidays
+  (vs 32% drug, 48.9 holidays at 0.80). 0.80 retained.
 
 ## Open questions
 - Is high-rho failure (10/61 progressed earlier under adaptive) real biology?
@@ -24,7 +24,7 @@ on Track B (adaptive therapy).
 
 ## Constraints
 - E_MAX_RATIO=1000 (empirical sweep: 500x undershoots, 2000x saturates)
-- THRESHOLD_OFF=0.80 (under test)
+- THRESHOLD_OFF=0.80 (0.50 tested: more drug, fewer holidays)
 - Negative-rho patients excluded from adaptive therapy sim
 - All scripts use PROJECT_ROOT/OUTPUT_DIR pattern
 
