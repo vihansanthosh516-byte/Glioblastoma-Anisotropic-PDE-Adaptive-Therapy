@@ -37,4 +37,4 @@ per-patient rho and E_max.
 - output/adaptive_therapy_comparison.png
 
 ## Threshold test
-Rerunning with THRESHOLD_OFF=0.50 to test high-rho hypothesis. Result pending.
+THRESHOLD_OFF=0.50 test (resolved): drug use rises to 43% of MTD and holidays collapse to 5.8 mean (vs 32% drug, 48.9 holidays at 0.80). A looser setpoint does not rescue adaptive dosing, so 0.80 is retained. Source: output/adaptive_cohort_summary.json.
