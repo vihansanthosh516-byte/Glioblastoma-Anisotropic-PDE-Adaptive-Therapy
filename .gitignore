@@ -9,6 +9,8 @@ __pycache__/
 .kilo/
 .kilo/*
 *.plan.md
+.claude/
+CLAUDE.md
 
 # Throwaway Debug & Test Scripts
 test_debug.py
@@ -31,7 +33,7 @@ output/02_run.log
 output/invasion_frames/
 kaggle_run/gbm-repo/
 # === Added after folder merge 2026-09-19 ===
-# Raw datasets — never commit
+# Raw datasets ï¿½ never commit
 data/brats/
 data/tcia/
 data/raw/
