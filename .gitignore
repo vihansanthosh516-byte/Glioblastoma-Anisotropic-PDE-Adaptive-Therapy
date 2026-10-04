@@ -101,3 +101,8 @@ output/ttp_equal_budget/*.pt
 
 # Graphify output
 graphify-out/
+
+# Private files
+emails_to_professors*.md
+reports/
+research_notes/
