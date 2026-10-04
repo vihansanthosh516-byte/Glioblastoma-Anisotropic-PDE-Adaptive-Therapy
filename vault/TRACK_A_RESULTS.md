@@ -369,7 +369,7 @@ Three bugs corrected:
 - `output/stromal_feedback_recurrence_maps.png` — cohort visualization
 
 ### Committed
-`[hash from git log]`
+`e76d26a`
 
 ### Key finding
 The inflammation signature (S100A8/S100A11) and CCL3L1 show directional adverse prognostic effects in real TCGA-GBM expression, and all four genes have therapeutic indices > 1. Age remains the dominant clinical predictor (p=0.01). This is a real-data clinical validation of the inflammation-targeting hypothesis.
