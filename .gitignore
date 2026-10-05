@@ -37,6 +37,7 @@ kaggle_run/gbm-repo/
 data/brats/
 data/tcia/
 data/raw/
+data/external/
 *.tar
 *.tar.gz
 *.zip
