@@ -1,0 +1,6 @@
+variable,kind,MU_eligible,MU_n,LUMIERE_eligible,LUMIERE_n,shift
+age (years; median),continuous,58.0,134,61.0,55,-0.2812064621442315
+female (share),binary,0.41044776119402987,134,0.4727272727272727,55,-0.06227951153324285
+MGMT methylated (share of known),binary,0.42201834862385323,109,0.56,50,-0.13798165137614682
+scans per patient (median),continuous,3.0,134,8.0,55,-1.8641029562456535
+interval between consecutive scans (days; median),continuous,77.0,332,91.0,305,-0.24003298553729643

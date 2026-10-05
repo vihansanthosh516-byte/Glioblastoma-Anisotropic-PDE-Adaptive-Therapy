@@ -40,8 +40,8 @@ Created 2026-10-04. Update when a result changes.
 
 ## CL-A1 C-GAT zone accuracy (UNRELIABLE)
 - Evidence: 78.7% vs scVI 73.0% under random cell split. Patient-ID lookup 82.8%. Patient-level LR 60.3%, RF 62.0%, scVI-LR 66.2% (script 86). Leak-free C-GAT: `output/cgat_leak_free.json` (script 88).
-- Level: not demonstrated. Do not quote 78.7% without the leak-free number.
-- Allowed: "Under patient-level folds, accuracy fell to X (leak-free run)." Fill X from script 88 output.
+- Level: not demonstrated. Leak-free C-GAT (script 88, 5 folds) is 63.8% (SD 13.3). A cells-per-patient-only classifier scores 64.6% (SD 27.5) under the same folds (script 95). Healthy class = 3 donors with other diagnoses (L33).
+- Allowed: "Under patient-level folds, a leak-free graph model reached 63.8% (SD 13.3), no better than non-biological baselines within fold spread."
 - Forbidden: "C-GAT classifies tumour zones at 78.7%."
 
 ## CL-A3 / CL-CGGA Age and survival

@@ -30,6 +30,7 @@ OUTPUT_DIR = PROJECT_ROOT / "output"
 DATA = PROJECT_ROOT / "data"
 MAN = DATA / "manifests"
 COHORT = OUTPUT_DIR / "mu_glioma_cohort.json"
+MU_CLINICAL = DATA / "tcia" / "MU-Glioma-Post_ClinicalData-July2025.xlsx"
 N_FOLDS = 5
 SPLIT_SEED = "20261004"
 DT_MIN, DT_MAX = 14.0, 365.0
@@ -50,6 +51,19 @@ def fold_of(pid: str) -> int:
     """Deterministic patient-level fold from a hash, independent of row order."""
     h = hashlib.sha256(f"{SPLIT_SEED}|{pid}".encode()).hexdigest()
     return int(h, 16) % N_FOLDS
+
+
+def mu_clinical() -> pd.DataFrame:
+    """Per-patient clinical fields used for subgroup and shift tables (MGMT codes per the data dictionary:
+    0 none, 1 methylated, 2 indeterminate, 3 unable, 4 unknown)."""
+    c = pd.read_excel(MU_CLINICAL, sheet_name="MU Glioma Post")
+    out = pd.DataFrame({
+        "patient_id": c["Patient_ID"], "age": c["Age at diagnosis"], "sex": c["Sex at Birth"],
+        "primary_diagnosis": c["Primary Diagnosis"], "who_grade": c["Grade of Primary Brain Tumor"].astype(str),
+        "mgmt_code": c["MGMT methylation"], "progression": c["Progression"],
+        "died": c["Overall Survival (Death)"]})
+    out["is_gbm"] = out["primary_diagnosis"].isin(["GBM", "Glioma w/ GBM features"])
+    return out
 
 
 def build_mu():
@@ -103,7 +117,8 @@ def build_mu():
                      "radiation_end_day": ts.get("radiation_end_day"),
                      "treatment_known": bool(ts), "segment_available": all(vox[t["number"]] is not None for t in tps),
                      "molecular_available": False, "fold": fold_of(pid)})
-    return pd.DataFrame(pats), pd.DataFrame(scans), pd.DataFrame(pairs)
+    pats = pd.DataFrame(pats).merge(mu_clinical(), on="patient_id", how="left")
+    return pats, pd.DataFrame(scans), pd.DataFrame(pairs)
 
 
 def build_lumiere():
@@ -185,6 +200,10 @@ def main():
             "pairs_empty_input_core": int((~mu_pairs["input_core_nonempty"]).sum()),
             "pairs_with_prior_scan_primary": int(prim["has_prior_scan"].sum()),
             "folds_patient_counts": mu_p["fold"].value_counts().sort_index().to_dict(),
+            "gbm_by_primary_diagnosis_all": int(mu_p["is_gbm"].sum()),
+            "gbm_among_eligible": int((mu_p["is_gbm"] & mu_p["eligible"]).sum()),
+            "non_gbm_among_eligible": int((~mu_p["is_gbm"] & mu_p["eligible"]).sum()),
+            "primary_diagnosis_counts_eligible": mu_p.loc[mu_p["eligible"], "primary_diagnosis"].value_counts().to_dict(),
         },
         "rolling_origin_rule_A1_1": ("primary" if int((per_pat >= 2).sum()) >= 30 else "secondary"),
         "lumiere": {"patients": int(len(lu_p)), "eligible_ge3_rated_followups": int(lu_p["eligible"].sum()),

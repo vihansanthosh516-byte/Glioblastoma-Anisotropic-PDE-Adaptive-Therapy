@@ -6,7 +6,7 @@ Status words: **Fixed** = rerun and the limit is gone. **Checked** = tested, the
 ## Biggest (change what the paper can claim)
 | ID | Limit | Status | What we know now |
 |---|---|---|---|
-| L0 | Track A uses a random cell-level split, with label-derived graph edges and test-set epoch choice | **Checked; script 88 running** | Patient-ID lookup scores 82.8%, above C-GAT 78.7%. Patient-level LR 60.3%, RF 62.0%, scVI-LR 66.2% (script 86). Leak-free C-GAT: fold 0 only (clean PCA graph 77.1%, cVAE without label edges 75.7%, published edges 86.4%). Wait for all 5 folds. |
+| L0 | Track A uses a random cell-level split, with label-derived graph edges and test-set epoch choice | **Checked; script 88 done, script 95 audit done** | Patient-ID lookup scores 82.8%, above C-GAT 78.7%. Patient-level LR 60.3%, RF 62.0%, scVI-LR 66.2% (script 86). Leak-free C-GAT: fold 0 only (clean PCA graph 77.1%, cVAE without label edges 75.7%, published edges 86.4%). All 5 folds: gat_pca_clean 63.8% (SD 13.3), cVAE no label edges 74.2%, published edges 75.8%. A classifier that sees only cells-per-patient scores 64.6% (SD 27.5). See ledger 2o. |
 | L24 | The Track A to Track B link | **Checked: none** | Inflammation score is 1.0 for all 61 patients (IDs do not match). Track A stands alone. |
 | L14/L28 | `real_test` is not a real-drug test | **Checked** | Real growth rates, but the same assumed kill rates for all 21 patients. Median kill/rho 77.7 vs 2.7-12.5 in synthetic sets (script 87). This explains the +2.1 d gain. |
 | L10 | Script 47 dual-agent "rescue" | **Fixed (explained)** | MTD plus the same second drug: 358.9 d, AUC 1152. Dual-adaptive: 305.6 d, AUC 1015 (script 89). The second drug does the work. |
@@ -63,6 +63,9 @@ Status words: **Fixed** = rerun and the limit is gone. **Checked** = tested, the
 | L30 | Script 90 multivariate c-index is odd (pooled 0.48) and was not checked | script 90 |
 | L32 | The zone-expression files used by the stromal and adaptive scripts (43-44) are very likely synthetic (see ledger 2m) | `output/real_cohort_{le,ct,it}.csv` |
 | L31 | Burdenko-GBM-Progression is restricted; not obtained | TCIA |
+| L33 | The "Healthy" class is 3 donors with other diagnoses (neurocytoma, oligodendroglioma, meningioma), all Fresh; no Frozen cell is Healthy | script 95, ledger 2o |
+| L34 | MU-Glioma primary population mixes WHO grades: 30 of 134 eligible patients are not GBM | script 94, ledger 2p |
+| L35 | Eligible MU patients progressed far more often than excluded ones (88.8% vs 47.8%): follow-up is informative | script 96, ledger 2p |
 
 ## Still to run
 Script 88 (4 folds left); RHUH-GBM analysis; script 81 whole-tumour target; E_MAX sweep (L8); power analysis (L15); stronger forecast baselines.
