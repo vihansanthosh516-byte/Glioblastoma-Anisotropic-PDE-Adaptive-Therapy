@@ -2,7 +2,7 @@
 
 ## 2026-09-23 — Adaptive therapy high-rho stratification
 
-**Finding:** 23 of 61 patients (rho > 0.02/day) show adaptive ≈ MTD. 
+**Finding:** 23 of 61 patients (rho > 0.02/day) show adaptive ≈ MTD. [UNVERIFIED 2026-10-04: `adaptive_geometry_metrics.json` has only 10 patients with rho > 0.02. The "23" may use another cutoff. Do not cite until reconciled.] 
 10/23 progress earlier under adaptive.
 
 **Hypothesis:** The 80% controller setpoint is too tight for fast-growing 

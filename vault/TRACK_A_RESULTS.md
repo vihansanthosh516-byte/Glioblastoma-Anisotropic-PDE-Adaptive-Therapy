@@ -48,7 +48,7 @@ Last updated: 2026-09-21
 - **Skipped.** Numbers aggregated manually (see leaderboard below).
 
 ### Script 15 — scVI baseline
-- Accuracy: 0.7310, F1: 0.7304, AUC: 0.8795
+- Accuracy: 0.7297, F1: 0.7288, AUC: 0.8800 (corrected 2026-10-04 from `output/scvi_metrics.json`; earlier 0.7310 / 0.7304 / 0.8795 did not match the file)
 - Output: `output/scvi_latent.npy`
 
 ### Script 16 — NMF baseline
@@ -60,14 +60,14 @@ Last updated: 2026-09-21
 | Rank | Method | Accuracy | Macro F1 | AUC |
 |---|---|---|---|---|
 | 1 | **C-GAT** (script 13) | **0.7873** | **0.7831** | **0.9218** |
-| 2 | scVI (script 15) | 0.7310 | 0.7304 | 0.8795 |
+| 2 | scVI (script 15) | 0.7297 | 0.7288 | 0.8800 |
 | 3 | Random Forest (script 06) | 0.7260 | 0.7248 | 0.8735 |
 | 4 | Logistic Regression (script 06) | 0.6983 | 0.6981 | 0.8623 |
 | 5 | NMF (script 16) | 0.6103 | 0.6112 | 0.7899 |
 | 6 | Hybrid (script 08) | 0.5120 | 0.4939 | 0.6907 |
 | 7 | Transformer (script 07) | 0.4960 | 0.4840 | 0.6884 |
 
-**Finding:** C-GAT (78.7%) outperforms scVI (73.1%) by 5.6 percentage points. Classical methods (LR, RF) reach 70–73%. Transformer-based methods underperform (49–51%), suggesting attention alone is insufficient without graph structure.
+**Finding:** C-GAT (78.7%) outperforms scVI (73.0%) by 5.8 percentage points. Classical methods (LR, RF) reach 70–73%. Transformer-based methods underperform (49–51%), suggesting attention alone is insufficient without graph structure.
 
 ---
 
@@ -223,9 +223,9 @@ All three agree within numerical accuracy.
 
 ### Script 30 — ABA Analysis & Clinical Correlation
 - Wave speed: **26.59 µm/hr** ✅ in range (10–50)
-- Necrotic fraction: **22.9%** (or 38.1% final snapshot) ✅ in range (10–40)
+- Necrotic fraction: **38.1%** of tumour cells at step 150 ✅ in range (10–40) (`clinical_correlation.necrotic_fraction` = 0.3813 in `output/aba_analysis_results.json`). The same file also lists `final_necrotic_fraction` = 0.172 (a different denominator). The earlier "22.9%" is not in the file. Quote 38.1% and name the denominator.
 - Histological pattern: infiltrative
-- Core doubling time: 87.3 hr (~3.6 days) — shorter than the 7–30 day literature range
+- Core doubling time: 47.5 hr (~2.0 days) (corrected 2026-10-04; earlier 87.3 hr did not match `output/aba_analysis_results.json`) — shorter than the 7–30 day literature range, so it is **out of range** (`doubling_time_in_range` = false)
 - Outputs: `output/aba_analysis_results.json`, `aba_kinetics_summary.tsv`, `invasion_dynamics_analysis.png`
 
 ### Script 31 — Virtual Gene Knockout Engine
@@ -357,7 +357,7 @@ Three bugs corrected:
 ### Results
 - Final tumor mass: 45.2 to 631.7 (14× range across cohort)
 - Median mass: ~46
-- Large growers (>100): 12 patients
+- Large growers (>100): 11 patients (corrected 2026-10-04 from `output/stromal_feedback_metrics.json`; median mass 45.6)
 - Baseline (no growth): ~60 patients clustered at 45.2-46
 
 ### Limitations

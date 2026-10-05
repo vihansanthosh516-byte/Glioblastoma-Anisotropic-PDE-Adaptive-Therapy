@@ -63,7 +63,8 @@ MPC optimal control, and a 3D volumetric extension.
 
 - **8 patients** (same cohort as script 47), 50³ grid, 180 days
 - **MTD eradicates tumor** (0 mm³) for 5/8 patients at low rho
-- **Adaptive holds** 5,000 – 41,500 mm³ residual with **88–99% dose sparing**
+- **Adaptive holds** 8,339 – 41,503 mm³ residual with **10.9–98.9% dose sparing** (corrected 2026-10-04 from `output/3d_extension_summary.json`; sparing is 98.9% for rho <= 0.0039 and falls with rho)
+- **Diffusivity caveat:** script 48 uses D_parallel = 0.013 and D_perp = 0.0013 mm²/d, about 10x below the Swanson-type values (see [[Script-78-Horizon-Crossover]]). The 3D numbers inherit this.
 - **Dose sparing collapses** as rho increases:
   - rho < 0.01: 89–99% sparing
   - rho = 0.012: 87.8%
@@ -89,9 +90,10 @@ MPC optimal control, and a 3D volumetric extension.
 ### 3. Dose sparing is inversely correlated with rho
 
 - **Pearson r = -0.84** between rho and drug reduction
-- Slow-growing tumors (rho < 0.002): 80–99% dose sparing
+- Slow-growing tumors (rho < 0.002, n = 16): 57–90% dose sparing (corrected 2026-10-04 from `adaptive_geometry_metrics.json`; earlier "80–99%" did not match)
 - Fast-growing tumors (rho > 0.03): < 30% dose sparing
-- Predictive rule: rho = 0.02/day is the inflection point
+- Predictive rule: rho = 0.02/day as the inflection point is **not tested in any output file**. Do not state it as a result. Only 10 of 61 patients have rho > 0.02.
+- Script 47 caveat: dual-agent drug exposure (AUC 944-1280) is 2.5-3.3x the MTD value (385) in `output/dual_drug_comparison.json`. Dual-agent rescues TTP and resistance but does **not** spare drug.
 
 ## Limitations
 

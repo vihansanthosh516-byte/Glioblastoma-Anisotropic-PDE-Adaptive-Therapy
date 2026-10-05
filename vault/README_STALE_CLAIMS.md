@@ -14,7 +14,7 @@ Checked 2026-10-04. **Do not cite the README in the paper.** Cite the vault note
 | RL 13.94 mm3 vs Stupp 11.01 mm3 at day 90 | Script 66: PPO 12.67 vs Stupp 14.47 mm3 (different run and setup). Do not mix. | [[Script-66-RL-Equal-Budget]] |
 | "Tracks B and C are evaluated on synthetic cohorts" | Track B uses real MU-Glioma-Post parameters. Track C uses a mix (see [[PAPER_DATA_SOURCES]]). | vault |
 | Robust MPC: "30% lower cost variance" | Variance reduction is **-31.8% (worse)**; 68.9% dose sparing is the supported number | [[TRACK_C_RESULTS]] |
-| Biomarker rho > 0.024 /day (CI 0.0202-0.0249) | Script 62 gives rho* about 0.075 /day, CI [0.0746, 0.0820]. These look like two different analyses (older virtual cohort vs script 62). Not resolved. Use script 62 only after confirming. | [[TRACK_C_RESULTS]] |
+| Biomarker rho > 0.024 /day (CI 0.0202-0.0249) | Script 62 gives rho* about 0.075 /day, CI [0.0746, 0.0820]. Script 62 is the current analysis (64 real growing patients, equal budget; early start wins for 60/64; only 4 patients lie above rho*). The README's 0.024 comes from an older virtual-cohort analysis. Use script 62. | [[TRACK_C_RESULTS]] |
 | 3D adaptive dose sparing 59.8% (one patient) | 8 patients: 81.4% +- 30.4%, collapses from 89-99% to 10.9% as rho rises | [[TRACK_B_RESULTS]] |
 | "8-patient synthetic cohort" for Track B | 61 real patients for adaptive therapy; 8 real patients for MPC and 3D | [[TRACK_B_RESULTS]] |
 | Adaptive: TTP "non-inferior", dose sparing | Also: final tumour mass is higher under adaptive (315.9 vs 306.4; VR 2.39), and 10/61 progressed earlier | `output/adaptive_cohort_summary.json` |

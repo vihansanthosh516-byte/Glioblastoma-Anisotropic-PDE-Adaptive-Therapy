@@ -14,7 +14,7 @@
 - Blind PPO is already 95-100% on lhs60 and real_test. The 25% failure is cohort64-specific (that set varies kill rates across patients).
 
 ## The caveat the paper must carry
-- These wins are on **day-90 volume**. Script 68 shows the day-90-optimal schedule **loses on time to progression (TTP): -29.4 days** (`TRACK_C_RESULTS.md`; per-set TTP numbers in `ttp_equal_budget/evaluate.json` not re-read).
+- These wins are on **day-90 volume**. Script 68 shows the day-90-optimal schedule never beats Stupp on time to progression (TTP): 0.0 d (cohort64), **-29.4 d (lhs60)**, -10.7 d (real_test), -7.9 d (synth_test). Read from `ttp_equal_budget/evaluate.json` 2026-10-04.
 - So "100% win" is a statement about one endpoint that the vault itself calls a poor metric. The optimal schedule leaves the tumour untreated for about 55 days.
 
 ## Script 68 — TTP oracle gains (from the vault)

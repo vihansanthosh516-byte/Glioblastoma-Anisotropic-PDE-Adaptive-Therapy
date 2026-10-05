@@ -1,5 +1,7 @@
 # Vault Audit Report
 
+> **Note (2026-10-04):** a second audit re-read the output JSON and CSV files and found errors this report passed (scVI metrics, Script 30 doubling time and necrotic fraction, CSGT p, TCGA median OS, large-grower count, dose-sparing ranges, TTP value). All were corrected in the vault. Treat the "143 PASS" count below as superseded. See [[PAPER_FINDINGS_LEDGER]].
+
 Date: 2026-10-03
 
 ## Summary
