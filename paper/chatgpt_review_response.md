@@ -52,3 +52,39 @@ Say "simulation evidence" every time.
 - Cut or downgrade: age to survival, simulated elongation, DTI, the dual-drug rescue.
 - Make Track B the centre. Make Track A exploratory and Track C a simulation study.
 - Every main finding needs: baseline, effect size, uncertainty, limit.
+
+
+---
+
+# Review of analysis_plan_v1 (2026-10-04, pre-commit checklist from ChatGPT)
+
+Each item was checked against `analysis_plan_v1.md` and the code. The "9/10" rating was not used. All fixes are in Amendment 1 of the plan.
+
+| # | Review claim | Check | Verdict |
+|---|---|---|---|
+| 1 | Patient-level aggregation undefined | Plan said "patient is the unit" but not how several forecasts become one value | Right. A1.1 |
+| 2 | Eligibility undefined | No criteria in v1 | Right. A1.2 (from `forecast_pairs()` and script 81) |
+| 3 | Missing / failed-fit rules | Absent | Right. A1.3 |
+| 4 | Baselines not defined | Only named. Also: script 81's `uniform_dilation` uses the true scan-2 volume (oracle) | Right, and worse than stated. A1.4 |
+| 5 | PDE spec not frozen | Absent; no optimizer exists (grid search) so "optimizer / regularization" are "none" | Right. A1.5, written from `run_improved_aniso.py` |
+| 6 | H2 "same sign" too weak | v1 said "same sign, CI reported" | Partly right (CI was already reported). Tiers added. A1.7 |
+| 7 | H3 not stated frozen | v1 had a general freeze rule | Partly right. A1.8. Also LUMIERE may have no tensors, so H3/H4 may be untestable externally |
+| 8 | H4 should be exploratory | Result already seen (-0.001, p 0.97) | Right. A1.9 |
+| 9 | H8 needs patient linkage | v1 wording implied a patient-level gain | Right. A1.10 |
+| 10 | Utility function undefined | Absent | Right. A1.11. Weights and progression rule are our choices, flagged as such |
+| 11 | H10 should be neutral | v1: "RL beats it" | Right. A1.12 |
+| 12 | Controller information | Absent | Right. A1.12 |
+| 13 | Subgroups mathematical | v1 had cutoffs +/-10% but "previous two scans" | Right, and a real flaw: first forecasts have no previous scan, so they cannot be subgrouped. A1.13 |
+| 14 | Early post-RT is not RANO | v1 said "(RANO 2.0)" | Right. A1.14 |
+| 15 | Catastrophic threshold wording | v1 had threshold, no label | Right. A1.15 |
+| 16 | H1 needs mean AND median | v1 already required both | Already in the plan. Wording made explicit. A1.6 |
+| 17 | Multiple testing | v1 already had Holm / BH, primary separate | Already in the plan. A1.16 restates |
+| 18 | Freeze list | v1 had tag only | Partly right. A1.17 |
+| 19 | External reruns | v1 said "re-runs only for crashes, logged" | Already in the plan. A1.18 restates |
+| 20 | Solver verification gate | v1 said no biological result until fixed | Already in the plan. A1.19 restates |
+
+**What the outside review missed (found in the files, not by the reviewer)**
+1. Four of five CV folds in script 81 chose the grid edge (rho 0.1, d 0.01). The fit may lie outside the grid. A1.5 adds a development-only grid-extension check before the freeze.
+2. The isotropic homogeneous model (+0.028) is as good as the anisotropic one (+0.026). The gain comes from growth, not from direction (`output/forecast_labels_core/results.json`).
+3. Script 81 forecasts only scan 1 to 2. Rolling-origin needs the count of patients with 3 or more scans, which is not known yet. A1.1 sets a rule.
+4. The "grew / shrank-or-same" split uses the target scan, so it is outcome-defined.
