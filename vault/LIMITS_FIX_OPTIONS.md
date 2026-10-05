@@ -151,11 +151,13 @@ Everything else is either future work or a model upgrade.
 | L14 real vs synthetic | Compare parameters | script 87 | real_test kill/rho 77.7 vs 2.7-12.5; kill rates are the same for all 21 patients (assumed). |
 | L16 threshold | Exact CI, permutation, leave-one-out | script 87 | 10/10 vs 0/51; p 5e-5; LOO 98.4%; still post hoc, n=10. |
 | L19 MGMT power | Schoenfeld | script 87 | Minimum detectable HR 1.74; underpowered. |
+| L7 external survival check | CGGA, WHO IV, two batches | script 90, `output/cgga_validation.json` | Age direction replicates, effect weaker (HR 1.009 vs TCGA 1.031; Holm p 0.08). Sex and MGMT null. See ledger 2k. |
+| L1/L3 new real patients | LUMIERE volume forecast | script 91, `output/lumiere_volume_forecast.json` | Growth-only model loses to no-change again (ledger 2l). Volumes only, no Dice. |
 | L24 inflammation link | Checked IDs | ledger | Score is 1.0 for all 61 patients. A-to-B link = none. Schematic fixed. |
 
 ### Not done (and why)
 - **L17** script 81 whole-tumour target: about 12 h compute.
-- **L1-L4, L7, L16, L19 external data** (CGGA, LUMIERE, RHUH-GBM, Burdenko): needs downloads. Each needs your yes first (filename, source, size).
+- **External data:** CGGA and LUMIERE tables are downloaded and used (`data/external/`, git-ignored). RHUH-GBM clinical CSV and NIfTI (2.9 GB) are downloaded, not yet analysed (n=40, no MGMT column). Burdenko is restricted, skipped. LUMIERE masks (30 GB zip) not downloaded.
 - **L1.5** stronger forecast baselines, **L8** E_MAX sweep, **L15** power analysis, **L5** Bayesian calibration: not started.
 
 ### Extra notes to keep
