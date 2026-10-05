@@ -272,8 +272,9 @@ All three agree within numerical accuracy.
 **Data:** 518 real TCGA-GBM patients from cBioPortal clinical dataset
 
 **Cohort:**
-- 518 patients, 428 events in the Cox report (`output/clinical_validation_report.md`); the clinical CSV flags 441 deaths among 518. Event count needs one source of truth before the paper quotes it.
-- Median OS: **do not quote 377.5 d.** That is the raw median of all 518 follow-up times, censored included (not a survival median). Kaplan-Meier median on `data/tcga_gbm_clinical.csv` = 428 d (recomputed 2026-10-04). The Cox report text says 383 d. Three values exist; see [[PAPER_FINDINGS_LEDGER]].
+- 518 patients, 428 events, 90 censored (`output/tcga_km_summary.json`, script 84, cohort file `output/clinical_mapped_cohort.csv`).
+- **Median OS: 432 days, Kaplan-Meier, 95% CI 393-457 (~14.2 months).** Use this.
+- Do not quote the old values. 377.5 d is the median of all follow-up times, censored included. 383 d (in `clinical_validation_report.md`) is the median among deaths only. Neither is a survival median.
 - Age range 10–89; 61% male
 - Subtype: Mesenchymal 152, Classical 143, Proneural 136, Neural 87
 

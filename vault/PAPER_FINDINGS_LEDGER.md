@@ -10,7 +10,7 @@ The single source for every number in the paper. Written 2026-10-04.
 |---|---|---|---|---|---|
 | A1 | C-GAT beats scVI at zone classification | 78.7% vs 73.1% accuracy; macro F1 0.783; AUC 0.922 | **Verified** (acc, F1 from JSON; scVI from vault) | `output/cgat/gat_metrics.json`, `benchmark_comparison.tsv` | 15,000-cell subsample, 3 classes. One seed, no CI. Script 14 was skipped, so the leaderboard was merged by hand. RF and LR are 72.6% and 69.8%. |
 | A2 | SPIB index-1 saddle, 5/5 checks | saddle energy 2.019; Hessian eigenvalues +2/-1; attractor energies 0.016 (Healthy), 0.008 (Core), 0.0 (Periphery) | **Verified** | `output/spib_saddle_point_metrics.json` | SPIB found only 2 metastable states (Core+Periphery merged). The saddle is between that merged basin and Healthy. "5/5" are internal consistency checks, not a test on new data. |
-| A3 | Age is the dominant prognostic factor in TCGA-GBM | n=518, HR 1.031 (1.023-1.038), p = 8.88e-16 | **Verified** | `output/survival_stats_summary.json` | Gender and subtype are null (HR 1.15, p 0.17; 1.09, p 0.50). Age is a known factor, so this validates the pipeline; it is not a discovery. **Event count and median OS conflict, see "Open conflicts".** |
+| A3 | Age is the dominant prognostic factor in TCGA-GBM | n=518, HR 1.031 (1.023-1.038), p = 8.88e-16 | **Verified** | `output/survival_stats_summary.json`, `tcga_km_summary.json` | Gender and subtype are null (HR 1.15, p 0.17; 1.09, p 0.50). Age is a known factor, so this validates the pipeline; it is not a discovery. Cohort: 428 events, 90 censored; KM median OS 432 d (393-457) (`output/tcga_km_summary.json`). |
 
 Supplement-only Track A: CSGT (H = 141.717, p = 1.68e-31 from JSON; note Periphery T-score 0.649 is not below Core 0.647), GRN (320 edges; master switches APOD 46, S100B 42, MT3 40; 37/380 edges survive bootstrap), three invasion models (26.6, 18.1, 26.6 um/hr), drug screen (MT-CO2 TI +4.82; no dual pair reaches TI > 10), penalized Cox C-index 0.639 (n=150).
 
@@ -44,7 +44,7 @@ Supplement-only Track C: inverse estimation (124/154 at lower bound), robust MPC
 | 124/154 patients fit at the growth lower bound | | [[TRACK_C_RESULTS]] |
 
 ## Open conflicts (fix before the paper quotes them)
-1. **TCGA events and median OS.** Cox report: 428 events, "median 383 d". Clinical CSV: 441 deaths among 518; raw median of all times 377.5 d (not a survival median); Kaplan-Meier median 428 d. Pick one definition and recompute from `data/tcga_gbm_clinical.csv`. Suggest: KM median, with the event count stated for the same rows.
+1. ~~TCGA events and median OS~~ **RESOLVED 2026-10-04 (script 84).** n=518, 428 events, 90 censored, **KM median 432 d (95% CI 393-457)**. Source: `output/tcga_km_summary.json`. The old 377.5 d (all times) and 383 d (deaths only) are not survival medians. The raw TCGA CSV flags 441 deaths; the analysed cohort file (`clinical_mapped_cohort.csv`) has 428. State which file the paper uses (the cohort file).
 2. **Biomarker threshold.** README 0.024 /day vs script 62 0.075 /day. Find which analysis is current.
 3. **"97 scripts".** True count of numbered files in `src/` is 97, but they use 82 distinct numbers (max 83). Say "97 numbered scripts".
 4. **Script 66 numbers** (PPO 12.67 vs Stupp 14.47 mm3) differ from README (13.94 vs 11.01). Use script 66.
