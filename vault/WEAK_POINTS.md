@@ -25,3 +25,6 @@ Numbers: [[PAPER_FINDINGS_LEDGER]]. Limits: [[LIMITS_CURRENT]].
 | W18 | MGMT null is underpowered (needs ~2,807 events) | limit_checks.json | State minimum detectable HR; use MGMT as context only | 6 | Accepted |
 | W19 | Zone-expression files for scripts 43-44 likely synthetic | LIMITS L32 | Do not use; if Track A to B link is wanted, rebuild from real data with patient IDs that match | 6 | Open |
 | W20 | No prospective validation | LIMITS L22 | Not possible. Wording: retrospective, in silico | all | Accepted |
+| W21 | Clamp u >= 0 adds mass under strong off-diagonal anisotropy (2.8% in a stress case) and is not logged | solver_verification.json V5 | Log clamp mass per forecast; report per-patient clamp gain; rerun aniso arm at h = 1 mm for a subset | 2-3 | Open |
+| W22 | At h = 2 mm the asymptotic front speed is off by up to +50% in the cell most folds chose (D 0.01, rho 0.1); radius error 0.64 mm at 70 d | solver_verification.json V7b, V9 | Extended-grid check (W3) run at h = 2 mm and h = 1 mm on a 30-patient development subset; report the shift | 2 | Open |
+
