@@ -18,3 +18,5 @@ Checked 2026-10-04. **Do not cite the README in the paper.** Cite the vault note
 | 3D adaptive dose sparing 59.8% (one patient) | 8 patients: 81.4% +- 30.4%, collapses from 89-99% to 10.9% as rho rises | [[TRACK_B_RESULTS]] |
 | "8-patient synthetic cohort" for Track B | 61 real patients for adaptive therapy; 8 real patients for MPC and 3D | [[TRACK_B_RESULTS]] |
 | Adaptive: TTP "non-inferior", dose sparing | Also: final tumour mass is higher under adaptive (315.9 vs 306.4; VR 2.39), and 10/61 progressed earlier | `output/adaptive_cohort_summary.json` |
+| Track A "C-GAT 78.7%" as a clean accuracy | Random cell-level split. A patient-ID lookup gets 82.8%; patient-level LR/RF/scVI-LR get 60-66% | `output/patient_level_cv.json`, [[LIMITS_CURRENT]] L0 |
+| Track A feeds Track B through an inflammation score | Score is 1.0 for all 61 patients; there is no link | [[PAPER_FINDINGS_LEDGER]] |

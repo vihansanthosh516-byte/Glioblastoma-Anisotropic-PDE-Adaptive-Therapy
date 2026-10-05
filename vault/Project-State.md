@@ -1,35 +1,26 @@
-# Project State — Last updated 2026-09-23
+# Project State: last updated 2026-10-04 (evening)
 
 ## What this project is
-Computational glioblastoma modeling with three tracks. Focus is currently 
-on Track B (adaptive therapy).
+Computational glioblastoma modelling with three tracks (A single cell to clinical, B PDE and adaptive therapy, C digital twin and RL).
+The paper title is fixed. The paper is NOT written. Methods is the restart point. See [[PAPER_FINDINGS_LEDGER]] for every number and [[LIMITS_CURRENT]] for every limit.
 
-## Verified results (committed)
-- **Script 27** (a2802ac): ABA lattice, wave speed 26.6 um/hr (the old "front velocity 0.118-0.120" is not reproducible from current output)
-- **Script 28** (7bd7def): FK-PDE, numerical 3.62 vs analytical 4.00, 9.4% error
-- **Script 29**: integrated invasion, free-propagation 26.6 um/hr vs analytical 28.3
-- **Script 43** (e76d26a): stromal feedback, per-patient rho, tumor mass 14x variation
-- **Script 44** (17bfade): adaptive therapy, 61 real patients. 
-  Resistance: median 99.2% MTD vs 30.6% adaptive. 
-  54/61 select more resistance under MTD, 0/61 under adaptive.
+## Where things stand
+- Vault is audited against output files ([[AUDIT_REPORT]] is superseded by the ledger).
+- 14 paper figures are in `paper/figures/` (made by `scripts/make_paper_figures.py`, `scripts/make_framework_figure.py`).
+- Track A is the weak track: the random cell-level split inflates it (scripts 86, 88). Track A does not feed Track B (inflammation score is 1.0 for all 61 patients).
+- Track B and C fixes done: script 48 at literature D (holds), script 89 fair dual-drug baseline (the second drug explains the rescue), script 87 checks.
+- External checks done: CGGA (script 90), LUMIERE volumes (script 91).
 
-## Resolved
-- Threshold test (script 44, THRESHOLD_OFF=0.50): 43% drug use, 5.8 mean holidays
-  (vs 32% drug, 48.9 holidays at 0.80). 0.80 retained.
+## Running
+- Script 88 (leak-free C-GAT), WSL, CPU, 5 folds x 3 variants, about 30 min per fold. Output `output/cgat_leak_free.json` (written per fold).
 
-## Open questions
-- Is high-rho failure (10/61 progressed earlier under adaptive) real biology?
-- Where do the 42 negative-rho responders go in the paper?
-- Scripts 46, 47, 48 still need per-patient param patches
+## Not done
+- RHUH-GBM analysis; script 81 whole-tumour target (about 12 h); E_MAX sweep; power analysis for probe-then-commit; stronger forecast baselines; Dice forecast on new cohorts (needs masks).
+- References in [[PAPER_REFERENCES]] are all unchecked. "Weidner 2023" has no verified title.
 
-## Constraints
-- E_MAX_RATIO=1000 (empirical sweep: 500x undershoots, 2000x saturates)
-- THRESHOLD_OFF=0.80 (0.50 tested: more drug, fewer holidays)
-- Negative-rho patients excluded from adaptive therapy sim
-- All scripts use PROJECT_ROOT/OUTPUT_DIR pattern
+## Rules
+- No commit of a paper section before the user reviews it. Every number cites a source file. Unknown numbers are `[MISSING]`. Abstract last.
+- One commit per verified fix; `git status --short` first; never `git add -A`; push at once.
 
 ## Where things live
-- src/44_adaptive_therapy.py
-- output/adaptive_cohort_summary.json (headline)
-- output/adaptive_geometry_metrics.json (61 per-patient records)
-- TRACK_A_RESULTS.md (scratchpad)
+- `src/` scripts 01-91; `output/` JSON evidence; `data/external/` new cohorts (git-ignored); `vault/` notes; `paper/figures/`.

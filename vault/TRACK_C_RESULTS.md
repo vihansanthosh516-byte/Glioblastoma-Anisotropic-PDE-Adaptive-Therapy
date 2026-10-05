@@ -52,6 +52,7 @@ sensitivity → endpoint comparison.
 
 ## Script 68 — Time-to-Progression Endpoint
 - Day-90 optimal schedule vs Stupp on TTP: 0.0 d (cohort64), **-29.4 d (lhs60)**, -10.7 d (real_test), -7.9 d (synth_test). It never wins (corrected 2026-10-04 from `ttp_equal_budget/evaluate.json`; earlier note quoted only the lhs60 value).
+- **`real_test` uses real growth rates but the same assumed kill rates for all 21 patients** (script 87; [[Script-75-Probe-Paced]]).
 - TTP oracle gains: +78d (cohort64), +50d (lhs60), +3.9d (real_test), +24.9d (synth)
 - CEM beat the oracle on 2/9 checks — oracle is a lower bound
 - Source: output/ttp_equal_budget/evaluate.json

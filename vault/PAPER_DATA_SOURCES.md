@@ -14,7 +14,9 @@ Written 2026-10-04. Every row was checked against a file on disk.
 - **UCSF-PDGM has one scan per patient.** It cannot give a forecast target. It supplies tensors and a shape test only.
 - **IvyGAP spatial zones are not redistributed.** Script 40 uses molecular subtype as a stand-in for zone. Say so.
 - **BraTS 2021 data exists in `data/brats/`.** Nothing in the vault says a result uses it. Do not cite it as a cohort unless a script is found that uses it.
-- **Track C RL/PPO "synthetic" sets** (cohort64, lhs60, synth_test) are model-generated. Only `real_test` (21 patients) uses real MU-Glioma parameters. The paper must label which is which.
+- **Track C RL/PPO "synthetic" sets** (cohort64, lhs60, synth_test) are model-generated. `real_test` (21 patients) uses real MU-Glioma growth rates but the same assumed kill rates for every patient. The paper must label which is which.
+- **Track A to Track B link is none.** The inflammation score is 1.0 for all 61 patients.
+- **External cohorts (downloaded 2026-10-04, in `data/external/`, git-ignored):** CGGA mRNAseq_693 and mRNAseq_325 clinical and expression (WHO IV usable: 237 and 137); LUMIERE (91 patients; pyradiomics volume tables from HD-GLIO-AUTO and DeepBraTumIA, RANO ratings, demographics); RHUH-GBM (40 patients; clinical CSV and 2.9 GB NIfTI with segmentations; no MGMT column). Used by scripts 90 and 91; RHUH not yet analysed. Burdenko is restricted and not obtained. Sources: CGGA (cgga.org.cn), LUMIERE (figshare), RHUH-GBM (TCIA).
 
 ## Cohort counts that look alike (do not mix)
 | Number | Meaning |

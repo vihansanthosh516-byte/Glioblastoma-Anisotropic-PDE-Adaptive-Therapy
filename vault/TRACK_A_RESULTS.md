@@ -67,7 +67,9 @@ Last updated: 2026-09-21
 | 6 | Hybrid (script 08) | 0.5120 | 0.4939 | 0.6907 |
 | 7 | Transformer (script 07) | 0.4960 | 0.4840 | 0.6884 |
 
-**Finding:** C-GAT (78.7%) outperforms scVI (73.0%) by 5.8 percentage points. Classical methods (LR, RF) reach 70–73%. Transformer-based methods underperform (49–51%), suggesting attention alone is insufficient without graph structure.
+> **Warning (2026-10-04):** this table uses a random cell-level split. A patient-ID lookup scores 82.8%, above C-GAT. Under patient-level folds LR, RF and scVI-LR score 60-66% (script 86). The leak-free C-GAT is script 88. See [[LIMITS_CURRENT]] L0.
+
+**Finding (on the random split only):** C-GAT (78.7%) outperforms scVI (73.0%) by 5.8 percentage points. Classical methods (LR, RF) reach 70–73%. Transformer-based methods underperform (49–51%), suggesting attention alone is insufficient without graph structure.
 
 ---
 
@@ -375,3 +377,9 @@ Three bugs corrected:
 ### Key finding
 The inflammation signature (S100A8/S100A11) and CCL3L1 show directional adverse prognostic effects in real TCGA-GBM expression, and all four genes have therapeutic indices > 1. Age remains the dominant clinical predictor (p=0.01). This is a real-data clinical validation of the inflammation-targeting hypothesis.
 
+
+
+## External checks (2026-10-04)
+- **Patient-level CV (script 86):** `output/patient_level_cv.json`. 21 patients; the Healthy class has 3.
+- **CGGA survival check (script 90):** `output/cgga_validation.json`. Age HR 1.009 pooled (TCGA 1.031); sex and MGMT null. See [[PAPER_FINDINGS_LEDGER]] 2k.
+- **Track A does not feed Track B.** The inflammation score is 1.0 for all 61 patients.

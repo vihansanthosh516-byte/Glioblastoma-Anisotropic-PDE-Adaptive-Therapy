@@ -65,6 +65,7 @@ MPC optimal control, and a 3D volumetric extension.
 - **MTD eradicates tumor** (0 mm³) for 5/8 patients at low rho
 - **Adaptive holds** 8,339 – 41,503 mm³ residual with **10.9–98.9% dose sparing** (corrected 2026-10-04 from `output/3d_extension_summary.json`; sparing is 98.9% for rho <= 0.0039 and falls with rho)
 - **Diffusivity caveat:** script 48 uses D_parallel = 0.013 and D_perp = 0.0013 mm²/d, about 10x below the Swanson-type values (see [[Script-78-Horizon-Crossover]]). The 3D numbers inherit this.
+- **Literature-D re-run (2026-10-04):** `GBM_D_REGIME=swanson`, `output/3d_extension_summary_swanson.json`. Sparing: 0.989 for the four low-rho patients; 0.837, 0.887, 0.346, 0.051 for the four high-rho patients. See [[Script-48-3D-Extension]].
 - **Dose sparing collapses** as rho increases:
   - rho < 0.01: 89–99% sparing
   - rho = 0.012: 87.8%
@@ -123,3 +124,8 @@ MPC optimal control, and a 3D volumetric extension.
 - [[Decisions]] — E_MAX_RATIO = 1000, THRESHOLD_OFF calibration
 - [[Open-Questions]] — outstanding questions
 - [[Repo]] — master map
+
+## New checks (2026-10-04)
+- Script 89: MTD plus the same second drug beats dual-adaptive on TTP (358.9 vs 305.6 d). The script 47 rescue is the second drug. [[Script-47-Optimal-Control]]
+- Script 91 (LUMIERE, volumes only): the growth-only forecast loses to no-change, as in MU-Glioma. [[PAPER_FINDINGS_LEDGER]] 2l
+- Script 87: rho > 0.02 threshold, permutation p 5e-5, leave-one-out 98.4%; still post hoc, n=10.
