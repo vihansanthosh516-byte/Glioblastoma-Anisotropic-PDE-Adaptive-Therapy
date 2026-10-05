@@ -31,9 +31,17 @@ GRID_SIZE = 50          # 50³ = 125K voxels (reduce to 40³ = 64K for faster ru
 DX = 1.0                # mm voxel spacing
 DIM = 3
 
-# Diffusion coefficients
-D_WHITE = 0.013         # mm²/day (along tracts)
-D_GRAY = 0.0013         # mm²/day (isotropic baseline)
+# Diffusion coefficients. Default (legacy) reproduces the committed outputs.
+# GBM_D_REGIME=swanson uses literature values (10x larger) and writes *_swanson outputs.
+import os as _os
+D_REGIME = _os.environ.get("GBM_D_REGIME", "legacy")
+if D_REGIME == "swanson":
+    D_WHITE = 0.13      # mm²/day (along tracts)
+    D_GRAY = 0.013      # mm²/day (isotropic baseline)
+else:
+    D_WHITE = 0.013     # mm²/day (along tracts)
+    D_GRAY = 0.0013     # mm²/day (isotropic baseline)
+_OUT_SUFFIX = "_swanson" if D_REGIME == "swanson" else ""
 
 from mu_glioma_loader import load_mu_glioma_params, real_cohort_stats
 _params = load_mu_glioma_params()
@@ -471,7 +479,7 @@ def main():
 
     # Save artifacts
     print(f"\n[6] Saving artifacts...")
-    np.savez_compressed(OUTPUT_DIR / "3d_master_cohort_volumes.npz", **all_volumes)
+    np.savez_compressed(OUTPUT_DIR / f"3d_master_cohort_volumes{_OUT_SUFFIX}.npz", **all_volumes)
 
     summary = {
         "grid_size": GRID_SIZE,
@@ -489,7 +497,7 @@ def main():
             "dose_sparing_fraction": {"mean": float(np.mean(ds)), "std": float(np.std(ds, ddof=1))},
         },
     }
-    with open(OUTPUT_DIR / "3d_extension_summary.json", "w") as f:
+    with open(OUTPUT_DIR / f"3d_extension_summary{_OUT_SUFFIX}.json", "w") as f:
         json.dump(summary, f, indent=2)
 
     print(f"\n{'='*70}")
