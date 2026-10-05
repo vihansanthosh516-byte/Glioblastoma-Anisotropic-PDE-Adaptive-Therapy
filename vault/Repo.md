@@ -77,7 +77,7 @@ mindmap
 | Clinical ingest | 35–41 | IvyGAP, survival, dose–response |
 
 **Verified physics anchors (from [[Project-State]])**
-- **27** ABA lattice — front velocity ~0.118–0.120
+- **27** ABA lattice — wave speed 26.6 µm/hr (old "front velocity ~0.118–0.120" not reproducible)
 - **28** FK-PDE — numerical 3.62 vs analytical 4.00 (~9.4% err)
 - **29** invasion — free-prop 26.6 vs analytical 28.3 µm/hr
 

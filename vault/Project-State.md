@@ -5,7 +5,7 @@ Computational glioblastoma modeling with three tracks. Focus is currently
 on Track B (adaptive therapy).
 
 ## Verified results (committed)
-- **Script 27** (a2802ac): ABA lattice, front velocity 0.118-0.120, sustained
+- **Script 27** (a2802ac): ABA lattice, wave speed 26.6 um/hr (the old "front velocity 0.118-0.120" is not reproducible from current output)
 - **Script 28** (7bd7def): FK-PDE, numerical 3.62 vs analytical 4.00, 9.4% error
 - **Script 29**: integrated invasion, free-propagation 26.6 um/hr vs analytical 28.3
 - **Script 43** (e76d26a): stromal feedback, per-patient rho, tumor mass 14x variation

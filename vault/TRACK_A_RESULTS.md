@@ -158,7 +158,7 @@ Last updated: 2026-09-21
 ### Script 27 — ABA lattice (agent-based invasion, final)
 
 - Grid: 512×512, 5 µm/pixel, 400 steps
-- Front velocity: 0.118–0.174 (sustained across 400 steps)
+- Front velocity: "0.118–0.174 over 400 steps" is **not reproducible** from the current `output/aba_metrics.json` (150 steps; per-step front velocity 0.0013-0.0206). It likely comes from an older run. Do not cite. Cite the wave speed (26.6 µm/hr) instead.
 - **Wave speed: 26.6 µm/hr** ✅ in clinical range 10–50 (Harpold et al. 2007)
 - **Necrotic fraction: 38.1%** ✅ in clinical range 10–40
 - Histological pattern: infiltrative
@@ -252,7 +252,7 @@ All three agree within numerical accuracy.
 | MT-CO3 | **+3.27** | 9× tumor selectivity |
 | S100A8 | **+2.42** | 5× tumor selectivity |
 
-**Dual KOs:** range +0.44 to −0.98. No saturation. Best pair (S100A11+S100A6) reaches only TI = +0.44.
+**Dual KOs:** range +0.44 to −0.98. No saturation. Best pair by TI is CCL3L1+S100A8 at TI = +0.44 (S100A11+S100A6 has TI = 0.00; it is the top pair by collapse score). Corrected 2026-10-04 from `output/dual_ko_ti.json`.
 
 - Outputs: `output/single_ko_ti.json`, `single_ko_ti.tsv`, `dual_ko_ti.json`, `dual_ko_ti.tsv`
 
@@ -333,7 +333,7 @@ All three agree within numerical accuracy.
 
 ### Script 41 — Dose-Response & Clinical Gating
 - Monotherapy therapeutic indices (from real expression × Cox weights):
-  - S100A6: TI = 5.44
+  - S100A6: TI = 5.44 (**caution:** its penalized-Cox weight is about -2e-7, i.e. zero. Do not call S100A6 prognostic.)
   - S100A11: TI = 5.24
   - S100A8: TI = 4.66
   - CCL3L1: TI = 3.72

@@ -92,7 +92,7 @@ MPC optimal control, and a 3D volumetric extension.
 - **Pearson r = -0.84** between rho and drug reduction
 - Slow-growing tumors (rho < 0.002, n = 16): 57–90% dose sparing (corrected 2026-10-04 from `adaptive_geometry_metrics.json`; earlier "80–99%" did not match)
 - Fast-growing tumors (rho > 0.03): < 30% dose sparing
-- Predictive rule: rho = 0.02/day as the inflection point is **not tested in any output file**. Do not state it as a result. Only 10 of 61 patients have rho > 0.02.
+- **Threshold test (script 85, `output/rho_threshold_check.json`):** all 10 patients with rho > 0.02 progress earlier under adaptive (10/10); none of the 51 with rho <= 0.02 does (0/51). The TTP penalty switches on between rho 0.0191 and 0.0277. Dose sparing falls smoothly instead (mean 0.85 for rho < 0.002; 0.84 for 0.002-0.01; 0.52 for 0.01-0.02; 0.18 above 0.03; Spearman -0.86). So 0.02 is a threshold for the TTP harm, not an inflection in sparing. Only 10 patients lie above it, and the cutoff was found after looking at the data.
 - Script 47 caveat: dual-agent drug exposure (AUC 944-1280) is 2.5-3.3x the MTD value (385) in `output/dual_drug_comparison.json`. Dual-agent rescues TTP and resistance but does **not** spare drug.
 
 ## Limitations

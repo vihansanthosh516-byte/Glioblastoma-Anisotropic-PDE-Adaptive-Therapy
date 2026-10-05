@@ -46,9 +46,12 @@ Supplement-only Track C: inverse estimation (124/154 at lower bound), robust MPC
 ## Open conflicts (fix before the paper quotes them)
 1. ~~TCGA events and median OS~~ **RESOLVED 2026-10-04 (script 84).** n=518, 428 events, 90 censored, **KM median 432 d (95% CI 393-457)**. Source: `output/tcga_km_summary.json`. The old 377.5 d (all times) and 383 d (deaths only) are not survival medians. The raw TCGA CSV flags 441 deaths; the analysed cohort file (`clinical_mapped_cohort.csv`) has 428. State which file the paper uses (the cohort file).
 2. ~~Biomarker threshold~~ **RESOLVED.** Script 62 is current: rho* = 0.0751 /day, bootstrap CI [0.0746, 0.0820], early start wins for 60/64, only 4 patients above rho*. README 0.024 is an older analysis.
-2b. **Decisions.md "23 of 61 patients with rho > 0.02".** The file has 10. Reconcile or drop.
+2b. ~~Decisions.md "23 of 61"~~ **RESOLVED (script 85).** 10 patients have rho > 0.02; all 10 progress earlier under adaptive; 0 of 51 below. Usable as a stratified B1 finding, with the caveats that n=10 and the cutoff was chosen after seeing the data. Source: `output/rho_threshold_check.json`.
 2c. **S100A6 therapeutic index (5.44, highest) uses a Cox weight of about -2e-7 (zero).** Do not claim S100A6 is prognostic. Only S100A8 (0.043) and CCL3L1 (0.021) have non-zero directional weights; none is significant.
-2d. **Script 47 dual-agent uses 2.5-3.3x more drug than MTD** (AUC 944-1280 vs 385). Do not call it dose-sparing.
+2d. **Script 47 dual-agent uses 2.5-3.3x more drug than MTD** (AUC 944-1280 vs 385). Do not call it dose-sparing. Single-agent is earlier than MTD for 1/8 patients, not 4/8.
+2f. **Re-checked 2026-10-04 and found correct:** Script 27 necrosis snapshots (22.2 / 30.4 / 38.1%); dual-KO screen (21 pairs, no positive Bliss, TI range -0.98 to +0.44); Script 76 (19 of 384 rows beat best non-adaptive; 17 are cohort64; 2 lhs60 rows +22.3 and +15.9 d); Script 78 Dice table (all 16 values for rho 0.02 at 2 mm and the 1 mm checks).
+2g. **Not reproducible, do not cite:** Script 27 "front velocity 0.118-0.174".
+2h. **Still not re-checked:** Script 29 hand-computed free-propagation numbers beyond `invasion_summary.json` (26.6 um/hr and 28.3 analytical are verified; the 5.97% error was not recomputed).
 2e. **Script 48 (3D) uses legacy D** (0.013 / 0.0013 mm2/d), about 10x below literature.
 3. **"97 scripts".** True count of numbered files in `src/` is 97, but they use 82 distinct numbers (max 83). Say "97 numbered scripts".
 4. **Script 66 numbers** (PPO 12.67 vs Stupp 14.47 mm3) differ from README (13.94 vs 11.01). Use script 66.
