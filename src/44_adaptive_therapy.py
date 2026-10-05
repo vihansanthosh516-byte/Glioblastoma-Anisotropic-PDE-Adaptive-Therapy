@@ -114,7 +114,7 @@ TMZ_EC50_UG_ML = 5.0
 # lets drug holidays trigger.
 # The module-level E_MAX is the cohort-median reference used as the solver
 # default; CohortSimulator.run_patient() overrides it per patient.
-E_MAX_RATIO = 1000.0
+E_MAX_RATIO = float(__import__("os").environ.get("ADAPTIVE_E_MAX_RATIO", "1000"))  # sweep: script 92
 E_MAX = RHO_SENSITIVE * E_MAX_RATIO
 EC50 = TMZ_EC50_UG_ML
 HILL_COEFF = 2.0
@@ -1747,7 +1747,7 @@ def main():
     print("MONTH 9: ADVANCED CLONAL OPTIMIZATION - ADAPTIVE THERAPY ENGINE")
     print("=" * 70)
 
-    output_dir = OUTPUT_DIR
+    output_dir = Path(os.environ["ADAPTIVE_OUT_DIR"]) if os.environ.get("ADAPTIVE_OUT_DIR") else OUTPUT_DIR
     output_dir.mkdir(parents=True, exist_ok=True)
 
     # ---------------------------------------------------------
