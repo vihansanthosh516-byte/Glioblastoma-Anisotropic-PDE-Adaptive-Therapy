@@ -16,7 +16,7 @@ Captions must say:
 - Fig 2C: absolute Dice is low; DTI orientation adds nothing (iso is as good); the model loses on shrinking cores. Fig 2D: simulation vs simulation; tract alignment is lower under aniso (0.45 vs 0.50).
 - Fig 3A: win is on day-90 volume only, which does not translate to TTP. Fig 3C: orange = real parameters (+2.1 d); blue = synthetic parameter sets.
 
-Not made: a framework schematic (optional). The "Do NOT use" and supplement notes below still apply.
+Framework schematic made: `paper/figures/fig0_framework.png` (script `scripts/make_framework_figure.py`). Text is hand-written from [[PAPER_FINDINGS_LEDGER]]. The A-to-B link is drawn as weak: scripts 43-44 scale growth by an inflammation score built from S100A8, S100A11, LST1 expression; where those per-patient values come from was not audited. The "Do NOT use" and supplement notes below still apply.
 
 ---
 (older plan below, kept for reference)
