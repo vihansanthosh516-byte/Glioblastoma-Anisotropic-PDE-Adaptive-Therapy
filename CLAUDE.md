@@ -141,3 +141,12 @@ Rules:
 - If graphify-out/wiki/index.md exists, use it for broad navigation instead of raw source browsing.
 - Read graphify-out/GRAPH_REPORT.md only for broad architecture review or when query/path/explain do not surface enough context.
 - After modifying code, run `graphify update .` to keep the graph current (AST-only, no API cost).
+
+## Outside review (ChatGPT checks this work)
+The author gives Claude's overviews, numbers and claims to ChatGPT for an independent rating. Assume anything Claude writes will be checked.
+- Every number must cite a file in `output/` or `vault/PAPER_FINDINGS_LEDGER.md`. No number from memory.
+- State the weakest point of each result next to the result. Do not leave a limit out of a summary.
+- Do not overclaim: say "simulation", "assumed", "post hoc", "exploratory" where they apply.
+- When an overview is written for review, include the negative findings, as `paper/overview_for_review.md` does.
+- When ChatGPT feedback comes back, check each claim against the files before acting. Do not agree or disagree by deference. Record what is wrong in `paper/chatgpt_review_response.md` and what is right too.
+- Interim numbers (jobs still running) must be labelled interim. A reviewer may quote them.
