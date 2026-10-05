@@ -80,7 +80,7 @@ Last updated: 2026-09-21
 - Output: `output/gradient_failure_analysis.png`
 
 ### Script 18 — CSGT proof
-- Kruskal-Wallis H = 141.4188, **p = 1.96 × 10⁻³¹**
+- Kruskal-Wallis H = 141.717, **p = 1.68 × 10⁻³¹** (corrected 2026-10-04 from `output/csgt_metrics.json`; earlier 141.4188 / 1.96e-31 did not match the file)
 - T-score: Healthy 0.587 → Periphery 0.649 → Core 0.647
 - Continuous transition confirmed (not discrete clusters)
 - Output: `output/csgt_mathematical_proof.png`, `output/csgt_metrics.json`, `output/csgt_transition_scores.npy`
@@ -272,8 +272,8 @@ All three agree within numerical accuracy.
 **Data:** 518 real TCGA-GBM patients from cBioPortal clinical dataset
 
 **Cohort:**
-- 518 patients, 428 events (83% event rate)
-- Median OS: 377.5 days (~12.5 months)
+- 518 patients, 428 events in the Cox report (`output/clinical_validation_report.md`); the clinical CSV flags 441 deaths among 518. Event count needs one source of truth before the paper quotes it.
+- Median OS: **do not quote 377.5 d.** That is the raw median of all 518 follow-up times, censored included (not a survival median). Kaplan-Meier median on `data/tcga_gbm_clinical.csv` = 428 d (recomputed 2026-10-04). The Cox report text says 383 d. Three values exist; see [[PAPER_FINDINGS_LEDGER]].
 - Age range 10–89; 61% male
 - Subtype: Mesenchymal 152, Classical 143, Proneural 136, Neural 87
 
