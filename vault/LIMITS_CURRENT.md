@@ -25,7 +25,7 @@ Status words: **Fixed** = rerun and the limit is gone. **Checked** = tested, the
 ## Model
 | ID | Limit | Status | Note |
 |---|---|---|---|
-| L8 | Adaptive results rest on assumed kill scale (E_MAX = rho x 1000) | Open | |
+| L8 | Adaptive results rest on assumed kill scale (E_MAX = rho x 1000) | **Checked: robust 500-2000** | Script 92: TTP split and rho > 0.02 split identical at 500/1000/2000; resistance advantage 57/54/51 of 61. Kill rates stay assumed. |
 | L9 | Script 48 (3D) used D 10x below literature | **Fixed** | Re-run at 0.13/0.013: result holds, sparing at high rho lower (0.678 to 0.346; 0.109 to 0.051). |
 | L11 | No clonal competition; resistance is a fixed fraction | Open | Model upgrade. |
 | L12 | Anisotropy not matched to real tumour shape; alignment lower under aniso | Open | Cause of the alignment result not checked. |
