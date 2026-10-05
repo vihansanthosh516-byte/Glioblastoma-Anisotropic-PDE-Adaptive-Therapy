@@ -1,5 +1,26 @@
 # Paper: Figure Inventory and Plan
 
+## STATUS 2026-10-04: all main-text figures are made
+Script: `scripts/make_paper_figures.py`. Every value is read from `output/` JSON/CSV. Rerun: `python scripts/make_paper_figures.py`. I viewed the three combined figures and two panels by eye after fixing layout.
+Output in `paper/figures/` (13 PNG, 300 dpi):
+
+| File | Panels | Data source |
+|---|---|---|
+| `fig1_track_a.png` (+ `fig1a_classification`, `fig1b_spib_saddle`, `fig1c_tcga_survival`) | A zone-classification accuracy (7 methods); B SPIB energy levels + index-1 saddle; C TCGA univariate Cox forest + KM median 432 d | `cgat/gat_metrics.json`, `scvi_metrics.json`, `nmf_metrics.json`, `benchmark_comparison.tsv`, `spib_saddle_point_metrics.json`, `survival_stats_summary.json`, `tcga_km_summary.json` |
+| `fig2_track_b.png` (+ `fig2a_resistance`, `fig2b_final_mass`, `fig2c_forecast`, `fig2d_elongation`) | A resistant fraction MTD vs adaptive (54/61 below diagonal); B final-mass ratio vs rho with 0.02 line; C core-target forecast Dice (all / grew / shrank); D paired elongation | `adaptive_geometry_metrics.json`, `forecast_labels_core/results.json`, `fractal_aniso_vs_iso.json` |
+| `fig3_track_c.png` (+ `fig3a_conditioned_policy`, `fig3b_probe_commit`, `fig3c_paced_ttp`) | A win rate by set, blind vs conditioned vs rule; B probe-then-commit vs noise; C paced TTP gain, 4 sets | `rl_kill_conditioned/evaluate.json`, `probe_paced_policies/evaluate.json` |
+
+Captions must say:
+- Fig 1A: 15,000-cell subsample, one seed, no CI. Fig 1B: SPIB found 2 metastable states; the three attractor energies are near zero. Fig 1C: age is a known factor.
+- Fig 2B: adaptive ends with more tumour mass in most patients (ratio up to about 4.7), and ratio is 1.0 for the 10 patients above rho 0.02, who all progress earlier (orange).
+- Fig 2C: absolute Dice is low; DTI orientation adds nothing (iso is as good); the model loses on shrinking cores. Fig 2D: simulation vs simulation; tract alignment is lower under aniso (0.45 vs 0.50).
+- Fig 3A: win is on day-90 volume only, which does not translate to TTP. Fig 3C: orange = real parameters (+2.1 d); blue = synthetic parameter sets.
+
+Not made: a framework schematic (optional). The "Do NOT use" and supplement notes below still apply.
+
+---
+(older plan below, kept for reference)
+
 Written 2026-10-04. I listed files and read the JSON that feeds them. **I have not opened any PNG.** Check each image by eye before use.
 `paper/figures/` exists and is empty.
 
