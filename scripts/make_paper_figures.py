@@ -197,7 +197,7 @@ def panel_b3(ax):
 
 # ---------------------------------------------------------------- Track C
 SETS = [("cohort64", "cohort64\n(synthetic)"), ("lhs60", "lhs60\n(synthetic)"), ("synth_test", "synth_test\n(synthetic)"),
-        ("real_test", "real_test\n(real params)")]
+        ("real_test", "real_test\n(real growth,\nassumed kill)")]
 
 
 def panel_c1(ax):

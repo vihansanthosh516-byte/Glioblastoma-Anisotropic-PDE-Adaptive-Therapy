@@ -29,7 +29,7 @@ TRACKS = [
          res="54/61 less resistance\nForecast +0.026 Dice vs no-change\nElongation 1.21 vs 1.03",
          lim="DTI orientation adds nothing;\nadaptive ends with more tumour"),
     dict(c=AQUA, name="Track C", sub="Digital twin and RL  (50-68, 75-83)",
-         data="Fitted growth rates\n(MU-Glioma-Post)\n3 synthetic sets, real_test n = 21",
+         data="Fitted growth rates (real)\nAssumed kill rates\n3 synthetic sets + real_test (21)",
          meth="Inverse estimation, robust MPC\nPPO / DAgger at equal budget\nProbe-then-commit\nPaced heuristic\nResistance models",
          res="Conditioned policy 100% (day 90)\nPacing +2.1 d real, +52.5 d synthetic\nProbe-then-commit 100% to 62%",
          lim="A one-line rule matches RL;\nresistance gain fails on real data"),
@@ -75,11 +75,10 @@ def main():
         ax.text(0.003, y + h / 2, ROW_LAB[key], rotation=90, ha="center", va="center", fontsize=6.3, color=INK2, fontweight="bold")
     # cross-track links
     ym = ROWS["meth"][0] + ROWS["meth"][1] / 2
-    arrow(ax, (xs[0] + W + 0.002, ym + 0.05), (xs[1] - 0.002, ym + 0.05), c=INK2, ls="--")
-    ax.text(xs[0] + W + GAP / 2, ym + 0.075, "weak\nlink", ha="center", va="bottom", fontsize=5.8, color=INK2)
+    ax.text(xs[0] + W + GAP / 2, ym + 0.05, "no\nlink", ha="center", va="center", fontsize=5.4, color=INK2)
     arrow(ax, (xs[1] + W + 0.002, ym + 0.05), (xs[2] - 0.002, ym + 0.05), c=INK, ls="-", lw=1.5)
     ax.text(xs[1] + W + GAP / 2, ym + 0.075, "PDE\nsolver", ha="center", va="bottom", fontsize=5.2, color=INK)
-    ax.text(0.5, 0.03, "Weak link: an inflammation score (S100A8, S100A11, LST1) scales growth in scripts 43-44.\n"
+    ax.text(0.5, 0.03, "Track A stands alone: the inflammation score in scripts 43-44 is 1.0 for every patient (no ID overlap with TCGA).\n"
             "Negative results reported in full: D_f invalid  |  MGMT does not predict time to progression\n"
             "forecast loses on shrinking tumours  |  resistance-driven adaptive gain fails on real data",
             ha="center", va="center", fontsize=6.2, color=INK2, linespacing=1.5)
