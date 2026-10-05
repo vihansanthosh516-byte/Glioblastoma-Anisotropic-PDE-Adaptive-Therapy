@@ -185,3 +185,25 @@ If solver verification fails (manufactured solution, convergence, positivity, co
 
 ### A1.20 Horizon bins (verified on data)
 Intervals in script 81 (n=152): 3 to 1109 d, median 72. Bins: short < 60 d (59), medium 60-120 d (66), long > 120 d (27). The primary population drops intervals < 14 d or > 365 d (A1.3). The long-bin CI will be wide. Bins stay as set.
+
+## Amendment 2 (2026-10-05, before any model result is run under this plan)
+Trigger: cohort audit (script 94/96, `data/manifests/consort_mu.json`, `output/cohort_tables.json`).
+
+### A2.1 Primary population stays all eligible patients; GBM-only is a pre-set sensitivity analysis
+- Primary population (A1.2) is unchanged: 134 eligible MU patients (104 GBM, 30 other: 18 astrocytoma, 8 diffuse glioma, 3 oligodendroglioma, 1 pilocytic).
+- GBM-only (Primary Diagnosis "GBM" or "Glioma w/ GBM features", `is_gbm` in the manifest, n=104 eligible) is a pre-set sensitivity analysis for every primary and secondary endpoint. Both are reported side by side.
+- Reading rule: a result is called a GBM result only if the GBM-only estimate has the same sign and a CI that excludes 0 whenever the all-patient one does. If the two disagree, say so in the abstract of the result.
+- Diagnosis is also a reported stratum (GBM vs other) in the residual analysis.
+
+### A2.2 Informative follow-up
+Eligible patients progressed in 88.8% vs 47.8% of excluded ones (SMD 0.97). Consequences fixed now:
+- Every MU result is described as "among patients with usable follow-up pairs".
+- Sensitivity: results stratified by `progression` (yes / no), and one analysis weighted by the inverse of an eligibility model (logistic on age, sex, GBM, MGMT code), weights truncated at the 5th and 95th percentile. The weighted estimate is reported next to the unweighted one.
+- No claim about all GBM patients is made from the eligible set.
+
+### A2.3 Track A claims
+- "Healthy" in the 15,000-cell data is three donors with other diagnoses (L33). It is called "non-GBM brain tissue (3 donors)" in every document. No claim of tumour-vs-healthy biology is made from it.
+- The leak-free C-GAT (63.8%, SD 13.3) is not claimed to beat non-biological baselines (script 95). Track A stays exploratory.
+
+### A2.4 LUMIERE comparability
+Scan counts for LUMIERE and MU are compared only on post-operative rated follow-up scans (same definition for both). The earlier "scans per patient" shift row mixes definitions and is not used.
