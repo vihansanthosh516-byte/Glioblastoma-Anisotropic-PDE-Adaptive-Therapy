@@ -140,3 +140,24 @@ Everything else is either future work or a model upgrade.
 
 ## Open reference item
 "Weidner 2023": two web searches found no paper by that name. The nearest 2023 hits were "Predictive Digital Twin for Optimizing Patient-Specific Radiotherapy Regimens under Uncertainty in High-Grade Gliomas" [S](https://arxiv.org/pdf/2308.12429) and a Frontiers in AI paper from October 2023 [S](https://www.frontiersin.org/journals/artificial-intelligence/articles/10.3389/frai.2023.1222612/pdf). I do not know the authors. Do not cite "Weidner 2023" until you have the title or DOI.
+
+## Status of fixes (2026-10-04, evening)
+| Limit | Fix | Script / file | Result |
+|---|---|---|---|
+| L0 Track A split | Patient-level 5-fold CV for LR, RF, scVI-LR; patient-lookup baseline | script 86, `output/patient_level_cv.json` | Random split: LR 0.710, RF 0.714, scVI-LR 0.726, lookup 0.8275. Patient-level: LR 0.603, RF 0.620, scVI-LR 0.662, lookup 0.157. About 10 pp of inflation. 21 patients; Healthy has only 3 patients, so class and patient are confounded. RF used 150 trees (script 06 used 500). |
+| L0 C-GAT | Leak-free C-GAT, 3 variants, patient folds, final epoch | script 88, `output/cgat_leak_free.json` | **Running (CPU, WSL). Result below when done.** |
+| L9 3D diffusivity | Re-run at D 0.13 / 0.013 | script 48 with `GBM_D_REGIME=swanson` | 3D result holds; sparing at high rho drops (see ledger 2e). |
+| L10 dual-agent baseline | MTD plus the same secondary drug | script 89, `output/dual_mtd_baseline.json` | The fair baseline beats dual-adaptive (ledger 2i). |
+| L14 real vs synthetic | Compare parameters | script 87 | real_test kill/rho 77.7 vs 2.7-12.5; kill rates are the same for all 21 patients (assumed). |
+| L16 threshold | Exact CI, permutation, leave-one-out | script 87 | 10/10 vs 0/51; p 5e-5; LOO 98.4%; still post hoc, n=10. |
+| L19 MGMT power | Schoenfeld | script 87 | Minimum detectable HR 1.74; underpowered. |
+| L24 inflammation link | Checked IDs | ledger | Score is 1.0 for all 61 patients. A-to-B link = none. Schematic fixed. |
+
+### Not done (and why)
+- **L17** script 81 whole-tumour target: about 12 h compute.
+- **L1-L4, L7, L16, L19 external data** (CGGA, LUMIERE, RHUH-GBM, Burdenko): needs downloads. Each needs your yes first (filename, source, size).
+- **L1.5** stronger forecast baselines, **L8** E_MAX sweep, **L15** power analysis, **L5** Bayesian calibration: not started.
+
+### Extra notes to keep
+- **L25 caution:** MT-CO2 is a mitochondrial gene. DepMap nuclear CRISPR screens will not cover it. Check script 31 before claiming it as a target.
+- **L12 alignment metric (script 74):** tract alignment is lower under aniso (0.45 vs 0.50). The cause is NOT checked (see [[Script-74-Fractal-Elongation]]). Do not say aniso "aligns with tracts". Say elongation rises and alignment does not.

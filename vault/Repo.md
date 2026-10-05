@@ -306,3 +306,5 @@ python tools/vault_index.py
 ## Tags
 
 #moc #repo #track-a #track-b #track-c #mu-glioma #adaptive-therapy #mpc #3d-extension #obsidian
+
+> **Correction (2026-10-04):** The chain above is not live. Track A does not feed Track B: the inflammation score in scripts 43-44 is 1.0 for all 61 patients (no ID overlap). Track A stands alone. Track B's PDE solver feeds Track C. See [[PAPER_FINDINGS_LEDGER]].

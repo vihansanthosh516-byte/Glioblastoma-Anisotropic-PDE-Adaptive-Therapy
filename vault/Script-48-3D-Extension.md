@@ -41,3 +41,5 @@ Same stratification as scripts 44 and 47.
 - src/48_3d_extension.py
 - output/3d_master_cohort_volumes.npz (15 MB)
 - output/3d_extension_summary.json
+## Literature-D re-run (2026-10-04)
+Run with `GBM_D_REGIME=swanson` (D 0.13 / 0.013). Outputs carry a `_swanson` suffix: `output/3d_extension_summary_swanson.json`, `3d_master_cohort_volumes_swanson.npz`. Sparing for the four high-rho patients falls (0.887->0.837, 0.877->0.887, 0.678->0.346, 0.109->0.051); the four low-rho patients stay at 0.989. MTD still reaches 0 mm3. n=8. Default (no env var) still runs legacy D.

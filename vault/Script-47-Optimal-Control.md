@@ -29,3 +29,5 @@
 ## Files
 - src/47_optimal_control.py
 - output/dual_drug_comparison.json
+## Fair-baseline check (script 89, 2026-10-04)
+MTD plus the same secondary drug at full dose, n=8: mean TTP 358.9 d, resistant fraction about 1e-12, AUC 1152.5. Dual-adaptive: 305.6 d, 0.13, AUC 1015.5. So the "dual-agent rescue" comes from the second drug, not from adaptive control. Source: `output/dual_mtd_baseline.json`. See [[PAPER_FINDINGS_LEDGER]] 2i.

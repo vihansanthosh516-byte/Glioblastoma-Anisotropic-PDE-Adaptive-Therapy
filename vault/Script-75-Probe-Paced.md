@@ -27,3 +27,6 @@
 - Kill rates are identifiable from daily noise-free volumes, not from clinical volumetry (about 5-10% CV, from `NEGATIVES_REVISITED.md`).
 - On lhs60 and real_test the win rate under noise falls to 11-46% (from `NEGATIVES_REVISITED.md`; not re-derived here).
 - Frame as an identifiability result, not a deployable policy.
+
+## Label correction (2026-10-04)
+`real_test` uses real fitted growth rates but the same assumed kill rates [0, 0.05, 0.08, 0.13] for all 21 patients. Figures now label it "real growth, assumed kill". Median kill/rho is 77.7 there vs 2.7-12.5 in the synthetic sets (script 87), which explains the small +2.1 d gain.

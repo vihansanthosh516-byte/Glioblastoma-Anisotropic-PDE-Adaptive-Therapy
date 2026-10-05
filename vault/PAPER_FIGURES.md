@@ -55,3 +55,8 @@ Make every paper figure from a JSON or CSV with one script (suggest `scripts/mak
 
 ## Missing figures to make (7)
 A1 leaderboard, B1 final-mass panel, B2 forecast, B3 elongation, C2 probe-then-commit, C3 paced TTP, plus an optional framework schematic.
+
+## Edits 2026-10-04
+- Fig 3 (A, C): `real_test` label is now "real growth, assumed kill".
+- Fig 0 (framework): Track A to Track B arrow removed, labelled "no link"; footer states the inflammation score is 1.0 for every patient. Track C data box says assumed kill rates.
+- Fig 1 (Track A): C-GAT accuracy bars must carry the script 86 / 88 caveat, or be dropped. Decide after script 88.
