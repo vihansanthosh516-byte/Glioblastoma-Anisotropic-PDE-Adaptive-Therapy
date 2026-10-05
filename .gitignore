@@ -112,3 +112,6 @@ research_notes/
 .claude/worktrees/
 .kilo/worktrees/
 track_a_metrics.zip
+output/emax_sweep/**/*.npz
+output/emax_sweep/**/*.png
+output/emax_sweep/**/log.txt
