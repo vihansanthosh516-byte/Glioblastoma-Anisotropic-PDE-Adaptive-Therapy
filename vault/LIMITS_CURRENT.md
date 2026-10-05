@@ -61,6 +61,7 @@ Status words: **Fixed** = rerun and the limit is gone. **Checked** = tested, the
 | L27 | LUMIERE tumour volumes are noisy: median no-change error 0.8-1.8 log units; gap shrinks above 500 mm3 | script 91 |
 | L29 | RHUH-GBM has no MGMT column and only 40 patients | `data/external/rhuh/` |
 | L30 | Script 90 multivariate c-index is odd (pooled 0.48) and was not checked | script 90 |
+| L32 | The zone-expression files used by the stromal and adaptive scripts (43-44) are very likely synthetic (see ledger 2m) | `output/real_cohort_{le,ct,it}.csv` |
 | L31 | Burdenko-GBM-Progression is restricted; not obtained | TCIA |
 
 ## Still to run
