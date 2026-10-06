@@ -225,3 +225,10 @@ Because script 98 found that growing the input mask by the training-fold median 
 ### A3.3 DTI (H4) stays exploratory
 Script 101 (alignment test) and the aniso vs iso_same, aniso vs iso_homog and aniso vs aniso_global_z contrasts are exploratory (A1.9). Hypothesis D (atlas too crude) is stated as untestable on MU.
 
+## Amendment 4 (2026-10-05, before any result of the PDE re-run; wording and design clarifications only)
+- A4.1 Cell selection, stated in one sentence: for each outer fold, the (r, d, rho) cell is chosen using only the first eligible pair of the training patients (patients not in that fold). It is then frozen and applied to all pairs of the fold's patients. Reported Dice are out-of-fold only.
+- A4.2 Terms: "training" (fit and selection), "development" (MU folds, out-of-fold), "external test" (LUMIERE). "Held-out" is used only for data excluded from the relevant selection step.
+- A4.3 "Confirmatory external test" in the Data section is replaced by "prespecified external evaluation". LUMIERE masks are produced by automated tools (HD-GLIO-AUTO, DeepBraTumIA), so the test measures agreement with that pipeline, not with expert segmentation. External segmentation shift is a named failure mode.
+- A4.4 The 1 mm pilot (A3.1) uses a pre-declared stratified subset of first pairs (strata from input volume and interval, both known before the forecast), not the first 20 patients by ID. Declared before the pilot runs.
+- A4.5 The geometric baseline was audited for leakage (see `paper/chatgpt_review_response.md`, Round 2, item 2).
+

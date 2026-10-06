@@ -88,3 +88,27 @@ Each item was checked against `analysis_plan_v1.md` and the code. The "9/10" rat
 2. The isotropic homogeneous model (+0.028) is as good as the anisotropic one (+0.026). The gain comes from growth, not from direction (`output/forecast_labels_core/results.json`).
 3. Script 81 forecasts only scan 1 to 2. Rolling-origin needs the count of patients with 3 or more scans, which is not known yet. A1.1 sets a rule.
 4. The "grew / shrank-or-same" split uses the target scan, so it is outcome-defined.
+
+## Round 2 (2026-10-05): review of `paper/review_packet_phase0-3.md`
+Each claim checked against files. No agreement by deference.
+
+| # | ChatGPT claim | Checked against | Verdict | Action |
+|---|---|---|---|---|
+| 1 | PDE must beat persistence AND the geometric rule; PDE vs geometric is the key secondary | `analysis_plan_v1.md` A3.2 | Right, and already registered (A3.2). | None. Report both, paired per patient. |
+| 2 | Geometric rule needs a leakage audit | `src/98_baseline_ladder.py` lines 133-156 | Audited. Inputs: input mask, input-scan brain mask, input volume, interval dt, and g = median log growth rate of pairs from patients NOT in the test fold (`prim["fold"] != f`). No future mask, no future volume, no per-patient fit. dt uses the date of the target scan, as the PDE does. The oracle uses the true volume and is labelled. No leak found. | None. |
+| 3 | The geometric rule is "potentially your biggest discovery" | `baseline_ladder.json` | Overstated. Gain is +0.0136 on a persistence Dice of 0.277. It is a population mean growth rate applied to the mask. It shows that per-patient extrapolation (last_rate -0.0445, linear -0.028) is worse than a population rate. It is a useful baseline, not a discovery. | Keep wording modest. |
+| 4 | Cell selection must use training patients only; state it in the plan | `src/100_pde_manifest.py` `select_cells()` lines 244-259 | Right and already true: the cell for fold f is chosen on first pairs of patients with `fold != f`. The plan did not say this in one sentence. | Add the sentence in Amendment 4. |
+| 5 | Do not call training-patient results "held-out" | `analyze()` | Right. Reported Dice are out-of-fold only. Terms to use: training, development (MU folds), external test (LUMIERE). | Wording rule in Amendment 4. |
+| 6 | 2 mm vs 1 mm sensitivity; connect numerical error to Dice | W22, `PILOT_N` | Right and queued. But the pilot takes the first 20 fold-0 patients by ID, not a spread of cases. That is a real gap. | Change the pilot to a pre-declared stratified subset (by input volume and interval, both known before forecast), after the main run ends. Not done yet. |
+| 7 | Segmentation perturbation is more valuable than another model | Masterplan 3.3 | Agree. Planned. | Phase 3.3. |
+| 8 | Do not call 57% of pairs "unforecastable" | ledger 2s | We do not. The ledger says "below the assumed noise floor". | None. |
+| 9 | DTI wording: no evidence that the atlas direction explains centroid displacement | ledger 2t | Agree. Ledger already says it does not prove tracts are irrelevant. | None. |
+| 10 | Cohort claim: say "eligible longitudinal cohort" | A2.2, ledger 2p | Right and already in A2.2. | None. |
+| 11 | Make GBM-only the primary analysis | A1.2, A2.1 | Fair point. Registered primary is all 134 eligible; GBM-only (n=104) is a sensitivity run. No PDE result exists yet, so a change now would be clean. Baseline GBM-only values (geometric +0.0149 vs +0.0136) are already seen and are close. | User decision (2 options). |
+| 12 | LUMIERE masks are machine-made; do not call it "confirmatory" | A1.18, plan lines 10 and 32 | Right on the masks (already stated). Plan text does say "confirmatory". | Replace with "prespecified external evaluation" in Amendment 4; add external segmentation shift as a failure mode. |
+| 13 | Treatment assumptions must not contaminate the MRI evidence | A1.11 | Agree; treatment is simulation only. | Keep separate in the paper. |
+| 14 | 93 tests are engineering evidence, not validation | ledger 2u | Agree. We say so. | None. |
+| 15 | Priority order: PDE rerun, 1 mm, segmentation, GBM-only, negative controls, freeze, LUMIERE | masterplan Phase 3 | Same order as the plan. | None. |
+
+What ChatGPT did not say: the packet's own correction (+0.031 was wrong, +0.0136 is right) came from checking the ledger against the JSON. Other ledger entries have not all been re-checked against their JSON yet (open task).
+
