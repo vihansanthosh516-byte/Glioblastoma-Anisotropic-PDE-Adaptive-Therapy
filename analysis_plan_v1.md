@@ -232,3 +232,10 @@ Script 101 (alignment test) and the aniso vs iso_same, aniso vs iso_homog and an
 - A4.4 The 1 mm pilot (A3.1) uses a pre-declared stratified subset of first pairs (strata from input volume and interval, both known before the forecast), not the first 20 patients by ID. Declared before the pilot runs.
 - A4.5 The geometric baseline was audited for leakage (see `paper/chatgpt_review_response.md`, Round 2, item 2).
 
+## Amendment 5 (2026-10-05, before any PDE re-run result is read; supersedes A1.2 and A2.1 on which population is primary)
+- A5.1 The primary population is the GBM-only eligible set (n = 104 patients; Primary Diagnosis GBM or glioma with GBM features, `data/manifests/patient_manifest.csv`). The all-eligible set (n = 134) is the pre-set sensitivity analysis. Both are reported for every endpoint; only the label changes.
+- A5.2 Reason: the project question is about GBM. 30 of the 134 are other diagnoses (18 astrocytoma, 8 diffuse glioma, 3 oligodendroglioma, 1 pilocytic; `consort_mu.json`).
+- A5.3 What was already seen when this was decided: the baseline ladder on both populations (geometric rule +0.0149 GBM-only vs +0.0136 all-eligible, `baseline_ladder.json`). No PDE result was seen. The choice does not depend on which population gives the better number.
+- A5.4 Cost: fewer patients (104 vs 134), so wider CIs. This is reported, not hidden.
+- A5.5 If the two populations disagree in sign or in the broadly-positive decision, both are stated in the abstract.
+
