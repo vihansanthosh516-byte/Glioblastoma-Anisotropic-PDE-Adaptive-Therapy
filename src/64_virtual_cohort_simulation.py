@@ -279,6 +279,54 @@ class FastPDESolver:
         return self.step_count >= 90
 
 
+# --------------------------------------------------------------------------- #
+# Restored from commit 59ec72e^ (removed when script 64 was rewritten at equal budget).
+# resistance_env.py, hybrid_virtual_trial.py, hybrid_controller.py and tests/test_hybrid_controller.py import these.
+# --------------------------------------------------------------------------- #
+# RL reward weights (tuned from Phase 7)
+RL_REWARD_WEIGHTS = {
+    "lambda_vol": 15.0,
+    "lambda_den": 5.0,
+    "lambda_tox": 0.01,
+    "lambda_shrink": 100.0,
+    "lambda_clear": 200.0,
+}
+
+class GbmTherapyEnv:
+    def __init__(self, solver: FastPDESolver, reward_weights: Dict[str, float]):
+        self.solver = solver
+        self.max_steps = 90
+        self.trajectory = []
+        self.reward_weights = reward_weights
+
+    def reset(self, seed: Optional[int] = None, options: Optional[Dict] = None):
+        self.solver.reset()
+        self.trajectory = []
+        return self.solver.get_observation(), {}
+
+    def step(self, action: int):
+        result = self.solver.rl_step(action)
+        obs = self.solver.get_observation()
+
+        norm_vol = result["norm_volume"]
+        u_max = result["u_max"]
+        delta_vol = result["delta_volume"]
+
+        action_cost = 1.0 if action > 0 else 0.0
+        lambda_vol = self.reward_weights["lambda_vol"]
+        lambda_den = self.reward_weights["lambda_den"]
+        lambda_tox = self.reward_weights["lambda_tox"]
+        
+        reward = -lambda_vol * norm_vol - lambda_den * u_max - lambda_tox * action_cost
+        if delta_vol > 0:
+            reward += self.reward_weights.get("lambda_shrink", 100.0) * max(delta_vol / max(self.solver.initial_volume, 1e-6), 0.0)
+
+        terminated = self.solver.is_done()
+        if terminated and norm_vol < 0.01:
+            reward += self.reward_weights.get("lambda_clear", 200.0)
+
+        return obs, float(reward), terminated, False, {}
+
 def generate_virtual_cohort(n_patients: int = N_PATIENTS, seed: int = 12345) -> List[Dict[str, float]]:
     """Generate virtual patient cohort with clinically sampled parameters."""
     np.random.seed(seed)

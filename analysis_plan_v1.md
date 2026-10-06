@@ -207,3 +207,21 @@ Eligible patients progressed in 88.8% vs 47.8% of excluded ones (SMD 0.97). Cons
 
 ### A2.4 LUMIERE comparability
 Scan counts for LUMIERE and MU are compared only on post-operative rated follow-up scans (same definition for both). The earlier "scans per patient" shift row mixes definitions and is not used.
+
+## Amendment 3 (2026-10-05, before any result of the PDE re-run under this plan)
+Trigger: solver verification (script 97), baseline ladder (script 98) and measured compute (script 100: 1,590 s per pair for the 125-cell grid on 3 concurrent processes).
+
+### A3.1 PDE run design (supersedes the grid in A1.5; everything else in A1.5 stands)
+- Grid (extended, to test the grid-edge problem): rho in {0, 0.01, 0.03, 0.1, 0.2} /day; d in {0.003, 0.01, 0.03, 0.1, 0.3} mm2/day; sharpening r in {1, 10}. Arms: aniso (r = 1, 10), iso_same, iso_homog, and aniso_global_z (homogeneous diag(1, 1, 10), not patient- or tract-informed; negative control for H3 and H4).
+- Two-stage selection, fixed now: stage 1 runs the full grid on the FIRST primary pair of every patient (no earlier scan). For each fold and arm, the (r, d, rho) cell with the best mean Dice over the training patients' stage-1 pairs is chosen (patient means). Stage 2 runs only that fold's chosen cell on every LATER primary pair. All reported Dice are out-of-fold. Reason: running the full grid on all 328 pairs would take about 37 h on this machine; stage 1 plus stage 2 takes about 16 h.
+- Primary analysis is still per-patient mean over all primary pairs (A1.1). First-pair-only is reported next to it.
+- Mass added by the lower clamp and removed by the upper clamp is logged for every run and reported for the selected cells (weak point W21).
+- Pairs whose input core is empty at 2 mm are excluded and listed (6 of 334 in script 98; weak point W8).
+- h = 1 mm pilot (20 fold-0 first pairs, reduced grid: arms aniso r = 1 and iso_homog, d in {0.01, 0.03, 0.1}, rho in {0.03, 0.1, 0.2}) compares Dice per cell with h = 2 mm to test whether the optimum moves (weak point W22).
+
+### A3.2 The comparator for the PDE is the geometric baseline
+Because script 98 found that growing the input mask by the training-fold median growth rate (no PDE) adds +0.031 Dice over persistence, the PDE result is reported as (a) PDE vs persistence and (b) PDE vs geometric_train_rate, paired per patient. (b) is the test of whether the PDE adds anything beyond a volume-growth rule. H1 as written (PDE vs persistence) is kept as the registered primary; (b) is registered as the key secondary.
+
+### A3.3 DTI (H4) stays exploratory
+Script 101 (alignment test) and the aniso vs iso_same, aniso vs iso_homog and aniso vs aniso_global_z contrasts are exploratory (A1.9). Hypothesis D (atlas too crude) is stated as untestable on MU.
+

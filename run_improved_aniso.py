@@ -207,13 +207,20 @@ class TensorFK:
                      0.05 / max(float(rho.max()) + kmax, 1e-6))
         n = max(1, math.ceil(t_end / dt_max))
         dt = t_end / n
+        # clamp bookkeeping (verification, script 97): mass the lower clamp adds / the upper clamp removes, per member
+        lo = torch.zeros(len(rhos))
+        hi = torch.zeros(len(rhos))
         with torch.no_grad():
             for step in range(n):
                 kill = 0.0
                 if kill_schedule is not None:
                     t = t_start + step * dt
                     kill = alpha * kill_schedule.tmz_concentration(t) + beta * kill_schedule.radiation_dose_rate(t)
-                u = (u + dt * (self.div_flux(u) + rho * u * (1 - u) - kill * u)).clamp_(0.0, 1.0) * self.m
+                raw = u + dt * (self.div_flux(u) + rho * u * (1 - u) - kill * u)
+                lo += (-(raw.clamp(max=0.0)) * self.m).sum((1, 2, 3))
+                hi += ((raw - 1.0).clamp(min=0.0) * self.m).sum((1, 2, 3))
+                u = raw.clamp_(0.0, 1.0) * self.m
+        self.clamp_added, self.clamp_removed = lo.numpy(), hi.numpy()
         return u.numpy(), n
 
 
