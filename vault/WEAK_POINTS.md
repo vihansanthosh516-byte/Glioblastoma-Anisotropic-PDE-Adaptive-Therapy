@@ -27,4 +27,7 @@ Numbers: [[PAPER_FINDINGS_LEDGER]]. Limits: [[LIMITS_CURRENT]].
 | W20 | No prospective validation | LIMITS L22 | Not possible. Wording: retrospective, in silico | all | Accepted |
 | W21 | Clamp u >= 0 adds mass under strong off-diagonal anisotropy (2.8% in a stress case) and is not logged | solver_verification.json V5 | Log clamp mass per forecast; report per-patient clamp gain; rerun aniso arm at h = 1 mm for a subset | 2-3 | Open |
 | W22 | At h = 2 mm the asymptotic front speed is off by up to +50% in the cell most folds chose (D 0.01, rho 0.1); radius error 0.64 mm at 70 d | solver_verification.json V7b, V9 | Extended-grid check (W3) run at h = 2 mm and h = 1 mm on a 30-patient development subset; report the shift | 2 | Open |
-
+| W23 | The PDE gain (+0.026) is matched or exceeded by a no-PDE population-rate growth baseline (+0.031; first pairs +0.042) | baseline_ladder.json | Rerun PDE arms on manifest folds, same pairs; paired comparison PDE vs geometric_train_rate is the real test of the PDE | 3 | Open |
+| W24 | Noise floor in the SNR analysis depends on voxel size (2 mm) | forecastability.json | Recompute at 1 mm; add a measured floor from segmenter disagreement (LUMIERE has two segmenters) | 3 | Open |
+| W25 | Baseline bootstrap used 2,000 draws; plan says 10,000 | baseline_ladder.json | Final primary run uses 10,000 | 3 | Open |
+| W26 | 5 older tests fail (test_hybrid_controller x?, test_inverse_estimation): module `vcs` has no `GbmTherapyEnv`; inverse-estimation KeyError. Not touched by Phase 1-2 changes (new files only) | pytest tests | Triage each: fix or retire; CLAUDE.md claims 56 passing | 3 | Open |
