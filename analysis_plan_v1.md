@@ -220,7 +220,7 @@ Trigger: solver verification (script 97), baseline ladder (script 98) and measur
 - h = 1 mm pilot (20 fold-0 first pairs, reduced grid: arms aniso r = 1 and iso_homog, d in {0.01, 0.03, 0.1}, rho in {0.03, 0.1, 0.2}) compares Dice per cell with h = 2 mm to test whether the optimum moves (weak point W22).
 
 ### A3.2 The comparator for the PDE is the geometric baseline
-Because script 98 found that growing the input mask by the training-fold median growth rate (no PDE) adds +0.031 Dice over persistence, the PDE result is reported as (a) PDE vs persistence and (b) PDE vs geometric_train_rate, paired per patient. (b) is the test of whether the PDE adds anything beyond a volume-growth rule. H1 as written (PDE vs persistence) is kept as the registered primary; (b) is registered as the key secondary.
+Because script 98 found that growing the input mask by the training-fold median growth rate (no PDE) adds +0.0136 Dice over persistence (`output/baseline_ladder.json`; an earlier draft of this sentence said +0.031 in error), the PDE result is reported as (a) PDE vs persistence and (b) PDE vs geometric_train_rate, paired per patient. (b) is the test of whether the PDE adds anything beyond a volume-growth rule. H1 as written (PDE vs persistence) is kept as the registered primary; (b) is registered as the key secondary.
 
 ### A3.3 DTI (H4) stays exploratory
 Script 101 (alignment test) and the aniso vs iso_same, aniso vs iso_homog and aniso vs aniso_global_z contrasts are exploratory (A1.9). Hypothesis D (atlas too crude) is stated as untestable on MU.
