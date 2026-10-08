@@ -1,0 +1,22 @@
+# Pinned to the local Windows environment (Python 3.14.4) where `pytest tests` gives 93 passed (2026-10-08).
+# Track B/C + tests only. Track A (scanpy, torch_geometric) and GPU work (torch) are not in this image;
+# GPU runs go to Kaggle as plain Python (paper/GRAND_PLAN.md section 2.2).
+numpy==2.4.4
+scipy==1.18.0
+matplotlib==3.11.1
+pandas==2.3.3
+pillow==12.3.0
+scikit-learn==1.9.0
+nibabel==5.4.2
+dipy==1.12.1
+seaborn==0.13.2
+lifelines==0.30.3
+plotly==7.0.0
+SALib==1.6.0
+pytest==9.0.3
+openpyxl==3.1.5
+h5py==3.16.0
+networkx==3.6.1
+pyyaml==6.0.3
+statsmodels==0.15.0
+tqdm==4.69.1

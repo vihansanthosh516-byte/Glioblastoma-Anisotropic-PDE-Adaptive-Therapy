@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import platform
 import subprocess
 import sys
@@ -73,7 +74,8 @@ def write_run_manifest(experiment_id: str, out_path, *, script: str, seed, confi
         "primary_endpoint": primary_endpoint,
         "seed": seed,
         "config": config or {},
-        "code_commit": _git("rev-parse", "HEAD"),
+        # inside the Docker image there is no .git; the build passes the commit in as GIT_COMMIT
+        "code_commit": _git("rev-parse", "HEAD") or os.environ.get("GIT_COMMIT", ""),
         "tracked_files_modified": bool(dirty),
         "modified_files": dirty.splitlines()[:20],
         "python": sys.version.split()[0],

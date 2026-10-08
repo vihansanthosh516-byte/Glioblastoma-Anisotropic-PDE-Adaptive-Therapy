@@ -34,8 +34,7 @@ help:  ## Show this help
 	@echo "Image tag in use: $(IMAGE):$(TAG)  (SHA=$(SHA))"
 
 build:  ## Build the Docker image (latest tag)
-	$(if $(filter $(shell uname),Linux),docker build -t $(IMAGE):latest .,\
-	docker build -t $(IMAGE):latest .)
+	docker build --build-arg GIT_COMMIT=$(shell git rev-parse HEAD) -t $(IMAGE):latest .
 
 build-sha: build  ## Also tag with the git commit SHA
 	@docker tag $(IMAGE):latest $(IMAGE):$(SHA)

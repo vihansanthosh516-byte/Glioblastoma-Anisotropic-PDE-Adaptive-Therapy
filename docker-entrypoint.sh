@@ -73,10 +73,8 @@ run_uq_ensemble() {
 
 run_tests() {
     echo "############### Pytest suite ###############"
-    for t in inverse_estimation robust_mpc spatial_metrics multiomic_fusion; do
-        echo "---- $t ----"
-        "$PYTHON" "$APP_DIR/tests/test_${t}.py" || true
-    done
+    # whole suite; a failure must fail the run (the old loop ran 4 files and ended each with `|| true`)
+    "$PYTHON" -m pytest -q "$APP_DIR/tests"
 }
 
 run_serve() {

@@ -23,11 +23,14 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      args:
+        GIT_COMMIT: ${GIT_COMMIT:-}
     image: gbm-digital-twin:latest
     container_name: gbm-benchmark
     volumes:
       - ./data:/data:ro
       - ./output:/output
+      - ./output:/app/output
     environment:
       - PYTHONUNBUFFERED=1
       - MPLBACKEND=Agg
@@ -48,6 +51,7 @@ services:
     volumes:
       - ./data:/data:ro
       - ./output:/output
+      - ./output:/app/output
     environment:
       - PYTHONPATH=/app:/app/src
     entrypoint: ["/bin/bash"]
@@ -61,6 +65,7 @@ services:
     volumes:
       - ./data:/data:ro
       - ./output:/output
+      - ./output:/app/output
     ports:
       - "7860:7860"
     environment:

@@ -22,7 +22,7 @@
 # Spinning up the CPU base image keeps the image portable; for GPU work
 # swap FROM to pytorch/pytorch:2.2.0-cuda12.1-cudnn8-runtime and rebuild.
 # =============================================================================
-FROM python:3.12-slim
+FROM python:3.14-slim
 
 LABEL org.opencontainers.image.title="GBM-Digital-Twin"
 LABEL org.opencontainers.image.description="Biophysical Glioblastoma Digital Twin & RL Adaptive Therapy Framework"
@@ -34,7 +34,7 @@ RUN apt-get update && \
         git \
         ffmpeg \
         libglib2.0-0 \
-        libgl1-mesa-glx \
+        libgl1 \
         build-essential \
         ca-certificates && \
     rm -rf /var/lib/apt/lists/*
@@ -48,15 +48,12 @@ WORKDIR /app
 #   scikit-learn + h5py (multi-omic elastic-net + HDF5)
 #   torch (CPU)        (FNO rollout, RL, XAI saliency, UQ ensemble)
 #   gymnasium + plotly  (closed-loop env + HIL/XAI dashboards)
-COPY Requirements.txt /app/Requirements.txt
+# Requirements.txt has unresolved merge-conflict markers, so the image uses requirements-docker.txt
+# (pinned to the local environment where the test suite passes). torch is the CPU build (same version as local); gymnasium / pymc are not installed.
+COPY requirements-docker.txt /app/requirements-docker.txt
 RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir -r Requirements.txt && \
-    pip install --no-cache-dir \
-        numpy scipy matplotlib pillow pandas \
-        gymnasium \
-        plotly \
-        pymc pytensor \
-        "--extra-index-url" "https://download.pytorch.org/whl/cpu" torch
+    pip install --no-cache-dir -r requirements-docker.txt && \
+    pip install --no-cache-dir --index-url https://download.pytorch.org/whl/cpu torch==2.14.0
 
 # ---------- Repo code ----------------------------------------------------------
 COPY . /app
@@ -67,7 +64,11 @@ COPY . /app
 RUN mkdir -p /data /output
 
 # Make the helper scripts runnable
-RUN chmod +x /app/docker-entrypoint.sh /app/run_all.sh 2>/dev/null || true
+RUN sed -i 's/\r$//' /app/docker-entrypoint.sh /app/run_all.sh && chmod +x /app/docker-entrypoint.sh /app/run_all.sh
+
+# commit of the source this image was built from (there is no .git inside the image)
+ARG GIT_COMMIT=""
+ENV GIT_COMMIT=${GIT_COMMIT}
 
 ENV PYTHONUNBUFFERED=1 \
     PYTHONPATH=/app:/app/src \

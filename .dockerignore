@@ -43,3 +43,14 @@ kaggle_run/*.pyc
 *.tmp
 *.temp
 debug.txt
+
+# Raw data (58 GB) is mounted at runtime, never baked in. Keep data/manifests (256 KB): tests/test_no_leakage.py reads it.
+data/external/
+data/tcia/
+data/tcga_gbm_expression*
+kaggle_run/
+graphify-out/
+archive/
+venv/
+*.npy
+*.zip
