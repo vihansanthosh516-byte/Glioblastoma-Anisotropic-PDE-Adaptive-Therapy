@@ -303,7 +303,7 @@ def analyze():
         j = pd.concat([pa, pb], axis=1, keys=["a", "b"]).dropna()
         return (j["a"] - j["b"]).to_numpy()
 
-    res = {"script": "100_pde_manifest", "n_pairs": int(len(df2)), "n_first_pairs": int((~df2["has_prior_scan"]).sum()),
+    res = {"script": "100_pde_manifest", "n_boot": ps.DEFAULT_N_BOOT, "n_pairs": int(len(df2)), "n_first_pairs": int((~df2["has_prior_scan"]).sum()),
            "n_later_pairs": int(df2["has_prior_scan"].sum()), "n_patients": int(df2["patient_id"].nunique()),
            "grid": {"rhos": RHOS, "ds": DS, "sharpen": SHARPEN, "global_r": GLOBAL_R},
            "selection": "per fold and arm, best mean Dice over training patients' FIRST pairs; later pairs run at that cell only",
@@ -325,7 +325,7 @@ def analyze():
         for name, a, b in contrasts:
             d = delta(sub, a, b)
             if len(d) >= 5:
-                blk[name] = ps.summarize_delta(d, n_boot=2000)
+                blk[name] = ps.summarize_delta(d)
         res["contrasts"][sname] = blk
     cl = []
     for r in recs:

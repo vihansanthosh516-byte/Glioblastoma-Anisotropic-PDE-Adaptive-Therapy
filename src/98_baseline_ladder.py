@@ -196,7 +196,7 @@ def summarise(res: pd.DataFrame, pairs, g_train, K_train):
     res = res.copy()
     res["bin"] = res["dt_days"].map(horizon_bin)
     out = {"script": "98_baseline_ladder", "target": "core labels 1,3 at 2 mm", "g_train_per_day": g_train,
-           "K_train_voxels": K_train, "n_pairs_primary": int(res[res["in_primary"] & (res["method"] == "persistence")].shape[0])}
+           "K_train_voxels": K_train, "n_boot": ps.DEFAULT_N_BOOT, "n_pairs_primary": int(res[res["in_primary"] & (res["method"] == "persistence")].shape[0])}
 
     def deltas(df, metric, method):
         a = ps.patient_means(df[df["method"] == method], metric)
@@ -225,7 +225,7 @@ def summarise(res: pd.DataFrame, pairs, g_train, K_train):
             if len(d) < 5:
                 continue
             block["methods"][m] = {
-                "dice_delta_vs_persistence": ps.summarize_delta(d, n_boot=2000),
+                "dice_delta_vs_persistence": ps.summarize_delta(d),
                 "mean_dice": float(ps.patient_means(sub, "dice").mean()),
                 "median_abs_log_vol_error": float(np.nanmedian(np.abs(sub["log_vol_ratio"]))),
                 "hd95_mean_mm": float(np.nanmean(ps.patient_means(sub, "hd95_mm"))),
@@ -254,5 +254,10 @@ def summarise(res: pd.DataFrame, pairs, g_train, K_train):
 
 
 if __name__ == "__main__":
-    lim = int(sys.argv[1]) if len(sys.argv) > 1 else None
-    main(lim)
+    if len(sys.argv) > 1 and sys.argv[1] == "--summarise-only":
+        # re-summarise the saved per-pair table (e.g. new bootstrap count); forecasts are not recomputed
+        prev = json.loads((OUT / "baseline_ladder.json").read_text())
+        summarise(pd.read_csv(OUT / "baseline_ladder_pairs.csv"), None, prev["g_train_per_day"], prev["K_train_voxels"])
+    else:
+        lim = int(sys.argv[1]) if len(sys.argv) > 1 else None
+        main(lim)
