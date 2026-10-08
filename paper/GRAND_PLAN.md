@@ -46,12 +46,8 @@ Risk, stated now: on MU, anisotropy changed Dice by +0.0002 (2w) and DTI alignme
 ## 2. Compute setup (Docker + Kaggle GPU)
 
 ### 2.1 Docker Desktop (this PC)
-Started 2026-10-07 by `winget install -e --id Docker.DockerDesktop`. After it finishes:
-1. Restart Windows.
-2. Open Docker Desktop. Accept the Docker agreement yourself (free for personal and education use).
-3. Settings → Resources → WSL integration → turn on **Ubuntu** (already installed, WSL version 2).
-4. Test: `docker run hello-world`.
-5. Test the project image: `make build && make test` (uses the existing `Dockerfile`).
+**Installed and tested 2026-10-08** (Docker Desktop 4.94.0, WSL2 backend; `docker run hello-world` printed "Hello from Docker!"). Fix needed on the way: a leftover non-admin `C:\ProgramData\DockerDesktop` folder blocked the installer; deleted from an admin shell, then reinstalled.
+Remaining step: test the project image with `make build && make test` (uses the existing `Dockerfile`) in P0.
 
 What Docker is for here:
 - Reproducible runs of the whole pipeline (`Dockerfile`, `docker-compose.yml`, `Makefile` already exist).
