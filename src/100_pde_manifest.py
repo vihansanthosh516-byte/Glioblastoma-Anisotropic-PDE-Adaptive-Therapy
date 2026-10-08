@@ -12,7 +12,7 @@ Differences from script 81 (which this replaces for the plan):
 Arms: aniso (r = 1, 10), iso_same, iso_homog, plus aniso_global_z (homogeneous diagonal tensor diag(1, 1, r),
 r = 10, normalised to unit trace/3, a direction that is NOT patient- or tract-informed; negative control for H3/H4).
 Mode --h 1: pilot at 1 mm (inputs at native 1 mm, atlas repeated 2x by nearest neighbour), reduced grid,
-fold-0 first pairs only. Answers whether the h = 2 mm optimum moves (W22).
+stratified first pairs (A4.4). Answers whether the h = 2 mm optimum moves (W22).
 
 Stages: forecast | analyze | pilot_analyze.  Output dir: output/pde_manifest/{cache_h2, cache_h1}, results.json
 Selection (analyze): per arm and fold, the (r, d, rho) cell with the best mean Dice over TRAINING patients (patient
@@ -47,7 +47,7 @@ CORE = (1, 3)
 PILOT_RHOS = [0.03, 0.1, 0.2]
 PILOT_DS = [0.01, 0.03, 0.1]
 PILOT_ARMS = [("aniso", 1.0), ("iso_homog", 1.0)]
-PILOT_N = 20
+PILOT_PER_STRATUM = 3   # 3 x 3 strata -> at most 27 first pairs, all folds (Amendment 4.4)
 
 
 def arms_full():
@@ -191,8 +191,14 @@ def get_pairs(h, limit=None, stage="forecast"):
     split = pd.read_csv(MAN / "split_mu.csv").set_index("patient_id")["fold"]
     pairs["fold"] = pairs["patient_id"].map(split)
     pairs = pairs[pairs["has_prior_scan"]] if stage == "selected" else pairs[~pairs["has_prior_scan"]]
-    if h == 1.0:   # pilot: fold-0 first primary pair of each patient, first PILOT_N patients by id
-        pairs = pairs[pairs["fold"] == 0].sort_values("patient_id").head(PILOT_N)
+    if h == 1.0:   # pilot (Amendment 4.4): stratified subset of first pairs, all folds. Strata = input-core-volume tertile x
+        # interval tertile (both known before the forecast); up to PILOT_PER_STRATUM per stratum, ordered by sha256(patient_id).
+        import hashlib
+        pairs = pairs.copy()
+        pairs["vq"] = pd.qcut(pairs["core_vox_in"], 3, labels=False, duplicates="drop")
+        pairs["dq"] = pd.qcut(pairs["dt_days"], 3, labels=False, duplicates="drop")
+        pairs["hk"] = pairs["patient_id"].map(lambda s: hashlib.sha256(("pilot|" + s).encode()).hexdigest())
+        pairs = pairs.sort_values("hk").groupby(["vq", "dq"], group_keys=False).head(PILOT_PER_STRATUM)
     pairs = pairs.sort_values(["patient_id", "day_in"])
     if limit:
         pairs = pairs.head(limit)
@@ -373,6 +379,22 @@ def pilot_analyze():
            "mean_abs_cell_diff": float(m["diff_h2_minus_h1"].abs().mean()),
            "cell_rank_spearman": float(m["h1"].rank().corr(m["h2"].rank())),
            "no_change_mean": float(np.mean([r["dice"]["no_change"] for r in r1]))}
+    # the cell most folds chose at 2 mm, as a fixed reference: PDE minus persistence at each resolution, per pair
+    ref = {}
+    for cell in ("aniso|r=1|d=0.01|rho=0.1", "iso_homog|r=1|d=0.01|rho=0.1"):
+        d1, d2, nc1, nc2 = [], [], [], []
+        for r in r1:
+            k = f"{r['patient_id']}_{r['tp_in']}_{r['tp_out']}"
+            if k in r2 and cell in r["dice"]["grid"] and cell in r2[k]["dice"]["grid"]:
+                d1.append(r["dice"]["grid"][cell] - r["dice"]["no_change"])
+                d2.append(r2[k]["dice"]["grid"][cell] - r2[k]["dice"]["no_change"])
+                nc1.append(r["dice"]["no_change"]); nc2.append(r2[k]["dice"]["no_change"])
+        if d1:
+            ref[cell] = {"n": len(d1), "delta_vs_persistence_h1_mean": float(np.mean(d1)), "delta_vs_persistence_h2_mean": float(np.mean(d2)),
+                         "per_pair_diff_h1_minus_h2_mean": float(np.mean(np.array(d1) - np.array(d2))),
+                         "per_pair_diff_abs_max": float(np.max(np.abs(np.array(d1) - np.array(d2)))),
+                         "persistence_dice_h1_mean": float(np.mean(nc1)), "persistence_dice_h2_mean": float(np.mean(nc2))}
+    out["reference_cell_resolution_effect"] = ref
     (OUT / "pilot_h1_vs_h2.json").write_text(json.dumps(out, indent=1, default=float))
     print(json.dumps({k: v for k, v in out.items() if k != "mean_dice_by_cell"}, indent=1))
 
