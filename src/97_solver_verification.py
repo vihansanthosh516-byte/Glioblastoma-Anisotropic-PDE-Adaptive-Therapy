@@ -262,9 +262,15 @@ def v9_forecast_horizon():
             "unverified_h2": [(r["D"], r["rho"]) for r in rows if not r["verified_h2"]]}
 
 
-def main():
+def main(solver_name="tensorfk"):
     t0 = time.time()
-    res = {"script": "97_solver_verification", "solver": "run_improved_aniso.TensorFK", "seed": SEED}
+    suffix = ""
+    if solver_name == "monotone":   # GRAND_PLAN #15: same checks on the positivity-preserving solver
+        sys.path.insert(0, str(PROJECT_ROOT / "src"))
+        from solver_monotone import TensorFKMonotone
+        ria.TensorFK = TensorFKMonotone
+        suffix = "_monotone"
+    res = {"script": "97_solver_verification", "solver": f"run_improved_aniso.TensorFK as {ria.TensorFK.__name__}", "seed": SEED}
     for name, fn in [("V1_spatial_order", v1_spatial_order), ("V2_temporal_order", v2_temporal_order),
                      ("V3_grid_convergence_front", v3_grid_convergence), ("V4_conservation", v4_conservation),
                      ("V5_boundedness", v5_boundedness), ("V6_boundary", v6_boundary),
@@ -276,13 +282,13 @@ def main():
             "V5_boundedness", "V6_boundary"]
     res["core_pass"] = all(res[k]["pass"] for k in core)
     res["production_grid_all_verified"] = res["V7_production_grid"]["V7b_n_verified_h2"] == res["V7_production_grid"]["n_cells"]
-    (OUT / "solver_verification.json").write_text(json.dumps(res, indent=1, default=float))
-    write_run_manifest("solver_verification_97", OUT / "solver_verification.manifest.json",
-                       script="src/97_solver_verification.py", seed=SEED, config={"h_production_mm": 2.0},
-                       inputs=[PROJECT_ROOT / "run_improved_aniso.py"], dataset="synthetic",
+    (OUT / f"solver_verification{suffix}.json").write_text(json.dumps(res, indent=1, default=float))
+    write_run_manifest("solver_verification_97" + suffix, OUT / f"solver_verification{suffix}.manifest.json",
+                       script="src/97_solver_verification.py", seed=SEED, config={"h_production_mm": 2.0, "solver": solver_name},
+                       inputs=[PROJECT_ROOT / "run_improved_aniso.py", PROJECT_ROOT / "src" / "solver_monotone.py"], dataset="synthetic",
                        primary_endpoint="n/a (verification)")
     print(json.dumps({k: res[k] for k in ("core_pass", "production_grid_all_verified")}))
 
 
 if __name__ == "__main__":
-    main()
+    main("monotone" if "--solver" in sys.argv and sys.argv[sys.argv.index("--solver") + 1] == "monotone" else "tensorfk")
