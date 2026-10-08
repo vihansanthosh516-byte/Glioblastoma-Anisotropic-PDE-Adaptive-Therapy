@@ -23,3 +23,6 @@ Created 2026-10-04. Never delete a row. Add rows when a result comes in. Numbers
 | Selector (mechanistic vs persistence) helps | not tested | Open | Phase 4 |
 | Sequential updating beats fixed fit | not tested | Open | Phase 4 |
 | Robust MPC ≥ RL under uncertainty | not tested | Open | Phase 5 |
+| H1 PDE beats persistence (broadly positive) | GBM-only +0.0130 (CI -0.0043 to +0.0302); all-eligible +0.0088 (-0.0061 to +0.0235) | Not supported | `output/pde_manifest/results.json` |
+| PDE beats the no-PDE geometric rule | GBM-only -0.0019 (-0.0176 to +0.0141) | Not supported | `output/pde_manifest/results.json` |
+| H3 tract anisotropy improves the forecast | aniso r=1 vs iso_same +0.0002 (-0.0002 to +0.0005) | Not supported | `output/pde_manifest/results.json` |

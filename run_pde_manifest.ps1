@@ -1,6 +1,7 @@
 # Script 100 end to end: first-pair full-grid forecasts, cell selection, later-pair selected-cell forecasts, analysis.
 # 4 processes x 2 torch threads (multiprocessing.spawn is refused on this machine). Resumable: finished pairs are cached.
-# Usage: powershell -ExecutionPolicy Bypass -File run_pde_manifest.ps1
+# Usage: powershell -ExecutionPolicy Bypass -File run_pde_manifest.ps1 [-SkipForecast]   (SkipForecast resumes after stage 1)
+param([switch]$SkipForecast)
 $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $MyInvocation.MyCommand.Path
 Set-Location $root
@@ -18,7 +19,7 @@ function Run-Stage($stage) {
     $procs | Wait-Process
 }
 
-Run-Stage "forecast"
+if (-not $SkipForecast) { Run-Stage "forecast" }
 & python -u src\100_pde_manifest.py --stage select *> (Join-Path $out "select.log")
 Run-Stage "selected"
 & python -u src\100_pde_manifest.py --stage analyze *> (Join-Path $out "analyze.log")
