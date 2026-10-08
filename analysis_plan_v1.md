@@ -239,3 +239,47 @@ Script 101 (alignment test) and the aniso vs iso_same, aniso vs iso_homog and an
 - A5.4 Cost: fewer patients (104 vs 134), so wider CIs. This is reported, not hidden.
 - A5.5 If the two populations disagree in sign or in the broadly-positive decision, both are stated in the abstract.
 
+
+## Amendment 6 (2026-10-08, before any PREDICT-GBM data is downloaded and before the 1 mm pilot is analysed)
+Trigger: the PDE re-run is negative (ledger 2w). Plan: `paper/GRAND_PLAN.md`. This amendment adds two new pre-registered questions (H-2, H-3), fixes open rules (W25, W27, W22, W24) and two checks on the existing result. It does not change any MU result already reported.
+
+### A6.0 What was already seen when this was written
+- All MU results in the ledger up to 2x (PDE, baselines, forecastability, DTI alignment, subgroups).
+- The published PREDICT-GBM paper (arXiv 2509.13360): aggregate recurrence coverage per model (standard 15 mm plan 77.34%, GliODIL 78.91%, U-Net 79.37%, PINN-GBM 77.99%, LOTI 78.54%) and its code (github.com/BrainLesion/PredictGBM: `create_standard_plan`, `topk_plan`, `recurrence_coverage`).
+- Not seen: any PREDICT-GBM image, segmentation, recurrence mask or per-patient result. The 1 mm pilot cache (21 of 27 pairs done at 2026-10-08 ~23:00) has not been analysed.
+
+### A6.1 Eligibility (W27)
+The analysed MU set is defined by the pair table (`data/manifests/forecast_pairs_mu.csv`, primary pairs with a non-empty 2 mm core): 133 patients, 105 GBM. `consort_mu.json` reports 134 (104 GBM) by the manifest flag. The difference (PatientID_0007 kept for its 2 dated pairs; PatientID_0242 and 0249 dropped for empty cores) is shown in the CONSORT figure. A5.1's "n = 104" reads "n = 105 as analysed".
+
+### A6.2 Bootstrap (W25)
+Every reported CI uses the patient bootstrap with 10,000 draws, seed 20261004 (`src/patient_stats.py` defaults). The 2,000-draw overrides in scripts 98, 100 and 102 are removed. Point estimates do not change; CI ends may move in the third decimal.
+
+### A6.3 1 mm rule (W22)
+Read once from `pilot_h1_vs_h2.json` at the fixed reference cell (aniso r=1, d=0.01, rho=0.1). If the mean per-pair change in (PDE minus persistence) Dice between h = 1 mm and h = 2 mm has absolute value > 0.005, or the best pilot cell differs from the 2 mm best cell, the selected cells are re-run at 1 mm for all pairs (Kaggle GPU) and the 1 mm result becomes primary. Otherwise 2 mm stays primary and the pilot is reported.
+
+### A6.4 Two checks on the existing MU result (exploratory)
+- Volume-matched shape test (GRAND_PLAN #2): PDE forecast and geometric forecast are each cut to the true next-scan volume (top-k voxels by PDE density, or by the geometric rule's distance ordering). Contrast: Dice(PDE, matched) minus Dice(geometric, matched), per patient, GBM-only. This measures shape skill with volume error removed.
+- First-vs-later swap (GRAND_PLAN #5): cells selected on training patients' later pairs, scored on first pairs; compared with the registered direction.
+
+### A6.5 Measured noise floor (W24)
+For each LUMIERE scan with both automated segmentations, segmenter disagreement = |ln(V_HD-GLIO-AUTO / V_DeepBraTumIA)| for the enhancing core. Floor = median disagreement / 2 per input-volume tertile. H-1 SNR tables are reported with the assumed floor (2s) and this measured floor side by side. Neither floor is tuned.
+
+### A6.6 H-2: pre-op scan to recurrence location (new primary question of the next phase)
+- Data: PREDICT-GBM release on Hugging Face (`LZimmer/PREDICT-GBM`, MIT). Development set: the TUM patients. Test set: the LUMIERE and RHUH patients (patient lists `predict_gbm/data/datasets/lumiere.json`, `rhuh.json`). The loader refuses to read test-set recurrence masks unless `configs/h2_frozen.yaml` exists and git tag `h2-frozen` is set.
+- Models. M0: standard plan (PREDICT-GBM `create_standard_plan`, 15 mm from tumour core, within brain mask). M1: isotropic Fisher-Kolmogorov with tissue diffusivity (white matter D, grey matter D/10, CSF 0), seeded from the pre-op segmentation. M2: same as M1 with an anisotropic tensor from a DTI tensor atlas registered to the data space (primary atlas: IIT Human Brain tensor template [verify licence and space before download]; sharpening r in {1, 10}). Every model map becomes a plan with PREDICT-GBM `topk_plan` at the M0 plan's voxel count (iso-volumetric).
+- Fitting: one population setting per arm, chosen on development patients only, over a grid of infiltration length lambda = sqrt(D/rho) (the quantity a single pre-op scan can inform; W14) and r for M2. No per-patient fitting in the primary.
+- Primary endpoint: per-patient enhancing-recurrence coverage, M2 minus M0, test set. Mean with 95% patient bootstrap CI (10,000) and Wilcoxon signed-rank. "Supported" only if the CI lower end is above 0.
+- Key secondary family (Holm): M2 minus M1; M1 minus M0; recurrence-core (enhancing + necrotic) coverage M2 minus M0.
+- Exploratory: M2 vs the precomputed maps in the release (GliODIL, U-Net, others; same patients); per centre; second tensor atlas (the project's UCSF-PDGM atlas); excluding multifocal and distant recurrences; failure atlas.
+- Exclusions, fixed now: patients with an empty recurrence mask in pre-op space, or a missing pre-op segmentation, are excluded and listed.
+- Overlap disclosure: LUMIERE volumes were used in script 91 (volume endpoint, not location). No location data from LUMIERE has been used.
+
+### A6.7 H-3: volume forecast with calibrated intervals
+- Target: ln(V_next / V_in) of the core (labels 1, 3) on the MU primary pairs; LUMIERE uses the enhancing-core volume tables (HD-GLIO-AUTO primary, DeepBraTumIA sensitivity).
+- Models: persistence (0); geometric_train_rate (existing); a mixed-effects model of log volume (patient random intercept and slope; fixed effects: days since RT end, TMZ phase, log V_in, interval) **= the registered primary model**; gradient boosting on the same pre-forecast features (secondary).
+- Primary endpoint: per-patient mean |ln ratio error|, mixed-effects minus persistence (negative = better), development out-of-fold on the manifest folds, then one frozen run on LUMIERE. Bootstrap 10,000.
+- Secondary (Holm): 80% and 90% interval coverage of patient-level split conformal intervals; AUC for RANO PD at the next scan (LUMIERE) using the predicted ln ratio.
+- Abstain rule: forecasts with predicted |ln ratio| below the A6.5 floor are labelled "below detectable change"; the cut is fixed on MU before LUMIERE.
+
+### A6.8 Wording
+"Supported" / "not supported" follow the CI rule above. H-2 and H-3 results are retrospective. "Digital twin" is not used unless the patient-calibrated model (GRAND_PLAN #20) beats both the population model and persistence under a rule declared before it runs.
