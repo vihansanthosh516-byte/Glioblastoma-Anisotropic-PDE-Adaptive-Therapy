@@ -38,7 +38,7 @@ from src import patient_stats as ps  # noqa: E402
 from src.run_manifest import write_run_manifest  # noqa: E402
 
 METHODS = ["geometric_train_rate", "last_rate", "linear", "gompertz", "oracle_volume_matched"]
-N_BOOT = 2000
+N_BOOT = ps.DEFAULT_N_BOOT
 
 
 def growth_stratum(c):
