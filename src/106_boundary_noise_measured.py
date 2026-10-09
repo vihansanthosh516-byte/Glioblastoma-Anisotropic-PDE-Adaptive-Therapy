@@ -14,6 +14,12 @@ Declared before the run (this file is committed before it is executed):
         for all scans and for RANO-rated follow-ups (PD/SD/PR/CR, as script 104).
   Comparison: script 103's assumed noise is a 1-voxel (2 mm) shift plus boundary jitter; its ceilings are read from
         output/segmentation_perturbation.json and reported next to the measured 2 mm Dice.
+FIX after the first run (2026-10-08, post hoc, reported as such): the first run compared raw voxel arrays. That was
+  wrong: in 364 scans the two label maps have different grids, and in many others the HD-GLIO-AUTO native map is
+  displaced (the LUMIERE readme says the native-space HD-GLIO-AUTO maps are not an official tool output). The first
+  run's numbers (median Dice 0) were an artefact and are not used. Now: both maps are resampled (nearest neighbour,
+  world coordinates from the NIfTI affines) onto the CT1 grid; QC keeps a scan only if >= 95% of each map's voxels lie
+  inside the CT1 brain (CT1 != 0, the HD-BET skull-stripped image); excluded scans are counted per reason.
 Weakest points (stated before the run): two automated tools are not a scan-rescan pair; LUMIERE enhancing label is not
   MU core (labels 1+3); native voxel sizes differ between scans (resampling to 2 mm makes the Dice comparable to MU).
 Input : data/external/lumiere/Imaging-v202211.zip (read in place), LUMIERE-ExpertRating-v202211.csv
@@ -29,6 +35,7 @@ import zipfile
 from pathlib import Path as _Path
 
 import nibabel as nib
+from nibabel.processing import resample_from_to, resample_to_output
 import numpy as np
 import pandas as pd
 from scipy import ndimage
@@ -46,15 +53,20 @@ HD = "HD-GLIO-AUTO-segmentation/native/segmentation_CT1_origspace.nii.gz"
 DBT = "DeepBraTumIA-segmentation/native/segmentation/ct1_seg_mask.nii.gz"
 REGIONS = {"enhancing": ((2,), (2,)), "whole": ((1, 2), (1, 2, 3))}
 GRID_MM = 2.0
+QC_INSIDE = 0.95
 
 
-def _load(z, name):
-    img = nib.Nifti1Image.from_bytes(gzip.decompress(z.read(name)))
-    return np.asarray(img.dataobj).astype(np.int16), np.asarray(img.header.get_zooms()[:3], float)
+def _img(z, name):
+    return nib.Nifti1Image.from_bytes(gzip.decompress(z.read(name)))
 
 
-def _to_grid(mask, zooms):
-    return ndimage.zoom(mask.astype(np.uint8), zooms / GRID_MM, order=0).astype(bool)
+def _on_ct1(img, ct):
+    return np.asarray(resample_from_to(img, ct, order=0).dataobj).astype(np.int16)
+
+
+def _to_grid(mask, ct):
+    m = nib.Nifti1Image(mask.astype(np.uint8), ct.affine)
+    return np.asarray(resample_to_output(m, voxel_sizes=GRID_MM, order=0).dataobj) > 0
 
 
 def _surface_dist(a, b, spacing):
@@ -75,7 +87,7 @@ def _surface_dist(a, b, spacing):
 def _metrics(a, b, spacing):
     inter = int((a & b).sum())
     d = _surface_dist(a, b, spacing)
-    return {"dice": 2 * inter / (a.sum() + b.sum()), "assd_mm": float(d.mean()), "hd95_mm": float(np.quantile(d, 0.95)),
+    return {"dice": float(2 * inter / (a.sum() + b.sum())), "assd_mm": float(d.mean()), "hd95_mm": float(np.quantile(d, 0.95)),
             "vol_a_mm3": float(a.sum() * np.prod(spacing)), "vol_b_mm3": float(b.sum() * np.prod(spacing))}
 
 
@@ -90,11 +102,14 @@ def main():
             n_missing += 1
             continue
         _, pid, tp, _ = base.split("/")
-        hd, zh = _load(z, base + HD)
-        dbt, zd = _load(z, base + DBT)
-        if hd.shape != dbt.shape or not np.allclose(zh, zd, atol=1e-3):
-            rows.append({"Patient": pid, "tp": tp, "skip": "grid mismatch"})
+        if base + "CT1.nii.gz" not in names:
+            rows.append({"Patient": pid, "tp": tp, "skip": "no CT1"})
             continue
+        ct = _img(z, base + "CT1.nii.gz")
+        brain = np.asarray(ct.dataobj) != 0
+        zh = np.asarray(ct.header.get_zooms()[:3], float)
+        hd = _on_ct1(_img(z, base + HD), ct)
+        dbt = _on_ct1(_img(z, base + DBT), ct)
         for reg, (lh, ld) in REGIONS.items():
             a, b = np.isin(hd, lh), np.isin(dbt, ld)
             r = {"Patient": pid, "tp": tp, "region": reg}
@@ -102,8 +117,14 @@ def main():
                 r["skip"] = "empty " + ("hd" if not a.any() else "dbt")
                 rows.append(r)
                 continue
+            ia, ib = float((a & brain).sum() / a.sum()), float((b & brain).sum() / b.sum())
+            r.update({"inside_brain_hd": ia, "inside_brain_dbt": ib})
+            if min(ia, ib) < QC_INSIDE:
+                r["skip"] = "qc: map outside brain (" + ("hd" if ia < QC_INSIDE else "dbt") + ")"
+                rows.append(r)
+                continue
             r.update({f"native_{m}": v for m, v in _metrics(a, b, zh).items()})
-            a2, b2 = _to_grid(a, zh), _to_grid(b, zh)
+            a2, b2 = _to_grid(a, ct), _to_grid(b, ct)
             if a2.any() and b2.any():
                 r.update({f"g2_{m}": v for m, v in _metrics(a2, b2, np.full(3, GRID_MM)).items()})
             r["voxel_mm"] = "x".join(f"{v:.2f}" for v in zh)
@@ -125,7 +146,7 @@ def main():
            "n_boot": ps.DEFAULT_N_BOOT, "summary": {}}
     for reg in REGIONS:
         for subset, d in (("all_scans", ok[ok["region"] == reg]),
-                          ("rated_followups", ok[(ok["region"] == reg) & [(p, t) in rated for p, t in zip(ok["Patient"], ok["tp"])]])):
+                          ("rated_followups", ok[(ok["region"] == reg) & np.array([(p, t) in rated for p, t in zip(ok["Patient"], ok["tp"])], bool)])):
             block = {"n_scans": int(len(d)), "n_patients": int(d["Patient"].nunique())}
             for col in ("native_dice", "native_assd_mm", "native_hd95_mm", "g2_dice", "g2_assd_mm", "g2_hd95_mm"):
                 x = d[col].dropna()
