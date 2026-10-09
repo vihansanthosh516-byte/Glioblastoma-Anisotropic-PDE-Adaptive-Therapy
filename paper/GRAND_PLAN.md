@@ -223,3 +223,22 @@ Success words: "broadly positive" only if the 95% CI is above 0. Otherwise "not 
 - UPenn-GBM (630 patients, has DTI, mostly pre-op): https://www.ncbi.nlm.nih.gov/pmc/articles/PMC9338035/
 
 Not found in today's search: a published GBM study that compares a PDE forecast with a persistence baseline on next-scan shape. If that holds after a proper search, H-1 itself is a gap filled. [VERIFY with a PubMed search before claiming.]
+
+## 9. Limit removal (added 2026-10-08)
+
+Rule from the author: find a fix for every stated limit. Rule from CLAUDE.md: a limit that is not fixed stays in the paper.
+Each row: limit, fix, source, status. "Needs OK" = needs the author's permission (download or upload).
+
+| # | Limit | Fix | Source | Status |
+|---|---|---|---|---|
+| L1 | Monotone solver not exact where a tensor is not a non-negative sum of 37 offsets (99.66% exact at r = 10) | Selling's decomposition: 6 non-negative weights, exact for every SPD tensor; long offsets blocked if they cross non-domain voxels | Selling 1874; Conway & Sloane 1992; Fehrenbach & Mirebeau 2014 (arXiv 1301.3925) | Done in code (`split="selling"`, 8 tests pass); script 97 rerun running |
+| L2 | V7: 2 mm grid is coarse against the front width (W22) | (a) 1 mm production run on Kaggle GPU; (b) discrete-speed correction: calibrate D_eff(h) so the discrete front speed equals 2 sqrt(D rho), applied before the fit; (c) anisotropic eikonal forecast arm, which does not need to resolve the front width | (c) Konukoglu et al. 2010, IEEE TMI 29:77 | (a) Needs OK (private Kaggle dataset of derived 2 mm masks); (b) can run locally; (c) Amendment 7 before any test-set use |
+| L3 | Production aniso arms not rerun with the new solver | Rerun script 100 aniso arms with `TensorFKMonotone` (Selling is about 8x slower at r = 10 on CPU, so GPU) | — | Open; GPU preferred |
+| L4 | Script 103 noise size assumed (1 voxel) | Script 106: measured boundary disagreement (Dice, ASSD, HD95) between two segmenters on all LUMIERE scans, native and 2 mm | LUMIERE native label maps | Running (declared in 4a8091e before the run) |
+| L5 | Two automated tools are not a scan-rescan pair | RIDER Neuro MRI: 19 recurrent GBM, repeat scans about 2 days apart, post-contrast 3D FLAIR 1 mm, repeat DTI (also gives tensor scan-rescan noise for the PDE input) | TCIA RIDER Neuro MRI | Needs OK (download); FLAIR-only segmentation needed |
+| L6 | LUMIERE enhancing label is not MU core (HD-GLIO-AUTO has no necrosis label) | Run one segmenter with the same labels on MU and LUMIERE | BraTS-trained model | Partial: needs GPU and a license check before any LUMIERE upload (non-commercial licence) |
+| L7 | Noise floor per volume tertile, not continuous | Smooth fit of disagreement against ln volume; sensitivity next to the registered A6.5 floor | — | Can run locally (sensitivity, not primary) |
+| L8 | Scans where one tool finds nothing are excluded | Include with a +1 voxel offset, as script 99 does; sensitivity | — | Can run locally |
+| L9 | Script 105: PDE density only inside a box around the input core | Larger box / whole-brain domain (GPU) | — | Open |
+| L10 | One population cell per fold; no patient-specific fit | Fit each patient's cell on the previous pair, forecast the next | — | Open |
+| L11 | Retrospective only; automated masks are not ground truth | Cannot be removed by analysis | — | Accepted (W20); stated |
