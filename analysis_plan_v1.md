@@ -283,3 +283,31 @@ For each LUMIERE scan with both automated segmentations, segmenter disagreement 
 
 ### A6.8 Wording
 "Supported" / "not supported" follow the CI rule above. H-2 and H-3 results are retrospective. "Digital twin" is not used unless the patient-calibrated model (GRAND_PLAN #20) beats both the population model and persistence under a rule declared before it runs.
+
+## Amendment 7 (2026-10-09): exact solver, per-patient fitting, subgroup, distant recurrence; committed BEFORE any PREDICT-GBM download
+
+### A7.0 What has been seen
+No PREDICT-GBM image, mask or prediction file has been downloaded. Seen: the paper's abstract-level numbers only (arXiv 2509.13360 v2: U-Net 79.37 +/- 2.08% and GliODIL 78.91 +/- 2.08% enhancing-recurrence coverage at equal volume; LMI and nnU-Net below the standard plan). On MU: ledger 2ak (exact solver; atlas direction does not help).
+
+### A7.1 Solver
+Every H-2 model (M1, M2, M3) uses the exact positivity-preserving solver `src/solver_monotone.py` (`split="selling"`). Reason: ledger 2ak (the old solver's clamp created a direction effect). The old solver is not used for H-2.
+
+### A7.2 New model M3: per-patient fit from the pre-op scan only
+- Why: PREDICT-GBM shows a population-parameter model (LMI) can be worse than the 15 mm margin; the models that win are fitted per patient.
+- Fit (uses only the pre-op scan of that patient, never a recurrence): seed at the centre of mass of the tumour core; for each lambda = sqrt(D/rho) on the A6.6 grid (and r in {1, 10} for the anisotropic variant), grow until the thresholded volume u >= 0.8 equals the pre-op core volume (enhancing + necrosis); score Dice(u >= 0.8, core) + Dice(u >= 0.16, core + edema) (visibility thresholds of the Konukoglu 2010 / Swanson family [verify the exact values in the full text before the freeze; if they differ, the published values replace 0.8 and 0.16 here, before any run]). Pick the best lambda (and r) per patient; ties go to the smaller lambda.
+- Variants: M3i (tissue isotropic, as M1) and M3a (anisotropic atlas tensor, as M2).
+- Plan: the fitted density map, `topk_plan` at the M0 voxel count (same as all models).
+- Status: second confirmatory hypothesis. Family of two primary contrasts, Holm: (a) M2 - M0 (A6.6, unchanged), (b) best-registered M3 variant - M0, where "best-registered" = M3a if r is fitted, compared as declared: M3a - M0 is the contrast; M3i - M0 is key secondary. "Supported" if the Holm-adjusted CI lower end is above 0.
+- Key secondary added to the A6.6 Holm family: M3a - M3i (does direction help once the model is fitted per patient?).
+
+### A7.3 Pre-registered subgroup: corpus callosum
+Tumours whose pre-op core lies within 5 mm of the corpus callosum (atlas label in the data space) vs the rest. Contrast M3a - M3i and M2 - M1 in each subgroup. Exploratory, reported whatever the result. Motivation: arXiv 2507.17707 (2025) reports the atlas-fibre gain mainly in tumours crossing the corpus callosum.
+
+### A7.4 Distant recurrence
+A recurrence component (26-connected, enhancing) is "distant" if its centroid is more than 30 mm from the pre-op core surface. Report the share of patients and of recurrence volume that is distant, and coverage with and without distant components, for every model. Distant components are NOT removed from the primary endpoint.
+
+### A7.5 3D viewer and clinical-style prototype
+A 3D viewer (GRAND_PLAN section 11) is built from model outputs. It is descriptive only; it adds no endpoint and is labelled "research prototype, not for patient care".
+
+### A7.6 Development use
+All fitting choices are made on development patients (TUM) only. Test recurrence masks stay locked by the A6.6 loader rule until `configs/h2_frozen.yaml` and tag `h2-frozen` exist.
