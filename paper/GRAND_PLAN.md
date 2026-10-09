@@ -325,3 +325,41 @@ Data rule: the page uses masks only (no MRI intensities); it stays private unles
 Honesty rule: the page shows the Dice for that patient and says "forecast", "atlas tensor", "retrospective".
 Done when: the page opens from one file, works for any patient id, and the shown Dice equals the ledger/cache value.
 Order: build it now on MU (we have forecasts and true next scans); add the radiation-plan layers after H-2 runs.
+
+## 12. Full-depth backlog (added 2026-10-09; user: "everything possible, time is not a concern")
+
+Order = dependency order. Every item: verify on disk, ledger entry, commit. Test set stays locked until item B6.
+
+### A. Running now
+- A1. Script 111 rerun: standard plan must reproduce exactly; published-model dev coverage near paper.
+- A2. Kaggle script 112 (M1/M2, 142 dev patients) -> `--stage select`.
+
+### B. H-2 (radiation plan coverage, PREDICT-GBM) — main result
+- B1. M3 per-patient fit (A7.2). First find the published visibility thresholds (T1Gd, FLAIR); no 0.8/0.16 without a source.
+- B2. Learned model arm: small 3D U-Net trained on dev only (5-fold), so we compare against the 79.37% bar fairly.
+- B3. Hybrid arm: PDE density as an extra U-Net input channel (physics-informed).
+- B4. Corpus-callosum subgroup (A7.3); distant recurrence > 30 mm (A7.4).
+- B5. Plan-volume sweep: coverage vs plan size curve (equal-volume and smaller-volume plans = less healthy brain dose).
+- B6. Freeze (configs/h2_frozen.yaml + tag h2-frozen), then one test run on LUMIERE + RHUH.
+- B7. Dose proxy: convert plan to a simple dose falloff; report brain volume spared at equal coverage.
+
+### C. H-3 (uncertainty)
+- C1. Conformal intervals for volume forecasts (MU), time-varying score.
+- C2. Conformal coverage maps on PREDICT-GBM (voxel risk sets with guaranteed coverage on dev folds).
+- C3. Calibration plots; failure cases.
+
+### D. Noise and data limits
+- D1. Simulated rescans (segmentation perturbation) to bound the noise floor.
+- D2. UPENN-GBM: check for follow-up scans / DTI; use if usable.
+- D3. Keep searching open scan-rescan data (L5 stays open).
+
+### E. Clinical-style prototype (research only, "not for patient care")
+- E1. Viewer: radiation layers (15 mm plan, model plan, recurrence), multi-patient picker.
+- E2. Uncertainty layer from C2.
+- E3. One-page report per patient (PDF): volume forecast, interval, plan comparison.
+- E4. Ask one radiation oncologist / neuroradiologist for a review (user does the contact).
+
+### F. Fair readiness
+- F1. One-sentence story; one headline number (H-2 test coverage vs 15 mm).
+- F2. Board, 30-second plain explanation, judge Q&A sheet with the weak points.
+- F3. Paper draft update; overview_for_review.md with negatives.
