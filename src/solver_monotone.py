@@ -6,9 +6,7 @@ up to 42% in one aniso r = 10 production run, ledger 2q / 2w).
 
 Method: non-negative directional splitting. At each voxel the tensor is written as
     D(x) = sum_k w_k(x) e_k e_k^T,   w_k >= 0,
-over a fixed set of integer lattice directions e_k (13 nearest: axes, face and body diagonals; 24 more wide
-directions of type (2,1,0) and (2,1,1) are used only where the 13 cannot represent D). The weights come from
-non-negative least squares per voxel. Then
+over integer lattice offsets e_k. Then
     div(D grad u)(x) ~ sum_k [ c_k(x + e_k/2) (u(x + e_k) - u(x)) + c_k(x - e_k/2) (u(x - e_k) - u(x)) ] / h^2,
 with c_k at the half point = mean of w_k at the two ends, set to 0 if either end is outside the domain (zero flux, so
 mass is conserved exactly when rho = 0). All coefficients are >= 0, so with
@@ -17,10 +15,17 @@ an explicit Euler step is a convex combination plus the reaction and kill terms;
 dt * rho <= 0.05 and dt * kill <= 0.05, u stays in [0, 1] without any clamp. The clamp in run() is kept only as a
 bookkeeping check: it should record zero mass.
 
-Cost of exactness: where D is not a non-negative combination of the available directions, the split is the nearest
-one in the Frobenius norm and the scheme is not consistent with D there. The relative residual per voxel is stored
-(self.rel_residual) and summarised (self.residual_summary). An isotropic or diagonal D is represented exactly by the
-three axes, and then the operator equals the standard 7-point Laplacian of TensorFK.
+Two ways to get the weights (argument `split`):
+  "selling" (default)  Selling's decomposition (Selling 1874; Conway & Sloane 1992, Proc R Soc A 436:55; used for
+                       diffusion by Fehrenbach & Mirebeau 2014, J Math Imaging Vis 49:123, arXiv 1301.3925).
+                       Selling's algorithm finds a D-obtuse superbase b0..b3 of Z^3 (b0+b1+b2+b3 = 0 and
+                       <b_i, D b_j> <= 0 for i != j); then D = sum_{i<j} -<b_i, D b_j> e_ij e_ij^T with
+                       e_ij = b_k x b_l ({i,j,k,l} = {0,1,2,3}). Six weights, all >= 0, exact for every SPD tensor.
+                       Offsets get longer as anisotropy grows (cost O(log condition number)). A diagonal D gives the
+                       three axes only, i.e. the 7-point operator of TensorFK.
+  "nnls"               earlier version: NNLS on a fixed set of up to 37 offsets, smallest stencil first. Not exact
+                       where D is not a non-negative combination of those offsets (kept for comparison).
+The relative residual |D - sum w e e^T|_F / |D|_F per voxel is stored (self.rel_residual, self.residual_summary).
 """
 from __future__ import annotations
 
@@ -77,14 +82,92 @@ def _shift(a, e):
     return out
 
 
+_PAIRS = [(i, j, *[x for x in range(4) if x not in (i, j)]) for i in range(4) for j in range(i + 1, 4)]
+
+
+def selling_superbase(D: np.ndarray, max_iter: int = 500) -> np.ndarray:
+    """D: (N, 3, 3) SPD. Returns (N, 4, 3) integer superbases that are D-obtuse (Selling's algorithm, vectorised)."""
+    b = np.zeros((D.shape[0], 4, 3), np.float64)
+    b[:, 0, 0] = b[:, 1, 1] = b[:, 2, 2] = 1.0
+    b[:, 3] = -1.0
+    tol = 1e-12 * np.trace(D, axis1=1, axis2=2)
+    for _ in range(max_iter):
+        changed = False
+        for i, j, k, l in _PAIRS:
+            sel = np.einsum("ni,nij,nj->n", b[:, i], D, b[:, j]) > tol
+            if sel.any():
+                bi = b[sel, i].copy()
+                b[sel, i] = -bi
+                b[sel, k] += bi
+                b[sel, l] += bi
+                changed = True
+        if not changed:
+            return b
+    raise RuntimeError("Selling's algorithm did not converge")
+
+
+def selling_decompose(D: np.ndarray):
+    """D: (N, 3, 3) SPD -> weights (N, 6) >= 0 and integer offsets (N, 6, 3) with D = sum_k w_k e_k e_k^T."""
+    b = selling_superbase(D)
+    w = [-np.einsum("ni,nij,nj->n", b[:, i], D, b[:, j]) for i, j, k, l in _PAIRS]
+    off = [np.cross(b[:, k], b[:, l]) for i, j, k, l in _PAIRS]
+    return np.clip(np.stack(w, 1), 0.0, None), np.rint(np.stack(off, 1)).astype(np.int64)
+
+
 class TensorFKMonotone(ria.TensorFK):
     """Drop-in replacement for ria.TensorFK (same constructor and run()); only the diffusion operator differs."""
 
-    def __init__(self, d6: np.ndarray, mask: np.ndarray, h: float = ria.H, tol: float = 1e-6):
+    def __init__(self, d6: np.ndarray, mask: np.ndarray, h: float = ria.H, tol: float = 1e-6,
+                 split: str = "selling"):
         self.h = h
+        self.split = split
         m_np = mask.astype(bool)
         self.m = torch.as_tensor(m_np.astype(np.float32))
         d6 = np.asarray(d6, np.float64) * m_np[..., None]
+        r2 = math.sqrt(2.0)
+        b_all = np.concatenate([d6[..., :3], r2 * d6[..., 3:]], axis=-1)
+        if split == "selling":
+            W, rel, n_wide = self._split_selling(d6, m_np)
+        elif split == "nnls":
+            W, rel, n_wide = self._split_nnls(m_np, b_all, tol)
+        else:
+            raise ValueError(split)
+        self.rel_residual = rel
+        inside = rel[m_np & (np.linalg.norm(b_all, axis=-1) > 0)]
+        self.residual_summary = {
+            "split": split, "n_offsets": len(self.dirs),
+            "max_offset_length": float(max(np.linalg.norm(e) for e in self.dirs)) if self.dirs else 0.0,
+            "n_voxels": int(inside.size), "n_voxels_wide_stencil": int(n_wide),
+            "rel_residual_median": float(np.median(inside)) if inside.size else 0.0,
+            "rel_residual_p95": float(np.quantile(inside, 0.95)) if inside.size else 0.0,
+            "rel_residual_max": float(inside.max()) if inside.size else 0.0,
+            "share_voxels_exact": float((inside <= tol).mean()) if inside.size else 1.0}
+        self._build_coefficients(W)
+
+    def _split_selling(self, d6, m_np):
+        idx = np.nonzero(m_np & (np.abs(d6).sum(-1) > 0))
+        s = d6[idx]
+        D = np.stack([np.stack([s[:, 0], s[:, 3], s[:, 4]], -1),
+                      np.stack([s[:, 3], s[:, 1], s[:, 5]], -1),
+                      np.stack([s[:, 4], s[:, 5], s[:, 2]], -1)], 1)
+        w, off = selling_decompose(D)
+        # e and -e give the same term: make the first non-zero component positive
+        lead = np.take_along_axis(off, (off != 0).argmax(-1)[..., None], -1)[..., 0]
+        off = off * np.where(lead < 0, -1, 1)[..., None]
+        keep = w > 0
+        uniq, inv = np.unique(off[keep], axis=0, return_inverse=True)
+        self.dirs = [tuple(int(x) for x in e) for e in uniq]
+        W = np.zeros(m_np.shape + (len(self.dirs),), np.float64)
+        vox = np.broadcast_to(np.arange(len(s))[:, None], keep.shape)[keep]
+        np.add.at(W, (idx[0][vox], idx[1][vox], idx[2][vox], inv.ravel()), w[keep])
+        of = off.astype(np.float64)
+        rec = np.einsum("nk,nki,nkj->nij", w, of, of)
+        rel = np.zeros(m_np.shape, np.float64)
+        rel[idx] = np.linalg.norm((rec - D).reshape(len(s), -1), axis=1) / np.linalg.norm(D.reshape(len(s), -1), axis=1)
+        n_wide = int(((np.abs(off) * keep[..., None]).max(axis=(1, 2)) >= 2).sum())
+        return W, rel, n_wide
+
+    def _split_nnls(self, m_np, b_all, tol):
         near, wide = lattice_directions(False), lattice_directions(True)
         wide_only = [e for e in wide if e not in near]
         self.dirs = near + wide_only
@@ -95,10 +178,8 @@ class TensorFKMonotone(ria.TensorFK):
                      lambda e: max(map(abs, e)) == 1, lambda e: True):
             cols = [k for k, e in enumerate(self.dirs) if keep(e)]
             levels.append((np.asarray(cols), _design([self.dirs[k] for k in cols])))
-        r2 = math.sqrt(2.0)
-        b_all = np.concatenate([d6[..., :3], r2 * d6[..., 3:]], axis=-1)
-        W = np.zeros(mask.shape + (len(self.dirs),), np.float64)
-        rel = np.zeros(mask.shape, np.float64)
+        W = np.zeros(m_np.shape + (len(self.dirs),), np.float64)
+        rel = np.zeros(m_np.shape, np.float64)
         n_wide = 0
         cache = {}
         for idx in zip(*np.nonzero(m_np)):
@@ -123,14 +204,9 @@ class TensorFKMonotone(ria.TensorFK):
             W[idx] = w
             rel[idx] = r
             n_wide += int(used_wide)
-        self.rel_residual = rel
-        inside = rel[m_np & (np.linalg.norm(b_all, axis=-1) > 0)]
-        self.residual_summary = {
-            "n_voxels": int(inside.size), "n_voxels_wide_stencil": int(n_wide),
-            "rel_residual_median": float(np.median(inside)) if inside.size else 0.0,
-            "rel_residual_p95": float(np.quantile(inside, 0.95)) if inside.size else 0.0,
-            "rel_residual_max": float(inside.max()) if inside.size else 0.0,
-            "share_voxels_exact": float((inside <= tol).mean()) if inside.size else 1.0}
+        return W, rel, n_wide
+
+    def _build_coefficients(self, W):
         Wt = torch.as_tensor(W.astype(np.float32))
         self.cp, self.cm = [], []
         diag = torch.zeros_like(self.m)
@@ -138,7 +214,13 @@ class TensorFKMonotone(ria.TensorFK):
             wk = Wt[..., k]
             if float(wk.abs().max()) == 0.0:
                 continue
-            cplus = 0.5 * (wk + _shift(wk, e)) * self.m * _shift(self.m, e)
+            # bond x -> x + e is open only if both ends and the voxels the segment passes through are in the domain
+            # (long Selling offsets must not jump across a sulcus or ventricle)
+            path = self.m * _shift(self.m, e)
+            n = max(map(abs, e))
+            for t in range(1, n):
+                path = path * _shift(self.m, tuple(int(np.floor(x * t / n + 0.5)) for x in e))
+            cplus = 0.5 * (wk + _shift(wk, e)) * path
             cminus = _shift(cplus, tuple(-x for x in e))
             self.cp.append((e, cplus))
             self.cm.append((tuple(-x for x in e), cminus))

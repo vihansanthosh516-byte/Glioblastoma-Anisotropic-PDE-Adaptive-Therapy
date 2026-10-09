@@ -34,6 +34,7 @@ Output: output/solver_verification.json, output/solver_verification.manifest.jso
 """
 from __future__ import annotations
 
+import inspect
 import json
 import math
 import sys
@@ -271,6 +272,8 @@ def main(solver_name="tensorfk"):
         ria.TensorFK = TensorFKMonotone
         suffix = "_monotone"
     res = {"script": "97_solver_verification", "solver": f"run_improved_aniso.TensorFK as {ria.TensorFK.__name__}", "seed": SEED}
+    if solver_name == "monotone":
+        res["split"] = inspect.signature(TensorFKMonotone.__init__).parameters["split"].default
     for name, fn in [("V1_spatial_order", v1_spatial_order), ("V2_temporal_order", v2_temporal_order),
                      ("V3_grid_convergence_front", v3_grid_convergence), ("V4_conservation", v4_conservation),
                      ("V5_boundedness", v5_boundedness), ("V6_boundary", v6_boundary),

@@ -9,7 +9,7 @@ sys.path.insert(0, str(REPO))
 sys.path.insert(0, str(REPO / "src"))
 
 import run_improved_aniso as ria  # noqa: E402
-from solver_monotone import TensorFKMonotone, lattice_directions  # noqa: E402
+from solver_monotone import TensorFKMonotone, lattice_directions, selling_decompose  # noqa: E402
 
 
 def _mass(a):
@@ -60,6 +60,38 @@ def test_random_spd_conserves_mass_and_stays_bounded():
     assert abs(_mass(u[0]) - _mass(u0)) / _mass(u0) < 1e-6
     assert float(u.min()) >= 0.0 and float(u.max()) <= 1.0
     assert _mass(u[0][~mask]) == 0.0
+
+
+def test_selling_is_exact_for_any_spd():
+    # includes condition numbers up to ~1e4 in random orientations
+    rng = np.random.default_rng(2)
+    Q, _ = np.linalg.qr(rng.normal(size=(2000, 3, 3)))
+    lam = np.exp(rng.uniform(0, np.log(1e4), size=(2000, 3)))
+    D = np.einsum("nij,nj,nkj->nik", Q, lam, Q)
+    w, off = selling_decompose(D)
+    rec = np.einsum("nk,nki,nkj->nij", w, off.astype(float), off.astype(float))
+    assert (w >= 0).all()
+    assert np.abs(rec - D).max() / np.abs(D).max() < 1e-9
+
+
+def test_selling_diagonal_uses_axes_only():
+    w, off = selling_decompose(np.diag([0.3, 0.2, 0.1])[None])
+    used = {tuple(abs(int(x)) for x in e) for e, ww in zip(off[0], w[0]) if ww > 0}
+    assert used == {(1, 0, 0), (0, 1, 0), (0, 0, 1)}
+
+
+def test_selling_solver_exact_on_strong_anisotropy():
+    shape = (20, 20, 20)
+    v = np.array([1.0, 2.0, 0.5]) / np.linalg.norm([1.0, 2.0, 0.5])
+    M = 0.03 * np.eye(3) + 0.27 * 10 * np.outer(v, v)        # r ~ 10 along a non-lattice direction
+    d6 = np.tile(ria.mat_to_six(M).astype(np.float32), shape + (1,))
+    u0 = np.zeros(shape, np.float32)
+    u0[8:12, 8:12, 8:12] = 1.0
+    s = TensorFKMonotone(d6, np.ones(shape, bool), h=2.0)
+    assert s.residual_summary["rel_residual_max"] < 1e-6
+    u, _ = s.run(u0, [0.0], 50.0)
+    assert float(s.clamp_added[0]) == 0.0
+    assert abs(_mass(u[0]) - _mass(u0)) / _mass(u0) < 1e-6
 
 
 def test_growth_stays_in_unit_interval_without_clamp():
