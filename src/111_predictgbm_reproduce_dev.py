@@ -44,7 +44,9 @@ def main():
             plan = pg.model_plan(pg._load(pid, f"{m}_pred.nii.gz"), c["seg"], c["brain"])
             rel = pg.DATA / pid / f"{m}_plan.nii.gz"
             if rel.exists():
-                plan_mismatch.setdefault(m, []).append(int((plan ^ (pg._load(pid, f"{m}_plan.nii.gz") > 0)).sum()))
+                relp = pg._load(pid, f"{m}_plan.nii.gz") > 0
+                plan_mismatch.setdefault(m, []).append(int((plan ^ relp).sum()))
+                r[f"{m}_released_enh"] = pg.coverage(re, relp)   # plan file as released (what the paper scored)
             r[f"{m}_enh"] = pg.coverage(re, plan)
             r[f"{m}_all"] = pg.coverage(ra, plan)
         rows.append(r)
@@ -58,14 +60,16 @@ def main():
            "plan_reproduction_voxel_mismatch": {m: {"n": len(v), "n_exact": int(sum(x == 0 for x in v)), "max": int(max(v))}
                                                 for m, v in plan_mismatch.items()},
            "coverage_enh_mean": {}, "delta_vs_standard_enh": {}}
-    for col in ["standard_enh"] + [f"{m}_enh" for m in pg.PUBLISHED_MODELS]:
+    for col in ["standard_enh"] + [f"{m}{x}_enh" for m in pg.PUBLISHED_MODELS for x in ("", "_released")]:
         if col in use:
             res["coverage_enh_mean"][col] = float(use[col].mean())
             if col != "standard_enh":
                 d = (use[col] - use["standard_enh"]).dropna().to_numpy()
                 res["delta_vs_standard_enh"][col] = ps.summarize_delta(d)
     res["weakest_points"] = ["Development patients only; published models may have been tuned on some of them.",
-                             "Coverage is geometric, not dose; retrospective."]
+                             "Coverage is geometric, not dose; retrospective.",
+                             "Rebuilt U-Net / LMI / GlioMap plans differ from the released plan files (U-Net scores are raw values "
+                             "outside 0-1 and are clipped as in evaluate.py); *_released_enh scores the released files."]
     (OUT / "dev_reproduce.json").write_text(json.dumps(res, indent=1, default=float))
     write_run_manifest("predictgbm_dev_111", OUT / "dev_reproduce.manifest.json", script="src/111_predictgbm_reproduce_dev.py",
                        seed=ps.DEFAULT_SEED, config={"ctv_margin": pg.CTV_MARGIN, "models": pg.PUBLISHED_MODELS},
