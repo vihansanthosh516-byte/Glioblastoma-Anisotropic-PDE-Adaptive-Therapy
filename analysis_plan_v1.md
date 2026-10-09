@@ -311,3 +311,6 @@ A 3D viewer (GRAND_PLAN section 11) is built from model outputs. It is descripti
 
 ### A7.6 Development use
 All fitting choices are made on development patients (TUM) only. Test recurrence masks stay locked by the A6.6 loader rule until `configs/h2_frozen.yaml` and tag `h2-frozen` exist.
+
+### A7.2a Visibility thresholds checked (2026-10-09, before any M3 run)
+The 0.8 / 0.16 values in A7.2 had no confirmed source. As A7.2 requires, they are replaced by published values before any run: T1Gd (core) threshold 0.6 and FLAIR (core + edema) threshold 0.35, the nominal values in Balcerak / Zhang et al., arXiv 2311.16536 (section 2.2), "motivated by" Lipkova et al. 2019 (multimodal Bayesian calibration). Fixed, not fitted (that paper fits them in [0.5, 0.8] and [0.2, 0.5]; fitting is a later sensitivity analysis only). Growth stops when the volume u >= 0.6 equals the pre-op core volume. Everything else in A7.2 is unchanged. No M3 output existed when this was written.
