@@ -138,6 +138,33 @@ def main():
     res["mu_primary_pairs"] = {"n_pairs": int(len(fp)), "n_patients": int(fp["patient_id"].nunique()),
                                "mu_pairs_per_lumiere_tertile": {str(int(k)): int(v) for k, v in fp["tert"].value_counts().sort_index().items()},
                                "side_by_side": side}
+
+    # sensitivity, added 2026-10-08 (GRAND_PLAN L7, L8; post hoc, the A6.5 floor above stays primary)
+    # L7: continuous floor = median regression of |ln ratio| on ln volume, / 2 (no tertile steps)
+    import statsmodels.api as sm
+    X = sm.add_constant(np.log(both["vgeo"].to_numpy()))
+    qr = sm.QuantReg(both["dis"].to_numpy(), X).fit(q=0.5)
+    vmin, vmax = both["vgeo"].min(), both["vgeo"].max()
+    v_mu = fp["v_in_mm3"].clip(vmin, vmax)   # no extrapolation outside the LUMIERE range
+    fp["floor_cont"] = np.maximum(qr.params[0] + qr.params[1] * np.log(v_mu), 1e-6) / 2
+    # L8: keep scans where one tool finds nothing, with a +8 mm3 (one 2 mm voxel) offset, tertiles as above
+    # an empty label is a blank volume in the CSV row (tool ran, found nothing) -> 0; a missing row (tool not run) is excluded
+    m8 = hd.assign(vol=hd["vol"].fillna(0)).merge(dbt.assign(vol=dbt["vol"].fillna(0)), on=["Patient", "tp"],
+                                                   how="inner", suffixes=("_hd", "_dbt"))
+    m8 = m8[(m8["vol_hd"] > 0) | (m8["vol_dbt"] > 0)].copy()
+    m8["dis"] = np.abs(np.log((m8["vol_hd"] + VOXEL_MM3_MU) / (m8["vol_dbt"] + VOXEL_MM3_MU)))
+    m8["tert"] = np.digitize(np.sqrt((m8["vol_hd"] + VOXEL_MM3_MU) * (m8["vol_dbt"] + VOXEL_MM3_MU)), edges)
+    floor8 = {int(t): float(g["dis"].median() / 2) for t, g in m8.groupby("tert")}
+    fp["floor_incl_zero"] = fp["tert"].map(floor8)
+    sens = {}
+    for name, col in (("continuous_floor_L7", "floor_cont"), ("including_empty_scans_L8", "floor_incl_zero")):
+        snr = fp["abs_ln_change"] / fp[col]
+        sens[name] = {"floor_median_ln": float(fp[col].median()), "share_pairs_snr_lt_1": float((snr < 1).mean()),
+                      "share_pairs_snr_lt_2": float((snr < 2).mean())}
+    sens["continuous_floor_L7"].update({"quantreg_intercept": float(qr.params[0]), "quantreg_slope_per_ln_mm3": float(qr.params[1]),
+                                        "lumiere_volume_range_mm3": [float(vmin), float(vmax)]})
+    sens["including_empty_scans_L8"].update({"n_scans": int(len(m8)), "floor_by_tertile": {str(k): v for k, v in floor8.items()}})
+    res["sensitivity_post_hoc"] = sens
     res["weakest_points"] = [
         "Inter-method disagreement (two automated tools) is not test-retest noise; a constant bias between tools adds to it.",
         "LUMIERE contrast-enhancing label vs MU core (labels 1+3, includes necrosis): different targets and pipelines.",
