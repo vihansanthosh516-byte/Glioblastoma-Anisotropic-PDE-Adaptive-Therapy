@@ -54,6 +54,10 @@ import numpy as np
 import torch
 from scipy import ndimage, optimize, stats
 
+# GPU (Kaggle): GBM_TORCH_DEVICE=cuda puts every solver tensor on the GPU; unset = CPU, unchanged behaviour
+if os.environ.get("GBM_TORCH_DEVICE"):
+    torch.set_default_device(os.environ["GBM_TORCH_DEVICE"])
+
 from src.radiation_model import RadiationSchedule
 from src.treatment_aware_pde import TreatmentSchedule
 
@@ -220,8 +224,8 @@ class TensorFK:
                 lo += (-(raw.clamp(max=0.0)) * self.m).sum((1, 2, 3))
                 hi += ((raw - 1.0).clamp(min=0.0) * self.m).sum((1, 2, 3))
                 u = raw.clamp_(0.0, 1.0) * self.m
-        self.clamp_added, self.clamp_removed = lo.numpy(), hi.numpy()
-        return u.numpy(), n
+        self.clamp_added, self.clamp_removed = lo.cpu().numpy(), hi.cpu().numpy()
+        return u.cpu().numpy(), n
 
 
 def selftest() -> dict:

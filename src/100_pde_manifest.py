@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 import time
 from pathlib import Path as _Path
@@ -60,12 +61,28 @@ def global_z_tensor(shape, r):
     return np.tile(np.array([w[0], w[1], w[2], 0, 0, 0], np.float32), tuple(shape) + (1,))
 
 
+# Optional mask pack (Kaggle GPU runs): GBM_MASK_PACK = npz from src/108_pack_masks_for_kaggle.py with the binary core
+# (labels 1+3) and brain masks, 1 mm, cropped to 240 x 240 x 154, bit-packed. Same arrays as the NIfTI path below.
+_PACK = None
+
+
+def _packed(kind, pid, tp):
+    global _PACK
+    if _PACK is None:
+        _PACK = np.load(os.environ["GBM_MASK_PACK"])
+    return np.unpackbits(_PACK[f"{kind}|{pid}|{tp}"])[: 240 * 240 * 154].reshape(240, 240, 154).astype(bool)
+
+
 def mask_native(pid, tp):
+    if os.environ.get("GBM_MASK_PACK"):
+        return _packed("core", pid, tp)
     p = ria.MU_DIR / pid / f"Timepoint_{tp}" / f"{pid}_Timepoint_{tp}_tumorMask.nii.gz"
     return np.isin(np.asarray(nib.load(str(p)).dataobj), CORE)[:240, :240, :154]
 
 
 def brain_native(pid, tp):
+    if os.environ.get("GBM_MASK_PACK"):
+        return _packed("brain", pid, tp)
     p = ria.MU_DIR / pid / f"Timepoint_{tp}" / f"{pid}_Timepoint_{tp}_brain_t1n.nii.gz"
     return (np.asarray(nib.load(str(p)).dataobj) > 0)[:240, :240, :154]
 
@@ -78,12 +95,10 @@ def up2(a):
 
 def load_inputs(pid, tp_in, tp_out, h):
     # 2 mm: block-average of the 1 mm binary mask, >= 0.5 (identical to script 81)
-    if h == 2.0:
-        raw1 = np.isin(np.asarray(nib.load(str(ria.mu_paths(pid, tp_in)[0])).dataobj), CORE)
-        raw2 = np.isin(np.asarray(nib.load(str(ria.mu_paths(pid, tp_out)[0])).dataobj), CORE)
-        t1 = ria.to_2mm(raw1) >= 0.5
-        t2 = ria.to_2mm(raw2) >= 0.5
-        brain = ria.to_2mm(np.asarray(nib.load(str(ria.mu_paths(pid, tp_in)[1])).dataobj) > 0) >= 0.5
+    if h == 2.0:   # to_2mm crops to 240 x 240 x 154 first, so the cropped native masks give identical results
+        t1 = ria.to_2mm(mask_native(pid, tp_in)) >= 0.5
+        t2 = ria.to_2mm(mask_native(pid, tp_out)) >= 0.5
+        brain = ria.to_2mm(brain_native(pid, tp_in)) >= 0.5
         return t1, t2, brain
     return mask_native(pid, tp_in), mask_native(pid, tp_out), brain_native(pid, tp_in)
 
@@ -176,6 +191,8 @@ def worker(pair):
     rec = forecast_pair(pair, ria._ATLAS, _H, _GRID)
     rec["seconds"] = round(time.time() - t0, 1)
     rec["atlas_sha"] = ria._ATLAS_SHA
+    rec["solver"] = ria.TensorFK.__name__
+    rec["device"] = str(__import__("torch").get_default_device())
     tmp = f.with_suffix(".tmp")
     tmp.write_text(json.dumps(rec))
     tmp.replace(f)
@@ -406,7 +423,14 @@ if __name__ == "__main__":
     ap.add_argument("--limit", type=int, default=None)
     ap.add_argument("--shard", type=int, default=0)
     ap.add_argument("--n-shards", type=int, default=1)
+    ap.add_argument("--solver", choices=["tensorfk", "monotone"], default="tensorfk",
+                    help="monotone = positivity-preserving Selling solver (GRAND_PLAN L3); writes to output/pde_manifest_monotone")
     a = ap.parse_args()
+    if a.solver == "monotone":
+        sys.path.insert(0, str(PROJECT_ROOT / "src"))
+        from solver_monotone import TensorFKMonotone
+        ria.TensorFK = TensorFKMonotone
+        OUT = PROJECT_ROOT / "output" / "pde_manifest_monotone"
     OUT.mkdir(parents=True, exist_ok=True)
     if a.stage in ("forecast", "selected"):
         stage_forecast(a.h, a.limit, a.shard, a.n_shards, a.stage)
