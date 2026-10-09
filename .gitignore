@@ -118,3 +118,4 @@ output/emax_sweep/**/log.txt
 
 kaggle_run/pack/
 kaggle_run/kernel_out/
+kaggle_run/pack_pg/

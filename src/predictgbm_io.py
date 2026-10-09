@@ -29,6 +29,9 @@ PUBLISHED_MODELS = ["unet", "gliodil", "sbtc", "pinngbm", "lmi", "gliomap"]   # 
 
 
 def test_ids() -> set[str]:
+    import os
+    if os.environ.get("GBM_PG_TEST_IDS"):
+        return set(json.loads(_Path(os.environ["GBM_PG_TEST_IDS"]).read_text()))
     ids = set()
     for f in ("lumiere.json", "rhuh.json"):
         ids |= {p["patient_id"] for p in json.loads((LISTS / f).read_text())["patients"]}
@@ -36,6 +39,9 @@ def test_ids() -> set[str]:
 
 
 def all_ids() -> list[str]:
+    import os
+    if os.environ.get("GBM_PG_PACK"):
+        return sorted({k.split("|")[0] for k in np.load(os.environ["GBM_PG_PACK"]).files})
     return sorted(p.name for p in DATA.iterdir() if p.is_dir())
 
 
@@ -51,20 +57,37 @@ def is_frozen() -> bool:
     return r.stdout.strip() == "h2-frozen"
 
 
+_PACK = None   # GBM_PG_PACK = npz from src/113_pack_predictgbm_for_kaggle.py (Kaggle runs)
+
+
 def _load(pid: str, name: str) -> np.ndarray:
+    import os
+    if os.environ.get("GBM_PG_PACK"):
+        global _PACK
+        if _PACK is None:
+            _PACK = np.load(os.environ["GBM_PG_PACK"])
+        key = f"{pid}|{name}"
+        if key + "|bits" in _PACK.files:
+            return np.unpackbits(_PACK[key + "|bits"])[: 240 * 240 * 155].reshape(240, 240, 155)
+        return _PACK[key]
     return np.asarray(nib.load(str(DATA / pid / name)).dataobj)
+
+
+def seg_labels(a: np.ndarray) -> np.ndarray:
+    """As PredictGBM load_segmentation: round to the nearest integer (some files store 1 as 0.996)."""
+    return np.rint(np.asarray(a, np.float64)).astype(np.int16)
 
 
 def load_case(pid: str, with_recurrence: bool = False) -> dict:
     """Pre-op inputs (always allowed) and, if asked, the recurrence (locked for test patients until the freeze)."""
-    c = {"pid": pid, "seg": _load(pid, "tumor_seg.nii.gz").astype(np.int16),
+    c = {"pid": pid, "seg": seg_labels(_load(pid, "tumor_seg.nii.gz")),
          "wm": _load(pid, "wm_pbmap.nii.gz").astype(np.float32), "gm": _load(pid, "gm_pbmap.nii.gz").astype(np.float32),
          "csf": _load(pid, "csf_pbmap.nii.gz").astype(np.float32),
          "brain": binary_fill_holes(_load(pid, "t1c_bet_mask.nii.gz") > 0)}
     if with_recurrence:
         if pid in test_ids() and not is_frozen():
             raise PermissionError(f"{pid} is a test patient; recurrence locked until configs/h2_frozen.yaml + tag h2-frozen")
-        c["rec"] = _load(pid, "recurrence_preop.nii.gz").astype(np.int16)
+        c["rec"] = seg_labels(_load(pid, "recurrence_preop.nii.gz"))
     return c
 
 
@@ -109,12 +132,23 @@ def topk_plan(scores: np.ndarray, k: int, mask: np.ndarray) -> np.ndarray:
     return out
 
 
-def model_plan(pred: np.ndarray, seg: np.ndarray, brain: np.ndarray) -> np.ndarray:
-    p = pred.astype(np.float32)
+def resample_to(a: np.ndarray, shape) -> np.ndarray:
+    """As ants.resample_image(use_voxels=True, interp_type=0 = linear): same origin, new spacing = old * n_old / n_new,
+    so new index i samples old index i * n_old / n_new."""
+    if a.shape == tuple(shape):
+        return a
+    from scipy.ndimage import map_coordinates
+    grid = np.meshgrid(*[np.arange(n) * (o / n) for n, o in zip(shape, a.shape)], indexing="ij")
+    return map_coordinates(a.astype(np.float32), grid, order=1, mode="nearest")
+
+
+def model_plan(pred: np.ndarray, seg: np.ndarray, brain: np.ndarray, k: int | None = None) -> np.ndarray:
+    """k = standard-plan voxel count; pass it when known to skip recomputing the standard plan."""
+    p = resample_to(pred.astype(np.float32), seg.shape)
     if np.isin(np.unique(p), [0, 1]).all():
         p = distance_fade(p > 0)
     p = np.clip(p, 0.0, 1.0)
-    return topk_plan(p, int(standard_plan(seg, brain).sum()), brain)
+    return topk_plan(p, int(standard_plan(seg, brain).sum()) if k is None else int(k), brain)
 
 
 def rec_enhancing(rec: np.ndarray) -> np.ndarray:
