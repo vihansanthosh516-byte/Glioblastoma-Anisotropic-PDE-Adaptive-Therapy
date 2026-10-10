@@ -389,3 +389,21 @@ Mean of rank-normalised maps: (a) M1 + distance; (b) published GliODIL + U-Net (
 
 ### X4. Above-noise subgroup on MU (exploratory, labelled)
 Re-report 2ak contrasts only on pairs with SNR > 1 under the registered floor (2ab). Exploratory; no claim of confirmation.
+
+## 14. Older negatives (vault/failed_hypotheses.md) and literature fixes (2026-10-10)
+
+Same rule as section 13: declared before running, development data first, negatives stay reported.
+
+| Old negative | Fix from literature | Verdict |
+|---|---|---|
+| Growth-only PDE loses to no-change on shrinking cores (-0.039, n 50) and on LUMIERE volumes | Fit a per-patient treatment response (kill rate) from the earlier scans instead of assumed alpha/beta (Hormuth et al. 2021 Sci Rep, PMC8055874: calibrated chemoradiation model, median enhancing-volume error -2.5% at 3 months, n 9). Also "sequential updating beats fixed fit" (open in the table). | **Y1: worth testing.** Strongest old lead. |
+| H1 PDE vs persistence not significant (MU) | Same as Y1 plus restrict to above-noise pairs (X4) | Y1 + X4 |
+| MGMT does not predict TTP (HR 1.11, p 0.60) | Meta-analysis: MGMT is predictive WITH TMZ (PFS HR 0.48, CI 0.40-0.57, 7,886 patients, PMC5873285). Our test pooled treatments and was underpowered. | **Y2:** re-test only in TMZ-treated patients, as the literature defines it; still underpowered, report as consistency check, not a discovery. |
+| Age weak in CGGA pooled | Known: age effect differs by cohort and treatment era | No fix; keep. |
+| C-GAT vs scVI: patient-ID leakage | Patient-level split (script 88 pending) | Y3: run script 88 (method fix, not a result fix). |
+| RL < simple rule | Literature often finds simple rules competitive; no fix that is not tuning | Keep as a finding. |
+| Resistance-driven adaptive gain 0/6; dual-agent "rescue" | Simulation with assumed kill rates; no real data to fit | Keep. |
+| Fractal D_f wrong direction; Track A score constant | No literature fix | Keep. |
+
+### Y1. Per-patient treatment response (declared before any run)
+MU pairs with at least two prior scans: fit one kill multiplier k (scales the assumed alpha*C + beta*R) per patient on the previous pair only (grid k in {0, 0.25, 0.5, 1, 2, 4}, best Dice on the previous pair), then forecast the next pair. Compare with the fixed-parameter PDE and persistence on the same pairs. Primary: Dice vs persistence on the shrink subgroup (A-plan subgroup rule). Exploratory, labelled; development data only.
