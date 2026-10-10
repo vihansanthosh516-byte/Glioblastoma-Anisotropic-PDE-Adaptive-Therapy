@@ -407,3 +407,8 @@ Same rule as section 13: declared before running, development data first, negati
 
 ### Y1. Per-patient treatment response (declared before any run)
 MU pairs with at least two prior scans: fit one kill multiplier k (scales the assumed alpha*C + beta*R) per patient on the previous pair only (grid k in {0, 0.25, 0.5, 1, 2, 4}, best Dice on the previous pair), then forecast the next pair. Compare with the fixed-parameter PDE and persistence on the same pairs. Primary: Dice vs persistence on the shrink subgroup (A-plan subgroup rule). Exploratory, labelled; development data only.
+
+### Y4-Y6 (added 2026-10-10 after user review; declared before any run)
+- Y4. Track A inflammation score = 1.0 for all 61 patients (`adaptive_cohort_summary.json`): check for saturation / clipping / normalisation bug. If a bug is found, fix it and rerun once; report old and new.
+- Y5. Age in CGGA: Cox model adjusted for grade, IDH status and treatment (radiotherapy, TMZ) where recorded, GBM only; one model, declared here. Report even if still weak.
+- Y6. RL vs rule: one stronger RL configuration fixed in advance (PPO, 10x training steps, domain-randomised simulated patients over the full prior ranges), run once with the same evaluation as script 68. Simulation only.
