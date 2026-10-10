@@ -6,6 +6,8 @@ saw it, so the dev coverage is out-of-fold, not in-sample. Test patients are nev
 Inputs at 2 mm (block mean of 1 mm maps): core (labels 1, 3), edema (label 2), wm, gm, csf, brain, distance from the core
 (mm / 50). Hybrid arm adds a growth-model channel: isotropic tissue model M1 density at lambda 2 mm (the script 112
 selected cell), grown to the standard-plan volume. Target: all recurrence (labels 1, 2, 3) inside the brain.
+MRI arms (unet_mri, hybrid_mri; user option 1, 2026-10-10) add the pre-op T1c and FLAIR at 2 mm from the private
+pack of script 116 (GBM_PG_MRI); same training settings, so the MRI effect is isolated.
 Loss: BCE + soft Dice. Output: logits, upsampled to 1 mm, plan = predictgbm_io.model_plan (scores mapped to 0-1 by
 a sigmoid so the benchmark clip keeps the ranking). Coverage of enhancing and all recurrence per patient.
 Output: output/predictgbm/unet_dev.json, unet_dev_pairs.csv
@@ -59,7 +61,17 @@ def m1_density(c, core2, std):
     return full
 
 
-def build(pid, hybrid):
+_MRI = None
+
+
+def mri2(pid):
+    global _MRI
+    if _MRI is None:
+        _MRI = np.load(os.environ["GBM_PG_MRI"])
+    return [_MRI[f"{pid}|{m}"].astype(np.float32) for m in ("t1c_bet_normalized.nii.gz", "flair_bet_normalized.nii.gz")]
+
+
+def build(pid, hybrid, mri=False):
     c = pg.load_case(pid, with_recurrence=True)
     core1 = pg.core(c["seg"])
     std = pg.standard_plan(c["seg"], c["brain"])
@@ -70,6 +82,8 @@ def build(pid, hybrid):
          s112.to2(c["brain"]), np.minimum(dist2, 3.0)]
     if hybrid:
         x.append(m1_density(c, core2, std) if core2.any() else np.zeros(SHAPE, np.float32))
+    if mri:
+        x += mri2(pid)
     y = s112.to2(pg.rec_all(c["rec"]) & c["brain"]) >= 0.5
     return {"x": np.stack(x).astype(np.float32), "y": y.astype(np.float32),
             "brain2": (s112.to2(c["brain"]) >= 0.5).astype(np.float32)}
@@ -151,12 +165,12 @@ def train_fold(data, tr, epochs, dev):
 def run(arm, epochs):
     import torch
     dev = "cuda" if torch.cuda.is_available() else "cpu"
-    hybrid = arm == "hybrid"
+    hybrid, mri = arm.startswith("hybrid"), arm.endswith("_mri")
     ids = pg.dev_ids()
     t0 = time.time()
     data = {}
     for pid in ids:
-        data[pid] = build(pid, hybrid)
+        data[pid] = build(pid, hybrid, mri)
     print(f"built {len(data)} in {time.time() - t0:.0f}s on {dev}", flush=True)
     order = np.random.default_rng(SEED).permutation(ids)
     folds = [list(order[k::K]) for k in range(K)]
@@ -186,25 +200,34 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--arms", default="unet,hybrid")
     ap.add_argument("--epochs", type=int, default=60)
+    ap.add_argument("--merge-prev", action="store_true")
     a = ap.parse_args()
     OUT.mkdir(parents=True, exist_ok=True)
     df = None
     for arm in a.arms.split(","):
         d = pd.DataFrame(run(arm, a.epochs))
         df = d if df is None else df.merge(d[["pid", f"{arm}_enh", f"{arm}_all"]], on="pid")
-    df.to_csv(OUT / "unet_dev_pairs.csv", index=False)
+    if a.merge_prev and (OUT / "unet_dev_pairs.csv").exists():   # add earlier arms (same folds, same seed)
+        prev = pd.read_csv(OUT / "unet_dev_pairs.csv")
+        keep = [c for c in prev.columns if c.endswith(("_enh", "_all")) and not c.startswith("standard") and c not in df]
+        df = df.merge(prev[["pid"] + keep], on="pid")
+    tag = "_mri" if "mri" in a.arms else ""
+    df.to_csv(OUT / f"unet_dev{tag}_pairs.csv", index=False)
     use = df[df["n_rec_enh"] > 0]
     res = {"script": "115_predictgbm_unet_dev", "split": "development (TUM), 5-fold out-of-fold", "seed": SEED,
            "epochs": a.epochs, "n_patients": int(len(use)), "standard_enh_mean": float(use["standard_enh"].mean()),
            "arms": {}}
-    for arm in a.arms.split(","):
+    for arm in [c[:-4] for c in df.columns if c.endswith("_enh") and c not in ("standard_enh",)]:
         res["arms"][arm] = {"enh_mean": float(use[f"{arm}_enh"].mean()), "all_mean": float(use[f"{arm}_all"].mean()),
                             "delta_vs_standard_enh": ps.summarize_delta((use[f"{arm}_enh"] - use["standard_enh"]).to_numpy())}
+    for a2, b2 in (("unet_mri", "unet"), ("hybrid_mri", "unet_mri")):
+        if f"{a2}_enh" in df.columns and f"{b2}_enh" in df.columns:
+            res[f"{a2}_minus_{b2}_enh"] = ps.summarize_delta((use[f"{a2}_enh"] - use[f"{b2}_enh"]).to_numpy())
     if "hybrid" in res["arms"] and "unet" in res["arms"]:
         res["hybrid_minus_unet_enh"] = ps.summarize_delta((use["hybrid_enh"] - use["unet_enh"]).to_numpy())
     res["weakest_points"] = ["Development patients; architecture and epochs set before the run, not tuned, but only TUM.",
                              "2 mm inputs; no MRI intensities (segmentation and tissue maps only)."]
-    (OUT / "unet_dev.json").write_text(json.dumps(res, indent=1, default=float))
+    (OUT / f"unet_dev{tag}.json").write_text(json.dumps(res, indent=1, default=float))
     print(json.dumps(res, indent=1, default=float)[:1500])
 
 
