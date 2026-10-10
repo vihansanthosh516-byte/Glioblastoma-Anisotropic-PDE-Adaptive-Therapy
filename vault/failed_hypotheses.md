@@ -15,7 +15,7 @@ Created 2026-10-04. Never delete a row. Add rows when a result comes in. Numbers
 | Resistance-driven adaptive gain on real patients | 0 of 6 cells (script 83) | Rejected | `plastic_resistance/results.json` |
 | Dual-agent "rescue" is adaptivity | MTD + same drug 358.9 d vs dual-adaptive 305.6 d | Rejected | `dual_mtd_baseline.json` |
 | Fractal D_f tracks anisotropy | wrong direction | Rejected | `fractal_aniso_vs_iso.json` |
-| Track A inflammation score informs Track B | score = 1.0 for all 61 | Rejected (null link) | `adaptive_cohort_summary.json` |
+| Track A inflammation score informs Track B | score = 1.0 for all 61 was a code default (0 ID overlap; zone files synthetic) | Not tested (ledger 2ap) | `adaptive_cohort_summary.json`; src/44_adaptive_therapy.py:749-764 |
 | rho > 0.02 /day threshold | 10/10 vs 0/51, p 5e-5 | Exploratory (post hoc, n=10) | `rho_threshold_check.json` |
 | Anisotropy elongates simulated tumour | +0.178, p 4e-19 | Supported (simulation only) | `fractal_aniso_vs_iso.json` |
 | Adaptive keeps resistant fraction lower | 54/61; robust at ratios 500–2000 | Supported (simulation, assumed kill scale) | `emax_sweep_summary.json` |
