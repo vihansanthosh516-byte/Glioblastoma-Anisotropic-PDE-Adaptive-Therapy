@@ -363,3 +363,29 @@ Order = dependency order. Every item: verify on disk, ledger entry, commit. Test
 - F1. One-sentence story; one headline number (H-2 test coverage vs 15 mm).
 - F2. Board, 30-second plain explanation, judge Q&A sheet with the weak points.
 - F3. Paper draft update; overview_for_review.md with negatives.
+
+## 13. Negative / null results and literature-based fixes (2026-10-10)
+
+Rule: a fix is legitimate only if (1) it comes from published literature, (2) it is declared here and in analysis_plan_v1.md BEFORE it is run, (3) it is chosen on development (TUM) only, (4) the test set is run once, after the freeze. Negative results stay in the paper unchanged; fixes are reported next to them, never instead of them.
+
+| # | Negative / null result | Ledger | Literature fix | Can it be fixed? |
+|---|---|---|---|---|
+| N1 | White-matter direction does not help (4 tests) | 2ak, 2al, 2an | Patient DTI instead of an atlas; free-water-corrected FA (Metz 2020, PMC7140058) | Not on PREDICT-GBM (no DTI). Keep as a finding: "atlas direction does not help". |
+| N2 | PDE shape = distance shape | 2af | Barrier-aware margins (ESTRO-EANO 2023: 0 mm at skull/falx/tentorium, 5 mm at ventricles); geodesic distance CTV (PMC4045722) | Yes: X1 below |
+| N3 | PDE vs persistence not significant (MU) | 2ak | Forecast skill only exists above the noise floor | Partly: X4 (pre-declared SNR > 1 subgroup, exploratory) |
+| N4 | M1 / M2 / M3 not better than 15 mm at equal volume | 2al, 2an | Model value is often smaller volume at equal coverage, not more coverage (Tran 2025 npj Digit Med, PMC12331921; FLAIR-based CTV ESTRO 2023; recurrence distance RD80 about 10 mm, Tang 2026) | Yes: X2 below |
+| N5 | Our U-Net / hybrid worse than 15 mm | 2ao | MRI inputs (running); deep-learning infiltration maps from mpMRI (PMC11089715) | Testing now (MRI arms) |
+| N6 | 39-52% of MU pairs below the noise floor | 2ag | Longer intervals; probabilistic targets | Partly: X4 |
+| N7 | Script 106 inconclusive; no scan-rescan data | 2aj, L5 | Registered-space comparison | Low priority |
+
+### X1. Barrier-aware 15 mm plan (ESTRO-EANO rules), declared before any run
+Geodesic (shortest path inside the brain) distance from the core, at 1 mm, with paths blocked by CSF probability > 0.5 (ventricles, falx/tentorium spaces and sulci in the tissue maps), margin 15 mm; equal-volume variant: top-k by geodesic distance at the standard-plan volume. Compared with the Euclidean standard plan at equal volume. Primary: enhancing coverage, dev TUM. If it wins on dev, it is frozen and run once on the test set.
+
+### X2. Coverage-volume curves (backlog B5), declared before any run
+For the standard plan and every model (published released maps where available; our M1), plan volume as a fraction of the standard-plan volume in {0.5, 0.6, 0.7, 0.8, 0.9, 1.0}. Endpoint: smallest volume fraction at which mean enhancing coverage is >= the standard plan's coverage at fraction 1.0 (the "volume spared at equal coverage"). Uncertainty by patient bootstrap. Dev first; test after freeze.
+
+### X3. Simple ensembles, declared before any run
+Mean of rank-normalised maps: (a) M1 + distance; (b) published GliODIL + U-Net (released maps) as a reference. Equal volume. Dev only until the freeze.
+
+### X4. Above-noise subgroup on MU (exploratory, labelled)
+Re-report 2ak contrasts only on pairs with SNR > 1 under the registered floor (2ab). Exploratory; no claim of confirmation.
