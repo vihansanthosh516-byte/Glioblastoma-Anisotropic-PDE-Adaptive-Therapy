@@ -7,8 +7,8 @@ Created 2026-10-04. Never delete a row. Add rows when a result comes in. Numbers
 | DTI improves forecast | −0.001 Dice, p 0.97 | Rejected (development only) | `forecast_labels_core/results.json`; external not run |
 | Growth-only PDE beats no-change on shrinking cores | −0.039 Dice, n=50 | Rejected | same file |
 | Growth-only model beats no-change on LUMIERE volumes | Worse (n=40 p 0.0003; n=50 p 0.004) | Rejected | `lumiere_volume_forecast.json` |
-| Age is a robust external predictor | HR 1.009, Holm p 0.082 (CGGA pooled) vs 1.031 TCGA | Weakened | `cgga_validation.json` |
-| MGMT predicts TTP | HR 1.11, p 0.60 | Not shown; underpowered (needs ~2,807 events) | `limit_checks.json` |
+| Age is a robust external predictor | HR 1.009, Holm p 0.082 (CGGA pooled) vs 1.031 TCGA; adjusted for IDH + treatment 1.011 (1.002-1.021, p 0.018; ledger 2ar) | Weakened: real but about 1/3 of the TCGA size | `cgga_validation.json` |
+| MGMT predicts TTP | HR 1.11, p 0.60; CGGA OS within TMZ 0.80 (0.60-1.05), MGMT x TMZ 0.60 (0.33-1.10) (ledger 2ar) | Not shown; direction matches literature; underpowered | `limit_checks.json` |
 | C-GAT beats scVI at zone classification | Random split only; patient-ID lookup 82.8% | Unreliable | script 86; script 88 pending |
 | RL > simple rule | RL 0.2% of oracle vs rule | Rejected | script 68 |
 | Pacing gain on real parameters | +2.1 d | Mostly explained (shared assumed kill rates) | script 87 |
