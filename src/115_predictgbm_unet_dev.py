@@ -45,23 +45,52 @@ SHAPE = (120, 120, 77)
 
 def m1_density(c, core2, std):
     """Script 112 M1 at lambda 2 mm (its selected cell), full 2 mm grid."""
+    return m1_density2(s112.to2(c["wm"]), s112.to2(c["gm"]), s112.to2(c["brain"]) >= 0.5, core2, std.sum() / 8.0)
+
+
+def m1_density2(wm, gm, brain2, core2, target2):
     from solver_monotone import TensorFKMonotone
-    wm, gm, brain2 = s112.to2(c["wm"]), s112.to2(c["gm"]), s112.to2(c["brain"]) >= 0.5
     lo = np.maximum(np.argwhere(core2).min(0) - s112.BOX_MM // 2, 0)
     hi = np.minimum(np.argwhere(core2).max(0) + s112.BOX_MM // 2 + 1, core2.shape)
     box = tuple(slice(int(a), int(b)) for a, b in zip(lo, hi))
-    scale = (wm + gm / 10.0)[box]
+    scale = (wm + gm / 10.0)[box].astype(np.float32)
     scale[core2[box]] = np.maximum(scale[core2[box]], 1.0)
     dom = (brain2[box] & (scale > 0.05)) | core2[box]
     D = 2.0 * 2.0 * s112.RHO
     fk = TensorFKMonotone(s112.tensor(None, scale * D, box), dom, h=2.0)
     u, t = core2[box].astype(np.float32), 0.0
-    while t < s112.T_MAX and (u >= s112.U_FRONT).sum() < std.sum() / 8.0:
+    while t < s112.T_MAX and (u >= s112.U_FRONT).sum() < target2:
         u = fk.run(u, [s112.RHO], 2.0)[0][0]
         t += 2.0
     full = np.zeros(core2.shape, np.float32)
     full[box] = u
     return full
+
+
+def build_mu(key, hybrid, mri):
+    """Z2: one MU pair from the script 121 pack (GBM_MU_PACK), same channel order as build()."""
+    z = _mu()
+    g = lambda n: z[f"{key}|{n}"].astype(np.float32)
+    wm, gm, csf = (z[f"atlas|{t}"].astype(np.float32) for t in ("wm", "gm", "csf"))
+    core2, brain2 = g("core") >= 0.5, g("brain")
+    dist2 = np.minimum(distance_transform_edt(~core2) * 2.0 / 50.0, 3.0)
+    x = [core2, g("edema"), wm, gm, csf, brain2, dist2]
+    if hybrid:
+        x.append(m1_density2(wm, gm, brain2 >= 0.5, core2, float(z[f"{key}|k2"])))
+    if mri:
+        x += [g("t1c"), g("flair")]
+    return {"x": np.stack(x).astype(np.float16), "y": (g("y") >= 0.5).astype(np.float32),
+            "ye": (g("ye") >= 0.5).astype(np.float32), "k2": int(z[f"{key}|k2"]), "brain2": (brain2 >= 0.5).astype(np.float32)}
+
+
+_MU = None
+
+
+def _mu():
+    global _MU
+    if _MU is None:
+        _MU = np.load(os.environ["GBM_MU_PACK"])
+    return _MU
 
 
 _MRI = None
@@ -89,7 +118,7 @@ def build(pid, hybrid, mri=False):
         x += mri2(pid)
     y = s112.to2(pg.rec_all(c["rec"]) & c["brain"]) >= 0.5
     ye = s112.to2(pg.rec_enhancing(c["rec"]) & c["brain"]) >= 0.5
-    return {"x": np.stack(x).astype(np.float32), "y": y.astype(np.float32), "ye": ye.astype(np.float32),
+    return {"x": np.stack(x).astype(np.float16), "y": y.astype(np.float32), "ye": ye.astype(np.float32),
             "k2": int(round(std.sum() / 8.0)), "brain2": (s112.to2(c["brain"]) >= 0.5).astype(np.float32)}
 
 
@@ -182,18 +211,25 @@ def train_fold(data, tr, epochs, dev, rank=False):
 def run(arm, epochs):
     import torch
     dev = "cuda" if torch.cuda.is_available() else "cpu"
-    hybrid, mri, rank = arm.startswith("hybrid"), "_mri" in arm, "_rank" in arm
+    hybrid, mri, rank, extra = arm.startswith("hybrid"), "_mri" in arm, "_rank" in arm, arm.endswith("_mu")
     ids = pg.dev_ids()
     t0 = time.time()
     data = {}
     for pid in ids:
         data[pid] = build(pid, hybrid, mri)
-    print(f"built {len(data)} in {time.time() - t0:.0f}s on {dev}", flush=True)
+    mu_keys = []
+    if extra:   # Z2: MU pairs join every training fold; never scored
+        mu_keys = [f"mu:{k}" for k in _mu()["keys"]]
+        for k in mu_keys:
+            data[k] = build_mu(k[3:], hybrid, mri)
+        n_tr = len(ids) * (K - 1) // K
+        epochs = max(1, round(epochs * n_tr / (n_tr + len(mu_keys))))   # same number of gradient steps (Z2 rule)
+    print(f"built {len(data)} in {time.time() - t0:.0f}s on {dev}; epochs {epochs}", flush=True)
     order = np.random.default_rng(SEED).permutation(ids)
     folds = [list(order[k::K]) for k in range(K)]
     rows = []
     for k in range(K):
-        tr = [p for j in range(K) if j != k for p in folds[j]]
+        tr = [p for j in range(K) if j != k for p in folds[j]] + mu_keys
         net = train_fold(data, tr, epochs, dev, rank)
         net.eval()
         for pid in folds[k]:
@@ -231,7 +267,7 @@ def main():
         prev = pd.read_csv(OUT / "unet_dev_pairs.csv")
         keep = [c for c in prev.columns if c.endswith(("_enh", "_all")) and not c.startswith("standard") and c not in df]
         df = df.merge(prev[["pid"] + keep], on="pid")
-    tag = "_rank" if "rank" in a.arms else ("_mri" if "mri" in a.arms else "")
+    tag = "_mu" if "_mu" in a.arms else "_rank" if "rank" in a.arms else ("_mri" if "mri" in a.arms else "")
     df.to_csv(OUT / f"unet_dev{tag}_pairs.csv", index=False)
     use = df[df["n_rec_enh"] > 0]
     res = {"script": "115_predictgbm_unet_dev", "split": "development (TUM), 5-fold out-of-fold", "seed": SEED,
