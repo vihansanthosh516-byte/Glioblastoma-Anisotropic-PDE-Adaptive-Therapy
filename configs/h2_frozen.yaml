@@ -1,0 +1,27 @@
+# H-2 FREEZE (analysis_plan_v1.md Amendment 8). Written 2026-10-11 before any test recurrence was read.
+frozen_at: "2026-10-11"
+code_commit_before_freeze: "954c18d09567e8e0bcc817a78aa29128b2f4c74d"
+final_model:
+  script: src/122_predictgbm_final_train_predict.py
+  arm: hybrid_rank_mu
+  inputs: [core, edema, wm, gm, csf, brain, distance, m1_density]
+  training: {tum_dev_patients: 142, mu_pairs: 334, epochs: 15, seed: 20261009, loss: "BCE + Dice + soft top-k ranking"}
+  kaggle_kernel: vihansanthosh/gbm-predictgbm-final-h2
+  test_logits_file: output/predictgbm/final/test_logits_2mm.npz
+  test_logits_sha256: "c502233b8c00087441b2f12dcdb814f8699f071995c81c4b6416773bdd522fc3"
+  model_state_sha256: "77d1a2ea8eacf5005472339a6d7fb297526a80e82046e3efc0bb4ef163b0a5d2"
+  test_patients_predicted: 101
+selection_rule: "GRAND_PLAN 15: highest out-of-fold dev enhancing coverage at equal volume (ledgers 2au, 2aw)"
+test_set: {datasets: [LUMIERE, RHUH], lists: data/external/PredictGBM_code/predict_gbm/data/datasets/{lumiere,rhuh}.json}
+primary:
+  endpoint: "mean paired difference in enhancing-recurrence coverage, final minus 15 mm standard plan"
+  population: "test patients with enhancing recurrence"
+  inference: "patient bootstrap 95% CI (patient_stats); two-sided Wilcoxon p"
+  success: "lower CI bound > 0"
+secondary:
+  - all-recurrence coverage
+  - per dataset (LUMIERE, RHUH)
+  - "90% volume vs standard at 100%, non-inferiority margin -0.01"
+  - "context only: released published plans on the same patients"
+scoring_script: src/123_predictgbm_test_score.py
+rules: "one run; reported whatever the result; no model change after this file"
