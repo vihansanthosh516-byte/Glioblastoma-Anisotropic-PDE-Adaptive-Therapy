@@ -8,6 +8,9 @@ Inputs at 2 mm (block mean of 1 mm maps): core (labels 1, 3), edema (label 2), w
 selected cell), grown to the standard-plan volume. Target: all recurrence (labels 1, 2, 3) inside the brain.
 MRI arms (unet_mri, hybrid_mri; user option 1, 2026-10-10) add the pre-op T1c and FLAIR at 2 mm from the private
 pack of script 116 (GBM_PG_MRI); same training settings, so the MRI effect is isolated.
+Ranking arms (*_rank; GRAND_PLAN 15 Z3) add a soft top-k loss: 1 - soft coverage of the ENHANCING recurrence by
+the k highest-scoring brain voxels, k = standard-plan volume at 2 mm (threshold = k-th largest logit, detached;
+temperature 1), on top of BCE + Dice. This trains for the endpoint (coverage at fixed volume).
 Loss: BCE + soft Dice. Output: logits, upsampled to 1 mm, plan = predictgbm_io.model_plan (scores mapped to 0-1 by
 a sigmoid so the benchmark clip keeps the ranking). Coverage of enhancing and all recurrence per patient.
 Output: output/predictgbm/unet_dev.json, unet_dev_pairs.csv
@@ -85,8 +88,9 @@ def build(pid, hybrid, mri=False):
     if mri:
         x += mri2(pid)
     y = s112.to2(pg.rec_all(c["rec"]) & c["brain"]) >= 0.5
-    return {"x": np.stack(x).astype(np.float32), "y": y.astype(np.float32),
-            "brain2": (s112.to2(c["brain"]) >= 0.5).astype(np.float32)}
+    ye = s112.to2(pg.rec_enhancing(c["rec"]) & c["brain"]) >= 0.5
+    return {"x": np.stack(x).astype(np.float32), "y": y.astype(np.float32), "ye": ye.astype(np.float32),
+            "k2": int(round(std.sum() / 8.0)), "brain2": (s112.to2(c["brain"]) >= 0.5).astype(np.float32)}
 
 
 def make_net(cin):
@@ -132,7 +136,18 @@ def pad(a):
     return out
 
 
-def train_fold(data, tr, epochs, dev):
+def topk_loss(logit, ye, b, k):
+    """1 - soft coverage of ye by the top-k brain voxels (sigmoid around the detached k-th largest logit)."""
+    import torch
+    v = logit[b > 0]
+    if ye.sum() == 0 or k <= 0 or k >= v.numel():
+        return logit.sum() * 0.0
+    t = torch.topk(v.detach(), k).values[-1]
+    soft = torch.sigmoid(logit - t) * b
+    return 1.0 - (soft * ye).sum() / ye.sum()
+
+
+def train_fold(data, tr, epochs, dev, rank=False):
     import torch
     torch.manual_seed(SEED)
     net = make_net(data[tr[0]]["x"].shape[0]).to(dev)
@@ -144,14 +159,16 @@ def train_fold(data, tr, epochs, dev):
         tot = 0.0
         for i in rng.permutation(tr):
             d = data[i]
-            x, y, b = (torch.from_numpy(pad(v))[None].to(dev) for v in (d["x"], d["y"], d["brain2"]))
+            x, y, b, ye = (torch.from_numpy(pad(v))[None].to(dev) for v in (d["x"], d["y"], d["brain2"], d["ye"]))
             if rng.random() < 0.5:   # left-right flip augmentation
-                x, y, b = x.flip(2), y.flip(1), b.flip(1)
+                x, y, b, ye = x.flip(2), y.flip(1), b.flip(1), ye.flip(1)
             logit = net(x)[:, 0]
             p = torch.sigmoid(logit) * b
             bce = torch.nn.functional.binary_cross_entropy_with_logits(logit, y, weight=b)
             dice = 1 - (2 * (p * y).sum() + 1) / (p.sum() + y.sum() + 1)
             loss = bce + dice
+            if rank:
+                loss = loss + topk_loss(logit, ye, b, d["k2"])
             opt.zero_grad()
             loss.backward()
             opt.step()
@@ -165,7 +182,7 @@ def train_fold(data, tr, epochs, dev):
 def run(arm, epochs):
     import torch
     dev = "cuda" if torch.cuda.is_available() else "cpu"
-    hybrid, mri = arm.startswith("hybrid"), arm.endswith("_mri")
+    hybrid, mri, rank = arm.startswith("hybrid"), "_mri" in arm, "_rank" in arm
     ids = pg.dev_ids()
     t0 = time.time()
     data = {}
@@ -177,7 +194,7 @@ def run(arm, epochs):
     rows = []
     for k in range(K):
         tr = [p for j in range(K) if j != k for p in folds[j]]
-        net = train_fold(data, tr, epochs, dev)
+        net = train_fold(data, tr, epochs, dev, rank)
         net.eval()
         for pid in folds[k]:
             with torch.no_grad():
@@ -214,7 +231,7 @@ def main():
         prev = pd.read_csv(OUT / "unet_dev_pairs.csv")
         keep = [c for c in prev.columns if c.endswith(("_enh", "_all")) and not c.startswith("standard") and c not in df]
         df = df.merge(prev[["pid"] + keep], on="pid")
-    tag = "_mri" if "mri" in a.arms else ""
+    tag = "_rank" if "rank" in a.arms else ("_mri" if "mri" in a.arms else "")
     df.to_csv(OUT / f"unet_dev{tag}_pairs.csv", index=False)
     use = df[df["n_rec_enh"] > 0]
     res = {"script": "115_predictgbm_unet_dev", "split": "development (TUM), 5-fold out-of-fold", "seed": SEED,
