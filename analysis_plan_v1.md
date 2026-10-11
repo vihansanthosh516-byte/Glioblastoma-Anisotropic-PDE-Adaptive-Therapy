@@ -314,3 +314,16 @@ All fitting choices are made on development patients (TUM) only. Test recurrence
 
 ### A7.2a Visibility thresholds checked (2026-10-09, before any M3 run)
 The 0.8 / 0.16 values in A7.2 had no confirmed source. As A7.2 requires, they are replaced by published values before any run: T1Gd (core) threshold 0.6 and FLAIR (core + edema) threshold 0.35, the nominal values in Balcerak / Zhang et al., arXiv 2311.16536 (section 2.2), "motivated by" Lipkova et al. 2019 (multimodal Bayesian calibration). Fixed, not fitted (that paper fits them in [0.5, 0.8] and [0.2, 0.5]; fitting is a later sensitivity analysis only). Growth stops when the volume u >= 0.6 equals the pre-op core volume. Everything else in A7.2 is unchanged. No M3 output existed when this was written.
+
+## Amendment 8 (2026-10-11): H-2 final model and locked test evaluation, declared before any test recurrence is read
+
+### A8.1 Final model
+Chosen by the GRAND_PLAN 15 rule (highest out-of-fold development enhancing coverage at equal volume, ensembles counted): on the 137 common TUM patients, hybrid_rank_mu 0.8529 > ensemble GliODIL + U-Net 0.8500 > hybrid_mri_rank_mu 0.8519 > GliODIL 0.8441 > standard 0.8208 (ledgers 2au, 2aw). Final model = script 115 arm hybrid_rank_mu, retrained once on all 142 TUM + 334 MU pairs, 15 epochs, seed 20261009 (script 122). Test inputs are pre-op only; the test recurrences are not in the Kaggle pack.
+
+### A8.2 Freeze
+After script 122 produces `output/predictgbm/final/test_logits_2mm.npz` and BEFORE any test recurrence is read: write `configs/h2_frozen.yaml` (final model, code commit, logits SHA-256, endpoints below) and create the git tag `h2-frozen`. Script 123 refuses to run if the logits hash differs.
+
+### A8.3 Endpoints (one run)
+Primary: mean paired difference in enhancing-recurrence coverage, final model minus the 15 mm standard plan, test patients (LUMIERE + RHUH) with enhancing recurrence; patient bootstrap 95% CI; two-sided Wilcoxon p. Success = lower CI bound > 0.
+Secondary: all-recurrence coverage; each dataset; 90% volume vs standard at 100% with non-inferiority margin -0.01; context only: released published plans on the same patients.
+Reported whatever the result. No re-run, no model change after the freeze.
