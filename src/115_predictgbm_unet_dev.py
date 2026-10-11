@@ -76,7 +76,8 @@ def build_mu(key, hybrid, mri):
     dist2 = np.minimum(distance_transform_edt(~core2) * 2.0 / 50.0, 3.0)
     x = [core2, g("edema"), wm, gm, csf, brain2, dist2]
     if hybrid:
-        x.append(m1_density2(wm, gm, brain2 >= 0.5, core2, float(z[f"{key}|k2"])))
+        x.append(m1_density2(wm, gm, brain2 >= 0.5, core2, float(z[f"{key}|k2"])) if core2.any()
+                 else np.zeros(SHAPE, np.float32))   # core empty at 2 mm: same rule as build()
     if mri:
         x += [g("t1c"), g("flair")]
     return {"x": np.stack(x).astype(np.float16), "y": (g("y") >= 0.5).astype(np.float32),
