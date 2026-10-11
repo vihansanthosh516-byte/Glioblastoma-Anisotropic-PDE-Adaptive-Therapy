@@ -20,6 +20,7 @@ from __future__ import annotations
 import argparse
 import importlib.util
 import json
+import re
 import os
 import sys
 import time
@@ -177,13 +178,14 @@ def topk_loss(logit, ye, b, k):
     return 1.0 - (soft * ye).sum() / ye.sum()
 
 
-def train_fold(data, tr, epochs, dev, rank=False):
+def train_fold(data, tr, epochs, dev, rank=False, enhw=False, seed=SEED):
+    """enhw (H-3 C3): BCE + Dice target is the enhancing recurrence instead of all recurrence."""
     import torch
-    torch.manual_seed(SEED)
+    torch.manual_seed(seed)
     net = make_net(data[tr[0]]["x"].shape[0]).to(dev)
     opt = torch.optim.AdamW(net.parameters(), 1e-3, weight_decay=1e-4)
     sched = torch.optim.lr_scheduler.CosineAnnealingLR(opt, epochs)
-    rng = np.random.default_rng(SEED)
+    rng = np.random.default_rng(seed)
     for ep in range(epochs):
         net.train()
         tot = 0.0
@@ -193,6 +195,8 @@ def train_fold(data, tr, epochs, dev, rank=False):
             if rng.random() < 0.5:   # left-right flip augmentation
                 x, y, b, ye = x.flip(2), y.flip(1), b.flip(1), ye.flip(1)
             logit = net(x)[:, 0]
+            if enhw:
+                y = ye
             p = torch.sigmoid(logit) * b
             bce = torch.nn.functional.binary_cross_entropy_with_logits(logit, y, weight=b)
             dice = 1 - (2 * (p * y).sum() + 1) / (p.sum() + y.sum() + 1)
@@ -212,7 +216,10 @@ def train_fold(data, tr, epochs, dev, rank=False):
 def run(arm, epochs):
     import torch
     dev = "cuda" if torch.cuda.is_available() else "cpu"
-    hybrid, mri, rank, extra = arm.startswith("hybrid"), "_mri" in arm, "_rank" in arm, arm.endswith("_mu")
+    hybrid, mri, rank = arm.startswith("hybrid"), "_mri" in arm, "_rank" in arm
+    enhw = "_enhw" in arm
+    tseed = SEED + int(arm.rsplit("_s", 1)[1]) if re.search(r"_s\d+$", arm) else SEED   # H-3 C4: training seed only
+    extra = re.sub(r"_s\d+$", "", arm).endswith("_mu")
     ids = pg.dev_ids()
     t0 = time.time()
     data = {}
@@ -228,23 +235,25 @@ def run(arm, epochs):
     print(f"built {len(data)} in {time.time() - t0:.0f}s on {dev}; epochs {epochs}", flush=True)
     order = np.random.default_rng(SEED).permutation(ids)
     folds = [list(order[k::K]) for k in range(K)]
-    rows = []
+    rows, oof = [], {}
     for k in range(K):
         tr = [p for j in range(K) if j != k for p in folds[j]] + mu_keys
-        net = train_fold(data, tr, epochs, dev, rank)
+        net = train_fold(data, tr, epochs, dev, rank, enhw, tseed)
         net.eval()
         for pid in folds[k]:
             with torch.no_grad():
                 logit = net(torch.from_numpy(pad(data[pid]["x"]))[None].to(dev))[0, 0, :, :, :77].cpu().numpy()
+            oof[pid] = logit.astype(np.float16)
             c = pg.load_case(pid, with_recurrence=True)
             std = pg.standard_plan(c["seg"], c["brain"])
             score = 1.0 / (1.0 + np.exp(-s112.up1(logit)))
             plan = pg.model_plan(score, c["seg"], c["brain"], k=int(std.sum()))
-            re, ra = pg.rec_enhancing(c["rec"]), pg.rec_all(c["rec"])
-            rows.append({"pid": pid, "fold": k, "n_rec_enh": int(re.sum()), "standard_enh": pg.coverage(re, std),
-                         "standard_all": pg.coverage(ra, std), f"{arm}_enh": pg.coverage(re, plan),
+            r_e, ra = pg.rec_enhancing(c["rec"]), pg.rec_all(c["rec"])
+            rows.append({"pid": pid, "fold": k, "n_rec_enh": int(r_e.sum()), "standard_enh": pg.coverage(r_e, std),
+                         "standard_all": pg.coverage(ra, std), f"{arm}_enh": pg.coverage(r_e, plan),
                          f"{arm}_all": pg.coverage(ra, plan)})
         print(f"fold {k} done [{(time.time() - t0) / 60:.1f} min]", flush=True)
+    np.savez_compressed(OUT / f"oof_logits_{arm}.npz", **oof)   # for H-3 C4/C5 ensembles
     return rows
 
 
@@ -256,6 +265,7 @@ def main():
     ap.add_argument("--epochs", type=int, default=60)
     ap.add_argument("--merge-prev", action="store_true")
     ap.add_argument("--from-csv", default=None)
+    ap.add_argument("--tag", default=None)
     a = ap.parse_args()
     OUT.mkdir(parents=True, exist_ok=True)
     df = None
@@ -268,7 +278,7 @@ def main():
         prev = pd.read_csv(OUT / "unet_dev_pairs.csv")
         keep = [c for c in prev.columns if c.endswith(("_enh", "_all")) and not c.startswith("standard") and c not in df]
         df = df.merge(prev[["pid"] + keep], on="pid")
-    tag = "_mu" if "_mu" in a.arms else "_rank" if "rank" in a.arms else ("_mri" if "mri" in a.arms else "")
+    tag = a.tag if a.tag else "_mu" if "_mu" in a.arms else "_rank" if "rank" in a.arms else ("_mri" if "mri" in a.arms else "")
     df.to_csv(OUT / f"unet_dev{tag}_pairs.csv", index=False)
     use = df[df["n_rec_enh"] > 0]
     res = {"script": "115_predictgbm_unet_dev", "split": "development (TUM), 5-fold out-of-fold", "seed": SEED,
