@@ -327,3 +327,17 @@ After script 122 produces `output/predictgbm/final/test_logits_2mm.npz` and BEFO
 Primary: mean paired difference in enhancing-recurrence coverage, final model minus the 15 mm standard plan, test patients (LUMIERE + RHUH) with enhancing recurrence; patient bootstrap 95% CI; two-sided Wilcoxon p. Success = lower CI bound > 0.
 Secondary: all-recurrence coverage; each dataset; 90% volume vs standard at 100% with non-inferiority margin -0.01; context only: released published plans on the same patients.
 Reported whatever the result. No re-run, no model change after the freeze.
+
+## Amendment 9 (2026-10-11): H-3 second locked test on UCSF follow-up, declared before any UCSF-ALPTDG file is opened
+
+### A9.1 Why
+H-2 primary was not met (ledger 2ax). H-2 stays reported unchanged. H-3 is a new, separate hypothesis on a new external set; it does not replace H-2.
+
+### A9.2 Test set
+UCSF-ALPTDG follow-up scans of patients with a UCSF-PDGM pre-op scan and segmentation; WHO grade 4 only; follow-up scan = first ALPTDG scan with tumour labels after resection. No ALPTDG label is read until `configs/h3_frozen.yaml` and tag `h3-frozen` exist. Only file listing and pre-op inputs may be read before the freeze. Exclusions (no grade 4, no labels, failed registration) are decided from metadata and pre-op data only, and are listed in the freeze file.
+
+### A9.3 Candidate methods (development = TUM, 5-fold out-of-fold, as script 115)
+C1 hybrid_rank_mu + MRI (T1c, FLAIR); C2 rank-average of C1 with the released PREDICT-GBM U-Net (dev only, context: U-Net has seen TUM); C3 enhancing-weighted ranking loss; C4 5-seed ensemble of the best of C1/C3; C5 C4 with per-patient uncertainty-weighted margin at equal volume. Selection rule: highest out-of-fold dev enhancing coverage at equal volume; ties within 0.002 -> simpler model. C2 is eligible only if the U-Net can be run on UCSF inputs.
+
+### A9.4 Endpoints (one run)
+Primary: mean paired difference in enhancing-recurrence coverage, final H-3 model minus the 15 mm standard plan; patient bootstrap 95% CI; two-sided Wilcoxon p; success = lower CI bound > 0. Secondary: all-recurrence coverage; 90% volume non-inferiority (margin -0.01). Reported whatever the result, together with H-2.
