@@ -201,13 +201,16 @@ def main():
     ap.add_argument("--arms", default="unet,hybrid")
     ap.add_argument("--epochs", type=int, default=60)
     ap.add_argument("--merge-prev", action="store_true")
+    ap.add_argument("--from-csv", default=None)
     a = ap.parse_args()
     OUT.mkdir(parents=True, exist_ok=True)
     df = None
-    for arm in a.arms.split(","):
+    if a.from_csv:   # summary only, from a saved pairs file (e.g. a Kaggle run whose summary step failed)
+        df = pd.read_csv(a.from_csv)
+    for arm in ([] if a.from_csv else a.arms.split(",")):
         d = pd.DataFrame(run(arm, a.epochs))
         df = d if df is None else df.merge(d[["pid", f"{arm}_enh", f"{arm}_all"]], on="pid")
-    if a.merge_prev and (OUT / "unet_dev_pairs.csv").exists():   # add earlier arms (same folds, same seed)
+    if a.merge_prev and not a.from_csv and (OUT / "unet_dev_pairs.csv").exists():   # add earlier arms (same folds, same seed)
         prev = pd.read_csv(OUT / "unet_dev_pairs.csv")
         keep = [c for c in prev.columns if c.endswith(("_enh", "_all")) and not c.startswith("standard") and c not in df]
         df = df.merge(prev[["pid"] + keep], on="pid")
@@ -217,7 +220,7 @@ def main():
     res = {"script": "115_predictgbm_unet_dev", "split": "development (TUM), 5-fold out-of-fold", "seed": SEED,
            "epochs": a.epochs, "n_patients": int(len(use)), "standard_enh_mean": float(use["standard_enh"].mean()),
            "arms": {}}
-    for arm in [c[:-4] for c in df.columns if c.endswith("_enh") and c not in ("standard_enh",)]:
+    for arm in [c[:-4] for c in df.columns if c.endswith("_enh") and c != "standard_enh" and not c.startswith("n_rec")]:
         res["arms"][arm] = {"enh_mean": float(use[f"{arm}_enh"].mean()), "all_mean": float(use[f"{arm}_all"].mean()),
                             "delta_vs_standard_enh": ps.summarize_delta((use[f"{arm}_enh"] - use["standard_enh"]).to_numpy())}
     for a2, b2 in (("unet_mri", "unet"), ("hybrid_mri", "unet_mri")):
