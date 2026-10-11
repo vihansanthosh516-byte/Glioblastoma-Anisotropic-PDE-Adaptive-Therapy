@@ -12,7 +12,7 @@ final_model:
   model_state_sha256: "77d1a2ea8eacf5005472339a6d7fb297526a80e82046e3efc0bb4ef163b0a5d2"
   test_patients_predicted: 101
 selection_rule: "GRAND_PLAN 15: highest out-of-fold dev enhancing coverage at equal volume (ledgers 2au, 2aw)"
-test_set: {datasets: [LUMIERE, RHUH], lists: data/external/PredictGBM_code/predict_gbm/data/datasets/{lumiere,rhuh}.json}
+test_set: {datasets: [LUMIERE, RHUH], lists: "data/external/PredictGBM_code/predict_gbm/data/datasets/{lumiere,rhuh}.json"}
 primary:
   endpoint: "mean paired difference in enhancing-recurrence coverage, final minus 15 mm standard plan"
   population: "test patients with enhancing recurrence"
@@ -25,3 +25,4 @@ secondary:
   - "context only: released published plans on the same patients"
 scoring_script: src/123_predictgbm_test_score.py
 rules: "one run; reported whatever the result; no model change after this file"
+# Erratum 2026-10-11: quotes added around the test_set lists path (YAML syntax only); nothing else changed; script 123 had stopped at YAML parsing, before any test recurrence was read.
