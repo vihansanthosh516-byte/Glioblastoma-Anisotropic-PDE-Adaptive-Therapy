@@ -412,3 +412,13 @@ MU pairs with at least two prior scans: fit one kill multiplier k (scales the as
 - Y4. Track A inflammation score = 1.0 for all 61 patients (`adaptive_cohort_summary.json`): check for saturation / clipping / normalisation bug. If a bug is found, fix it and rerun once; report old and new.
 - Y5. Age in CGGA: Cox model adjusted for grade, IDH status and treatment (radiotherapy, TMZ) where recorded, GBM only; one model, declared here. Report even if still weak.
 - Y6. RL vs rule: one stronger RL configuration fixed in advance (PPO, 10x training steps, domain-randomised simulated patients over the full prior ranges), run once with the same evaluation as script 68. Simulation only.
+
+## 15. Old goal kept: beat the 15 mm plan with our own method (user decision 2026-10-11)
+
+Diagnosis of why our arms lost (2al-2as): small training set (~113 per fold), wrong objective (segmentation loss, but the endpoint is coverage at fixed volume = ranking), 2 mm vs 1 mm scoring. Paths, each declared here before it runs; dev (TUM) only; test set once at the end for the single final model chosen on dev:
+- Z1. Ensemble (= X3): mean of per-patient rank-normalised maps. Candidates declared: (a) GliODIL + LOTI; (b) GliODIL + U-Net(raw); (c) GliODIL + LOTI + U-Net(raw); (d) (c) + our M1 density; (e) (c) + Euclidean distance. Equal volume and the X2 volume grid.
+- Z2. More training data: add MU-Glioma-Post patients (pre-op mask + later recurrence mask) to the U-Net training folds; TUM folds unchanged for scoring.
+- Z3. Ranking objective: loss = soft top-k coverage of recurrence at the standard-plan volume (plus BCE for stability).
+- Z4. Start from the released PREDICT-GBM U-Net (Apache-2.0 code) and fine-tune with our M1 density as an extra input channel, 5-fold on TUM.
+- Z5. 1 mm training for the best of Z2-Z4 if GPU time allows.
+Final model selection rule (fixed now): the arm with the highest out-of-fold dev enhancing coverage at equal volume; ensembles count as arms. One test run.
