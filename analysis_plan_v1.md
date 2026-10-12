@@ -341,3 +341,9 @@ C1 hybrid_rank_mu + MRI (T1c, FLAIR); C2 rank-average of C1 with the released PR
 
 ### A9.4 Endpoints (one run)
 Primary: mean paired difference in enhancing-recurrence coverage, final H-3 model minus the 15 mm standard plan; patient bootstrap 95% CI; two-sided Wilcoxon p; success = lower CI bound > 0. Secondary: all-recurrence coverage; 90% volume non-inferiority (margin -0.01). Reported whatever the result, together with H-2.
+
+### A9.5 Published U-Net split lists received (2026-10-12, before any H-3 dev or test result)
+L. Zimmer (PREDICT-GBM) sent the train/val/test lists of the 15 released U-Nets (3 seeds x 5 folds; file data/external/unet_splits/ensemble_data_splits.json). Training datasets: TUM-GBM, LUMIERE, RHUH, UPENN, TCGA-GBM, IVYGAP, CPTAC. UCSF is not among them, so the released U-Net has not seen any H-3 test patient. Consequences, fixed now:
+(a) C2 is eligible for H-3 if the U-Net can be run on UCSF inputs (its 7 inputs: seg, wm, gm, csf, T1c, FLAIR, ADC; PDGM has ADC). Inference runs only on Kaggle (weights never on this PC), on CPU if no GPU quota.
+(b) C2 dev score uses, per TUM patient, only the 3 U-Nets whose fold lists that patient as TEST (leak-free out-of-fold), not the released averaged prediction.
+(c) H-2 is NOT re-evaluated. A leak-free U-Net score on LUMIERE/RHUH may be reported as exploratory context only.
