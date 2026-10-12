@@ -132,8 +132,9 @@ def ucsf():
         z = np.load(f)
         t1c, fl, b = z["t1c"], z["flair"], z["brain"]
 
-        def nrm(a):   # 0-1 by 0.5-99.5 brain percentiles (as the released *_bet_normalized maps lie in [0, 1])
-            lo, hi = np.percentile(a[b], [0.5, 99.5])
+        def nrm(a):   # BrainLes PercentileNormalizer as in the authors' package: 0.1 / 99.9 percentiles of the whole
+            a = a * b    # skull-stripped volume (zeros included), mapped to [0, 1] and clipped (checked on released maps)
+            lo, hi = np.percentile(a, [0.1, 99.9])
             return np.clip((a - lo) / max(hi - lo, 1e-6), 0, 1) * b
 
         x = stack(z["seg"], z["wm"], z["gm"], z["csf"], nrm(t1c), nrm(fl), seg)
