@@ -213,6 +213,24 @@ def train_fold(data, tr, epochs, dev, rank=False, enhw=False, seed=SEED):
     return net
 
 
+class DiskData(dict):
+    """Low-RAM mode (env GBM_DISK_CACHE=<dir>, e.g. free Colab): samples are written to disk, read back per step."""
+
+    def __init__(self, root):
+        super().__init__()
+        self.root = _Path(root)
+        self.root.mkdir(parents=True, exist_ok=True)
+
+    def __setitem__(self, k, v):
+        f = self.root / (k.replace(":", "_").replace("|", "_") + ".npz")
+        np.savez(f, **{a: np.asarray(b) for a, b in v.items()})
+        super().__setitem__(k, f)
+
+    def __getitem__(self, k):
+        z = np.load(super().__getitem__(k))
+        return {a: (z[a].item() if z[a].ndim == 0 else z[a]) for a in z.files}
+
+
 def run(arm, epochs):
     import torch
     dev = "cuda" if torch.cuda.is_available() else "cpu"
@@ -222,7 +240,7 @@ def run(arm, epochs):
     extra = re.sub(r"_s\d+$", "", arm).endswith("_mu")
     ids = pg.dev_ids()
     t0 = time.time()
-    data = {}
+    data = DiskData(os.environ["GBM_DISK_CACHE"] + "/" + arm) if os.environ.get("GBM_DISK_CACHE") else {}
     for pid in ids:
         data[pid] = build(pid, hybrid, mri)
     mu_keys = []
