@@ -2,11 +2,13 @@
 
 State-dict keys match MONAI: model.0 (down), model.1 (SkipConnection.submodule = Sequential(down, skip..., up)), model.2
 (final transposed conv, conv only). Channels 32-64-128-256-512-1024, strides 2, kernel 3. The checkpoint has no norm or
-activation parameters, so norm is InstanceNorm3d(affine=False) or none and the activation is parameter-free; the variant
-is chosen by matching the released out-of-fold predictions on development patients (script 125 --stage validate).
+activation parameters, so norm is InstanceNorm3d(affine=False) or none and the activation is parameter-free. Authors' container code (create_network.py, read 2026-10-12): norm "instance",
+act LeakyReLU(negative_slope = e^-2), dropout 0 -> variant ("instance", "leaky_e2").
 Weights are loaded with torch.load(weights_only=True) on Kaggle only.
 """
 from __future__ import annotations
+
+import math
 
 import torch
 from torch import nn
@@ -25,7 +27,8 @@ class Conv(nn.Module):
         if not conv_only:
             if norm == "instance":
                 layers.append(nn.InstanceNorm3d(cout, affine=False))
-            layers.append({"relu": nn.ReLU(), "leaky": nn.LeakyReLU(0.01), "prelu0": nn.LeakyReLU(0.25)}[act])
+            layers.append({"relu": nn.ReLU(), "leaky": nn.LeakyReLU(0.01), "prelu0": nn.LeakyReLU(0.25),
+                           "leaky_e2": nn.LeakyReLU(math.exp(-2))}[act])
         self.adn = nn.Sequential(*layers)
 
     def forward(self, x):
@@ -58,7 +61,7 @@ OUT = 1
 
 
 class PublishedUNet(nn.Module):
-    def __init__(self, cin=7, norm="instance", act="relu"):
+    def __init__(self, cin=7, norm="instance", act="leaky_e2"):
         super().__init__()
         self.model = _level(cin, CH, norm, act, True)
 
