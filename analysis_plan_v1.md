@@ -383,3 +383,15 @@ Predicted |yhat| below the measured floor (ledger 2ab tertile floors 1.03 / 0.88
 - (a) Burdenko open CSV (data/external/burdenko_clinical.csv): pseudo-progression and distant-progression shares per follow-up and per patient; timing vs RT end (<=84 d vs later).
 - (b) LUMIERE: script-91 volume errors stratified by target-scan RANO rating (PD vs SD/PR/CR) from LUMIERE-ExpertRating-v202211.csv; rationale pseudo mentions counted.
 - (c) PREDICT-GBM has no RANO field: the H-2 null is contextualised with (a)/(b) rates, not re-run.
+
+## Amendment 11 (2026-10-16): H-3 final model fixed; C4/C5 dropped; target scan specified. Written before any UCSF-ALPTDG label is read
+
+### A11.1 Final model
+C4 (5 seeds) and C5 (seed-uncertainty margin) are dropped: GPU quota does not allow 4 more 5.5 h seed runs before the fair. This is decided before any UCSF label is read. Among the evaluated declared candidates (TUM out-of-fold, 137 patients, script 126, dev_ensembles.json): C1 +0.0298, C2 +0.0305, C3 +0.0274. C2 - C1 = +0.0007 < 0.002, so by the A9.3 tie rule the simpler model wins: **final H-3 model = C1 = script 115 arm hybrid_mri_rank_mu**, seed 20261009, retrained once on all 142 TUM + 334 MU pairs, 15 epochs (same as the dev run's gradient-step rule and script 122).
+
+### A11.2 Target scan (clarifies A9.2, from metadata only)
+A9.2 says the follow-up scan is "the first ALPTDG scan with tumour labels after resection" = ALPTDG time1. Metadata (Clinical Info, no label read) for the 59 included patients: time1 is a median 325 days (min 92) after first surgery; time2 is a median 56 days after time1. Primary target = **time1_seg**: enhancing = label 3, all = labels 1-3; label 4 (resection cavity) is not recurrence. Inside the aligned pre-op brain mask. Secondary (exploratory): the same with time2_seg.
+Patients enter the primary analysis if time1 has enhancing tumour (label 3 > 0), as A9.4.
+
+### A11.3 Weak points declared now
+(1) Enhancing tumour at time1 may be residual or treatment-related enhancement, not only recurrence (no RANO label is used). (2) Pre-op to time1 alignment is rigid (brain Dice mean 0.969); resection shift is not modelled. (3) UCSF tissue maps are a 3-class T1 mixture, not the PREDICT-GBM pipeline. (4) ALPTDG selected patients with two post-treatment scans.
