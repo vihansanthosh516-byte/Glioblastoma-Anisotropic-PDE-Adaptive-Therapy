@@ -347,3 +347,39 @@ L. Zimmer (PREDICT-GBM) sent the train/val/test lists of the 15 released U-Nets 
 (a) C2 is eligible for H-3 if the U-Net can be run on UCSF inputs (its 7 inputs: seg, wm, gm, csf, T1c, FLAIR, ADC; PDGM has ADC). Inference runs only on Kaggle (weights never on this PC), on CPU if no GPU quota.
 (b) C2 dev score uses, per TUM patient, only the 3 U-Nets whose fold lists that patient as TEST (leak-free out-of-fold), not the released averaged prediction.
 (c) H-2 is NOT re-evaluated. A leak-free U-Net score on LUMIERE/RHUH may be reported as exploratory context only.
+
+## Amendment 10 (2026-10-16): H-3 volume forecast with conformal intervals (H-3v), callosum proxy rule, RANO-aware check X5. Declared before any of these runs.
+
+### A10.0 What was already seen
+- All MU results through ledger 2ay; H-2 locked test 2ax (enhancing +0.0088 null; all-recurrence +0.0811 secondary).
+- LUMIERE volumes (script 91, ledger 2l): growth model lost to no-change. Any LUMIERE volume claim stays exploratory in wording, but the frozen one-run rule below still applies.
+- No H-3v (A6.7) output exists. "H-3" in Amendment 9 (UCSF coverage) is a different hypothesis; the volume work here is called H-3v to avoid confusion.
+
+### A10.1 H-3v model (revises A6.7 covariates)
+- TMZ phase is DROPPED: no TMZ data exist in any MU manifest (verified 2026-10-16 by search over data/manifests/*.csv).
+- Target: y = ln(V_out / V_in) of the core (labels 1+3, 2 mm) on the MU primary pairs (328, pair-table rule A6.1).
+- Fixed effects: log V_in, interval dt (days), days-since-RT-end (day_in minus radiation_end_day; 24 patients lack dates -> missing indicator + median imputation, the A1.14 "unknown timing" stratum), age, sex, MGMT code. Random effects: patient intercept + patient slope on dt (statsmodels MixedLM).
+- Arms (all out-of-fold on the manifest folds, refit per outer fold on outer-train only): persistence (0), geometric_train_rate (existing script-98 values, no refit), MixedLM (registered primary model). Gradient boosting (A6.7 secondary) is DEFERRED to keep this run CPU-small; its absence is stated, not hidden.
+- Populations: GBM-only primary (A5.1/A6.1: 105 as analysed), all-eligible sensitivity (133). Patient is the unit (A1.1); per-patient mean |y - yhat|.
+
+### A10.2 H-3v endpoints
+- Primary: per-patient mean |ln ratio| error, MixedLM minus persistence (negative = better), patient bootstrap 10,000 (seed 20261004). Success ("supported") = CI upper bound < 0.
+- Secondary (Holm): 80% and 90% patient-level split-conformal coverage (observed vs nominal); RANO-PD AUC on LUMIERE (frozen run only).
+- Conformal (split, declared): inside each outer fold, split outer-train patients 75/25 (proper-train/calibration, seed 20261004). Fit MixedLM on proper-train pairs. Nonconformity = pair |residual|; patient score = mean over that patient''s pairs. q80/q90 = calibration-patient quantiles. Test interval = pred +/- q. Coverage = share of test patients whose true patient-mean y falls inside; width reported. LUMIERE frozen run uses pooled quantiles (see A10.4).
+
+### A10.3 Abstain rule (fixed here)
+Predicted |yhat| below the measured floor (ledger 2ab tertile floors 1.03 / 0.88 / 0.35 by input-volume edges 2059 / 7614 mm3) is labelled "below detectable change". The cut is fixed now, before any H-3v run. Reported as a subgroup (abstain vs forecast), not as a re-run trigger.
+
+### A10.4 LUMIERE frozen run (one run)
+- After dev: write configs/h3v_frozen.yaml (MixedLM params refit on ALL MU primary pairs, pooled q80/q90, abstain cut, preprocessing versions) + git tag h3v-frozen. Script 130 refuses to run without both.
+- One run on LUMIERE enhancing volumes (HD-GLIO-AUTO primary, DeepBraTumIA sensitivity; script-91 loaders and week->day mapping reused unchanged). Endpoints: mean |ln| error vs persistence, 80/90% coverage, RANO-PD AUC. Reported whatever the result.
+
+### A10.5 Callosum subgroup (implements A7.3 with a proxy)
+- No corpus-callosum atlas label exists locally (verified 2026-10-16). Proxy rule, fixed now: "callosum-adjacent" = pre-op core has >= 1 voxel with |x - midline| <= 5 mm AND wm_pbmap > 0.5, where midline = middle x-index of the brain mask. Labelled PROXY everywhere; the atlas-label version is not done.
+- Contrasts (TUM dev only, exploratory, patient bootstrap 10k): M2(r1|lam2) minus M1(iso|lam2) per patient from output/predictgbm/cache_112/*.json (selected cells, ledger 2al) in each subgroup.
+- M3a-M3i subgroup is PENDING: no per-patient M3 file was saved (verified 2026-10-16: m3_dev.json has summaries only; cache_114 holds the M1/M2 grid). It needs a script-114 rerun with pairs saving (Kaggle-scale) and is declared as follow-up, not run now.
+
+### A10.6 RANO-aware check X5 (exploratory, no new model runs)
+- (a) Burdenko open CSV (data/external/burdenko_clinical.csv): pseudo-progression and distant-progression shares per follow-up and per patient; timing vs RT end (<=84 d vs later).
+- (b) LUMIERE: script-91 volume errors stratified by target-scan RANO rating (PD vs SD/PR/CR) from LUMIERE-ExpertRating-v202211.csv; rationale pseudo mentions counted.
+- (c) PREDICT-GBM has no RANO field: the H-2 null is contextualised with (a)/(b) rates, not re-run.

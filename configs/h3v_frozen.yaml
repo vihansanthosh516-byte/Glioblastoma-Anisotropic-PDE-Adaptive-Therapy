@@ -1,0 +1,44 @@
+fit_kind: mixedlm
+fixed_effects:
+- const
+- logVin
+- dt_days
+- daysRT
+- rt_known
+- age
+- sexM
+- mgmt_meth
+- mgmt_miss
+floor_edges_mm3:
+- 2059.0
+- 7614.0
+floors:
+- 1.03
+- 0.88
+- 0.35
+lumiere_rules:
+  daysRT_missing: RTmiss=1, daysRT=<rt_median_days>
+  mgmt_map:
+    methylated: 1.0
+    not methylated: 0.0
+    other_or_missing: 0.0 with mgmt_miss=1
+  sex_map:
+    female: 0.0
+    male: 1.0
+  volume: contrast-enhancing CT1 VoxelVolume, HD-GLIO-AUTO primary / DeepBraTumIA
+    sensitivity
+model: mixedlm_gbm_all_pairs
+params:
+  age: -0.0003379324995220624
+  const: 2.7474844251312853
+  daysRT: -0.0005020833327294383
+  dt_days: -0.00342869350260028
+  logVin: -0.39994539847205135
+  mgmt_meth: -0.1873253228044386
+  mgmt_miss: 0.16051422705050156
+  rt_known: 0.6875601694829159
+  sexM: -0.1096104432639697
+q80: 1.3734599850384945
+q90: 1.6780146393599646
+rt_median_days: 26.0
+script: 127_h3v_volume_conformal --write-freeze
