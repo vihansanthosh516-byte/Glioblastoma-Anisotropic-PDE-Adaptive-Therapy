@@ -395,3 +395,6 @@ Patients enter the primary analysis if time1 has enhancing tumour (label 3 > 0),
 
 ### A11.3 Weak points declared now
 (1) Enhancing tumour at time1 may be residual or treatment-related enhancement, not only recurrence (no RANO label is used). (2) Pre-op to time1 alignment is rigid (brain Dice mean 0.969); resection shift is not modelled. (3) UCSF tissue maps are a 3-class T1 mixture, not the PREDICT-GBM pipeline. (4) ALPTDG selected patients with two post-treatment scans.
+
+### A11.4 UCSF tissue maps (input check, no label read)
+Input check of script 131 against 10 TUM dev patients: the script 124 T1 3-class mixture gives csf 0.25 vs 0.10 and gm 0.39 vs 0.53 (mean inside brain), a clear input shift. Replaced, before any label is read, by the dev-mean tissue atlas at 2 mm (the same proxy as the 334 MU training pairs, script 121); M1 density uses the same atlas. Core, edema, brain, distance, T1c and FLAIR are unchanged.
