@@ -1,0 +1,24 @@
+# H-3 freeze (Amendments 9 and 11). Written before any UCSF-ALPTDG label is read. Script 133 runs once after this.
+hypothesis: H-3
+frozen_date: 2026-10-16
+code_commit: 8870fd5ca2615e6dae374448e631a72ff493df96
+final_model:
+  arm: hybrid_mri_rank_mu
+  candidate: C1
+  seed: 20261009
+  epochs: 15
+  train: {tum: 142, mu_pairs: 334}
+  kaggle_kernel: vihansanthosh/gbm-h3-final
+  ucsf_logits_file: output/predictgbm/h3_final/ucsf_logits_2mm.npz
+  ucsf_logits_sha256: 1a21a6d10dbf1655170edd5b026eecebdeb3ac7b6d3ee572e579710a9ebd862f
+  model_state_sha256: 9b58299d3dd376d52366c5fdfb4ba3e3c89a7f0cadfbbaaf86567da1de3b938a
+  n_test_predicted: 59
+inputs:
+  pack_file: kaggle_run/pack_ucsf/ucsf_h3_inputs_2mm.npz
+  pack_sha256: 0644edc3e23526648ef27ecab4ac995d4f4d25babb7f0b638ed0738b527d3ba9
+  tissue: dev-mean atlas (A11.4)
+endpoints:
+  primary: time1 enhancing coverage (label 3), final minus 15 mm standard plan, equal volume, patients with label 3 > 0; success = bootstrap 95% CI lower bound > 0
+  secondary: [all recurrence time1 (labels 1-3), 90% volume non-inferior margin -0.01, time2 enhancing (exploratory), released U-Net context]
+  not_recurrence: label 4 (cavity)
+runs_allowed: 1
