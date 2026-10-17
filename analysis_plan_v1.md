@@ -417,3 +417,29 @@ TUM (C1 out-of-fold logits, 137), LUMIERE + RHUH (H-2 frozen logits, 101), UCSF 
 
 ### A12.5 Confirmation
 The selected rule (and any later retrained model from step 2) is frozen and tested once on a new external dataset, chosen and declared in a later amendment before its labels are read.
+
+## Amendment 13 (2026-10-16): H-4 step 2 -- pooled retrain and the new locked test. Written after the A12.4a pick (G10_1.0, ledger 2be); no label of any future locked dataset is read under this amendment.
+
+### A13.1 Status
+The step-1 numbers (ledger 2be) are post hoc dev. This amendment fixes, before any step-2 run: the retrained model recipe, the plan rule it will carry, what counts as its result on a NEW dataset, and the one-shot freeze protocol. The dataset itself is declared in a later amendment (A13.4), before its labels are read. LUMIERE, RHUH, UCSF are training data from now on (A12.1).
+
+### A13.2 Retrain recipe (fixed now, one run)
+- Arm: hybrid_mri_rank_mu (the H-3 C1 arm, script 115). Identical network, loss (BCE + Dice + soft top-k), AdamW, cosine schedule, 15 epochs, seed 20261009. No hyperparameter search; one training run.
+- Training samples (636): 142 TUM patients (full, not out-of-fold) + 334 MU pairs + 61 LUMIERE + 40 RHUH + 59 UCSF-ALPTDG patients. Targets = first-follow-up recurrence (time1), labels 1-3 all / 3 enhancing inside the pre-op brain, the same convention the endpoints are scored with. time2 is never a target.
+- New-set inputs: LUMIERE/RHUH = PREDICT-GBM pre-op carrier + native tissue maps + 2 mm MRI (t1c/flair _bet_normalized, block mean, script 116 normalisation); UCSF = script 124/131 pre-op arrays, dev-mean tissue atlas (A11.4), same 2 mm MRI scaling. Packed by script 135 (kaggle_run/pack_h4/h4_retrain_pack.npz, manifest in output/predictgbm/h4/).
+- The retrain replaces the model only; the plan rule stays G10 (A13.3). Re-selecting the rule on in-sample retrained scores is biased; the rule was fixed at step 1 on out-of-fold scores.
+
+### A13.3 Plan rule carried into the locked test
+Primary rule: G10 at 100% volume (core + 10 mm guard always treated, model fills the rest of the standard volume). Secondary: G10 at 90% volume. No other candidates; no re-selection.
+
+### A13.4 New locked-test dataset: eligibility and choice
+Eligibility checklist (all required): (1) pre-op MRI with a usable core segmentation and a recurrence MRI with enhancing/all-recurrence segmentations (labels 1-3, 3 = enhancing, 4 = cavity convention or a documented mapping); (2) at least 40 patients expected evaluable under A13.5; (3) public or authorised access with a licence allowing research use; (4) not previously scored by this project in any form. Choice rule: one primary dataset, chosen on logistics/eligibility only (never on any model result), declared in an amendment before its first label is read; among qualifying candidates the earliest stable access wins. Only this one dataset carries the headline; any further set is context only.
+
+### A13.5 Endpoint for the locked test (refines A9.4)
+Primary: enhancing-recurrence coverage, G10_1.0 minus the 15 mm plan, on the evaluable subset = patients with time1 enhancing recurrence AND standard-plan coverage < 0.999, equal volume; success = patient-bootstrap 95% CI lower bound > 0. The full-cohort difference (all patients with time1 enhancing) is reported alongside. The evaluable rule is model-independent (defined by the 15 mm plan alone). Justification: pooled dev (2be pairs, post hoc) -- 102/284 patients (35.9%; UCSF 61%) have standard coverage >= 0.999 and can contribute no measurable gain; on the 172 evaluable (TUM 83, LUMIERE 44, RHUH 28, UCSF 17) the G10_1.0 dev difference is +0.038 (CI +0.016 to +0.063) vs +0.022 pooled. Secondary, reported regardless: all-recurrence coverage (expected positive), 90% volume non-inferiority (margin -0.01), released-model context.
+
+### A13.6 One-shot freeze protocol (h2/h3/h3v pattern)
+configs/h4_frozen.yaml records: code commit, model-state SHA-256, training-record SHA-256, retrain pack SHA-256, rule G10_1.0, evaluable rule, endpoints, runs_allowed: 1. The scoring script refuses to run unless the config exists and git tag h4-frozen exists, and verifies the model-state hash before opening any label of the new dataset. Wording rule: until then every G10/R0 number is "post hoc, test set re-used" (2be); afterwards the locked result is the only "unseen patients" claim.
+
+### A13.7 Stop conditions and fallback
+If no eligible dataset reaches stable access by the freeze deadline, H-4 stays post hoc and the headline must say so (A12.1 wording); the retrained model is still reported, labelled post hoc dev.
