@@ -398,3 +398,22 @@ Patients enter the primary analysis if time1 has enhancing tumour (label 3 > 0),
 
 ### A11.4 UCSF tissue maps (input check, no label read)
 Input check of script 131 against 10 TUM dev patients: the script 124 T1 3-class mixture gives csf 0.25 vs 0.10 and gm 0.39 vs 0.53 (mean inside brain), a clear input shift. Replaced, before any label is read, by the dev-mean tissue atlas at 2 mm (the same proxy as the 334 MU training pairs, script 121); M1 density uses the same atlas. Core, edema, brain, distance, T1c and FLAIR are unchanged.
+
+## Amendment 12 (2026-10-16): H-4 improve-and-retest program. Written after the H-2 and H-3 locked results are known
+
+### A12.1 Status of earlier test sets
+LUMIERE, RHUH (H-2) and UCSF (H-3) have been scored once each. From now on they are **development data (post hoc reuse)**. Any number on them is labelled "post hoc, test set re-used", never "locked test". A claim of "better on unseen patients" needs a new locked test on a dataset not yet scored (A12.5).
+
+### A12.2 Pooled development set (script 134)
+TUM (C1 out-of-fold logits, 137), LUMIERE + RHUH (H-2 frozen logits, 101), UCSF (H-3 frozen logits, 59). No model is retrained in step 1; only the plan rule changes.
+
+### A12.3 Plan-rule candidates (step 1)
+- R0: model top-k at fraction f of the standard volume (current rule).
+- G5, G10: guarded hybrid: core + 5 mm (or 10 mm) Euclidean margin is always treated; the model fills the remaining voxels to f x standard volume.
+- f in {0.7, 0.8, 0.9, 1.0}. Endpoints vs the 15 mm plan at f = 1.0: enhancing coverage and all-recurrence coverage; patient bootstrap 95% CI, pooled and per dataset.
+
+### A12.4 Selection rule (fixed now)
+(a) Equal volume: pick the rule with the highest pooled enhancing lower CI bound among rules with all-recurrence lower CI > 0. (b) Reduced volume: the smallest f where a rule has both enhancing and all-recurrence lower CI > -0.01 pooled AND in each of the 4 datasets mean > -0.01. Ties within 0.002 go to the simpler rule (R0 < G5 < G10).
+
+### A12.5 Confirmation
+The selected rule (and any later retrained model from step 2) is frozen and tested once on a new external dataset, chosen and declared in a later amendment before its labels are read.
