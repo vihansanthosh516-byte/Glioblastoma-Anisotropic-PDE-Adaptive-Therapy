@@ -43,9 +43,9 @@ It is background, not the goal. Honest summary: `README_STATUS.md` (corrected af
 ## 6. Which files to trust
 | Status | Files |
 |---|---|
-| CURRENT | `START_HERE.md`, `CLAUDE.md`, `analysis_plan_v1.md`, `vault/PAPER_FINDINGS_LEDGER.md`, `paper/phd_level_plan_probabilistic_rano.md`, `paper/problem_first_rano_noise.md`, `README_STATUS.md` (old-work status, corrected) |
+| CURRENT | `START_HERE.md`, `CLAUDE.md`, `analysis_plan_v1.md`, `vault/PAPER_FINDINGS_LEDGER.md`, `paper/phd_level_plan_probabilistic_rano.md`, `paper/problem_first_rano_noise.md`, `README.md` (new), `README_STATUS.md` (old-work status, corrected) |
 | BACKGROUND (still true as records, wrong as goals) | `paper/new_project_options.md`, `paper/literature_search_digital_twin.md`, `vault/LIMITS_CURRENT.md`, `vault/claim_ledger.md`, `vault/audit_2026-10-18/*` |
-| HISTORICAL (banner at the top of each file; do not use for goals or "first" claims) | `README.md`, `REPO_MIND_MAP.md`, `TRACK_A_RESULTS.md`, `FIXES_SUMMARY.md`, `most_revolutionary_track.md`, `discrepancies_table.md`, `docs/*`, `output/*.md`, `paper/GRAND_PLAN.md`, `paper/summary_all_tracks.md`, `paper/overview_for_review.md`, `paper/project_plan_trusted_twin.md`, `paper/masterplan_implementation_plan.md`, `vault/Script-*.md`, `vault/TRACK_*.md` |
+| ARCHIVED (moved to `archive_old_gbm/`, same sub-paths; banner on each; do not use for goals or "first" claims) | all old GBM READMEs, summaries, plans, track results, `docs/*`, `output/*.md`, `vault/Script-*.md`, `vault/TRACK_*.md` |
 | ARCHIVE (unchanged on purpose) | `vault/audit_2026-10-18/originals/*`, `.claude/skills/*`, `graphify-out/*` |
 
 ## 7. Next step
