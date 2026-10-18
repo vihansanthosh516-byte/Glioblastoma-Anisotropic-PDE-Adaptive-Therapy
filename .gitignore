@@ -119,3 +119,8 @@ output/emax_sweep/**/log.txt
 kaggle_run/pack/
 kaggle_run/kernel_out/
 kaggle_run/pack_pg/
+
+# Large regenerable arrays and bytecode (added 2026-10-18; SHA-256 of locked-test logits are recorded in test_results.json / ucsf_test_results.json)
+kaggle_run/**/*.npz
+output/predictgbm/**/*.npz
+kaggle_run/**/*.pyc
