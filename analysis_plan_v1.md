@@ -443,3 +443,27 @@ configs/h4_frozen.yaml records: code commit, model-state SHA-256, training-recor
 
 ### A13.7 Stop conditions and fallback
 If no eligible dataset reaches stable access by the freeze deadline, H-4 stays post hoc and the headline must say so (A12.1 wording); the retrained model is still reported, labelled post hoc dev.
+
+## Amendment 14 (2026-10-18): Triage test -- can the pre-op MRI predict which patients the 15 mm plan fails for? EXPLORATORY. Written before any feature or outcome of this analysis is computed.
+
+### A14.1 Status and honesty rules
+No locked test set exists any more (A12.1: H-2 and H-3 sets are dev; H-4 has no eligible set). This is therefore an exploratory analysis on spent sets. It is still declared first. Every patient is scored by a model that never saw that patient's centre (leave-one-centre-out), which is the strongest external check available. What was seen before this declaration: aggregate standard-plan coverage per set in earlier entries (ledger 2au to 2bd, 2be); no relation between any pre-op feature and the standard-plan outcome has been looked at. Allowed wording for any result: "exploratory, leave-one-centre-out, spent sets". Never "unseen" or "locked".
+
+### A14.2 Cohort
+302 patients with a pre-op MRI and a first-recurrence segmentation (time1): TUM 142 (pg.dev_ids), LUMIERE + RHUH 101 (pg.test_ids, recurrence read under the h2 freeze), UCSF 59 (script 124 pre-op arrays; ALPTDG time1 seg). Exclusions, each reported with a count: no core voxel, no all-recurrence voxel inside the pre-op brain, missing time1 segmentation. 1 mm grid, labels as in script 133 (core = labels 1 or 3; all recurrence = labels 1-3 inside the pre-op brain).
+
+### A14.3 Outcome (fixed now)
+standard_coverage = share of all-recurrence voxels inside the standard plan (EDT <= 15 mm from the core, inside the brain, predictgbm_io.standard_plan). Primary outcome FAIL = standard_coverage < 0.80. Secondary outcome FAIL90 = standard_coverage < 0.90. Continuous: standard_coverage itself. If prevalence of FAIL is below 10% or above 90% overall or in a held-out centre, that is reported and the primary result is called underpowered, not re-defined.
+
+### A14.4 Features (fixed list, pre-op only, no tissue maps because UCSF tissue is a dev-mean atlas)
+1 log core volume (mL); 2 log edema volume (label 2, mL, log1p); 3 enhancing share of core (label 3 voxels / core voxels); 4 lateral distance of core centroid from the brain bounding-box midline in x (mm, absolute); 5 anterior-posterior position of the centroid (0-1 inside the brain bounding box, y); 6 superior-inferior position (0-1, z); 7 distance from the core centroid to the brain surface (mm); 8 margin truncation = 1 - (standard plan volume / volume of the 15 mm dilation of the core without the brain mask); 9 largest bounding-box extent of the core (mm); 10 number of connected core components with volume >= 0.5 mL. No other feature may be added or removed after the table is built.
+
+### A14.5 Model, validation, endpoints
+Standardise on the training folds; L2 logistic regression, C = 1.0, fixed, no tuning, class weights balanced. Leave-one-centre-out with 4 folds (TUM, LUMIERE, RHUH, UCSF). Pooled out-of-fold predictions. Baseline B1 = logistic on feature 1 only (same settings). Patient bootstrap 2000 draws, seed 20261018, percentile 95% CI.
+- PRIMARY: pooled out-of-fold AUC for FAIL. Success = lower CI bound > 0.5.
+- Secondary S1: AUC(full) minus AUC(B1), paired bootstrap; success = lower bound > 0.
+- Secondary S2: pooled AUC for FAIL90. Secondary S3: Spearman correlation of predicted risk with standard_coverage (negative expected). Secondary S4: per-centre AUC, reported for all four centres whatever the values.
+- No other test is declared. Anything else computed is labelled undeclared exploratory.
+
+### A14.6 What a success would and would not mean
+Success: the pre-op MRI carries information about when the 15 mm plan misses recurrence, across centres. It would NOT show that a model plan helps those patients (not tested here), nor any clinical benefit. A failure is reported as a failure (primary CI includes 0.5) and the triage idea is dropped; it is not re-run with other features or thresholds.
