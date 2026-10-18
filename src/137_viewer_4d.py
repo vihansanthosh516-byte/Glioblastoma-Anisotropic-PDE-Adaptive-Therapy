@@ -8,7 +8,7 @@ Two modes in one self-contained HTML page (plotly.js embedded, opens offline):
   2. Growth simulation (time slider). Fisher-Kolmogorov growth from the pre-op core on the 2 mm grid with ASSUMED round
      parameters (rho, D_wm, D_gm are not fitted to the patient). Scenarios: no treatment, and an ASSUMED constant drug
      exposure whose kill rate is a fraction of the growth rate. This is a what-if simulation, not a forecast.
-Patients: UCSF locked-test patients at the 75th, 90th and 95th percentile of all-recurrence gain (model minus standard):
+Patients: UCSF locked-test patients at the 60th to 95th percentile of all-recurrence gain (model minus standard):
   upper-part examples, labelled as such on the page together with the cohort mean gain.
 Output: output/viewer4d/viewer4d.html and viewer4d_info.json.
 """
@@ -33,10 +33,10 @@ ZIP = _Path(os.environ.get("UCSF_ALPTDG_ZIP", r"C:\Users\vihan\Downloads\UCSF_PO
 sys.path.insert(0, str(PROJECT_ROOT / "src"))
 import predictgbm_io as pg  # noqa: E402
 
-QUANTILES = (0.75, 0.9, 0.95)
+QUANTILES = (0.6, 0.7, 0.8, 0.85, 0.9, 0.95)
 RHO, D_WM, D_GM = 0.02, 0.10, 0.02          # per day, mm^2/day, mm^2/day: ASSUMED round values, not fitted
 KILL_FRACTIONS = (0.0, 0.2, 0.4)            # ASSUMED drug kill rate as a fraction of RHO
-DAYS = (0, 30, 60, 90, 120, 150, 180)
+DAYS = (0, 45, 90, 135, 180)
 U_VISIBLE = 0.5
 H = 2.0
 
@@ -93,7 +93,8 @@ def mesh(mask, spacing, smooth=0.0, step=1):
     if v.max() < 0.5:
         return None
     verts, faces, _, _ = measure.marching_cubes(np.pad(v, 1), 0.5, step_size=step)
-    return ((verts - 1) * spacing).astype(np.float32), faces.astype(np.int32)
+    fd = np.uint16 if len(verts) < 65535 else np.int32   # smaller page
+    return np.round((verts - 1) * spacing, 1).astype(np.float32), faces.astype(fd)
 
 
 def tr(m, name, color, opacity, group):
@@ -139,11 +140,11 @@ def main():
         info.append({"pid": sid, "gain_percentile": float(100 * QUANTILES[pi]), "cohort_mean_gain": cohort_gain, "plan_volume_ml": k * ml, "core_ml": float(core.sum() * ml),
                      "recurrence_ml": float(rec.sum() * ml), "coverage_standard_all": cs, "coverage_model_all": cm,
                      "gain": cm - cs, "matches_script133_csv": True})
-        statics = [("Brain", mesh(brain, 1.0, smooth=1.5, step=3), "#9aa3ad", 0.07, "brain"),
-                   ("Tumour core (pre-op)", mesh(core, 1.0), "#3b82f6", 0.7, "core"),
-                   ("Standard 15 mm plan", mesh(std, 1.0, step=2), "#cbd5e1", 0.10, "std"),
-                   ("Model plan (same volume)", mesh(plan, 1.0, step=2), "#f59e0b", 0.35, "model"),
-                   ("Real recurrence (later scan)", mesh(rec, 1.0), "#22c55e", 0.35, "rec")]
+        statics = [("Brain", mesh(brain, 1.0, smooth=2.0, step=6), "#8b9bb4", 0.06, "brain"),
+                   ("Tumour core (pre-op)", mesh(core, 1.0, step=2), "#60a5fa", 0.75, "core"),
+                   ("Standard 15 mm plan", mesh(std, 1.0, smooth=0.8, step=3), "#94a3b8", 0.10, "std"),
+                   ("Model plan (same volume)", mesh(plan, 1.0, smooth=0.8, step=3), "#fbbf24", 0.38, "model"),
+                   ("Real recurrence (later scan)", mesh(rec, 1.0, smooth=0.6, step=2), "#34d399", 0.35, "rec")]
         for name, m, col, op, grp in statics:
             traces.append(tr(m, name, col, op, f"{pi}{grp}"))
             meta.append({"p": pi, "kind": "static", "layer": grp})
@@ -156,55 +157,75 @@ def main():
             for d in DAYS:
                 vis = snaps[d] >= U_VISIBLE
                 vols.append(float(vis.sum() * H ** 3 * ml))
-                traces.append(tr(mesh(vis, H), f"Simulated tumour, day {d}", "#ef4444", 0.55, f"{pi}sim{scen}{d}"))
+                traces.append(tr(mesh(vis, H) if d else None, f"Simulated tumour, day {d}", "#f87171", 0.55, f"{pi}sim{scen}{d}"))
                 meta.append({"p": pi, "kind": "sim", "scen": scen, "day": d})
             info[-1].setdefault("sim_volume_ml", {})[sname] = dict(zip(map(str, DAYS), vols))
         print(sid, round(cs, 3), "->", round(cm, 3), flush=True)
 
     fig = go.Figure(traces)
     fig.update_layout(scene=dict(aspectmode="data", xaxis_visible=False, yaxis_visible=False, zaxis_visible=False,
-                                 bgcolor="#0b1220"),
-                      paper_bgcolor="#0b1220", font=dict(color="#e5e7eb"), legend=dict(x=0.01, y=0.98),
-                      margin=dict(l=0, r=0, t=0, b=0), height=700)
+                                 bgcolor="#0a0f1c", camera=dict(eye=dict(x=1.5, y=-1.5, z=0.7))),
+                      paper_bgcolor="#0a0f1c", font=dict(color="#e5e7eb", family="system-ui, sans-serif"),
+                      legend=dict(x=0.01, y=0.99, bgcolor="rgba(10,15,28,0.6)", font=dict(size=13)),
+                      margin=dict(l=0, r=0, t=0, b=0), height=680)
     script = f"""
-var META={json.dumps(meta)}, INFO={json.dumps(info)}, DAYS={json.dumps(list(DAYS))};
-var RISK=['brain','core','std','model','rec'];
+var META={json.dumps(meta)}, INFO={json.dumps(info)}, DAYS={json.dumps(list(DAYS))}, P=0, MODE='risk';
 function gd(){{return document.getElementsByClassName('plotly-graph-div')[0];}}
+function $(id){{return document.getElementById(id);}}
+function setP(i){{P=i; document.querySelectorAll('.pt').forEach(function(b,k){{b.classList.toggle('on',k===i);}}); upd();}}
+function setM(m){{MODE=m; $('bm_risk').classList.toggle('on',m==='risk'); $('bm_sim').classList.toggle('on',m==='sim'); upd();}}
 function upd(){{
- var p=+document.getElementById('pat').value, mode=document.getElementById('mode').value,
-     scen=document.getElementById('scen').value, di=+document.getElementById('day').value, i=INFO[p];
- var vis=META.map(function(m){{ if(m.p!==p) return false;
-   if(m.kind==='static') return mode==='risk' ? true : (m.layer==='brain'||m.layer==='core');
-   return mode==='sim' && m.scen===scen && m.day===DAYS[di]; }});
+ var scen=$('scen').value, di=+$('day').value, i=INFO[P];
+ var vis=META.map(function(m){{ if(m.p!==P) return false;
+   if(m.kind==='static') return MODE==='risk' ? true : (m.layer==='brain'||m.layer==='core');
+   return MODE==='sim' && m.scen===scen && m.day===DAYS[di]; }});
  Plotly.restyle(gd(),{{visible:vis}});
- document.getElementById('simctl').style.display = mode==='sim' ? 'inline' : 'none';
- var t;
- if(mode==='risk') t='<b>Recurrence-risk map from the pre-op MRI.</b> Orange = model plan, grey = standard 15 mm plan, both '
-   +i.plan_volume_ml.toFixed(0)+' mL. Green = where the tumour really came back. Share of the recurrence inside the plan: '
-   +'standard '+(100*i.coverage_standard_all).toFixed(1)+'%, model '+(100*i.coverage_model_all).toFixed(1)+'%. '
-   +'Frozen model, never trained on this centre. All recurrence labels counted. '
-   +'This is an upper-part example (gain percentile '+i.gain_percentile.toFixed(0)+'); mean gain over all 59 patients is +'+(100*i.cohort_mean_gain).toFixed(1)+' points.';
- else {{ var s=document.getElementById('scen').selectedOptions[0].text, v=i.sim_volume_ml[s];
-   t='<b>SIMULATION with assumed parameters, not a forecast.</b> Growth 0.02 per day, diffusion 0.10 (white) and 0.02 (grey) mm2 per day, '
-   +'round values, not fitted to this patient. Drug scenarios are what-ifs with an assumed kill rate. Day '+DAYS[di]+': '
-   +'simulated tumour '+v[String(DAYS[di])].toFixed(1)+' mL (start '+v['0'].toFixed(1)+' mL).'; }}
- document.getElementById('note').innerHTML=t; document.getElementById('dl').textContent='day '+DAYS[di];
+ $('simctl').style.display = MODE==='sim' ? 'flex' : 'none';
+ $('cards_risk').style.display = MODE==='risk' ? 'flex' : 'none';
+ $('cards_sim').style.display = MODE==='sim' ? 'flex' : 'none';
+ var cs=100*i.coverage_standard_all, cm=100*i.coverage_model_all;
+ $('v_std').textContent=cs.toFixed(0)+'%'; $('v_mod').textContent=cm.toFixed(0)+'%'; $('v_gain').textContent='+'+(cm-cs).toFixed(0)+' pts';
+ $('b_std').style.width=cs+'%'; $('b_mod').style.width=cm+'%';
+ $('v_vol').textContent=i.plan_volume_ml.toFixed(0)+' mL';
+ var s=$('scen').selectedOptions[0].text, v=i.sim_volume_ml[s], d=String(DAYS[di]);
+ $('s_start').textContent=v['0'].toFixed(1)+' mL'; $('s_now').textContent=v[d].toFixed(1)+' mL';
+ var ch=100*(v[d]/v['0']-1); $('s_ch').textContent=(ch>=0?'+':'')+ch.toFixed(0)+'%'; $('dl').textContent='day '+DAYS[di];
+ $('note').innerHTML = MODE==='risk'
+  ? 'Both plans cover the same volume ('+i.plan_volume_ml.toFixed(0)+' mL). Green is where the tumour really came back on a later scan. The model never saw this centre in training. Examples are from the upper part of the cohort (gain percentile '+i.gain_percentile.toFixed(0)+'); the mean gain over all 59 patients is +'+(100*i.cohort_mean_gain).toFixed(1)+' points.'
+  : '<b>Simulation with assumed parameters. Not a forecast.</b> Growth 0.02 per day; diffusion 0.10 (white matter) and 0.02 (grey matter) mm\\u00b2 per day; round values, not fitted to this patient. Drug scenarios are what-ifs with an assumed kill rate.';
 }}
-window.addEventListener('load',function(){{ ['pat','mode','scen','day'].forEach(function(id){{document.getElementById(id).addEventListener('input',upd);}}); setTimeout(upd,300); }});
+window.addEventListener('load',function(){{ $('scen').addEventListener('input',upd); $('day').addEventListener('input',upd); setTimeout(upd,300); }});
 """
-    controls = ("<div style='font:14px system-ui;color:#e5e7eb;background:#0b1220;padding:10px 16px;line-height:1.7'>"
-                "<b style='font-size:16px'>GBM 4D viewer</b> &nbsp;<span style='color:#fca5a5'>Research prototype. Not for patient care.</span><br>"
-                "Patient <select id='pat'>" + "".join(f"<option value='{i}'>Patient {i + 1} (UCSF {p})</option>" for i, p in enumerate(pids)) + "</select> "
-                "&nbsp;View <select id='mode'><option value='risk'>Recurrence-risk map</option><option value='sim'>Growth simulation over time</option></select> "
-                "<span id='simctl' style='display:none'>&nbsp;Scenario <select id='scen'>"
-                "<option value='none'>No treatment</option>"
-                "<option value='drug20'>Assumed drug, kill = 20% of growth rate</option>"
-                "<option value='drug40'>Assumed drug, kill = 40% of growth rate</option></select> "
-                "&nbsp;Time <input id='day' type='range' min='0' max='" + str(len(DAYS) - 1) + "' value='0' style='vertical-align:middle;width:260px'> "
-                "<b id='dl'>day 0</b></span>"
-                "<div id='note' style='margin-top:4px;max-width:1100px'></div></div>")
-    html = fig.to_html(include_plotlyjs=True, full_html=True)
-    html = html.replace("<body>", "<body style='margin:0;background:#0b1220'>" + controls, 1)
+    pills = "".join(f"<button class='pt{' on' if i == 0 else ''}' onclick='setP({i})'>Patient {i + 1}<small>UCSF {p}</small></button>" for i, p in enumerate(pids))
+    controls = f"""<style>
+:root{{--bg:#0a0f1c;--panel:#111a2e;--line:#22304d;--text:#e5e7eb;--mut:#9aa8c2;--acc:#fbbf24}}
+body{{margin:0;background:var(--bg);color:var(--text);font:14px/1.5 system-ui,sans-serif}}
+.top{{padding:14px 20px 6px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px}}
+.top h1{{font-size:20px;margin:0;letter-spacing:.2px}}.pill{{font-size:12px;color:#fca5a5;border:1px solid #7f1d1d;border-radius:99px;padding:2px 10px}}
+.row{{display:flex;gap:8px;flex-wrap:wrap;align-items:center;padding:4px 20px}}
+button{{background:var(--panel);color:var(--text);border:1px solid var(--line);border-radius:8px;padding:6px 12px;cursor:pointer;font:inherit}}
+button small{{display:block;font-size:11px;color:var(--mut)}}button.on{{border-color:var(--acc);box-shadow:0 0 0 1px var(--acc) inset}}
+select,input{{background:var(--panel);color:var(--text);border:1px solid var(--line);border-radius:8px;padding:5px 8px;font:inherit}}
+.cards{{display:flex;gap:10px;padding:8px 20px;flex-wrap:wrap}}.card{{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:8px 14px;min-width:150px}}
+.card .k{{font-size:12px;color:var(--mut)}}.card .v{{font-size:24px;font-weight:600}}.bar{{height:6px;border-radius:3px;background:#1e293b;margin-top:4px}}.bar i{{display:block;height:6px;border-radius:3px}}
+#note{{padding:2px 20px 8px;color:var(--mut);max-width:1100px}}
+@media(max-width:700px){{.card{{min-width:120px}}.top h1{{font-size:17px}}}}
+</style>
+<div class='top'><h1>GBM 4D viewer</h1><span class='pill'>Research prototype. Not for patient care.</span></div>
+<div class='row'>{pills}</div>
+<div class='row'><button id='bm_risk' class='on' onclick="setM('risk')">Recurrence-risk map</button><button id='bm_sim' onclick="setM('sim')">Growth simulation over time</button>
+<span id='simctl' style='display:none;gap:8px;align-items:center'><select id='scen'>
+<option value='none'>No treatment</option><option value='drug20'>Assumed drug, kill = 20% of growth rate</option><option value='drug40'>Assumed drug, kill = 40% of growth rate</option></select>
+<input id='day' type='range' min='0' max='{len(DAYS) - 1}' value='0' style='width:240px'><b id='dl'>day 0</b></span></div>
+<div class='cards' id='cards_risk'>
+<div class='card'><div class='k'>Recurrence inside standard 15 mm plan</div><div class='v' id='v_std'></div><div class='bar'><i id='b_std' style='background:#94a3b8'></i></div></div>
+<div class='card'><div class='k'>Recurrence inside model plan, same volume</div><div class='v' id='v_mod' style='color:var(--acc)'></div><div class='bar'><i id='b_mod' style='background:#fbbf24'></i></div></div>
+<div class='card'><div class='k'>Difference</div><div class='v' id='v_gain'></div></div><div class='card'><div class='k'>Plan volume</div><div class='v' id='v_vol'></div></div></div>
+<div class='cards' id='cards_sim' style='display:none'><div class='card'><div class='k'>Simulated tumour at start</div><div class='v' id='s_start'></div></div>
+<div class='card'><div class='k'>Simulated tumour now</div><div class='v' id='s_now'></div></div><div class='card'><div class='k'>Change</div><div class='v' id='s_ch'></div></div></div>
+<div id='note'></div>"""
+    html = fig.to_html(include_plotlyjs=True, full_html=True, config=dict(displaylogo=False, displayModeBar=False))
+    html = html.replace("<body>", "<body>" + controls, 1)
     html = html.replace("</body>", "<script>" + script + "</script></body>", 1)
     OUT.mkdir(parents=True, exist_ok=True)
     (OUT / "viewer4d.html").write_text(html, encoding="utf-8")
