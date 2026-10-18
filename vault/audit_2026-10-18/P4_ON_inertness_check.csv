@@ -1,0 +1,5 @@
+OFF,patients_with_any_difference,n_diff_ttp,n_diff_VR,max_abs_dVR,n_diff_drugpct,max_abs_ddrugpct,n_diff_holidays,affected_rho_range,affected_with_rho_gt_0.02
+0.5,12,5,12,0.004283424614456188,10,6.777812857406701,7,"(np.float64(0.01208), np.float64(0.11019))",7
+0.65,16,6,16,0.02600420925629421,16,8.000022374944614,14,"(np.float64(0.01119), np.float64(0.11019))",10
+0.8,16,9,16,0.021890505891930756,16,5.333332833603876,15,"(np.float64(0.01246), np.float64(0.11019))",10
+0.9,26,14,26,0.15075242936712407,26,8.444390505419722,26,"(np.float64(0.00676), np.float64(0.11019))",10

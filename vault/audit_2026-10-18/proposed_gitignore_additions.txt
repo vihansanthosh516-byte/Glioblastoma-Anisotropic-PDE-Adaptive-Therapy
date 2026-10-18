@@ -1,0 +1,24 @@
+# PROPOSED additions to .gitignore (2026-10-18). NOT APPLIED. Review, then paste or ask me to apply.
+# Why: 50 untracked entries total 1.87 GB; about 1.84 GB of that is .npz arrays. Small JSON records, logs and scripts are left visible so they can be committed.
+# Your .gitignore already covers output/*.npz (top level only) and output/**/*.pt, but not the paths below.
+# Note: .gitattributes marks *.npz as a Git LFS filter, so if you ever do want an array in git it should go through LFS.
+
+# Kaggle / H-3 / H-4 run packs and outputs (regenerable by the scripts named in the ledger; hashes recorded in the JSON files)
+kaggle_run/**/*.npz
+#   untracked now: pack_h4/h4_retrain_pack.npz 534 MB, pack_h4/pg_mri_ext_2mm.npz 66 MB, out_final 327 MB (3 files), pack_mu 215 MB,
+#   pack_ucsf 214 MB, pack_unetval 136 MB, pack_mri 88 MB, kernel_out_pg 8 MB
+
+# Locked-test logits (large; their SHA-256 are recorded in test_results.json and ucsf_test_results.json)
+output/predictgbm/**/*.npz
+#   untracked now: final/test_logits_2mm.npz 159 MB, h3_final/ucsf_logits_2mm.npz 97 MB
+#   DECISION FOR YOU: these two files are what re-scoring the locked H-2 and H-3 tests would need. Ignoring them keeps git small but
+#   they then exist only on this machine. Keep a copy elsewhere (or LFS) before relying on them.
+
+# Bytecode inside kaggle_run (a tracked .pyc exists already: kaggle_run/__pycache__/run_job.cpython-314.pyc)
+kaggle_run/**/*.pyc
+
+# NOT proposed (needs your decision)
+#   - kaggle_run/out_h4_retrain/h4_retrain_model_state.pt (5.6 MB) and the other .pt files in kaggle_run/out_*: README 5a.5 says 'decide'.
+#     The SHA-256 b9846e1f... is recorded in h4_retrain_train.json, so the file can be verified if kept anywhere.
+#   - output/pde_manifest*/cache_*: about 2 MB in total, not worth a rule.
+#   - CLAUDE.md is listed in .gitignore but is tracked, so edits to it still show in git status. Remove the .gitignore line or untrack it (git rm --cached) if that is not intended.

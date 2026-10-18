@@ -1,0 +1,8 @@
+ratio,n,MTD_more_resistant,adaptive_more_resistant,ties,median_res_frac_MTD,median_res_frac_adaptive,mean_drug_pct_of_MTD,mean_VR_adaptive_over_MTD,median_VR,mean_final_mass_MTD,mean_final_mass_adaptive,TTP_adaptive_earlier,TTP_adaptive_later,TTP_same,both_censored,any_progression,rho>0.02_n,rho>0.02_adaptive_earlier,rho<=0.02_n,rho<=0.02_adaptive_earlier,n_MTD_ever_below_half,source
+100,61,27,0,34,0.2377,0.2377,96.0127,1.0002,1.0,328.7791,330.569,27,0,34,34,27,10,10,51,17,7,new run
+250,61,59,0,2,0.5135,0.3403,64.5427,1.2403,1.2379,312.9161,316.7988,14,7,40,39,22,10,10,51,4,29,new run
+500,61,57,0,4,0.8463,0.3068,44.8869,1.7319,1.621,308.3762,315.7272,10,12,39,39,22,10,10,51,0,58,existing (ledger 2n)
+1000,61,54,0,7,0.9918,0.3063,32.3551,2.3913,1.991,306.3963,315.8595,10,12,39,39,22,10,10,51,0,59,"existing (ledger 2n), re-run matches exactly"
+2000,61,51,0,10,1.0,0.3057,26.3078,2.8912,1.9516,305.6403,316.0183,10,12,39,39,22,10,10,51,0,60,existing (ledger 2n)
+4000,61,49,0,12,1.0,0.3144,23.2677,3.0835,2.4993,305.3501,316.1064,9,13,39,39,22,10,9,51,0,61,new run
+8000,61,43,0,18,1.0,0.3528,22.0546,3.1694,2.3131,305.1914,316.5072,5,13,43,39,22,10,5,51,0,61,new run

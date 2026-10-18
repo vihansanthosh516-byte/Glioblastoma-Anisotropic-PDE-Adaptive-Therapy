@@ -76,7 +76,7 @@ python src/phase15_virtual_trial.py \
 pytest tests/
 ```
 
-9 test files, 56 tests covering: `test_inverse_estimation`, `test_joint_inverse_estimation`, `test_robust_mpc`, `test_spatial_metrics`, `test_multiomic_fusion`, `test_hybrid_controller`, `test_mu_glioma_loader`, `test_retrospective_validation`, `test_treatment_models`.
+15 test files, 101 tests (all passed on 2026-10-18 in a copy with partial data; see ledger 2bo) covering: `test_inverse_estimation`, `test_joint_inverse_estimation`, `test_robust_mpc`, `test_spatial_metrics`, `test_multiomic_fusion`, `test_hybrid_controller`, `test_mu_glioma_loader`, `test_retrospective_validation`, `test_treatment_models`, `test_baselines`, `test_metrics_stats`, `test_no_leakage`, `test_run_manifest`, `test_solver`, `test_solver_monotone`.
 
 ## Docker (Track B + C)
 
@@ -120,7 +120,7 @@ Never use relative paths like `Path("output")` or `"output/file.json"` — they 
 
 **Track A data dependency:** Scripts `01`–`41` require the external UCSC Cell Browser `multiomic-gbm` dataset (~1.4 GB) pointed to via `GBM_DATA_DIR`. Without it, Track A scripts will fail at data loading.
 
-**`Requirements.txt` has unresolved merge conflict markers** — use the dependency list from `pyproject.toml` or the README installation instructions instead.
+**`Requirements.txt` had merge conflict markers; resolved 2026-10-18 by keeping the union of both sides (SALib, nibabel, dipy, scikit-learn, h5py).** `pyproject.toml` does not list these packages yet, so use `Requirements.txt` together with the install lines under Environment Setup.
 
 ## Verification Protocol
 
