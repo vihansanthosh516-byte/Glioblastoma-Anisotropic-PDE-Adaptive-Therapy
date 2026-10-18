@@ -515,3 +515,29 @@ s in {0, 0.25, 0.5, 0.75, 1.0} constant, plus one volume-dependent scenario "vol
 
 ### A16.6 Not declared, no re-runs
 No other outcome counts as a test. No change of the grid, the noise bounds, the growth spread or the thresholds after seeing the result. Results are labelled "simulation, assumed parameters" and never as evidence about a real trial. The script is committed before it is run.
+
+## Amendment 17 (2026-10-18): Probabilistic RANO calculator (Aim 4). TOOL, not a result. Written before the code exists.
+
+### A17.1 Status and honest framing
+A small open-source function, `src/rano_calc.py`, plus tests `tests/test_rano_calc.py`. It is NOT a clinical device and is not validated on patients. It turns the A15 noise bracket and a stated normal-error model into probabilities. Every output carries the label "model-based, noise bracket from one centre (LUMIERE, 2 tools); not for clinical use".
+
+### A17.2 Definitions (fixed now)
+Input: volumes v0 and v1 in mm3, and either a change SD `s` (ln units, the SD of the log-ratio error as in A15/A16) or `band="auto"` (size band chosen from the geometric mean of v0 and v1 using the A15 edges 2503.39 and 5118.34 mm3).
+- Bracket by band = (min, max) of the A15 `s_change_upper_bound` and `s_change_lower_bound` from `output/rano_noise/rano_tool_dependence.json`; the code reads that file and does not copy numbers.
+- Backward (posterior) mode: flat prior on the true log ratio r; r | observed ~ N(ln(v1/v0), s^2). Returns P(true change >= +40%), P(true change <= -65%), P(between). Label: "flat-prior, normal-error approximation".
+- Forward mode: given a true ratio, returns the probability that the observed call is progression (observed log ratio >= ln 1.40), partial response (<= ln 0.35) or stable, with observed log ratio ~ N(ln true ratio, s^2).
+- Floor flag: if either volume is below 500 mm3, output carries `below_measurability_floor = True` and the class is reported as "not measurable (RANO 2.0)".
+- Minimal detectable change: MDC95 = 1.96 s in ln units, also as percent (exp(MDC) - 1).
+- s <= 0 returns the deterministic class.
+
+### A17.3 Tests with pass rules (fixed now, run once after the code is committed)
+1. Closed form vs Monte Carlo: 200000 draws, seed 20261018, for 12 (ratio, s) pairs; pass if every absolute difference < 0.005.
+2. Probabilities sum to 1 (tolerance 1e-9) for 50 random inputs.
+3. Monotone: P(PD) rises with v1 at fixed v0 and s; falls as s rises when the observed ratio is below 1.40 and rises with s when above... stated as: at observed ratio 1.40 exactly the backward P(true >= 1.40) = 0.5.
+4. Symmetry: forward P(observed PD | true 1.40) = 0.5.
+5. s = 0 gives class exactly equal to the RANO 2.0 rule (ratio >= 1.40 PD, <= 0.35 PR, else stable) for 1000 random pairs.
+6. Floor flag raised for v < 500 mm3 and not raised at 500 mm3 exactly.
+7. Bracket reading: the code returns bracket values equal to those in the A15 JSON (assert equality).
+
+### A17.4 Not declared
+No performance claim, no clinical claim. No change of tests after seeing results. If a test fails, the failure is reported and the code is fixed under a new amendment.
