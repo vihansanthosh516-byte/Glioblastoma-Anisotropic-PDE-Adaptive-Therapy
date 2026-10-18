@@ -150,3 +150,9 @@ The author gives Claude's overviews, numbers and claims to ChatGPT for an indepe
 - When an overview is written for review, include the negative findings, as `paper/overview_for_review.md` does.
 - When ChatGPT feedback comes back, check each claim against the files before acting. Do not agree or disagree by deference. Record what is wrong in `paper/chatgpt_review_response.md` and what is right too.
 - Interim numbers (jobs still running) must be labelled interim. A reviewer may quote them.
+
+## Past work is not automatically good (user rule, 2026-10-18)
+- Do not assume something is good, correct or worth keeping because it was already built, committed, or reported in the ledger. Judge it on evidence and on whether it serves the current goal.
+- Discarding the existing work and starting over is acceptable to the user. Say so plainly when it is the better choice. Do not defend sunk cost.
+- Current goal (set 2026-10-18): a completely new, strong project in computational biology with substantial mathematics, for the Greater Austin Regional Engineering and Science Fair (GARE), with a February 2027 deadline. Findings must be backed by solid science. Claims of novelty must say how they were checked and what is unverified.
+- Presentation rule from the user: show best real results, do not advertise failures, never fabricate. Answer questions on limits fully when asked.
