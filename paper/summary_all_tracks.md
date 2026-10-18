@@ -1,3 +1,5 @@
+> **STATUS 2026-10-18: HISTORICAL.** Written before the pivot to the probabilistic-RANO project. Goals, plans, and words like "first", "novel", "revolutionary", "validated" in this file are NOT current and NOT supported. Numbers are records of past runs; check `vault/PAPER_FINDINGS_LEDGER.md` before you quote one. Current state: `START_HERE.md`.
+
 # Summary of all tracks
 
 Written 2026-10-18. Built only from `README_STATUS.md` (2026-10-18) and `paper/overview_for_review.md` (older, about 2026-10-05). No script was re-run. Numbers marked "overview" have no file cited there and were not re-checked against `output/` or the ledger. Where the two files disagree, the newer one (`README_STATUS.md`) wins.

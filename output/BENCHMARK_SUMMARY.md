@@ -1,3 +1,5 @@
+> **STATUS 2026-10-18: HISTORICAL.** Written before the pivot to the probabilistic-RANO project. Goals, plans, and words like "first", "novel", "revolutionary", "validated" in this file are NOT current and NOT supported. Numbers are records of past runs; check `vault/PAPER_FINDINGS_LEDGER.md` before you quote one. Current state: `START_HERE.md`.
+
 # Benchmark Summary: Core vs Periphery vs Healthy Classification
 
 **Dataset:** 15,000 cells (5,000 per class) from multiomic-gbm scRNA-seq

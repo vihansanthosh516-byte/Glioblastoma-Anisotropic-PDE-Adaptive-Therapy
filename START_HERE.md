@@ -1,0 +1,52 @@
+# START HERE (for any AI agent or person). Updated 2026-10-18.
+
+Read this file first. If another file disagrees with it, this file and `vault/PAPER_FINDINGS_LEDGER.md` win.
+
+## 1. Current goal
+One author. Greater Austin Regional Science and Engineering Fair (GARSEF; deadline February 2027; dates, categories and forms NOT verified). Goal: a new, strong computational-biology project with real mathematics, backed by solid science. A win is not predictable. Never promise one.
+
+## 2. Current project: "probabilistic RANO"
+Question: are the RANO 2.0 volume lines (progression at +40%, partial response at -65%, measurability floor 0.5 cm3) above the measurement noise of automated segmentation in glioblastoma, and what does the noise do to trial endpoints (progression-free survival, PFS)?
+- Plan: `paper/phd_level_plan_probabilistic_rano.md`. Problem and literature: `paper/problem_first_rano_noise.md`.
+- Rules and declarations: `analysis_plan_v1.md` (Amendments 14, 15, 16 are the current ones). Results: `vault/PAPER_FINDINGS_LEDGER.md` (latest entry 2br; next id 2bs).
+- Novelty is UNVERIFIED (about 15 snippet-level searches). Say "not found in our searches", never "first" or "revolutionary".
+
+## 3. State of the work (checked against files on 2026-10-18)
+| Item | State | Source |
+|---|---|---|
+| A15 test 1: RANO class differs between the two tools | DONE. 54.5% of 121 eligible pairs (CI 45.6% to 63.8%), "material" | `output/rano_noise/rano_tool_dependence.json`, ledger 2br |
+| A15 test 2: minimal detectable change vs the +40% line | DONE. Smallest size band: inside the noise. Two larger bands: undetermined (noise lower bound is degenerate) | same |
+| A16 trial simulation (Aim 3) | DECLARED (commit 1b7f4ec). Script `src/141_trial_sim.py` NOT written, NOT run | `analysis_plan_v1.md` |
+| Calculator, patient timeline viewer, paper, poster | NOT started | plan |
+
+Weakest points of A15: the two tools are not a scan-rescan pair; 71.9% of pairs fell below the floor or had a missing volume; one centre; exploratory.
+
+## 4. Rules that must not break
+1. Declare a test in `analysis_plan_v1.md` and commit it BEFORE the code runs. Commit the code BEFORE the run. Run once. No re-runs with other thresholds.
+2. Every number cites a file in `output/` or the ledger. No number from memory.
+3. Report negative results unchanged. Label: simulation, assumed, post hoc, exploratory, interim.
+4. Never hand-edit output JSON. Fix the code and re-run (only if the plan allows a re-run).
+5. Paths come from `__file__`, not the working directory.
+6. After a script runs, check the output file exists and its size is above zero.
+7. Past work is NOT good just because it exists. Judge it on evidence.
+8. H-2 and H-3 test sets are SPENT (Amendment 12). They cannot be locked tests again.
+9. Commit format: `Script N: brief description`. Check `git status --short` first. Never `git add -A`. Push after each commit.
+
+## 5. The older GBM work (Tracks A, B, C)
+It is background, not the goal. Honest summary: `README_STATUS.md` (corrected after an audit). Important facts for anyone reading old files:
+- Old files call work "first", "novel", "revolutionary", "validated". Those words are NOT supported. Ignore them.
+- RL results: the 25% gain is on a simulated cohort; the real-test result (20/21) uses assumed kill rates. Both are simulation.
+- Growth-model forecasts did not beat "no change" on real data (persistence baseline).
+- Several drug and RL numbers use assumed parameters, not measured ones.
+- Script count: 154 numbered files in `src/` (01 to 140, with number collisions) and 202 `.py` files; 15 test files.
+
+## 6. Which files to trust
+| Status | Files |
+|---|---|
+| CURRENT | `START_HERE.md`, `CLAUDE.md`, `analysis_plan_v1.md`, `vault/PAPER_FINDINGS_LEDGER.md`, `paper/phd_level_plan_probabilistic_rano.md`, `paper/problem_first_rano_noise.md`, `README_STATUS.md` (old-work status, corrected) |
+| BACKGROUND (still true as records, wrong as goals) | `paper/new_project_options.md`, `paper/literature_search_digital_twin.md`, `vault/LIMITS_CURRENT.md`, `vault/claim_ledger.md`, `vault/audit_2026-10-18/*` |
+| HISTORICAL (banner at the top of each file; do not use for goals or "first" claims) | `README.md`, `REPO_MIND_MAP.md`, `TRACK_A_RESULTS.md`, `FIXES_SUMMARY.md`, `most_revolutionary_track.md`, `discrepancies_table.md`, `docs/*`, `output/*.md`, `paper/GRAND_PLAN.md`, `paper/summary_all_tracks.md`, `paper/overview_for_review.md`, `paper/project_plan_trusted_twin.md`, `paper/masterplan_implementation_plan.md`, `vault/Script-*.md`, `vault/TRACK_*.md` |
+| ARCHIVE (unchanged on purpose) | `vault/audit_2026-10-18/originals/*`, `.claude/skills/*`, `graphify-out/*` |
+
+## 7. Next step
+Write `src/141_trial_sim.py` exactly as Amendment 16 says. Commit it. Run once. Verify `output/trial_sim/` on disk. Add ledger 2bs. Report as declared.

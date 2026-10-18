@@ -1,3 +1,5 @@
+> **STATUS 2026-10-18: HISTORICAL.** Written before the pivot to the probabilistic-RANO project. Goals, plans, and words like "first", "novel", "revolutionary", "validated" in this file are NOT current and NOT supported. Numbers are records of past runs; check `vault/PAPER_FINDINGS_LEDGER.md` before you quote one. Current state: `START_HERE.md`.
+
 # Repo Mind Map: 20206 science fair (detailed)
 
 Made 2026-10-14. Read-only map. No code or data was changed.

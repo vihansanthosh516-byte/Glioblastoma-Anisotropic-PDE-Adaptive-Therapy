@@ -1,3 +1,5 @@
+> **STATUS 2026-10-18: HISTORICAL.** Written before the pivot to the probabilistic-RANO project. Goals, plans, and words like "first", "novel", "revolutionary", "validated" in this file are NOT current and NOT supported. Numbers are records of past runs; check `vault/PAPER_FINDINGS_LEDGER.md` before you quote one. Current state: `START_HERE.md`.
+
 # Script 82: MGMT-calibrated resistance analysis (C3 on real data)
 
 **Date:** 2026-10-04. **Script / outputs:** `src/82_mgmt_calibrated_resistance.py`, `output/mgmt_resistance/{results.json, km_mgmt_ttp.png, cells/}`. Hypothesis, endpoints, calibration rule and the "flips positive" rule are in the script header (written before the run). A smoke test of the clinical part (no design change) was run first.

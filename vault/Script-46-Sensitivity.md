@@ -1,3 +1,5 @@
+> **STATUS 2026-10-18: HISTORICAL.** Written before the pivot to the probabilistic-RANO project. Goals, plans, and words like "first", "novel", "revolutionary", "validated" in this file are NOT current and NOT supported. Numbers are records of past runs; check `vault/PAPER_FINDINGS_LEDGER.md` before you quote one. Current state: `START_HERE.md`.
+
 # Script 46 — Sobol Sensitivity Analysis
 
 > **SUPERSEDED (2026-10-03):** the S1=0.998 result came from a reduced ODE, not the PDE. Real PDE Sobol: α_sens S1=0.43, ρ_s S1=0.20, D_w S1=0.000. See [[Script-60-66-Swanson-D]].

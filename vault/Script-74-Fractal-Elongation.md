@@ -1,3 +1,5 @@
+> **STATUS 2026-10-18: HISTORICAL.** Written before the pivot to the probabilistic-RANO project. Goals, plans, and words like "first", "novel", "revolutionary", "validated" in this file are NOT current and NOT supported. Numbers are records of past runs; check `vault/PAPER_FINDINGS_LEDGER.md` before you quote one. Current state: `START_HERE.md`.
+
 # Script 74 — Matched-isotropic paired test (D_f and elongation)
 
 **Source:** `output/fractal_aniso_vs_iso.json` (script `src/74_fractal_aniso_vs_iso.py`). n = 103 patients (MU-Glioma-Post masks). Design: paired, same patient, rho, seed, dt and steps. Only the tensor differs. Iso tensor = trace(D)/2 * I. Values below were read from the JSON on 2026-10-04.

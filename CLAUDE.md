@@ -4,7 +4,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Multi-track computational oncology research platform for glioblastoma treatment planning. Four tracks, 65+ numbered pipeline scripts:
+**Read `START_HERE.md` first.** CURRENT PROJECT (2026-10-18): "probabilistic RANO" (measurement noise of RANO 2.0 volume lines and its effect on PFS and trial power; see `START_HERE.md`, `analysis_plan_v1.md` Amendments 14-16, `paper/phd_level_plan_probabilistic_rano.md`). The four tracks below are the OLDER GBM platform: background, not the goal. Old files that say "first", "novel" or "revolutionary" are not supported.
+
+Older platform: four tracks, 154 numbered scripts in `src/` (01 to 140, with number collisions; 202 `.py` files in total):
 
 | Track | Scripts | Domain |
 |-------|---------|--------|
@@ -154,5 +156,5 @@ The author gives Claude's overviews, numbers and claims to ChatGPT for an indepe
 ## Past work is not automatically good (user rule, 2026-10-18)
 - Do not assume something is good, correct or worth keeping because it was already built, committed, or reported in the ledger. Judge it on evidence and on whether it serves the current goal.
 - Discarding the existing work and starting over is acceptable to the user. Say so plainly when it is the better choice. Do not defend sunk cost.
-- Current goal (set 2026-10-18): a completely new, strong project in computational biology with substantial mathematics, for the Greater Austin Regional Engineering and Science Fair (GARE), with a February 2027 deadline. Findings must be backed by solid science. Claims of novelty must say how they were checked and what is unverified.
+- Current goal (set 2026-10-18): a completely new, strong project in computational biology with substantial mathematics, for the Greater Austin Regional Science and Engineering Fair (GARSEF), with a February 2027 deadline. Chosen project: probabilistic RANO (see `START_HERE.md`). Findings must be backed by solid science. Claims of novelty must say how they were checked and what is unverified.
 - Presentation rule from the user: show best real results, do not advertise failures, never fabricate. Answer questions on limits fully when asked.

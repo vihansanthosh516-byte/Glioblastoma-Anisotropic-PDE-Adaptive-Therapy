@@ -1,3 +1,5 @@
+> **STATUS 2026-10-18: HISTORICAL.** Written before the pivot to the probabilistic-RANO project. Goals, plans, and words like "first", "novel", "revolutionary", "validated" in this file are NOT current and NOT supported. Numbers are records of past runs; check `vault/PAPER_FINDINGS_LEDGER.md` before you quote one. Current state: `START_HERE.md`.
+
 # Scripts 67-68 — Kill-conditioned policy and the TTP endpoint
 
 **Sources:** `output/rl_kill_conditioned/evaluate.json` (script 67), `output/ttp_equal_budget/evaluate.json` (script 68). Values read 2026-10-04.

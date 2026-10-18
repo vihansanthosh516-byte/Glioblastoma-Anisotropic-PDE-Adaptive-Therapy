@@ -1,3 +1,5 @@
+> **STATUS 2026-10-18: HISTORICAL.** Written before the pivot to the probabilistic-RANO project. Goals, plans, and words like "first", "novel", "revolutionary", "validated" in this file are NOT current and NOT supported. Numbers are records of past runs; check `vault/PAPER_FINDINGS_LEDGER.md` before you quote one. Current state: `START_HERE.md`.
+
 # Fixes Summary: Glioblastoma Anisotropic PDE & Adaptive Therapy Pipeline
 
 **Applied**: 2026-06-15 (single-session fixes following comprehensive audit)

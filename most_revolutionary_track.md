@@ -1,6 +1,8 @@
+> **STATUS 2026-10-18: HISTORICAL.** Written before the pivot to the probabilistic-RANO project. Goals, plans, and words like "first", "novel", "revolutionary", "validated" in this file are NOT current and NOT supported. Numbers are records of past runs; check `vault/PAPER_FINDINGS_LEDGER.md` before you quote one. Current state: `START_HERE.md`.
+
 # Most Revolutionary Track: Track C (Digital Twin Reactor)
 
-Per the ISEF outline, **Track C** is the most revolutionary component of the platform.
+Per the ISEF outline, **Track C** is the component the outline called most revolutionary. That is the outline's wording; no literature check supports "first" or "revolutionary".
 
 ## Key Innovations (Section 4.3 - Novelty)
 

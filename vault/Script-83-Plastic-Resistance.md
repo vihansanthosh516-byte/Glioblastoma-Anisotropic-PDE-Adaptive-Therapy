@@ -1,3 +1,5 @@
+> **STATUS 2026-10-18: HISTORICAL.** Written before the pivot to the probabilistic-RANO project. Goals, plans, and words like "first", "novel", "revolutionary", "validated" in this file are NOT current and NOT supported. Numbers are records of past runs; check `vault/PAPER_FINDINGS_LEDGER.md` before you quote one. Current state: `START_HERE.md`.
+
 # Script 83: plastic resistance and adaptive therapy
 
 Model: script 76 TwoPopSim plus drug-induced S<->T switching (sig_i on drug, sig_r off drug). f_r0 = 0.001, cost 0.25, eps 0, window 365 d.

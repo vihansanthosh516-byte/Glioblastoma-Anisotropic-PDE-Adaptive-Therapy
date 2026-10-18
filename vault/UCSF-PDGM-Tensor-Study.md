@@ -1,3 +1,5 @@
+> **STATUS 2026-10-18: HISTORICAL.** Written before the pivot to the probabilistic-RANO project. Goals, plans, and words like "first", "novel", "revolutionary", "validated" in this file are NOT current and NOT supported. Numbers are records of past runs; check `vault/PAPER_FINDINGS_LEDGER.md` before you quote one. Current state: `START_HERE.md`.
+
 # UCSF-PDGM Three-Way Tensor Study (real patients, n = 62)
 
 Written 2026-10-04. This study was missing from the vault. Numbers below were recomputed from the CSV files on disk.

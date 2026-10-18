@@ -1,3 +1,5 @@
+> **STATUS 2026-10-18: HISTORICAL.** Written before the pivot to the probabilistic-RANO project. Goals, plans, and words like "first", "novel", "revolutionary", "validated" in this file are NOT current and NOT supported. Numbers are records of past runs; check `vault/PAPER_FINDINGS_LEDGER.md` before you quote one. Current state: `START_HERE.md`.
+
 # Biophysical Glioblastoma (GBM) Modeling & Reinforcement Learning Therapy Framework
 ## Comprehensive Project Review Summary for Peer Review, Scientific Critics, and ISEF Judges
 
@@ -231,7 +233,7 @@ This project answers **yes**. By integrating 3D anisotropic DTI-based diffusion,
 
 ## CONCLUSION
 
-This framework establishes the **first end-to-end biophysical Digital Twin for GBM** that:
+This framework establishes an end-to-end biophysical digital-twin pipeline for GBM (the word "first" was removed 2026-10-18: no literature check supports it) that:
 1. **Integrates** DTI anisotropy, poroelastic mechanics, and multimodal therapy in a single 3D PDE solver
 2. **Demonstrates** RL adaptive therapy achieving **10.6× tumor clearance** over standard Stupp (1.04 vs 11.01 mm³)
 3. **Discovers** a clinically actionable biomarker rule: **ρ > 0.024 → use RL adaptive**

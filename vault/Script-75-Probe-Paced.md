@@ -1,3 +1,5 @@
+> **STATUS 2026-10-18: HISTORICAL.** Written before the pivot to the probabilistic-RANO project. Goals, plans, and words like "first", "novel", "revolutionary", "validated" in this file are NOT current and NOT supported. Numbers are records of past runs; check `vault/PAPER_FINDINGS_LEDGER.md` before you quote one. Current state: `START_HERE.md`.
+
 # Script 75 — Probe-then-commit and paced heuristic
 
 **Source:** `output/probe_paced_policies/evaluate.json` (script `src/75_probe_and_paced_policies.py`). Budget 35.0, horizon 365 d, progression factor 1.4. Values read from the JSON on 2026-10-04.

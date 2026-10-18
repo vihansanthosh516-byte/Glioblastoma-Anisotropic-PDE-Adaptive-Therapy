@@ -1,10 +1,10 @@
 # GBM computational oncology project: status README
 
-Written 2026-10-17. Corrected the same day after a number audit against the ledger and `output/`. All numbers come from `vault/PAPER_FINDINGS_LEDGER.md` (entries cited as "ledger 2xx") or files in `output/`. I did not re-run any script for this file. Interim numbers are marked interim. The old `README.md` is unchanged.
+**This file covers the OLDER GBM platform. The current project (probabilistic RANO, from 2026-10-18) is described in `START_HERE.md`.** Written 2026-10-17. Corrected the same day after a number audit against the ledger and `output/`. All numbers come from `vault/PAPER_FINDINGS_LEDGER.md` (entries cited as "ledger 2xx") or files in `output/`. I did not re-run any script for this file. Interim numbers are marked interim. The old `README.md` is unchanged.
 
 ## 1. What this project is
 
-A glioblastoma (GBM) research platform with four tracks and 190+ scripts (150 with numbered file names; see `REPO_MIND_MAP.md` for the full inventory).
+A glioblastoma (GBM) research platform with four tracks and 202 `.py` files in `src/` (154 with numbered file names, counted 2026-10-18; see `REPO_MIND_MAP.md` for the full inventory).
 
 | Track | Scripts | Domain |
 |---|---|---|
