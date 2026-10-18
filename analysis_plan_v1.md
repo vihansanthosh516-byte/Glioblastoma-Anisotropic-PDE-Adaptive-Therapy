@@ -484,3 +484,34 @@ Per pair, d = (ln V1 - ln V0 in tool A) - (ln V1 - ln V0 in tool B). Size band =
 
 ### A15.5 Not declared here
 Trial simulation (A3) and the measurement-model identifiability proof (A1) get their own amendment before they are run. Anything computed beyond A15.3 and A15.4 is labelled undeclared exploratory. No re-run with other thresholds, floors or definitions after seeing the result.
+
+## Amendment 16 (2026-10-18): Trial simulation (Aim 3) -- how segmentation noise in a volumetric progression call biases progression-free survival (PFS) and trial power. SIMULATION ONLY. Written before the simulation script exists or runs.
+
+### A16.1 Status and honest framing
+Pure simulation. Every parameter below is ASSUMED or taken from the A15 noise bracket; none is fitted to a trial. Results are a sensitivity analysis of how measurement noise could act, not a forecast of any real trial. Seen before this declaration: A15 results (`output/rano_noise/rano_tool_dependence.json`). Nothing from this simulation. Wording: "simulation, assumed parameters".
+
+### A16.2 Model (fixed now)
+Units: weeks. Two arms, 1:1, N per arm. Patient i has true volume V(t) = V0 exp(g t), monotone growth, baseline = nadir in truth. ln g_i = ln g_med + 0.6 Z_i (assumed spread); control g_med = ln(1.40) / 34.8 per week (true median time to a true +40% rise = 34.8 weeks = 8 months, in the range of published median PFS in newly diagnosed glioblastoma, 8.8 to 11.8 months in one 73-patient cohort, PMC11241823; assumed). Experimental arm: g multiplied by theta. True progression time T_true = ln(1.40) / g. ln V0 ~ N(ln 4000 mm3, 0.8^2) (assumed; used only by the volume-dependent noise). Scans at weeks 0, D, 2D, ... up to 104 weeks (D = 8 or 12). Administrative censoring at the last scan.
+Measurement: ln Vhat_j = ln V(t_j) + e_j with e_j ~ N(0, (s / sqrt(2))^2), independent across scans, tool-independent of arm (non-differential). s is the standard deviation of the CHANGE error of one tool (the quantity bounded in A15.4); a single-scan error has SD s / sqrt(2).
+Calls: reference at scan j = minimum of Vhat over earlier scans including baseline (RANO nadir rule). Single-scan rule: progression at the first scan j >= 1 with Vhat_j / ref_j >= 1.40. Confirmed rule: progression at scan j if the criterion holds at scan j and also at scan j+1 against the SAME ref_j; event time = t_j; a scan with no following scan cannot be confirmed. No event by the last scan = censored there. Response and the 0.5 cm3 floor are not modelled.
+
+### A16.3 Grid and replication
+s in {0, 0.25, 0.5, 0.75, 1.0} constant, plus one volume-dependent scenario "vol" using the A15 UPPER-bound change SD by size band: 1.286 (V < 2503 mm3), 1.133 (2503 to 5118 mm3), 0.718 (> 5118 mm3), applied to the true current volume at each scan. confirm in {none, two-scan}; theta in {1.0, 0.7}; N in {50, 100}; D in {8, 12} weeks. 6 x 2 x 2 x 2 x 2 = 96 cells. R = 2000 simulated trials per cell. Master seed 20261018; common random numbers: for each (N, D) the draws Z_i, V0 and the noise draws are generated once per trial and reused across s, confirm and theta, so differences are paired.
+
+### A16.4 Estimands (all relative to the SAME rule with s = 0, which removes discretisation bias)
+- E1 noise-attributable bias in the control-arm Kaplan-Meier median PFS = median(s) - median(0), in weeks, mean over trials with Monte Carlo 95% CI (mean +/- 1.96 SE); trials where a median is not reached are excluded and counted. Reading: material if |mean| >= 4.345 weeks (one month) and the CI excludes 0.
+- E2 power change at theta = 0.7: rejection rate (two-sided log-rank, chi-square > 3.8415) at s minus at 0, paired across trials, MC 95% CI. Reading: material loss if <= -0.05 with the CI excluding 0.
+- E3 type I error at theta = 1.0: rejection rate at each s. Expectation declared now: non-differential noise keeps it within [0.04, 0.06]; report any cell outside it.
+- E4 attenuation at theta = 0.7: mean of (Peto log hazard ratio at s) minus (Peto log hazard ratio at 0), with MC 95% CI. Peto log HR = (O - E) / V of the log-rank.
+- E5 early-call share: share of patients whose observed event time is earlier than T_true - D, by cell (s, rule).
+- E0 discretisation check at s = 0: mean (observed control median at s = 0) minus (Kaplan-Meier median of the continuous T_true with the same censoring); expected positive and of the order of D / 2.
+
+### A16.5 Predictions declared before the run (each reported as supported or not supported)
+- H-S1: with the single-scan rule, noise makes PFS earlier: E1 < 0 with the CI excluding 0 for s = 0.5, 0.75 and 1.0 at N = 100, D = 8, theta = 0.
+  (The control arm is used; theta does not enter E1.)
+- H-S2: noise attenuates the effect: E4 > 0 with the CI excluding 0 for s = 0.5, 0.75 and 1.0 at N = 100, D = 8, single-scan, theta = 0.7.
+- H-S3: confirmation trades early bias for delay: at s = 0.75, N = 100, D = 8, |E1| is smaller with the two-scan rule than with the single-scan rule, AND at s = 0 the two-scan control median exceeds the single-scan control median.
+- H-S4: non-differential noise does not inflate type I error (E3 within [0.04, 0.06] in all cells at R = 2000; MC standard error about 0.005).
+
+### A16.6 Not declared, no re-runs
+No other outcome counts as a test. No change of the grid, the noise bounds, the growth spread or the thresholds after seeing the result. Results are labelled "simulation, assumed parameters" and never as evidence about a real trial. The script is committed before it is run.
