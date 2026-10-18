@@ -3,7 +3,7 @@
 You know nothing about this project. Rate it honestly. I want hard feedback, not praise. Every number below comes from a file named in the last column; interim numbers are marked.
 
 ## What it is
-A single-author science-fair project (Greater Austin regional fair, February 2027) in computational biology of glioblastoma. Question: RANO 2.0 calls tumour progression at a volume rise of 40% or more (partial response at a fall of 65% or more; floor 0.5 cm3). Volumes now come from automated segmentation. Are those lines above the measurement noise, and what does noise do to trial endpoints (progression-free survival, PFS)? All work is retrospective analysis of public data or simulation. Nothing was tested on live patients. No paper yet.
+A single-author science-fair project (Greater Austin regional fair, February 2027) in computational biology of glioblastoma. Question: RANO 2.0 calls tumour progression at a volume rise of 40% or more (partial response at a fall of 65% or more; progression is judged against the nadir; the 0.5 cm3 floor is our own rule, not part of RANO 2.0). NOTE: Result 1 compares CONSECUTIVE scans, not the nadir, so it is not the RANO rule itself. Volumes now come from automated segmentation. Are those lines above the measurement noise, and what does noise do to trial endpoints (progression-free survival, PFS)? All work is retrospective analysis of public data or simulation. Nothing was tested on live patients. No paper yet.
 
 ## Method rules
 Each test is written into `analysis_plan_v1.md` and committed before the code runs; the code is committed before the run; each runs once; no re-runs with other settings.

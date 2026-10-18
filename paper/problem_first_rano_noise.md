@@ -3,7 +3,7 @@
 Status: research brief only. Nothing here is declared or run. Novelty = not found in about 12 searches (snippet level); UNVERIFIED.
 
 ## 1. The problem (from the literature)
-- RANO 2.0 volumetric rules: progression = volume increase of 40% or more; partial response = decrease of 65% or more; measurability floor 0.5 cm3. Sources: https://pmc.ncbi.nlm.nih.gov/articles/PMC11630866/ (guide), https://pmc.ncbi.nlm.nih.gov/articles/PMC12986764/ (RANO 2.0 vs mRANO vs RANO, 137 patients).
+- RANO 2.0 volumetric rules: progression = volume increase of 40% or more; partial response = decrease of 65% or more; reference = nadir for progression, baseline for response. The 0.5 cm3 floor is our operational choice, NOT in the RANO 2.0 text (checked 2026-10-18). Sources: https://pmc.ncbi.nlm.nih.gov/articles/PMC11630866/ (guide), https://pmc.ncbi.nlm.nih.gov/articles/PMC12986764/ (RANO 2.0 vs mRANO vs RANO, 137 patients).
 - Volumes come from segmentation, which is noisy: manual and automated inter-rater ICC from 0.22 to 0.96 across studies; automated tools "need expert supervision" (https://pmc.ncbi.nlm.nih.gov/articles/PMC10513769/, LUMIERE, 80 patients, 502 time points, two tools).
 - A 2026 narrative review states that no automated tool had been formally validated against RANO 2.0 (as of Nov 2024) (https://www.frontiersin.org/journals/neurology/articles/10.3389/fneur.2026.1797487/full).
 - NOT found in searches: any study that computes a minimal detectable change or within-subject variability for glioblastoma volumes, or that estimates how often segmentation error flips a RANO category near the 40% / 65% lines.

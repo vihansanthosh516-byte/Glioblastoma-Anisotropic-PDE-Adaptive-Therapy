@@ -541,3 +541,23 @@ Input: volumes v0 and v1 in mm3, and either a change SD `s` (ln units, the SD of
 
 ### A17.4 Not declared
 No performance claim, no clinical claim. No change of tests after seeing results. If a test fails, the failure is reported and the code is fixed under a new amendment.
+
+## Amendment 18 (2026-10-18): Sensitivity of A15 and A16 to the noise model, the floor and the reference rule. EXPLORATORY / SIMULATION. Written before any of this is computed. Replaces nothing; A15 and A16 stand as run. Amendment 17 (calculator) is postponed until Parts A and D are reported.
+
+### A18.1 Errata to earlier text
+The 0.5 cm3 floor in A15 and A16 is an operational choice. It is NOT part of the RANO 2.0 text (PMC11630866, checked 2026-10-18). RANO 2.0 compares progression with the NADIR and response with baseline; A15 test 1 used CONSECUTIVE-scan ratios, so it measures tool dependence of a consecutive-scan classification, not the RANO rule itself. Earlier wording that called the floor a RANO 2.0 rule is withdrawn.
+
+### A18.2 Part A: finer noise grid (simulation; script 142)
+Same model, seed, R=2000, common random numbers and estimands E1, E2, E4 as A16 (N=100, D=8, theta in {1.0, 0.7}, both rules). Constant s in {0.05, 0.10, 0.15, 0.20}. Reported: the smallest s in this grid and in the A16 grid with material E1 (|mean| >= 4.345 weeks, CI excludes 0) and with material power loss (<= -0.05, CI excludes 0), per rule. Prediction PA1: material E1 appears at s <= 0.15 for the single-scan rule. Prediction PA2: material power loss appears at s <= 0.15 for the single-scan rule.
+
+### A18.3 Part B: correlated scan noise
+Per-scan noise with marginal SD sigma in {0.10, 0.25, 0.50} and AR(1) correlation rho in {0, 0.5, 0.8} between successive scans of one patient (the change SD over one interval is sigma*sqrt(2(1-rho))). Same estimands, N=100, D=8, single-scan and two-scan. Prediction PB1: for fixed sigma, |E1| is smaller at rho=0.8 than at rho=0.
+
+### A18.4 Part C: death as an event
+Add an independent exponential death time, same in both arms, median 78 weeks (assumed, about 18 months); the PFS event is the first of a progression call or death; censoring unchanged. Compare E1 and E2 with Part A, at s in {0, 0.25, 0.5}. No prediction; report the direction.
+
+### A18.5 Part D: real-data sensitivity of A15 (script 142 reads the same inputs as script 140; labelled post hoc sensitivity, never replacing test 1)
+(i) Exclusion flow: counts of consecutive pairs lost by reason (a tool volume missing, zero, positive but below 500 mm3), by tool, and an eligible-versus-excluded comparison on time since the first scan and on the share with an expert PD rating. (ii) Flip rate of the class (PD/SD/PR) with the floor at 0 (any positive volumes), 250, 500 and 1000 mm3. (iii) Flip rate when each tool's progression is computed against that tool's NADIR (smallest earlier volume of the same tool in the same patient, floor 500 mm3) and response against that tool's first post-operative scan. Prediction PD1: the lower CI bound of the flip rate stays >= 0.20 for floors 250, 500, 1000 and for the nadir reference. Patient-cluster bootstrap CI as in A15.
+
+### A18.6 Reading rules and limits
+Everything is labelled "sensitivity analysis". No claim about a real trial. No threshold, grid or definition changes after seeing results. If PA1, PA2, PB1 or PD1 fail, the failure is reported unchanged.

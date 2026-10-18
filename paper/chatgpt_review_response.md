@@ -112,3 +112,21 @@ Each claim checked against files. No agreement by deference.
 
 What ChatGPT did not say: the packet's own correction (+0.031 was wrong, +0.0136 is right) came from checking the ledger against the JSON. Other ledger entries have not all been re-checked against their JSON yet (open task).
 
+
+## Round 3 (2026-10-18): review of `paper/overview_for_review_rano.md` (probabilistic RANO)
+Each claim checked against files or the source. No agreement by deference.
+
+| # | ChatGPT claim | Checked against | Verdict | Action |
+|---|---|---|---|---|
+| 1 | Tool disagreement is not calibrated measurement noise | A15 text, ledger 2br | Right. Already stated as the weakest point; the result is "tool dependence", not an error rate. | Wording: say "tool-dependent classification", never "error rate". |
+| 2 | Result 2 effects follow from the assumed noise; s=0.5 already equals the line | `output/trial_sim/trial_sim_cells.csv`, ledger 2bs | Right. I also wrote that s=0.25 was "near a plausible level"; that has no support. s=0.25 alone gives -15.3 weeks, so the real question is the smallest s with a material effect. | Amendment 18 sensitivity grid down to s=0.05. |
+| 3 | Exclusion of 71.9% limits what the result applies to; need an exclusion-flow analysis | `rano_tool_dependence.json` (one merged count) | Right. The script merges missing, zero and below-floor into one number. | A18 exclusion flow by reason and tool, descriptive. |
+| 4 | RANO progression is against the nadir, not the previous scan | Source text, PMC11630866 Table 2 (fetched 2026-10-18): PD "compare to nadir", PR "compare to baseline" | Right, and a real flaw: A15 test 1 uses CONSECUTIVE-scan ratios (`src/140_rano_tool_dependence.py`). A16 does use the nadir. | A18 adds a nadir-referenced flip rate as a labelled sensitivity. The A15 result stays as declared, described as a consecutive-scan classification. |
+| 5 | The 0.5 cm3 floor is not a RANO 2.0 rule | Same source: no volume floor stated; measurable = 10 mm in 3 planes | Right. My docs called it a RANO 2.0 floor. That was WRONG. | Fixed in START_HERE, README, plan, brief, review overview. It is an operational choice. A18 varies it. |
+| 6 | PFS definition in the simulation (death, censoring, backdating) | A16.2 | Right. Death is not modelled; no backdating; censoring at last scan. | A18 adds an independent-death variant (assumed). |
+| 7 | Correlated errors and systematic tool bias not modelled | A16.2 | Partly right. A constant per-patient bias cancels in a ratio. Correlation between scans is not modelled and matters for the nadir. | A18 adds an AR(1) variant. |
+| 8 | Do not start with calculator or viewer; calibrate first | plan | Agree. | Calculator (A17, declared, no code yet) is postponed until A18 is reported. |
+| 9 | Scores 7/10 regional, 5/10 ISEF | n/a | Opinion, not checkable. Noted. | None. |
+| 10 | Keep the original simulation, label extras as sensitivity analyses | A16.6 | Agree. | A18 adds, never replaces. |
+
+What ChatGPT did not say: the 0.5 cm3 error came from my own earlier docs; the source check showed it.

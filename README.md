@@ -3,7 +3,7 @@
 Glioblastoma project for the Greater Austin Regional Science and Engineering Fair (GARSEF, February 2027). One author. Status date: 2026-10-18. Start with `START_HERE.md`.
 
 ## Question
-RANO 2.0 calls progression at a tumour volume rise of 40% or more and partial response at a fall of 65% or more (floor 0.5 cm3). Volumes now come from automated segmentation. How noisy are they, and what does that noise do to single patients and to trials?
+RANO 2.0 calls progression at a tumour volume rise of 40% or more and partial response at a fall of 65% or more (progression against the nadir, response against baseline; the 0.5 cm3 floor used here is our own operational rule, not in the RANO 2.0 text). Volumes now come from automated segmentation. How noisy are they, and what does that noise do to single patients and to trials?
 
 ## Results so far (all exploratory or simulation; each declared before it ran)
 | Test | Result | Weakest point | Source |

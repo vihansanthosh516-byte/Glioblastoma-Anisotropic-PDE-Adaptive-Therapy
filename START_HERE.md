@@ -6,9 +6,9 @@ Read this file first. If another file disagrees with it, this file and `vault/PA
 One author. Greater Austin Regional Science and Engineering Fair (GARSEF; deadline February 2027; dates, categories and forms NOT verified). Goal: a new, strong computational-biology project with real mathematics, backed by solid science. A win is not predictable. Never promise one.
 
 ## 2. Current project: "probabilistic RANO"
-Question: are the RANO 2.0 volume lines (progression at +40%, partial response at -65%, measurability floor 0.5 cm3) above the measurement noise of automated segmentation in glioblastoma, and what does the noise do to trial endpoints (progression-free survival, PFS)?
+Question: are the RANO 2.0 volume lines (progression at +40%, partial response at -65%; progression is judged against the NADIR, response against baseline). The 0.5 cm3 volume floor used in our analysis is OUR operational choice. It is NOT in the RANO 2.0 text (checked 2026-10-18 in PMC11630866) above the measurement noise of automated segmentation in glioblastoma, and what does the noise do to trial endpoints (progression-free survival, PFS)?
 - Plan: `paper/phd_level_plan_probabilistic_rano.md`. Problem and literature: `paper/problem_first_rano_noise.md`.
-- Rules and declarations: `analysis_plan_v1.md` (Amendments 14, 15, 16 are the current ones). Results: `vault/PAPER_FINDINGS_LEDGER.md` (latest entry 2bs; next id 2bt).
+- Rules and declarations: `analysis_plan_v1.md` (Amendments 14, 15, 16, 17, 18 are the current ones). Results: `vault/PAPER_FINDINGS_LEDGER.md` (latest entry 2bs; next id 2bt).
 - Novelty is UNVERIFIED (about 15 snippet-level searches). Say "not found in our searches", never "first" or "revolutionary".
 
 ## 3. State of the work (checked against files on 2026-10-18)
@@ -49,4 +49,4 @@ It is background, not the goal. Honest summary: `README_STATUS.md` (corrected af
 | ARCHIVE (unchanged on purpose) | `vault/audit_2026-10-18/originals/*`, `.claude/skills/*`, `graphify-out/*` |
 
 ## 7. Next step
-Aim 3 is done. Next: the calculator (class probabilities for two volumes), then the patient timeline viewer with uncertainty bands, then paper and poster. Check GARSEF 2027 handbook (dates, categories, forms) and ask a clinician or faculty member to review the framing.
+Aim 3 is done. Next: script 142 for Amendment 18 (sensitivity: finer noise grid, correlated noise, death, exclusion flow, nadir reference). Then the calculator (Amendment 17, declared, no code yet), then the patient timeline viewer with uncertainty bands, then paper and poster. Check GARSEF 2027 handbook (dates, categories, forms) and ask a clinician or faculty member to review the framing.
