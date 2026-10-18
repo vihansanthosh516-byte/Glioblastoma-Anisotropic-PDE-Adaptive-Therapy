@@ -8,7 +8,7 @@ One author. Greater Austin Regional Science and Engineering Fair (GARSEF; deadli
 ## 2. Current project: "probabilistic RANO"
 Question: are the RANO 2.0 volume lines (progression at +40%, partial response at -65%, measurability floor 0.5 cm3) above the measurement noise of automated segmentation in glioblastoma, and what does the noise do to trial endpoints (progression-free survival, PFS)?
 - Plan: `paper/phd_level_plan_probabilistic_rano.md`. Problem and literature: `paper/problem_first_rano_noise.md`.
-- Rules and declarations: `analysis_plan_v1.md` (Amendments 14, 15, 16 are the current ones). Results: `vault/PAPER_FINDINGS_LEDGER.md` (latest entry 2br; next id 2bs).
+- Rules and declarations: `analysis_plan_v1.md` (Amendments 14, 15, 16 are the current ones). Results: `vault/PAPER_FINDINGS_LEDGER.md` (latest entry 2bs; next id 2bt).
 - Novelty is UNVERIFIED (about 15 snippet-level searches). Say "not found in our searches", never "first" or "revolutionary".
 
 ## 3. State of the work (checked against files on 2026-10-18)
@@ -16,10 +16,10 @@ Question: are the RANO 2.0 volume lines (progression at +40%, partial response a
 |---|---|---|
 | A15 test 1: RANO class differs between the two tools | DONE. 54.5% of 121 eligible pairs (CI 45.6% to 63.8%), "material" | `output/rano_noise/rano_tool_dependence.json`, ledger 2br |
 | A15 test 2: minimal detectable change vs the +40% line | DONE. Smallest size band: inside the noise. Two larger bands: undetermined (noise lower bound is degenerate) | same |
-| A16 trial simulation (Aim 3) | DECLARED (commit 1b7f4ec). Script `src/141_trial_sim.py` NOT written, NOT run | `analysis_plan_v1.md` |
+| A16 trial simulation (Aim 3) | DONE (simulation, assumed parameters). Noise makes PFS earlier and cuts power a lot (H-S1, H-S2 supported; H-S3, H-S4 NOT supported as declared) | `output/trial_sim/trial_sim_summary.json`, ledger 2bs |
 | Calculator, patient timeline viewer, paper, poster | NOT started | plan |
 
-Weakest points of A15: the two tools are not a scan-rescan pair; 71.9% of pairs fell below the floor or had a missing volume; one centre; exploratory.
+Weakest point of A16: effect sizes depend on the assumed noise model; s=0.25 alone already gives -15 weeks. Weakest points of A15: the two tools are not a scan-rescan pair; 71.9% of pairs fell below the floor or had a missing volume; one centre; exploratory.
 
 ## 4. Rules that must not break
 1. Declare a test in `analysis_plan_v1.md` and commit it BEFORE the code runs. Commit the code BEFORE the run. Run once. No re-runs with other thresholds.
@@ -49,4 +49,4 @@ It is background, not the goal. Honest summary: `README_STATUS.md` (corrected af
 | ARCHIVE (unchanged on purpose) | `vault/audit_2026-10-18/originals/*`, `.claude/skills/*`, `graphify-out/*` |
 
 ## 7. Next step
-Write `src/141_trial_sim.py` exactly as Amendment 16 says. Commit it. Run once. Verify `output/trial_sim/` on disk. Add ledger 2bs. Report as declared.
+Aim 3 is done. Next: the calculator (class probabilities for two volumes), then the patient timeline viewer with uncertainty bands, then paper and poster. Check GARSEF 2027 handbook (dates, categories, forms) and ask a clinician or faculty member to review the framing.
