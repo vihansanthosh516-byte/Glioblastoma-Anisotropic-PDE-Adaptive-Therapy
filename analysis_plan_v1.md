@@ -467,3 +467,20 @@ Standardise on the training folds; L2 logistic regression, C = 1.0, fixed, no tu
 
 ### A14.6 What a success would and would not mean
 Success: the pre-op MRI carries information about when the 15 mm plan misses recurrence, across centres. It would NOT show that a model plan helps those patients (not tested here), nor any clinical benefit. A failure is reported as a failure (primary CI includes 0.5) and the triage idea is dropped; it is not re-run with other features or thresholds.
+
+## Amendment 15 (2026-10-18): Probabilistic RANO -- tool dependence and minimal detectable change of volumetric progression criteria. EXPLORATORY. Written before any scan-level flip or MDC number is computed.
+
+### A15.1 Status and what was seen
+Exploratory, spent public data. Seen before this declaration: aggregate noise summaries in `output/seg_noise_floor.json` (script 104: floor by size tertile, median change disagreement 1.90 over 330 pairs and 1.20 over 181 rated pairs) and the UPenn expert-correction summary (script 109). Not seen: any scan-pair classification under the RANO 2.0 thresholds, any flip rate, any MDC. Wording: "exploratory, two automated tools, not a scan-rescan pair".
+
+### A15.2 Data and pairs
+LUMIERE contrast-enhancing volume per scan from the two tools (HD-GLIO-AUTO, DeepBraTumIA) as extracted in script 104 (same QC, same label rule A6.5). Pair = two consecutive post-operative scans of the same patient. A pair is eligible if the enhancing volume is at least 500 mm3 (0.5 cm3, the RANO 2.0 measurability floor) at BOTH scans in BOTH tools. Counts of pairs and patients and the share excluded by the floor are reported.
+
+### A15.3 Test 1 (primary): RANO class flip rate between tools
+Class from the volume ratio r = V1 / V0 within a tool: progression if r >= 1.40; partial response if r <= 0.35; otherwise stable. Flip = the two tools give different classes for the same pair. Statistic: flip rate over eligible pairs, patient-cluster bootstrap 95% CI (10,000 draws, seed 20261018). Reading rule (fixed now): material tool dependence if the lower CI bound >= 0.20; robust if the upper CI bound <= 0.10; otherwise inconclusive. Secondary 1a: share of pairs where one tool says progression and the other does not. Secondary 1b: for pairs whose later scan has an expert RANO rating (PD vs not PD), sensitivity and specificity of each tool's progression call, with the same bootstrap.
+
+### A15.4 Test 2 (primary): minimal detectable change versus the progression line
+Per pair, d = (ln V1 - ln V0 in tool A) - (ln V1 - ln V0 in tool B). Size band = tertile of the smaller of the pair's two tool-averaged volumes at the earlier scan (edges from the eligible pairs). UPPER noise bound per band: s_up = 1.4826 x MAD(d) / sqrt(2) (assumes independent tool errors; includes any definition difference that changes over time). LOWER noise bound per band: from `output/upenn_rater_noise_scans.csv`, the median |ln(V_ai / V_rad)| converted to a standard deviation as median / 0.6745, applied to the change as sqrt(2) x that value (one tool, expert correction only). MDC95 = 1.96 x s for each bound. Compare with ln(1.40) = 0.336. Reading rule: the progression line is "inside the noise" for a band if MDC95 (upper bound) > 0.336, "above the noise" if MDC95 (lower bound) < 0.336, and "undetermined" if the bracket straddles 0.336.
+
+### A15.5 Not declared here
+Trial simulation (A3) and the measurement-model identifiability proof (A1) get their own amendment before they are run. Anything computed beyond A15.3 and A15.4 is labelled undeclared exploratory. No re-run with other thresholds, floors or definitions after seeing the result.
