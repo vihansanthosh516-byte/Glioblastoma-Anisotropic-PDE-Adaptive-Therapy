@@ -17,8 +17,10 @@ RANO 2.0 calls progression at a tumour volume rise of 40% or more and partial re
 ## Tool
 `python src/rano_calc.py V0_mm3 V1_mm3 [s]` gives the probability that the true change is progression, response or stable, and the minimal detectable change (`src/rano_calc.py`, tests `tests/test_rano_calc.py`, ledger 2bv). Model-based; not for clinical use. Pass the nadir volume as V0 for progression.
 
+Viewer: `output/viewer_rano/viewer_rano.html` (open in a browser; 62 LUMIERE patients; bands, nadir, +40% line, class probabilities; display only; ledger 2bw).
+
 ## Not done
-Patient timeline viewer, paper, poster. Novelty is unverified (about 15 snippet-level searches). Nothing here is a clinical claim.
+ paper, poster. Novelty is unverified (about 15 snippet-level searches). Nothing here is a clinical claim.
 
 ## Files
 `START_HERE.md` (state and rules), `analysis_plan_v1.md` (declarations), `vault/PAPER_FINDINGS_LEDGER.md` (results), `paper/` (plans), `src/140_*`, `src/141_*` (current scripts), `archive_old_gbm/` (old GBM documents), `CLAUDE.md` (run commands).
