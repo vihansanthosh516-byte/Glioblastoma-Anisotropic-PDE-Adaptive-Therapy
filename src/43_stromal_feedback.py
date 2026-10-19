@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# NOTE (2026-10-19 audit): historical legacy script; not part of the current RANO project. The header speaks of patient-specific calibration, but the code uses fixed simulation defaults; nothing here shows per-patient fitting. Defaults use cwd-relative Path('output'), so cwd is now anchored at the project root.
 """
 Month 8: Stromal Feedback Coupled PDE Solver
 ==============================================
@@ -101,6 +102,9 @@ COHORT_PATIENTS = None
 # =========================================================================== #
 # PHASE 1: Tensor Field Builder (reusing Month 7 anisotropic tensor builder)
 # =========================================================================== #
+import os as _os
+_os.chdir(_os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))))  # cwd-relative output/ defaults below; anchor cwd at the project root
+
 class TensorFieldBuilder:
     """
     Constructs a 2x2 symmetric anisotropic diffusion tensor field over a

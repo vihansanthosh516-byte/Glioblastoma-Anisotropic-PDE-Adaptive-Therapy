@@ -269,7 +269,7 @@ def load_all_metrics() -> Dict[str, Any]:
                 raise RuntimeError(
                     f"{phase_key} record {rec.get('patient_id','?')}: "
                     f"missing keys {missing}")
-    print(f"[Ingest] All 3 phases loaded, 8 patients each, schemas verified.")
+    print(f"[Ingest] All 3 phases loaded, {len(COHORT_PATIENTS)} patients each, schemas verified.")
     return loaded
 
 
@@ -1713,9 +1713,9 @@ def write_research_dossier(master: Dict[str, Any],
     body = (
         "# Research Executive Summary & Technical Dossier\n\n"
         "## Executive Summary\n\n"
-        "To our knowledge, this platform is among the first open research frameworks "
-        "to integrate DTI-informed anisotropic invasion, microenvironmental coupling, "
-        "and uncertainty-aware adaptive dosing into a single reproducible pipeline.\n\n"
+        "This platform combines DTI-informed anisotropic invasion, microenvironmental coupling "
+        "and uncertainty-aware adaptive dosing in one pipeline. It is a simulation; no novelty "
+        "claim is made, and no literature search supports one.\n\n"
         "**Biological Rationale for Metrics & Mechanics**\n\n"
         "* **Fractal Dimension (Df)** serves as a spatial biomarker quantifying "
         "invasive border irregularity along white matter tracts, distinguishing "
@@ -1727,7 +1727,7 @@ def write_research_dossier(master: Dict[str, Any],
         "microenvironmental growth factor signaling that enhances tumor "
         "proliferation in a spatially coupled reaction-diffusion framework.\n\n"
         "This dossier documents the in silico adaptive therapy platform developed "
-        "across Months 7–10, validated on a synthetic 8-patient virtual cohort. "
+        "across Months 7–10, evaluated only in simulation on a synthetic 8-patient virtual cohort (not validated against patient outcomes). "
         "The platform integrates:\n\n"
         "1. **Anisotropic tumor invasion** — DTI-derived diffusion tensors drive "
         "directional growth along white-matter tracts, producing fractal invasion "
@@ -1736,7 +1736,7 @@ def write_research_dossier(master: Dict[str, Any],
         f"Cohen's d = {a['cohens_d']:.2f}).\n\n"
         "2. **Stromal microenvironment coupling** — Reaction-diffusion coupling "
         "between tumor cells and growth factors maintains tumor-GF front correlation "
-        f"in the range {fc_lo:.3f}–{fc_hi:.3f} across all 8 patients (hard floor "
+        f"in the range {fc_lo:.3f}–{fc_hi:.3f} across all {len(COHORT_PATIENTS)} patients (hard floor "
         "0.90; all patients clear the floor).\n\n"
         "3. **Uncertainty-aware adaptive therapy** — Model Predictive Control (MPC) "
         "with 14-day horizon reduces cumulative drug exposure by "
@@ -1800,7 +1800,7 @@ def write_research_dossier(master: Dict[str, Any],
         "factor (G): ∂u/∂t = ∇·(D∇u) + ρ u (1-u/K) + α G u; ∂G/∂t = D_G ∇²G + "
         "β u - γ G.\n"
         f"- **Front correlation**: Tumor-GF interface correlation ∈ "
-        f"[{fc_lo:.3f}, {fc_hi:.3f}], floor 0.90; all 8 patients PASS.\n"
+        f"[{fc_lo:.3f}, {fc_hi:.3f}], floor 0.90; all {len(COHORT_PATIENTS)} patients PASS.\n"
         f"- **Fractal dimension (Phase 2)**: Df ∈ [0.4, 1.0] bounds; all "
         "patients in-range.\n\n"
         "### 3. Adaptive Therapy with MPC (Month 9)\n\n"

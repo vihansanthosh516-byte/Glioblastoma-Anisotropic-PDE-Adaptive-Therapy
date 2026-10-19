@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# NOTE (2026-10-19 audit): historical legacy script; not part of the current RANO project. The header's atlas-DTI Dice 0.95-0.97 (p > 0.01) has no source in this script. Dwhite=0.013, Dgray=0.0013, rho=0.02, dt=0.1 and the 100 grid are chosen constants, not patient fits; results are simulation. Some helper defaults use cwd-relative output/ paths, so cwd is now anchored at the project root.
 """
 Month 7: Anisotropic Tensor Diffusion Engineering
 ====================================================
@@ -106,6 +107,9 @@ PATIENT_SAVE_INTERVAL = 250
 # =========================================================================== #
 # PHASE 1: Tensor Field Builder
 # =========================================================================== #
+import os as _os
+_os.chdir(_os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))))  # cwd-relative output/ defaults below; anchor cwd at the project root
+
 class TensorFieldBuilder:
     """
     Constructs a 2x2 symmetric anisotropic diffusion tensor field over a

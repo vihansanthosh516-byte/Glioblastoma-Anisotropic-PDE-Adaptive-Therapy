@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# NOTE (2026-10-19 audit): historical legacy script; not part of the current RANO project. TCGA bulk data has no spatial dimension: molecular subtypes serve as pseudo-zones, so this is a subtype proxy, not measured spatial recurrence.
 """
 Month 6, Week 3: Recurrence Risk Mapper (adapted for TCGA-GBM molecular subtypes)
 

@@ -1,3 +1,4 @@
+# NOTE (2026-10-19 audit): historical legacy script; not part of the current RANO project. Needs SALib (not in Requirements.txt; present in requirements-docker.txt). Sobol ranking is conditional on fixed model settings (DT 0.1, 360 days, base rho 0.015, E_MAX ratio 1000), not empirical efficacy.
 """Phase 2b: Global Sobol Sensitivity Analysis.
 
 Reduced-ODE evaluator + SALib Sobol indices + publication-ready tornado plot.

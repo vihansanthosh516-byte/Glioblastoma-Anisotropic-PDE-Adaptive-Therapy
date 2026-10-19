@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# NOTE (2026-10-19 audit): historical legacy script; not part of the current RANO project. Needs lifelines (not in Requirements.txt). Elastic Net Cox on historical TCGA data is a cohort association, not validation of any treatment effect; penalizer 0.1 and L1 ratio 0.5 are fixed.
 """
 Month 6, Week 2: Penalized Survival Modeling
 

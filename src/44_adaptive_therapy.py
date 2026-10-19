@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# NOTE (2026-10-19 audit): historical legacy script; not part of the current RANO project. Simulation with an assumed kill-rate scale (E_MAX ratio); not a patient-validated result. The generated report text claims a fixed seed; check the run configuration before treating it as reproducible.
 """
 Month 9: Advanced Clonal Optimization - Adaptive Therapy Engine
 ================================================================

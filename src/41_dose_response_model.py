@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# NOTE (2026-10-19 audit): historical legacy script; not part of the current RANO project. EC50 = 1 and Hill coefficient = 2 are assumed, not measured; the dose-response curves do not establish clinical dose response.
 """
 Month 6, Week 4: Dose-Response Model & Clinical Gating Matrix
 
