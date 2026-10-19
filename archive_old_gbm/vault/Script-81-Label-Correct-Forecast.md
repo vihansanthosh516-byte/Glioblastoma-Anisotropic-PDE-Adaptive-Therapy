@@ -7,7 +7,9 @@
 ## What Changed
 Previous target was `mask > 0`, which includes resection cavity (label 4) and edema (label 2) — both change from surgery/treatment, not growth. Script 81 scores only the enhancing + necrotic core (labels 1, 3).
 
-## Result (133 patients)
+## Retrospective internal out-of-fold result (133 scored;19 skipped)
+
+Not external/prospective validation. There are126 cases with nonempty target in both scans; denominators differ. Target selection followed the earlier volume-label probe (post hoc); later paired manifest comparisons use different folds/windows and are not a direct replication.
 | Arm | Out-of-fold Dice |
 |---|---|
 | anisotropic | 0.259 |
@@ -22,7 +24,7 @@ Previous target was `mask > 0`, which includes resection cavity (label 4) and ed
 ## Limitations
 - Absolute Dice is low (0.26)
 - Modest gain (+11% relative)
-- Model still loses on shrinking tumors (−0.039 Dice)
+- Model loses on shrinking/same-size tumors: -0.0390814 Dice,n=50 (`output/forecast_labels_core/results.json:descriptive_shrank_or_same.tests.anisotropic_vs_no_change.mean_diff`)
 
 ## Source
 - output/forecast_labels_core/results.json

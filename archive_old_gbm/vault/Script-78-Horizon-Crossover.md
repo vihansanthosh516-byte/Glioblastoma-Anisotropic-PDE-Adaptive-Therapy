@@ -44,7 +44,7 @@ The script-60 numbers match the Swanson cm²/d values read as mm²/d. The unit s
 | 0.1 | 0.923 | 0.943 | 0.946 | 0.951 |
 | 0.3 | 0.838 | 0.848 | 0.918 | 0.920 |
 
-The effect is nearly the same at 1 mm as at 2 mm. It is a property of the physics, not of the grid. The crossover horizon is identical (90 d at D 0.1 and 0.3, none at 0.01 and 0.03).
+The effect is nearly the same at 1 mm as at 2 mm. This grid comparison suggests a model effect, but does not eliminate resolution sensitivity or validate biological physics. The crossover horizon is identical (90 d at D 0.1 and 0.3, none at 0.01 and 0.03).
 
 Grid convergence of the full arm (1 mm downsampled vs 2 mm): Dice 0.83-0.91 at 90 d (masks are only 85-170 voxels at 2 mm), rising to 0.95-0.98 at 365 d and later. Report 90-d values with that resolution error in mind.
 
@@ -61,4 +61,6 @@ Grid convergence of the full arm (1 mm downsampled vs 2 mm): Dice 0.83-0.91 at 9
 - The comparison to script 77 is approximate: script 77 used 30 LHS scenarios, script 78 uses a fixed grid.
 
 ## Reframing
-**The ablation null is a parameter artifact, not structural.** At script 60's D (0.01-0.03) diffusion cannot cross a 2 mm voxel in 90 d, so the null follows. At literature diffusivities (D ≈ 0.1) the DTI orientation changes the day-90 tumour mask by ~8% Dice, and this holds on a 1 mm grid. Volume is still insensitive (mass conservation, script 77), so the effect is a shape/extent effect. Treatment-planning conclusions drawn from script 60 used a diffusivity 10x or more too low; re-checked in [Script-60-66-Swanson-D.md](Script-60-66-Swanson-D.md). (Correction 2026-10-03: the S1(rho) = 0.998 once quoted here is from archived script 46's reduced ODE, not script 60.)
+**In this deterministic simulation grid, the low-D null disappears at larger tested D.** At script 60's D (0.01-0.03) diffusion cannot cross a 2 mm voxel in 90 d, so the null follows. At literature diffusivities (D ≈ 0.1) the DTI orientation changes the day-90 tumour mask by ~8% Dice, and this holds on a 1 mm grid. Volume is still insensitive (mass conservation, script 77), so the effect is a shape/extent effect. No clinical treatment-planning conclusion is established: script60 used a selected lower diffusivity; the unit-slip explanation is inferred, and the exact comparable literature parameter source remains to be checked; re-checked in [Script-60-66-Swanson-D.md](Script-60-66-Swanson-D.md). (Correction 2026-10-03: the S1(rho) = 0.998 once quoted here is from archived script 46's reduced ODE, not script 60.)
+
+Synthetic deterministic differences are not real-scan detectability. The no-noise, one-seed and censored-cell caveats apply to every grid result, including the shape/extent interpretation.
