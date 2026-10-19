@@ -10,11 +10,12 @@ Subgroups use ONLY information available before the forecast (plan A1.13, A1.14)
   horizon bin           short < 60 d, medium 60-120 d, long > 120 d (pre-set)
   diagnosis             GBM vs other (plan A2.1)
 Delta = Dice(method) - Dice(persistence), ONE value per patient per stratum (patient mean over the stratum's pairs),
-patient bootstrap (2,000 draws; the registered primary run uses 10,000).
+patient bootstrap (N_BOOT = patient_stats.DEFAULT_N_BOOT = 10,000 draws; an earlier header said 2,000, which was stale).
 Catastrophic error (analysis-defined research threshold, not clinical): Dice < 0.1 on a pair whose persistence Dice >= 0.1;
 sensitivity 0.05 and 0.2. Cluster bootstrap by patient.
 Residuals: Spearman between the geometric-baseline gain and covariates known at forecast time; the observed growth
-ln(V_out/V_in) is shown for explanation only and is outcome-defined.
+ln(V_out/V_in) is outcome-defined (not known at forecast time); its Spearman association and
+cluster-bootstrap CI are also computed and written (tagged known_before_forecast: false), for explanation only.
 
 Input : output/baseline_ladder_pairs.csv, data/manifests/*.csv
 Output: output/subgroups.json, output/subgroups_pairs.csv

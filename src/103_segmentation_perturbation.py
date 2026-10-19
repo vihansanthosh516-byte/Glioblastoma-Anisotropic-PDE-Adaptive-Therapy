@@ -133,7 +133,7 @@ def main():
         for k in range(K_DRAWS):
             d = sub[sub["draw"] == k]
             pm = ps.patient_means(d, "delta")
-            s = ps.summarize_delta(pm.to_numpy(), n_boot=2000)
+            s = ps.summarize_delta(pm.to_numpy(), n_boot=2000)  # NOTE 2026-10-19: 2,000 draws, not the 10,000 of plan A6.2; per-draw ci95 has no n_boot field. Left unchanged so the saved output stays reproducible.
             per_draw.append({"draw": k, "mean_delta": s["mean"], "ci95": s["mean_ci95"], "median": s["median"],
                              "persistence_mean_dice": float(ps.patient_means(d, "persistence").mean())})
         md = np.array([x["mean_delta"] for x in per_draw])
@@ -141,7 +141,8 @@ def main():
                                        "n_draws_ci_excludes_zero": int(sum(x["ci95"][0] > 0 for x in per_draw))}
     (OUT / "segmentation_perturbation.json").write_text(json.dumps(res, indent=1, default=float))
     write_run_manifest("segmentation_perturbation_103", OUT / "segmentation_perturbation.manifest.json",
-                       script="src/103_segmentation_perturbation.py", seed=0, config={"k_draws": K_DRAWS, "p_flip": P_FLIP},
+                       script="src/103_segmentation_perturbation.py", seed=0,  # nominal: each draw is seeded from SHA-256 of patient/timepoint/draw in rng_for()
+                       config={"k_draws": K_DRAWS, "p_flip": P_FLIP},
                        inputs=[OUT / "baseline_ladder.json", MAN / "forecast_pairs_mu.csv", MAN / "split_mu.csv"],
                        dataset="MU-Glioma-Post core", patient_split="data/manifests/split_mu.csv", primary_endpoint="n/a (robustness)")
     print(json.dumps({k: v for k, v in res.items() if k in ("A_ceiling_patient_mean_dice",)}, indent=1))

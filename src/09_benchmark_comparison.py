@@ -6,7 +6,15 @@ Produces:
   - Combined metrics TSV
   - Bar chart of accuracy / macro F1 / AUC
   - Per-class heatmap
-  - Summary markdown for science fair poster
+  - Summary markdown (historical Track A report; see note)
+
+NOTE (2026-10-19 audit): historical legacy Track A report generator, not part of the
+current RANO project. The inputs come from a random cell-level split (not
+patient-held-out; patient leakage, see vault/PAPER_FINDINGS_LEDGER.md). The
+"Best Test Acc" column is max(test accuracy over epochs) selected on the test set
+(scripts 07/08), so it is optimistic and must not be reported as performance.
+The archived copy of the summary is archive_old_gbm/output/BENCHMARK_SUMMARY.md;
+this script refuses to overwrite an existing output/BENCHMARK_SUMMARY.md.
 """
 import os, json
 import numpy as np
@@ -16,7 +24,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import seaborn as sns
 
-ROOT    = "."
+ROOT    = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 OUT_DIR = os.path.join(ROOT, "output")
 
 # Input metric files
@@ -138,12 +146,13 @@ fig.savefig(os.path.join(OUT_DIR, "benchmark_confusion_matrices.png"), dpi=200, 
 plt.close(fig)
 print(f"Saved benchmark_confusion_matrices.png")
 
-# ---- 4. Markdown summary for poster ----
+# ---- 4. Markdown summary (historical) ----
+if os.path.exists(MD_OUT):
+    raise SystemExit(f"{MD_OUT} exists; refusing to overwrite. Remove it deliberately to regenerate.")
 with open(MD_OUT, "w") as f:
     f.write("# Benchmark Summary: Core vs Periphery vs Healthy Classification\n\n")
-    f.write("**Dataset:** 15,000 cells (5,000 per class) from multiomic-gbm scRNA-seq\n")
-    f.write("**Features:** Top 100 HVGs (row-z-scored)\n")
-    f.write("**Split:** 80/20 stratified (12,000 train / 3,000 test)\n\n")
+    f.write("> HISTORICAL legacy Track A report. Random cell-level split (patient leakage); not a validated result. 'Best Test Acc' is the best epoch chosen on the test set and is optimistic.\n\n")
+    f.write("**Dataset / features / split:** as recorded by scripts 04-08 (15,000 cells, 100 genes used by methods 2-3, 80/20 cell-level split); not re-read from the metrics by this script.\n\n")
     f.write("## Overall Metrics\n\n")
     f.write(df.to_markdown(index=False))
     f.write("\n\n## Per-Class F1 Scores\n\n")
@@ -153,10 +162,7 @@ with open(MD_OUT, "w") as f:
     f.write("\n\n## Key Findings\n\n")
     best = df.loc[df["Macro F1"].astype(float).idxmax(), "Method"]
     f.write(f"- **Best overall: {best}** (Macro F1 = {df['Macro F1'].max()})\n")
-    f.write(f"- Classical methods (LR, RF) outperform deep learning on this small-feature, tabular-style data.\n")
-    f.write(f"- The Hybrid method (injecting LR coefficients as attention bias) did not improve over the Transformer baseline, likely due to the limited sequence length (100 genes) and shallow model.\n")
-    f.write(f"- All methods struggle most with **Periphery** class (intermediate biology between Core and Healthy).\n")
-    f.write(f"- Recommendation for science fair: Lead with **Random Forest** as the primary result, show Transformer as 'deep learning attempt', Hybrid as 'novel architecture exploration'.\n")
+    f.write("- Compare rows in the table above directly; no narrative conclusion is generated here. Interpret only with the random-split and test-selected-epoch limits stated at the top.\n")
 
 print(f"Saved {MD_OUT}")
 print("\nDONE.")
