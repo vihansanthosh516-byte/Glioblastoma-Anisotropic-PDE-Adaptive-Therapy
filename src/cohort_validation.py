@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
-"""Cohort-level forward validation using joint treatment-aware inverse estimation.
+"""Historical within-cohort temporal evaluation using assumed treatment-aware models.
+
+No independent patient holdout or locked-test gate is established here. Real
+imaging-derived inputs do not independently validate clinical forecast skill.
 
 Loads all MU-Glioma-Post patients with >=3 timepoints, fits rho/D jointly across
 all adjacent intervals (with a physiological prior), then validates forward by

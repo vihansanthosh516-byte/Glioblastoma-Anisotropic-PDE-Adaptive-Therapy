@@ -2,7 +2,7 @@
 """
 4D 3D Tumor Viewer - Interactive 3D Isosurfaces with Time Slider + Patient Dropdown
 ===================================================================================
-Shows actual 3D volumetric tumor evolution (isosurfaces) with time slider,
+Shows model-simulated 3D volumetric tumor trajectories (isosurfaces) with time slider,
 not just 2D charts. Patient dropdown to switch between patients.
 """
 
@@ -12,10 +12,12 @@ import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
 from pathlib import Path
+
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
 from scipy.ndimage import gaussian_filter
 
 
-BASE_OUTPUT = Path("output/batch_digital_twins")
+BASE_OUTPUT = Path((PROJECT_ROOT / "output/batch_digital_twins"))
 
 
 def load_patient_data(patient_id):
@@ -80,12 +82,12 @@ def run_3d_simulation(patient_data, patient_id, total_days=120, save_interval=5)
     print(f"[3D SIM] Running 3D simulation for {patient_id}...")
     
     # Load patient mask
-    patient_dir = Path(f"data/tcia/MU-Glioma-Post/{patient_id}")
+    patient_dir = Path((PROJECT_ROOT / f"data/tcia/MU-Glioma-Post/{patient_id}"))
     mask_file = patient_dir / "Timepoint_1" / f"{patient_id}_Timepoint_1_tumorMask.nii.gz"
     
     if not mask_file.exists():
         # Try BraTS format
-        mask_file = Path(f"data/brats/{patient_id}/{patient_id}_seg.nii.gz")
+        mask_file = Path((PROJECT_ROOT / f"data/brats/{patient_id}/{patient_id}_seg.nii.gz"))
         if not mask_file.exists():
             print(f"  [WARNING] No mask found for {patient_id}")
             return None
@@ -138,14 +140,14 @@ def run_3d_simulation(patient_data, patient_id, total_days=120, save_interval=5)
                     rt_dose[day] = 2.0
     
     # Run 3D simulation with snapshot saving
-    os.makedirs("output/time_series_3d", exist_ok=True)
+    os.makedirs((PROJECT_ROOT / "output/time_series_3d"), exist_ok=True)
     
     # Clear old snapshots
-    for f in Path("output/time_series_3d").glob("tumor_3d_day_*.npy"):
+    for f in Path((PROJECT_ROOT / "output/time_series_3d")).glob("tumor_3d_day_*.npy"):
         f.unlink()
     
     # Save initial state
-    np.save("output/time_series_3d/tumor_3d_day_000.npy", u)
+    np.save((PROJECT_ROOT / "output/time_series_3d/tumor_3d_day_000.npy"), u)
     
     volume_history = []
     
@@ -174,10 +176,10 @@ def run_3d_simulation(patient_data, patient_id, total_days=120, save_interval=5)
         
         # Save snapshot
         if day % save_interval == 0:
-            np.save(f"output/time_series_3d/tumor_3d_day_{day:03d}.npy", u)
+            np.save((PROJECT_ROOT / f"output/time_series_3d/tumor_3d_day_{day:03d}.npy"), u)
     
     # Save final
-    np.save(f"output/time_series_3d/tumor_3d_day_{n_steps:03d}.npy", u)
+    np.save((PROJECT_ROOT / f"output/time_series_3d/tumor_3d_day_{n_steps:03d}.npy"), u)
     
     print(f"  [SIM] Final volume: {volume_history[-1]:.0f} voxels")
     print(f"  [SIM] Saved 3D snapshots every {save_interval} days")
@@ -191,7 +193,7 @@ def create_4d_viewer_html(patient_data, patient_ids, patient_id):
     p = patient_data
     
     # Check if 3D snapshots exist
-    snapshot_files = sorted(Path("output/time_series_3d").glob("tumor_3d_day_*.npy"))
+    snapshot_files = sorted(Path((PROJECT_ROOT / "output/time_series_3d")).glob("tumor_3d_day_*.npy"))
     if not snapshot_files:
         print(f"  [WARNING] No 3D snapshots found for {pid}")
         return None
@@ -297,6 +299,7 @@ def create_4d_viewer_html(patient_data, patient_ids, patient_id):
     </style>
 </head>
 <body>
+    <p role="note">Model simulation, not observed longitudinal imaging or clinical validation. Missing rho/D fields use assumed 0.015/day and 0.01 values; treatment effects are assumed. No random sampling is used.</p>
     <div class="container">
         <h1>4D 3D Tumor Viewer</h1>
         
@@ -417,7 +420,7 @@ def create_4d_viewer_html(patient_data, patient_ids, patient_id):
                     aspectmode: 'data',
                     camera: {{eye: {{x: 1.5, y: 1.5, z: 1.2}}}}
                 }},
-                title: {{text: '4D Tumor Evolution - {pid} (Day ' + dayLabels[frameIdx] + ')', font: {{size: 16}}}},
+                title: {{text: 'Simulated tumor trajectory - {pid} (Day ' + dayLabels[frameIdx] + ')', font: {{size: 16}}}},
                 margin: {{l: 0, r: 0, t: 50, b: 0}},
                 height: 700
             }});
@@ -519,6 +522,8 @@ def main():
     output_path = BASE_OUTPUT / f"4d_3d_viewer_{target_patient}.html"
     with open(output_path, 'w') as f:
         f.write(html)
+    if not output_path.is_file() or output_path.stat().st_size == 0:
+        raise RuntimeError(f"Missing or empty viewer: {output_path}")
     
     print(f"[SUCCESS] 4D 3D viewer saved to: {output_path}")
     

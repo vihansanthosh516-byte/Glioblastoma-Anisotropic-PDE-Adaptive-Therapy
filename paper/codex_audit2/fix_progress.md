@@ -71,7 +71,7 @@ Audit evidence and original progress.md remain unchanged. Status tracks correcti
 | 063 | TODO | Pending report/source review and corrections. |
 | 064 | TODO | Pending report/source review and corrections. |
 | 065 | TODO | Pending report/source review and corrections. |
-| 066 | TODO | Pending report/source review and corrections. |
+| 066 | DONE | Seven source files fixed: graph build/comparison I/O moved behind main; graph paths and Windows resource fallback; explicit future comparison artifact; within-cohort framing; five summary inventory exclusions and disabled bulk CLI; three viewer source-root paths and visible assumed/simulation labels. Empty batch placeholder retained as non-runnable record. Added tests/test_audit_import_safety.py. Audit-local py_compile passed; Git-backed scratch pytest: 117 passed, 13 warnings, 130.85 s. No graph-builder, fitting, or viewer simulation main run; absence of historical output artifacts remains explicitly unverified, not regenerated. |
 | 067 | TODO | Pending report/source review and corrections. |
 | 068 | TODO | Pending report/source review and corrections. |
 | 069 | DONE | patient_stats/radiation edge fixes plus synthetic tests; FNO generator/trainer now source-relative, seeded and metadata-bearing, correctly labeled reaction-only synthetic targets, and refuse historical artifact overwrite. Optional legacy-ml dependencies declared; virtual trial paths/framing and pseudo-trajectory paths/framing corrected. Missing-os audit finding rejected: local imports exist. All edited Python compiled under audit-local cache. Latest Git-backed scratch pytest: 111 passed, 13 warnings, 26.93 s. No training/generation/clinical pipeline run; FNO runtime/clean install not verified. |
@@ -92,3 +92,9 @@ Command: `python -m pytest tests/ -q`, only in Git-backed scratch clone `C:/User
 ## Verified FNO/utility batch (2026-10-19)
 
 Repeated `python -m pytest tests/ -q` only in the same scratch clone after copying all six newly edited source/config files; all byte hashes matched. Result: 111 passed, 13 warnings, 26.93 seconds, exit 0. Same 12 SciPy unknown-disp warnings and one ElasticNet convergence warning. Transcript retained in scratch as pytest_utility_fno.log. Syntax-only compilation passed for fno_solver.py, generate_fno_data.py, train_fno.py, phase15_virtual_trial.py and pseudotrajectory_generator.py, with the audit-local cache. pyproject.toml parsed successfully with tomllib and the five legacy-ml packages were present. Tests do not run FNO training/data generation or virtual trials; no performance or clinical validation inferred.
+
+Graph maintenance: `graphify update .` completed AST-only after source changes (no LLM): 8,483 nodes, 16,379 edges. No tracked graph changes appeared in git status. Scientific output/ and frozen artifacts were not regenerated.
+
+## Verified import-safety batch (2026-10-19)
+
+Command `python -m pytest tests/ -q` only in the same Git-backed scratch clone after copying nine edited source/test/config files; SHA-256 byte matches verified. Result: 117 passed, 13 warnings in 130.85 seconds, exit 0; transcript pytest_import_safety.log retained in scratch. Same SciPy unknown-disp and ElasticNet convergence warnings. New tests reject import-time latent-array/clinical-spreadsheet reads, exercise disabled bulk CLI, and use temporary synthetic NPZ/JSON fixtures for viewer loading across a changed CWD. The readers are exercised; no full graph, patient fit or viewer simulation pipeline is executed. Seven edited sources plus the new test compiled with audit-local cache. Eighteen test files contain 115 test functions; parametrization yields 117 collected cases. No clinical/scientific validation follows from this result.

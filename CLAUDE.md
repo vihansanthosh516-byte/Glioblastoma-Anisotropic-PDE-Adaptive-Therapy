@@ -42,7 +42,7 @@ The following CLI, Track B/C, validation and Phase 15 commands are historical ex
 ```bash
 python -m src.cli 53          # runs src/53_spatial_metrics.py
 python -m src.cli --list      # list all pipeline scripts
-python -m src.cli --run-all   # run all sequentially
+# Bulk --run-all is disabled; select only an individually reviewed historical entry
 ```
 
 **Track B cohort pipeline (scripts 42→48→45):**
@@ -82,7 +82,7 @@ python src/phase15_virtual_trial.py \
 pytest tests/ -q  # scratch copy only; never the working tree
 ```
 
-Static inventory checked 2026-10-19: 17 test files and 111 test functions (including calculator tests test1-test7). The static count is separate from execution; the latest utility-fix scratch run passed 111 tests with 13 warnings in 57.36 s (`paper/codex_audit2/fix_progress.md`). Ledger 2bo is an author-reported historical 101-test result assembled across multiple runs with partial data; its transcripts are absent. The prior audit reports 108 passed/13 warnings in a Git-backed scratch clone (`paper/codex_audit_report.md`, section E). Modules include: `test_inverse_estimation`, `test_joint_inverse_estimation`, `test_robust_mpc`, `test_spatial_metrics`, `test_multiomic_fusion`, `test_hybrid_controller`, `test_mu_glioma_loader`, `test_retrospective_validation`, `test_treatment_models`, `test_baselines`, `test_metrics_stats`, `test_no_leakage`, `test_run_manifest`, `test_solver`, `test_solver_monotone`, `test_rano_calc`.
+Static inventory checked 2026-10-19: 18 test files and 115 test functions (including calculator tests test1-test7). The static count is separate from execution; the latest audit-fix scratch run passed 117 test cases with 13 warnings in 130.85 s (`paper/codex_audit2/fix_progress.md`). Ledger 2bo is an author-reported historical 101-test result assembled across multiple runs with partial data; its transcripts are absent. The prior audit reports 108 passed/13 warnings in a Git-backed scratch clone (`paper/codex_audit_report.md`, section E). Modules include: `test_inverse_estimation`, `test_joint_inverse_estimation`, `test_robust_mpc`, `test_spatial_metrics`, `test_multiomic_fusion`, `test_hybrid_controller`, `test_mu_glioma_loader`, `test_retrospective_validation`, `test_treatment_models`, `test_baselines`, `test_metrics_stats`, `test_no_leakage`, `test_run_manifest`, `test_solver`, `test_solver_monotone`, `test_rano_calc`.
 
 ## Docker (Track B + C)
 

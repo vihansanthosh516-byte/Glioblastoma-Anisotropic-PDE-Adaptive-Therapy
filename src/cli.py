@@ -20,7 +20,6 @@ SCRIPTS = {
     "6": "src/06_method1_classical_baseline.py",
     "7": "src/07_method2_transformer.py",
     "8": "src/08_method3_hybrid.py",
-    "9": "src/09_benchmark_comparison.py",
     "10": "src/10_cvae_pretrain.py",
     "11": "src/11_cvae_extract_latent.py",
     "12": "src/12_gat_build_graph.py",
@@ -69,6 +68,16 @@ SCRIPTS = {
 }
 
 
+# Explicit exclusions from the runnable inventory (audit summary).
+EXCLUDED_SCRIPTS = {
+    "src/09_benchmark_comparison.py": "archived report with test-selected metrics",
+    "src/batch_run_digital_twins.py": "empty placeholder; no implementation",
+    "src/build_full_graph.py": "heavy full-cohort graph; histology-derived features",
+    "src/22_saddle_point_proof_backup.py": "legacy alternate solver shares primary output path",
+    "src/run_sensitivity_shifts.py": "post-freeze exploratory access to spent H-2 outputs",
+}
+
+
 def run_script(script_name: str) -> int:
     """Run a single pipeline script."""
     script_path = os.path.join(PROJECT_ROOT, SCRIPTS[script_name])
@@ -87,7 +96,7 @@ def run_script(script_name: str) -> int:
 
 def list_scripts():
     """List available scripts."""
-    print("Available pipeline scripts:")
+    print("Historical script entries (not current validated pipelines):")
     print("=" * 60)
     for key, path in sorted(SCRIPTS.items(), key=lambda x: int(x[0]) if x[0].isdigit() else 999):
         label = f"{key}: {os.path.basename(path)}"
@@ -100,7 +109,7 @@ def main():
     if len(sys.argv) < 2:
         list_scripts()
         print("\nUsage: python -m src.cli <script_number> | --list")
-        print("       python -m src.cli --run-all       (run all scripts sequentially)")
+        print("       --run-all is disabled; inspect individual historical entries")
         print("       GBM_PROJECT_ROOT=/path python -m src.cli <script_number>")
         sys.exit(1)
 
@@ -111,23 +120,8 @@ def main():
         return
 
     if arg == "--run-all":
-        print("Running all scripts sequentially...")
-        print("=" * 60)
-        failed = 0
-        total = len(SCRIPTS)
-        for key in sorted(SCRIPTS.keys(), key=lambda x: int(x) if x.isdigit() else 999):
-            script_name = SCRIPTS[key]
-            rc = run_script(key)
-            if rc != 0:
-                print(f"[CLI] FAILED at script {key} ({os.path.basename(script_path) if False else script_name})")
-                failed += 1
-            else:
-                print(f"[CLI] OK   script {key}")
-        print("=" * 60)
-        print(f"Completed: {total - failed}/{total} succeeded; {failed} failed")
-        if failed > 0:
-            sys.exit(1)
-        return
+        print("[CLI] --run-all disabled: historical entries include heavy, unsafe and spent-set analyses. Select an individually reviewed script.", file=sys.stderr)
+        sys.exit(2)
 
     # Run specific script
     script_key = arg

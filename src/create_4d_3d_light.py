@@ -11,8 +11,10 @@ import numpy as np
 import base64
 from pathlib import Path
 
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
-BASE_OUTPUT = Path("output/batch_digital_twins")
+
+BASE_OUTPUT = Path((PROJECT_ROOT / "output/batch_digital_twins"))
 
 
 def load_patient_4d_data(patient_id):
@@ -88,10 +90,10 @@ def main():
     # Run 3D simulation
     print("Running 3D simulation...")
     
-    patient_dir = Path(f"data/tcia/MU-Glioma-Post/{target_patient}")
+    patient_dir = Path((PROJECT_ROOT / f"data/tcia/MU-Glioma-Post/{target_patient}"))
     mask_file = patient_dir / "Timepoint_1" / f"{target_patient}_Timepoint_1_tumorMask.nii.gz"
     if not mask_file.exists():
-        mask_file = Path(f"data/brats/{target_patient}/{target_patient}_seg.nii.gz")
+        mask_file = Path((PROJECT_ROOT / f"data/brats/{target_patient}/{target_patient}_seg.nii.gz"))
         if not mask_file.exists():
             print(f"  [WARNING] No mask found for {target_patient}")
             return 1
@@ -143,11 +145,11 @@ def main():
                     rt_dose[day] = 2.0
     
     # Run simulation and collect only key frames
-    os.makedirs("output/time_series_3d_light", exist_ok=True)
-    for f in Path("output/time_series_3d_light").glob("*.npy"):
+    os.makedirs((PROJECT_ROOT / "output/time_series_3d_light"), exist_ok=True)
+    for f in Path((PROJECT_ROOT / "output/time_series_3d_light")).glob("*.npy"):
         f.unlink()
     
-    np.save("output/time_series_3d_light/tumor_3d_day_000.npy", u)
+    np.save((PROJECT_ROOT / "output/time_series_3d_light/tumor_3d_day_000.npy"), u)
     
     snapshots = []
     day_labels = []
@@ -232,6 +234,7 @@ def main():
     </style>
 </head>
 <body>
+    <p role="note">Model simulation, not observed longitudinal imaging or clinical validation. Missing rho/D fields use assumed 0.015/day and 0.01 values; treatment effects are assumed. No random sampling is used.</p>
     <div class="container">
         <h1>4D 3D Tumor Viewer - {target_patient}</h1>
         <div class="info">
@@ -370,6 +373,8 @@ def main():
     output_path = BASE_OUTPUT / f"4d_3d_light_{target_patient}.html"
     with open(output_path, 'w') as f:
         f.write(html)
+    if not output_path.is_file() or output_path.stat().st_size == 0:
+        raise RuntimeError(f"Missing or empty viewer: {output_path}")
     
     print(f"[SUCCESS] Lightweight viewer saved: {output_path}")
     print(f"[INFO] Open directly in browser (no server needed)")

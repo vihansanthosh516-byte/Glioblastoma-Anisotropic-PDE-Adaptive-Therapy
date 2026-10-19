@@ -20,7 +20,7 @@ dependencies = [
 run-pipeline = "src.cli:main"
 
 [project.optional-dependencies]
-legacy-ml = ["torch", "gymnasium", "stable-baselines3", "nibabel", "scikit-learn"]
+legacy-ml = ["torch", "gymnasium", "stable-baselines3", "nibabel", "scikit-learn", "plotly"]
 
 [tool.setuptools.packages.find]
 where = ["src"]

@@ -40,7 +40,7 @@ It is background, not the goal. Honest summary: `README_STATUS.md` (corrected af
 - RL results: the 25% gain is on a simulated cohort; the real-test result (20/21) uses assumed kill rates. Both are simulation.
 - Growth-model forecasts did not beat "no change" on real data (persistence baseline).
 - Several drug and RL numbers use assumed parameters, not measured ones.
-- Inventory checked 2026-10-19: 159 numbered top-level files in `src/` (maximum prefix 145, with collisions); 208 top-level and 217 recursive source `.py` files. `tests/` has 17 `test_*.py` files, 111 test functions, and conftest.py. File existence is not a safe-runnable or validation claim.
+- Inventory checked 2026-10-19: 159 numbered top-level files in `src/` (maximum prefix 145, with collisions); 208 top-level and 217 recursive source `.py` files. `tests/` has 18 `test_*.py` files, 115 test functions, and conftest.py. File existence is not a safe-runnable or validation claim.
 
 ## 6. Which files to trust
 | Status | Files |

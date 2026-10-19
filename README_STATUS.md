@@ -88,7 +88,7 @@ Retrain caveat: attempt 2 is a second launch of a run the plan calls one-shot. L
 - `Requirements.txt` had merge-conflict markers; resolved 2026-10-18 by keeping the union of both sides. `pyproject.toml` does not list SALib, nibabel, dipy, scikit-learn or h5py, so add them there before dropping `Requirements.txt`.
 - Script numbers reused (15, 16, 22, 50-56). `archive_old_gbm/REPO_MIND_MAP.md` section 13b lists the files behind each number. No file was renamed.
 - Untracked run kits and caches (`kaggle_run/*`, `output/pde_manifest/cache_*`). Historical storage measurements lack a retained filesystem manifest and are not current facts. Re-measure before deciding what to ignore.
-- Ledger 2bo records author-reported historical split scratch runs totaling 101/101, not one invocation. Current static inventory is 17 test files and 111 test functions. The prior audit reports 108 passed/13 warnings in a Git-backed scratch clone (`paper/codex_audit_report.md`, section E); the latest utility-fix scratch run passed 111 tests with 13 warnings in 57.36 s (`paper/codex_audit2/fix_progress.md`).
+- Ledger 2bo records author-reported historical split scratch runs totaling 101/101, not one invocation. Current static inventory is 18 test files and 115 test functions. The prior audit reports 108 passed/13 warnings in a Git-backed scratch clone (`paper/codex_audit_report.md`, section E); the latest audit-fix scratch run passed 117 test cases with 13 warnings in 130.85 s (`paper/codex_audit2/fix_progress.md`).
 - Run `graphify update .` after code changes.
 
 ### 5e. Long-term options (all unproven)
