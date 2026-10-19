@@ -1,3 +1,4 @@
+# NOTE (2026-10-19 audit): historical legacy script; not part of the current RANO project. Interactive diagnostic helper; adds a cwd-relative src to sys.path and produces no result analysis.
 import sys
 sys.path.insert(0, "src")
 from resistance_env import make_resistance_env

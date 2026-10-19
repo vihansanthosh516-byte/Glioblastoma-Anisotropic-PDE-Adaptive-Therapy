@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# NOTE (2026-10-19 audit): historical legacy script; not part of the current RANO project. Despite the 'Real-Patient DTI Integration' title it can also build synthetic inputs; patient provenance depends on the caller's paths.
 """
 Real-Patient DTI Integration
 =============================

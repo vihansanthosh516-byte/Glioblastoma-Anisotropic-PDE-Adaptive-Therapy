@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# NOTE (2026-10-19 audit): historical legacy script; not part of the current RANO project. Has a synthetic spherical seed fallback when segmentation is absent; such input is simulated, not patient data.
 """
 BraTS / NIfTI / DICOM Loader for GBM Digital Twin
 ==================================================

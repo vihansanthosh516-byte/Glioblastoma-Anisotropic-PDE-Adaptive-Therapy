@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# NOTE (2026-10-19 audit): historical legacy script; not part of the current RANO project. The docstring claims 190 simulations; the real count comes from a glob with no fixed check. cwd anchored at the project root. The expected HTML was absent when audited.
 """
 Unified Patient 4D Viewer - Simple Direct HTML Generation
 ==========================================================
@@ -16,6 +17,9 @@ import glob
 
 BASE_OUTPUT = Path("output/batch_digital_twins")
 
+
+import os as _os
+_os.chdir(_os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))))  # cwd-relative output/ paths below; anchor cwd at the project root
 
 def load_all_patient_4d_data():
     """Load 4D simulation data for all patients."""

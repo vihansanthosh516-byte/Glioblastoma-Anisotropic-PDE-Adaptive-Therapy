@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# NOTE (2026-10-19 audit): historical legacy script; not part of the current RANO project. The header claims 183 twins, but the loaded number is whatever the runtime directory glob finds. Paths are cwd-relative, so cwd is anchored at the project root.
 """
 Master Cohort Dashboard - Aggregates All 183 Patient Digital Twins
 ==================================================================
@@ -22,6 +23,9 @@ import glob
 
 BASE_OUTPUT = Path("output/batch_digital_twins")
 
+
+import os as _os
+_os.chdir(_os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))))  # cwd-relative output/ paths below; anchor cwd at the project root
 
 def load_all_patient_data():
     """Load data from all successful patient runs."""
