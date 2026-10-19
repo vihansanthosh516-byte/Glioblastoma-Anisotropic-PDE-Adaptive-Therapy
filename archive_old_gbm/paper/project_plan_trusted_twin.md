@@ -4,27 +4,29 @@
 
 Status: plan only. Nothing here has been run. Not yet declared as an amendment. Written for the user's goal: keep the GBM project and its parts, change a lot, add a new mathematical core, for GARSEF (February 2027).
 
-## 1. Honest novelty check (searches, snippet level; unverified)
+## 1. Historical novelty notes (snippet-level; unverified)
+
+No dated search protocol/query log or full-source reading record supports completeness. Primary papers must be checked before any novelty claim; these notes are not current search findings.
 - Uncertainty-aware glioma digital twins already exist: Bayesian calibration with probabilistic forecasts and risk-aware radiotherapy (https://arxiv.org/pdf/2308.12429; https://arxiv.org/pdf/2505.08927). Strong groups work here. A plain "digital twin" is NOT new.
 - NASEM 2023 stresses VVUQ and "fit-for-purpose" validation for digital twins (secondary sources only; exact wording not read). A cancer twin is a named example. No oncology VVUQ benchmark was found (https://www.frontiersin.org/journals/physiology/articles/10.3389/fphys.2024.1473125/full).
 - NOT found in about 9 searches: (a) a per-patient rule that withholds a growth forecast when it cannot beat "no change" given measurement noise; (b) a forecast skill score against persistence for glioma growth models; (c) a closed-form forecast horizon from noise and growth speed; (d) conformal coverage guarantees for glioblastoma radiotherapy margins.
 - Closest work: a rat-simulation study of imaging quality (https://pmc.ncbi.nlm.nih.gov/articles/PMC12564088/, no theorem, no baseline); Bayesian glioma growth that folds segmentation error into model error (https://pmc.ncbi.nlm.nih.gov/articles/PMC10599765).
-- Conclusion: the new part is narrow: a trust criterion with a theorem behind it, tested against a no-change baseline on real patients. The twin around it is not new. Claim only that.
+- Proposed contribution to investigate: a trust criterion with assumptions/proof and future predeclared comparison to no-change. Neither novelty, theorem validity nor completed patient testing is established. A dated query/source log is missing; snippet searches cannot establish absence.
 
 ## 2. What stays, changes, goes
 | Item | Decision | Reason |
 |---|---|---|
-| Recurrence model and two-centre all-recurrence gain (+0.081, +0.085) | Keep as module 1 ("where") | Verified in files; not new alone |
-| Exact monotone solver (Selling) | Keep as the verified simulator | Needed to check the theorems |
+| Recurrence model and two-centre all-recurrence gain (+0.081, +0.085) | Keep as module 1 ("where") | Secondary all-recurrence estimates only; both enhancing primaries failed and former tests are spent (ledger 2ax/2bd/2bj) |
+| Exact monotone solver (Selling) | Keep for synthetic numerical checks, subject to grid-speed/resolution error (ledger 2q/2ac) | Needed to check the theorems |
 | Measured segmentation noise floor | Keep, extend to all longitudinal sets | Core input to the theory |
 | 4D viewer | Keep, add a trust indicator and a confidence band | Demo for the poster |
-| Persistence tests (H1, H3, volume forecast) | Keep as evidence for the theory | Real data, pre-declared |
+| Persistence tests (H1, H3, volume forecast) | Keep as evidence for the theory | Historical declarations do not establish every access/run date; reused H-2/H-3 tests are spent under Amendment 12 |
 | Drug what-if | Keep as labelled simulation only | Assumed rates |
 | Triage, H-4 test-set hunt, enhancing-recurrence chase | Drop | No headroom, no data |
 | Headline "digital twin predicts growth" | Drop | Not supported |
 
 ## 3. The project in one sentence
-A glioblastoma twin with three honest parts: it shows WHERE the tumour returns (validated), says WHEN a growth forecast is meaningful at all (new theory), and shows WHAT-IF drug scenarios labelled as simulation.
+A glioblastoma twin with three honest parts: it would explore recurrence coverage (historical secondary results, not clinical validation) and WHEN a growth forecast might be meaningful (unproved theory), and shows WHAT-IF drug scenarios labelled as simulation.
 
 ## 4. Mathematics to prove (the new core)
 T1. Exact identity: Dice(A,B) = 1 - |A sym-diff B| / (|A|+|B|). First-order law: 1 - Dice ~ (mean |u|) S / (2V) for a boundary displaced by a normal field u (S surface area, V volume). State the error term and the smoothness assumptions.
@@ -41,7 +43,7 @@ Each theorem gets: statement, assumptions, proof, numerical check.
 ## 6. Real-data tests (each declared in an amendment BEFORE it is run)
 - R1 (parameter-free prediction): the theory predicts, from measured noise and measured displacement alone, the share of real scan pairs where any forecast can beat persistence. Compare with the observed share of pairs where the FK forecast beats persistence (data: MU 334 pairs and the longitudinal sets already on disk). No fitted parameter. Success rule to be written in the amendment.
 - R2: does FI rank pairs by forecast gain (AUC with bootstrap CI)? Leave-one-dataset-out.
-- R3: guaranteed-coverage plan (conformal) for the recurrence map: smallest volume that reaches a stated coverage with a finite-sample guarantee; test coverage leave-one-centre-out; report volume against the 15 mm plan.
+- R3: proposed conformal recurrence plan at a stated nominal coverage; any finite-sample guarantee requires an explicit calibration/exchangeability unit, coverage level and method assumptions; test coverage leave-one-centre-out; report volume against the 15 mm plan.
 All data are spent sets: label results "exploratory, leave-one-dataset-out", never "locked".
 
 ## 7. Deliverables

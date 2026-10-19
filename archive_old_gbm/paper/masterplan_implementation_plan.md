@@ -3,8 +3,10 @@
 # Implementation plan for GBM_ISEF_PHD_Level_Masterplan.md
 
 Source: `C:\Users\vihan\Downloads\GBM_ISEF_PHD_Level_Masterplan.md` (sections §1–§210).
-Scope: all 37 priority items (Tier S, A, B, §200) in build order (§201).
+Scope (author-reported; exact external source version is not attached): 37 priority items (Tier S, A, B, §200) in build order (§201).
 Rules for every step: patient is the unit (§76), numbers cite `output/` files, negative results are kept, no tuning on LUMIERE after freeze (§79).
+Historical scope note (2026-10-19): prospective rules below do not certify every run. Amendment 12 later reused LUMIERE/RHUH/UCSF former tests as development; all are SPENT. Gates/phases are proposals, not completion evidence, and no rerun is authorized by this archive.
+
 New scripts start at `src/94_*`. Reuse existing scripts where listed. "Reuse" names come from `src/` file names; check each one before building on it.
 
 ## Gates (a phase does not start until the gate before it passes)
@@ -115,4 +117,4 @@ Neural residual (§59), FNO surrogate with its own error budget (§60–61, reus
 - Parts of Track B depend on LUMIERE and MU data already on disk (`data/external/`). Re-check each path before Phase 1.
 - Several existing numbers are interim or post hoc. Mark them so in the ledger.
 - Scope is about 6 months of work. Phases 0–4 give the strongest science. Phases 5–6 can be cut to "exploratory" without hurting Phases 0–4.
-- ISEF 2027 is May 8–14, 2027 (§167). Today is 2026-10-04. Work backward: external run done by ~Jan 2027, paper by ~Mar 2027.
+- Fair dates/rules/forms are unverified; the old May-2027 and Jan/Mar schedule is superseded. Data-path availability and deadline assumptions require dated checks; current state is ../../START_HERE.md.
