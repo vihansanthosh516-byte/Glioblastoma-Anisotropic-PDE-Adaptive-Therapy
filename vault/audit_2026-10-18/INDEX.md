@@ -15,6 +15,8 @@ This folder holds the files cited by ledger entries 2bi, 2bj, 2bk, 2bm, 2bn and 
 | `vault/audit_2026-10-18/` | this folder |
 Pre-edit copies of the two files that had no git history are in `originals/`. The other three files are recoverable from git history. `.gitignore` was not edited.
 
+Originals notice (2026-10-19 audit correction): `originals/README_STATUS_original_2026-10-17.md` and `originals/REPO_MIND_MAP_original_2026-10-14.md` are unchanged dated snapshots (ARCHIVE in `START_HERE.md` §6), kept byte-identical on purpose and not current guidance. Where they differ from `README_STATUS.md`, `README_STATUS_change_log.md` and `vault/PAPER_FINDINGS_LEDGER.md` win. Known superseded items in the README snapshot: the 190+/150 script counts (current: 202 `.py`, 154 numbered); `failed_hypotheses.md` path (now `vault/failed_hypotheses.md`); adaptive-therapy "54/61 less resistance" (corrected: MTD ends with more resistant cells in 54/61, 7 ties, 0 reversed, simulation with assumed kill rate, `output/emax_sweep_summary.json`); inverse-estimation 124/154 (corrected: D at bound 147/154, rho at lower bound 124/154); "25% win" (simulated cohort64, n=20); H-3 C2 +0.031 (displayed +0.030, dev, interim); the PDE H1 interval (earlier 2,000-draw bootstrap, superseded by 10,000 draws); the 3.8 GB size (unreproduced); pytest status; the H-4 candidate list (2026-10-18 desk review confirmed none eligible); and the "locked" labels on the H-2/H-3 sets, which are spent/post hoc development data after Amendment 12. Values were cross-checked only against the later status files and change log, not re-extracted from outputs.
+
 ## Files here
 | File | What it is | Ledger |
 |---|---|---|
