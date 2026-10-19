@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Month 4, Week 4: Drug Gating Report & Optimization Matrix
-Compiles publication-ready therapeutic discovery report with optimization matrix.
+Summarizes historical in-silico knockout model scores, not drug efficacy or clinical validation.
 """
 
 from __future__ import annotations
@@ -140,7 +140,16 @@ def generate_report(data: Dict, output_path: str):
     single_ti = data['single_ko_ti']
     dual_ti = data['dual_ko_ti']
     ms = data['master_switches']
-    single_ko = json.load(open(str(OUTPUT_DIR / "single_ko_results.json")))
+    single_ko = data['single_ko']
+    top_single = max(single_ko, key=lambda row: row['collapse_score'], default=None)
+    top_bliss = max(data['dual_ko'], key=lambda row: row.get('bliss_synergy', float('-inf')), default=None)
+    top_selectivity = max(single_ti, key=lambda row: row['therapeutic_index'], default=None)
+    single_summary = (f"{top_single['gene']} (collapse = {top_single['collapse_score']:.6g})"
+                      if top_single else "No single-KO rows supplied")
+    bliss_summary = (f"{top_bliss['gene_a']} + {top_bliss['gene_b']} (Bliss = {top_bliss['bliss_synergy']:.6g})"
+                     if top_bliss else "No dual-KO rows supplied")
+    selectivity_summary = (f"{top_selectivity['gene']} (model score = {top_selectivity['therapeutic_index']:.6g})"
+                           if top_selectivity else "No selectivity rows supplied")
 
     md = f"""# Month 4: In Silico Combinatorial Drug Gating Report
 
@@ -152,13 +161,13 @@ def generate_report(data: Dict, output_path: str):
 ## Executive Summary
 
 This report presents the results of the **In Silico Combinatorial Drug Gating** pipeline 
-applied to glioblastoma spatial transcriptomics (15,000 cells, 3 zones: Healthy, Periphery, Core).
+from supplied model-result arrays. Cell count and cohort provenance require an external manifest; no clinical response is measured.
 
 **Key Findings:**
-- **Top Single KO Target:** TMLHE (C = 0.0378)
-- **Top Dual KO Synergy:** S100A8 + S100A6 (Bliss = -0.4258, antagonistic)
-- **Clinical Translation:** No combinations achieved TI > 10 with tumor_collapse > 0.05
-- **Best Single Target:** TMLHE (collapse = 0.0378, TI = 0.02)
+- **Highest Single-KO Collapse Score:** {single_summary}
+- **Highest Dual-KO Bliss Score:** {bliss_summary} (model score; sign is not drug efficacy)
+- **Scope:** TI > 10 and tumor_collapse > 0.05 are chosen model cutoffs, not clinical acceptance criteria.
+- **Highest Single-KO Selectivity Score:** {selectivity_summary}; ranking differs from collapse.
 
 ---
 
@@ -178,12 +187,11 @@ applied to glioblastoma spatial transcriptomics (15,000 cells, 3 zones: Healthy,
 
 ### Therapeutic Index (TI) for Single Knockouts
 
-TI = C_tumor / C_healthy (higher = better therapeutic window)
+The supplied therapeutic_index field is a calibrated model selectivity score, not literal division by displayed healthy collapse. Raw zeros and the upstream 0.001 floor affect it; no pharmacologic therapeutic window is established.
 
 | Rank | Gene | Tumor C | Healthy C | TI |
 |------|------|---------|-----------|-----|
 """
-    single_ti = json.load(open(str(OUTPUT_DIR / "single_ko_ti.json")))
     for i, r in enumerate(single_ti[:10], 1):
         md += f"| {i} | {r['gene']} | {r['tumor_collapse']:.4f} | {r['healthy_collapse']:.4f} | {r['therapeutic_index']:.2f} |\n"
 
@@ -193,12 +201,12 @@ TI = C_tumor / C_healthy (higher = better therapeutic window)
 
 ## 2. Combinatorial Dual Knockout Screen
 
-### Top 10 by Combined Effect (C)
+### Top 10 by Combined Model Effect (C)
 
 | Rank | Gene A | Gene B | Combined C | Bliss Synergy | Loewe Synergy |
 |------|--------|--------|-----------|---------------|---------------|
 """
-    for i, r in enumerate(dual_ti[:10], 1):
+    for i, r in enumerate(sorted(dual_ti, key=lambda row: row["tumor_collapse"], reverse=True)[:10], 1):
         md += f"| {i} | {r['gene_a']} | {r['gene_b']} | {r['tumor_collapse']:.4f} | {r.get('bliss_synergy', 0):.4f} | {r.get('loewe_synergy', 0):.4f} |\n"
 
     md += f"""
@@ -208,7 +216,7 @@ TI = C_tumor / C_healthy (higher = better therapeutic window)
 | Rank | Gene A | Gene B | TI | Tumor C | Healthy C | Bliss | Loewe |
 |------|--------|--------|-----|---------|-----------|-------|-------|
 """
-    for i, r in enumerate(dual_ti[:10], 1):
+    for i, r in enumerate(sorted(dual_ti, key=lambda row: row["therapeutic_index"], reverse=True)[:10], 1):
         md += f"| {i} | {r['gene_a']} | {r['gene_b']} | {r['therapeutic_index']:.2f} | {r['tumor_collapse']:.4f} | {r['healthy_collapse']:.4f} | {r.get('bliss_synergy', 0):.4f} | {r.get('loewe_synergy', 0):.4f} |\n"
 
     md += f"""
@@ -218,7 +226,7 @@ TI = C_tumor / C_healthy (higher = better therapeutic window)
 ## 3. Optimization Matrix
 
 The optimization matrix evaluates each target across 6 dimensions:
-1. **Therapeutic Index** (TI = C_tumor / C_healthy)
+1. **Model selectivity score** (upstream floor/calibration-dependent)
 2. **Tumor Collapse** (C_tumor)
 3. **Healthy Collapse** (C_healthy)  
 4. **GRN Out-Degree** (master switch centrality)
@@ -229,7 +237,7 @@ See `output/optimization_matrix.png` for heatmap visualization.
 
 ---
 
-## 4. Master Switches & Causal GRN
+## 4. Inferred Network Centrality (not causal intervention evidence)
 
 **Top 10 Master Switches by Out-Degree Centrality:**
 
@@ -254,23 +262,23 @@ See `output/optimization_matrix.png` for heatmap visualization.
     # No combinations with TI > 10 and tumor_collapse > 0.05
     clinical = [r for r in dual_ti if r['therapeutic_index'] > 10 and r['tumor_collapse'] > 0.05]
     if not clinical:
-        md += "| - | No combinations meet clinical thresholds (TI > 10, Tumor C > 0.05) | | | | | |\n"
+        md += "| - | No combinations meet chosen model cutoffs (TI > 10, Tumor C > 0.05) | | | | | |\n"
     else:
         for r in clinical[:5]:
             md += f"| | {r['gene_a']}+{r['gene_b']} | {r['therapeutic_index']:.2f} | {r['tumor_collapse']:.4f} | {r['healthy_collapse']:.4f} | {r.get('bliss_synergy', 0):.4f} | HIGH |\n"
 
     md += f"""
 
-### Biomarker Strategy
+### Unvalidated model hypotheses
 - **Pharmacodynamic:** Periphery transition score reduction
 - **Patient Stratification:** High Periphery zone fraction (>20%)
 - **Combo Biomarker:** Co-expression of target pair in Periphery zone
 
 ---
 
-## 6. Next Steps (Month 5)
+## 6. Historical proposed experiments (not clinical recommendations)
 
-1. **Clinical Validation:** Test top 5 combinations on Ivy GAP / TCGA-GBM cohorts
+1. **Independent testing needed:** expression cohorts alone do not validate treatment effects
 2. **Dose-Response Modeling:** Extend binary KO to graded inhibition
 3. **Spatial PK/PD:** Integrate drug diffusion in 3D tissue geometry
 4. **Manuscript Preparation:** Compile for Nature Methods / Cancer Cell submission
@@ -281,12 +289,12 @@ See `output/optimization_matrix.png` for heatmap visualization.
 
 | Artifact | Path | Description |
 |----------|------|-------------|
-| Single KO Results | `output/single_ko_results.json` | 200 genes × collapse scores |
-| Single KO TI | `output/single_ko_ti.json` | 4 genes × TI metrics |
-| Dual KO Results | `output/dual_ko_results.json` | 15 pairs × synergy metrics |
-| Dual KO TI | `output/dual_ko_ti.json` | 15 pairs × TI metrics |
+| Single KO Results | `output/single_ko_results.json` | {len(single_ko)} genes × collapse scores |
+| Single KO TI | `output/single_ko_ti.json` | {len(single_ti)} genes × model scores |
+| Dual KO Results | `output/dual_ko_results.json` | {len(data['dual_ko'])} pairs × model synergy metrics |
+| Dual KO TI | `output/dual_ko_ti.json` | {len(dual_ti)} pairs × model scores |
 | Optimization Matrix | `output/optimization_matrix.npy` | Gene × 6 metrics |
-| Master Switches | `output/master_switches.tsv` | 100 TFs × centrality |
+| Master Switches | `output/master_switches.tsv` | {len(data['master_switches'])} supplied centrality rows |
 | Causal GRN | `output/causal_grn.graphml` | Cytoscape-compatible |
 | Drug Gating Report | `output/drug_gating_report.md` | This document |
 
@@ -294,8 +302,10 @@ See `output/optimization_matrix.png` for heatmap visualization.
 
 *Report generated by MSOS Pipeline v1.0 | {time.strftime('%Y-%m-%d %H:%M:%S')}*
 """
-    with open(output_path, "w") as f:
+    with open(output_path, "w", encoding="utf-8") as f:
         f.write(md)
+    if Path(output_path).stat().st_size == 0:
+        raise RuntimeError(f"Empty report: {output_path}")
 
 
 def main():

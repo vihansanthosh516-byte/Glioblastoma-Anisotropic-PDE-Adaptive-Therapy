@@ -10,23 +10,23 @@ baseline for anisotropy-vs-isotropic comparison, renders a publication
 Architectural Justification (Dual-Resolution Design):
 -----------------------------------------------------
 This platform employs a dual-resolution architecture for computational
-efficiency and clinical relevance:
+exploration; no clinical utility is established:
 
 * **High-Resolution 2D Slice Model (100x100 grid, 1mm voxels):**
   Used for high-throughput parameter sweeps, Monte Carlo uncertainty
   sampling, Sobol sensitivity analysis (N=500), and real-time interactive
   MPC optimization. The 2D mid-axial slice captures tract-anisotropy
-  in the primary invasion plane while enabling ~1000x speedup over 3D.
+  in the selected invasion plane; no measured 2D/3D speedup is established.
 
 * **Anisotropic 3D Mesh Model (50x50x50 mm, 1mm isotropic voxels):**
   Used for full spatial volume evaluation and 3D boundary validation
-  (Dice coefficient, Hausdorff distance). The 3D model validates that
-  2D slice dynamics faithfully represent volumetric tumor-GF front
-  correlation and invasion morphology.
+  (Dice coefficient, Hausdorff distance). No cited artifact establishes that
+  2D slice dynamics faithfully reproduce volumetric tumor-GF front
+  correlation or invasion morphology.
 
 Both models share the same DTI-derived diffusion tensor field, reaction
-kinetics, and MPC controller parameters, ensuring cross-resolution
-consistency. The 2D model enables the large-N virtual cohort studies
+kinetics, and MPC controller parameters in the intended design; cross-resolution
+consistency requires independent checks. The 2D model enables the large-N virtual cohort studies
 reported here; the 3D model provides spatial validation metrics
 reported in Tier 3.
 
@@ -47,7 +47,7 @@ Generated:
     output/RESEARCH_EXECUTIVE_SUMMARY_AND_TECHNICAL_DOSSIER.md
     output/isotropic_baseline_metrics.json (idempotency cache)
 
-Honest-framing (D2): adaptive arm maintains comparable TTP at lower drug
+Historical D2 comparability claim is unsupported; report TTP separately from drug
 exposure; do NOT claim longer TTP or preserved sensitivity.
 Df bounds (D1): Phase1 [1.0,2.0], Phase2 [0.4,1.0].
 Front-correlation floor: 0.90 (realized min reported separately).
@@ -103,18 +103,20 @@ ISO_DT = 0.02
 SAVE_INTERVAL = 100
 SEED_THRESHOLD = 0.1 * K  # tumor mask threshold for geometry metrics
 
-INPUT_FILES = {
-    "phase1_anisotropic": Path("output/anisotropic_geometry_metrics.json"),
-    "phase2_stromal":     Path("output/stromal_feedback_metrics.json"),
-    "phase3_adaptive":    Path("output/adaptive_geometry_metrics.json"),
-}
-EVOLUTION_STROMAL_FMT = "output/stromal_evolution_{pid}.npz"
-EVOLUTION_ANISO_FMT   = "output/anisotropic_evolution_{pid}.npz"
-TENSOR_PROFILES_NPZ   = Path("output/anisotropic_tensor_profiles.npz")
-ADAPTIVE_DATA_NPZ     = Path("output/adaptive_therapy_data.npz")
-ISO_CACHE             = Path("output/isotropic_baseline_metrics.json")
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
-OUTPUT_DIR = Path("output")
+INPUT_FILES = {
+    "phase1_anisotropic": (PROJECT_ROOT / "output/anisotropic_geometry_metrics.json"),
+    "phase2_stromal":     (PROJECT_ROOT / "output/stromal_feedback_metrics.json"),
+    "phase3_adaptive":    (PROJECT_ROOT / "output/adaptive_geometry_metrics.json"),
+}
+EVOLUTION_STROMAL_FMT = str(PROJECT_ROOT / "output/stromal_evolution_{pid}.npz")
+EVOLUTION_ANISO_FMT   = str(PROJECT_ROOT / "output/anisotropic_evolution_{pid}.npz")
+TENSOR_PROFILES_NPZ   = (PROJECT_ROOT / "output/anisotropic_tensor_profiles.npz")
+ADAPTIVE_DATA_NPZ     = (PROJECT_ROOT / "output/adaptive_therapy_data.npz")
+ISO_CACHE             = (PROJECT_ROOT / "output/isotropic_baseline_metrics.json")
+
+OUTPUT_DIR = (PROJECT_ROOT / "output")
 MASTER_SUMMARY_JSON = OUTPUT_DIR / "master_cohort_summary.json"
 MASTER_PNG          = OUTPUT_DIR / "master_cohort_synthesis.png"
 POSTER_MD           = OUTPUT_DIR / "POSTER_KEY_FINDINGS.md"
@@ -925,9 +927,9 @@ def run_statistics(master: Dict[str, Any]) -> Dict[str, Any]:
         "t_statistic": float(t_ttp),
         "p_value": float(p_ttp),
         "degrees_of_freedom": int(len(ttp_m) - 1),
-        "interpretation": ("Non-inferiority: cannot reject equality of TTP "
-                           "(p>0.05 expected). Equal TTP at lower drug "
-                           "exposure — adaptive is non-inferior, not superior."),
+        "interpretation": ("Paired model TTP comparison only; no prespecified non-inferiority "
+                           "margin is supplied. Report arm means, ratio and p-value without "
+                           "equivalence or clinical-efficacy conclusions."),
     }
 
     # 4) Multi-omic stratification (inflammation tertiles)
@@ -1008,14 +1010,14 @@ def _print_statistics_table(s: Dict[str, Any]) -> None:
           f"({_fmt_p(d['inflammation_vs_drug_reduction']['spearman_p'])})")
 
     t = s["ttp_non_inferiority"]
-    print("\n[3] TTP non-inferiority (honest framing D2)")
+    print("\n[3] Model TTP comparison (no non-inferiority inference)")
     print(f"    mean TTP MTD={t['mean_ttp_mtd']:.1f} "
           f"Adaptive={t['mean_ttp_adaptive']:.1f} "
           f"ratio mean={t['ttp_ratio_mean']:.3f} "
           f"(range {t['ttp_ratio_min']:.3f}-{t['ttp_ratio_max']:.3f})")
     print(f"    paired t={t['t_statistic']:.3f} {_fmt_p(t['p_value'])} "
-          f"-> cannot reject equality (non-inferior, NOT superior)")
-    print(f"    INTERPRETATION: Adaptive achieves equal TTP at "
+          f"(paired superiority test; not an equivalence/non-inferiority test)")
+    print(f"    EXPOSURE (TTP must be assessed separately): adaptive has "
           f"{(d['drug_reduction']['min']*100):.0f}-"
           f"{(d['drug_reduction']['max']*100):.0f}% lower drug exposure.")
 
@@ -1221,7 +1223,7 @@ def render_master_canvas(master: Dict[str, Any],
         dose_adapt = []
         for p in patients:
             pid = p["patient_id"]
-            npz_path = Path("output/adaptive_{}.npz".format(pid))
+            npz_path = (PROJECT_ROOT / "output/adaptive_{}.npz".format(pid))
             if npz_path.exists():
                 d = np.load(npz_path, allow_pickle=True)
                 if "adaptive_dose" in d.files:
@@ -1449,15 +1451,15 @@ def write_poster_findings(master: Dict[str, Any],
         f"- Stromal microenvironment coupling maintains tumor-GF front "
         f"correlation in the range {fc_lo:.3f}-{fc_hi:.3f} across all 8 "
         f"patients (hard floor 0.90; all patients clear the floor).",
-        f"- Within the virtual cohort, adaptive therapy maintained comparable "
-        f"simulated time-to-progression (TTP) while significantly reducing "
-        f"cumulative drug exposure (paired t = {t['t_statistic']:.2f}, "
+        f"- In the assumed virtual cohort, adaptive/MTD TTP is reported as a ratio; "
+        f"no non-inferiority conclusion follows from a paired superiority test "
+        f"(paired t = {t['t_statistic']:.2f}, "
         f"{_fmt_p(t['p_value'])}; TTP ratio mean = {t['ttp_ratio_mean']:.3f}, "
         f"range {t['ttp_ratio_min']:.3f}-{t['ttp_ratio_max']:.3f}) at "
         f"{(d['min']*100):.0f}-{(d['max']*100):.0f}% lower cumulative drug "
         f"exposure (mean ± SD = {d['mean']*100:.1f} ± {d['std']*100:.1f}%).",
         f"- Higher inflammatory burden (S100A8/S100A11/LST1 zones) "
-        f"stratifies time-to-progression into Low/Mid/High tiers "
+        f"defines exploratory, possibly non-monotonic Low/Mid/High tiers "
         f"(mean TTP MTD = "
         f"{mean_ttp_low:.0f} / {mean_ttp_mid:.0f} / {mean_ttp_high:.0f} steps; "
         f"Pearson r(infl vs TTP) = "
@@ -1467,9 +1469,9 @@ def write_poster_findings(master: Dict[str, Any],
         f"(Pearson r = {infl_corr['pearson_r']:.2f}, "
         f"{_fmt_p(infl_corr['pearson_p'])}; Spearman rho = "
         f"{infl_corr['spearman_rho']:.2f}, "
-        f"{_fmt_p(infl_corr['spearman_p'])}), suggesting adaptive benefit is "
-        f"patient-specific.",
-        f"- All tensor-field and mass-conservation validation checks pass "
+        f"{_fmt_p(infl_corr['spearman_p'])}); these are exploratory "
+        f"correlations, not measured patient benefit.",
+        f"- Internal tensor/mass numerical checks (not clinical validation) report "
         f"(symmetry residual = {tv.get('symmetry_max_error','n/a')} < 1e-12; "
         f"relative mass error = {mc.get('relative_mass_error','n/a')}).",
     ]
@@ -1523,9 +1525,9 @@ def write_poster_findings(master: Dict[str, Any],
 
     body = ("# POSTER KEY FINDINGS — Month 10 Master Cohort Synthesis\n\n"
             "All numeric values are sourced from `output/master_cohort_summary.json` "
-            "and computed at write time. Honest framing per decisions D2/D4 "
-            "(adaptive maintains comparable TTP at lower drug exposure; not superior "
-            "in TTP).\n\n"
+            "and computed at write time for an assumed-parameter synthetic cohort. "
+            "Report TTP and exposure separately; no clinical or non-inferiority "
+            "claim follows from these numerical checks.\n\n"
             + "\n".join(bullets) + "\n")
     path.parent.mkdir(parents=True, exist_ok=True)
     with open(path, "w", encoding="utf-8") as f:
@@ -1739,8 +1741,8 @@ def write_research_dossier(master: Dict[str, Any],
         "3. **Uncertainty-aware adaptive therapy** — Model Predictive Control (MPC) "
         "with 14-day horizon reduces cumulative drug exposure by "
         f"{(d['min']*100):.0f}–{(d['max']*100):.0f}% (mean ± SD = "
-        f"{d['mean']*100:.1f} ± {d['std']*100:.1f}%) while maintaining "
-        f"comparable simulated time-to-progression (TTP) vs continuous MTD "
+        f"{d['mean']*100:.1f} ± {d['std']*100:.1f}%); simulated TTP differs "
+        f"from continuous MTD as reported below; no non-inferiority inference "
         f"(TTP ratio mean = {t['ttp_ratio_mean']:.3f}, range "
         f"{t['ttp_ratio_min']:.3f}–{t['ttp_ratio_max']:.3f}; paired t = "
         f"{t['t_statistic']:.2f}, {_fmt_p(t['p_value'])}).\n\n"
@@ -1815,7 +1817,7 @@ def write_research_dossier(master: Dict[str, Any],
         f"{t['ttp_ratio_mean']:.3f} (range {t['ttp_ratio_min']:.3f}–"
         f"{t['ttp_ratio_max']:.3f}).\n"
         f"- **Paired t-test**: t = {t['t_statistic']:.2f}, {_fmt_p(t['p_value'])}; "
-        "cannot reject equality of TTP (non-inferior, NOT superior).\n"
+        "paired comparison does not establish non-inferiority or equivalence.\n"
         f"- **Inflammation correlation**: Pearson r = "
         f"{infl_corr['pearson_r']:.2f} ({_fmt_p(infl_corr['pearson_p'])}), "
         f"Spearman ρ = {infl_corr['spearman_rho']:.2f} "

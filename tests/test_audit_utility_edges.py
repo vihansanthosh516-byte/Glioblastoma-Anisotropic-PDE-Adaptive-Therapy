@@ -37,3 +37,30 @@ def test_tensor_builder_rejects_nonfinite_inputs_and_regularizes_negative_eigenv
     tensor = build_pd_tensor(-2.0, 0.0, 0.6)
     assert np.allclose(tensor, tensor.T)
     assert np.linalg.eigvalsh(tensor).min() >= 1e-6 - 1e-12
+
+
+def test_report_rankings_follow_supplied_scores_without_reading_patient_artifacts(tmp_path):
+    import ast
+    from pathlib import Path
+    import time
+    # Isolate the report function: importing the legacy script creates output/.
+    source = Path(__file__).resolve().parents[1] / "src/34_drug_gating_report.py"
+    tree = ast.parse(source.read_text(encoding="utf-8"))
+    report = next(node for node in tree.body if isinstance(node, ast.FunctionDef) and node.name == "generate_report")
+    scope = {"Dict": dict, "Path": Path, "time": time}
+    exec(compile(ast.Module(body=[report], type_ignores=[]), str(source), "exec"), scope)
+    data = {
+        "single_ko": [{"gene": "LOW", "collapse_score": 0.01}, {"gene": "HIGH", "collapse_score": 0.9}],
+        "single_ko_ti": [{"gene": "SELECTIVE", "therapeutic_index": 3.0, "tumor_collapse": 0.4, "healthy_collapse": 0.0}],
+        "dual_ko": [{"gene_a": "A", "gene_b": "B", "bliss_synergy": -0.2}],
+        "dual_ko_ti": [{"gene_a": "A", "gene_b": "B", "therapeutic_index": 0.5, "tumor_collapse": 0.7, "healthy_collapse": 0.0, "bliss_synergy": -0.2}],
+        "master_switches": [],
+    }
+    target = tmp_path / "report.md"
+    scope["generate_report"](data, str(target))
+    rendered = target.read_text(encoding="utf-8")
+    assert "HIGH (collapse = 0.9)" in rendered
+    assert "SELECTIVE (model score = 3)" in rendered
+    assert "A + B (Bliss = -0.2)" in rendered
+    assert "TMLHE" not in rendered and "15 pairs" not in rendered
+    assert "chosen model cutoffs" in rendered

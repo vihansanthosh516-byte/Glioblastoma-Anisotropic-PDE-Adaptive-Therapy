@@ -1,6 +1,6 @@
 > **STATUS 2026-10-18: HISTORICAL.** Written before the pivot to the probabilistic-RANO project. Goals, plans, and words like "first", "novel", "revolutionary", "validated" in this file are NOT current and NOT supported. Numbers are records of past runs; check `vault/PAPER_FINDINGS_LEDGER.md` before you quote one. Current state: `START_HERE.md`.
 
-# Month 6 Clinical Actionability Report
+# Month 6 Hypothetical Model-Scenario Report
 ## Dose-Response Modeling & Therapeutic Gating Matrix
 
 **Generated**: Month 6, Week 4
@@ -10,17 +10,21 @@
 
 ## Executive Summary
 
-This report synthesizes the complete Month 6 therapeutic pipeline:
-1. **Week 1**: Real cohort ingestion (120 patients x 3 spatial zones x 4 target genes)
+Audit correction 2026-10-19: no regimen is clinically actionable on this evidence. Exact actionability inputs, generator and output are missing. The zone files are likely synthetic fallback data (ledger 2m); the distinct 150-case TCGA manifest does not establish their provenance. All treatment effects are hypothetical assumptions.
+
+This report describes an unverified historical model pipeline:
+1. **Week 1**: Likely synthetic/defaulted zone-expression inputs (120 PAT-style records; exact lineage unverified, ledger 2m)
 2. **Week 2**: Penalized Cox survival modeling (zone-stratified hazard ratios)
 3. **Week 3**: Fisher-Kolmogorov PDE spatial recurrence mapping
 4. **Week 4**: Continuous Hill equation dose-response optimization
 
-**Key Finding**: 5 regimens meet clinical actionability criteria (TI > 1.0, healthy toxicity <= 15%).
+**Historical model assertion (unverified)**: five regimens were labeled by chosen score/toxicity cutoffs. No clinical actionability established; exact machine-readable optimization output is missing.
 
 ---
 
 ## Virtual Drug Portfolio
+
+Every EC50, Emax, selectivity and MTD below is an assumed illustrative input with no experimental drug-parameter provenance. No clinical dose or therapeutic response follows.
 
 | Gene Target | Virtual Drug | Class | EC50 Tumor (uM) | EC50 Healthy (uM) | Selectivity | Emax Tumor | MTD (uM) |
 |-------------|--------------|-------|-----------------|-------------------|-------------|------------|----------|
@@ -31,9 +35,11 @@ This report synthesizes the complete Month 6 therapeutic pipeline:
 
 ---
 
-## Monotherapy Optimization Results
+## Unverified monotherapy model assertions
 
-| Target | Optimal Dose (uM) | Tumor Kill | Healthy Toxicity | TI (log2) | Safety Margin | Actionable |
+Exact generator, configuration and machine-readable result artifact are missing for these dose/response tables. “YES” means only an unverified model flag, never clinical actionability.
+
+| Target | Optimal Dose (uM) | Tumor Kill | Healthy Toxicity | TI (log2) | Safety Margin | Unverified model flag |
 |--------|-------------------|------------|------------------|-----------|---------------|------------|
 | LST1 | 0.15 | 10.0% | 0.1% | 6.07 | 0.149 | YES |
 | S100A11 | 0.44 | 10.1% | 0.2% | 6.03 | 0.148 | YES |
@@ -44,25 +50,27 @@ This report synthesizes the complete Month 6 therapeutic pipeline:
 
 ## Dual Therapy Optimization Results (Top 10)
 
-| Rank | Combination | Dose A (uM) | Dose B (uM) | Bliss Synergy | Tumor Kill | Healthy Tox | TI (log2) | Safety | Actionable |
+| Rank | Combination | Dose A (uM) | Dose B (uM) | Bliss Synergy | Tumor Kill | Healthy Tox | TI (log2) | Safety | Unverified model flag |
 |------|-------------|-------------|-------------|---------------|------------|-------------|-----------|--------|------------|
 | 1 | S100A8+S100A11 | 0.00 | 0.44 | 0.0000 | 10.0% | 0.2% | 6.03 | 0.148 | YES |
 
 ---
 
-## Clinical Gating Matrix (Full)
+## Hypothetical model gates (unverified)
 
-| Rank | Regimen | Drug A | Drug B | C1 (uM) | C2 (uM) | Tumor Kill | Healthy Tox | TI (log2) | Safety | Actionable |
+| Rank | Regimen | Drug A | Drug B | C1 (uM) | C2 (uM) | Tumor Kill | Healthy Tox | TI (log2) | Safety | Unverified model flag |
 |------|---------|--------|--------|---------|---------|------------|-------------|-----------|--------|------------|
-| 1 | ZNF106 Monotherapy | ZNF106 Modulator (virtual) | � | 1.00 | 0.00 | 10.0% | 0.0% | 8.11 | 0.150 | YES |
-| 2 | LST1 Monotherapy | Anti-LST1 mAb (virtual) | � | 0.15 | 0.00 | 10.0% | 0.1% | 6.07 | 0.149 | YES |
+| 1 | ZNF106 Monotherapy | ZNF106 Modulator (virtual) | — | 1.00 | 0.00 | 10.0% | 0.0% | 8.11 | 0.150 | YES |
+| 2 | LST1 Monotherapy | Anti-LST1 mAb (virtual) | — | 0.15 | 0.00 | 10.0% | 0.1% | 6.07 | 0.149 | YES |
 | 3 | S100A8 + S100A11 | S100A8/A9 Blockade (virtual) | S100A11 Inhibitor (virtual) | 0.00 | 0.44 | 10.0% | 0.2% | 6.03 | 0.148 | YES |
-| 4 | S100A11 Monotherapy | S100A11 Inhibitor (virtual) | � | 0.44 | 0.00 | 10.1% | 0.2% | 6.03 | 0.148 | YES |
-| 5 | S100A8 Monotherapy | S100A8/A9 Blockade (virtual) | � | 0.19 | 0.00 | 10.0% | 0.5% | 4.28 | 0.145 | YES |
+| 4 | S100A11 Monotherapy | S100A11 Inhibitor (virtual) | — | 0.44 | 0.00 | 10.1% | 0.2% | 6.03 | 0.148 | YES |
+| 5 | S100A8 Monotherapy | S100A8/A9 Blockade (virtual) | — | 0.19 | 0.00 | 10.0% | 0.5% | 4.28 | 0.145 | YES |
 
 ---
 
-## Patient-Specific Dosing (First 8 Patients)
+## Historical illustrative dosing assertions — withdrawn
+
+The following PAT_0000–PAT_0007 doses are not verified individualized pharmacology. A reproducible per-patient output, drug model and input manifest are missing. Spatial-risk values do not establish drug response; no dose is recommended.
 
 ### PAT_0000
 
@@ -138,7 +146,9 @@ This report synthesizes the complete Month 6 therapeutic pipeline:
 
 ---
 
-## Spatial Recurrence Context
+## Model-derived spatial-risk context
+
+These scores are not measured treatment response. Source `../../output/spatial_recurrence_summary.json`; no clinical pharmacology linkage is established.
 
 Patient spatial risk profiles (from Week 3 FK-PDE simulation):
 
@@ -157,6 +167,8 @@ Patient spatial risk profiles (from Week 3 FK-PDE simulation):
 
 ## Methodology
 
+These are stated hypothetical Hill/Bliss objectives and chosen toxicity constraints. Mapping latent effects to dose response is unvalidated; this log2 score differs from the floor-calibrated knockout score and is not a clinical therapeutic index.
+
 ### Hill Equation Model
 E(C) = Emax * C^n / (EC50^n + C^n)
 
@@ -171,7 +183,7 @@ E_comb = E1 + E2 - E1*E2 + S * E1 * E2
 
 Where S is the Bliss synergy coefficient from Month 4 dual-KO screen.
 
-### Therapeutic Index (Log2 Scale)
+### Model selectivity objective (log2 scale, not clinical TI)
 TI = log2(E_tumor / E_healthy)
 
 ### Optimization Constraints
@@ -183,16 +195,16 @@ TI = log2(E_tumor / E_healthy)
 
 ## Conclusions & Recommendations
 
-### Top Actionable Combinations
+### Unvalidated model hypotheses
 1. **ZNF106 Monotherapy**: TI=8.11, achieves 10% tumor kill with 0.0% toxicity at doses 1.0/0.0 uM
 2. **LST1 Monotherapy**: TI=6.07, achieves 10% tumor kill with 0.1% toxicity at doses 0.1/0.0 uM
 3. **S100A8 + S100A11**: TI=6.03, achieves 10% tumor kill with 0.2% toxicity at doses 0.0/0.4 uM
 
-### Clinical Translation Pathway
-1. **Lead Optimization**: Prioritize ZNF106 Monotherapy for in vivo PDX validation
-2. **Biomarker Strategy**: Use spatial recurrence risk (Leading Edge S100A8 expression) for patient stratification
-3. **Adaptive Dosing**: Implement Week 3 spatial profiling for real-time dose adjustment
-4. **Safety Monitoring**: Track healthy tissue toxicity against 15% threshold
+### Hypothetical future experiments (not clinical recommendations)
+1. **Independent testing needed**: the ZNF106 model hypothesis requires experimental evidence; no lead recommendation follows.
+2. **Unvalidated hypothesis**: test whether a model-derived expression score predicts independent outcomes; do not use it for patient stratification.
+3. **Model proposal**: evaluate assumed adaptive schedules; no real-time patient dose adjustment is recommended.
+4. **Assumed constraint**: the 15% toxicity cutoff is not a validated patient safety threshold.
 
 ### Limitations
 - Virtual drugs based on target homology; real pharmacokinetics not modeled

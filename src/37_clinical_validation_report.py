@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """
-Month 5, Week 3: Clinical Validation Report Generation
+Month 5, Week 3: Observational Association Report Generation
 
 Synthesizes the real TCGA-GBM survival analysis (scripts 35-36) and the
-spatial therapeutic indices (scripts 33-34) into a publication-ready
+spatial therapeutic indices (scripts 33-34) into a historical observational
 clinical validation report.
 """
 
@@ -113,7 +113,7 @@ def generate_report(survival_data: Dict, univariate: List[Dict], dual_ko: List[D
     top_cov = min(univariate, key=lambda r: r.get("cox_p", 1)) if univariate else None
 
     with open(output_path, "w", encoding="utf-8") as f:
-        f.write("# Clinical Validation Report — Track A\n\n")
+        f.write("# Observational Association Report — Track A\n\n")
         f.write(f"**Generated:** {time.strftime('%Y-%m-%d %H:%M:%S')}\n")
         f.write("**Cohort:** Real TCGA-GBM (cBioPortal clinical data)\n\n")
         f.write("---\n\n")
@@ -180,11 +180,9 @@ def generate_report(survival_data: Dict, univariate: List[Dict], dual_ko: List[D
             )
         f.write("\n### Interpretation\n\n")
         f.write(
-            "These results recapitulate the known TCGA-GBM prognostic structure: "
-            "age at diagnosis is the dominant predictor of overall survival "
-            "(HR = 1.03 per year), while gender and molecular subtype have "
-            "weak or no independent effect in this cohort. The pipeline "
-            "correctly identifies what is prognostic in real patient data.\n\n"
+            "These tables describe same-cohort observational associations. "
+            "Inspect the supplied estimates and uncertainty; no independent "
+            "pipeline, biomarker or treatment-effect validation follows.\n\n"
         )
 
         # Appendix
