@@ -1,10 +1,12 @@
+> **HISTORICAL:** Sampled October 3–4 audit, superseded by the 2026-10-19 claim-level audit (`paper/codex_audit2/SUMMARY.md`) and correction tracker (`paper/codex_audit2/fix_progress.md`). Aggregate counts below lack a retained item-level workpaper. They are historical reports, not current pass counts or scientific validation.
+
 # Vault Audit Report
 
 > **Note (2026-10-04):** a second audit re-read the output JSON and CSV files and found errors this report passed (scVI metrics, Script 30 doubling time and necrotic fraction, CSGT p, TCGA median OS, large-grower count, dose-sparing ranges, TTP value). All were corrected in the vault. Treat the "143 PASS" count below as superseded. See [[PAPER_FINDINGS_LEDGER]].
 
 Date: 2026-10-03
 
-## Summary
+## Historical summary (unreproducible first-pass tally)
 
 - **Files audited:** 18
 - **Claims checked:** 147
@@ -12,7 +14,7 @@ Date: 2026-10-03
 - **STALE:** 1 (fixed)
 - **MISSING SOURCE:** 3
 
-## Per-File Results
+## Historical per-file tally (item-level worksheet not retained)
 
 | File | Claims Checked | PASS | STALE | MISSING SOURCE |
 |---|---|---|---|---|
@@ -39,23 +41,23 @@ Date: 2026-10-03
 ### 1. Script-46-Sensitivity.md — Sobol S1 = 0.998 artifact
 
 - **Old value:** `rho_s dominates TTP variance: S1 = 0.998 (95% CI ±0.086)`
-- **Correct value:** `alpha_sens S1 = 0.43 dominates TTP variance (PDE), ρ_s S1 = 0.20, D_w S1 = 0.000`
+- **Correct value:** `alpha_sens S1 = 0.43 dominates TTP variance (PDE), ρ_s S1 = 0.20, D_w S1 rounds to 0.000 (not exactly zero)`
 - **Source:** `output/sobol_pde_swanson_vs_legacy.json`; the archived S1=0.998 came from a reduced ODE with `k_diff = 15` and `D_white` held within ±20% of 0.013, so rho dominated by construction
 - **File updated:** `vault/Script-46-Sensitivity.md` line 13 replaced to reflect PDE values and acknowledge the ODE artifact
 - **Verification:** The file already had a superseded notice on line 3 with the correct PDE values (α_sens S1=0.43, ρ_s S1=0.20, D_w S1=0.000). The Key finding on line 13 was updated to be consistent with the superseded notice.
 
 ## Stale Claims NOT Fixed (require manual review)
 
-None. All other stale claims identified in the task description were verified as already correct in the vault files:
+Original October 3–4 conclusion, superseded by the later claim-level audit: the following claims were then considered correct. This is not current certification; the retained tally does not independently establish them:
 
 - **Claim B (D values 0.013/0.0013):** All vault files that cite these values do so in the context of documenting the Swanson-type correction (D_white=0.13, D_gray=0.013). No file perpetuates the error without context.
 - **Claim C (forecast Dice 0.494/0.541):** NEGATIVES_REVISITED.md already contains the correct cellular-core target values (anisotropic 0.259 vs no_change 0.233, +0.026, Holm p = 0.0015).
 - **Claim D (threshold test 0.50):** All affected files (Script-44-Adaptive-Therapy.md, Project-State.md, Decisions.md, Repo.md) already contain the correct values: 0.50 gives 43% drug, 5.8 holidays; 0.80 retained.
 - **Claim E (hash placeholder in TRACK_A_RESULTS.md):** No "[hash from git log]" placeholder found in the file; commit hashes are already present (e.g., e76d26a, 7bd7def).
 
-## Missing Vault Notes (scripts 80-83)
+## Historical documentation-gap snapshot (scripts 80-83)
 
-The following scripts have output JSONs in output/ but no corresponding vault notes. Script numbers 80-83 appear to be Sobol/sensitivity and label-correction scripts that were run as part of the 2026-10-03 re-evaluation:
+As of the original October 3–4 review, the following scripts had output JSONs in output/ but no corresponding vault notes. Script numbers 80-83 appear to be Sobol/sensitivity and label-correction scripts that were run as part of the 2026-10-03 re-evaluation:
 
 - **Script 80:** PDE Sobol (Swanson vs legacy) — output: `output/sobol_pde_swanson.json`, `output/sobol_pde_legacy.json`, `output/sobol_pde_swanson_vs_legacy.json`. A vault note summarizing the S1 values (ρ S1=0.20, alpha_sens S1=0.43, D_w S1=0.000) and the ODE vs PDE discrepancy would be valuable.
 - **Script 81:** Label-correct forecast (core target) — output: `output/forecast_labels_core/results.json`. A vault note referencing the core-target Dice values (anisotropic 0.259 vs no_change 0.233, +0.026, Holm p = 0.0015) and the target definition (labels {1,3}, cellular core) would consolidate the finding.
@@ -64,7 +66,7 @@ The following scripts have output JSONs in output/ but no corresponding vault no
 
 ## Recommendations
 
-1. **Create vault notes for scripts 80-83** as listed above. These scripts were run during the 2026-10-03 re-evaluation and their findings are currently only in the output JSONs and the Script-60-66-Swanson-D.md appendix.
+1. **Create vault notes for scripts 80-83** as listed above. These scripts were run during the 2026-10-03 re-evaluation and that was the original documentation assessment. Later ledger entries and corrected archive notes now cover these analyses; this is not a current missing-work list.
 2. **Run `python tools/vault_index.py`** after creating new vault notes to update the RAG index (as noted in Repo.md tag 5).
 3. **Verify the Script-46-Sensitivity.md** full file consistency: the "Key finding" section now has the superseded notice (line 3) and the updated PDE values (line 13). The "Method" section still describes the reduced-ODE analysis (N=500 Saltelli samples, etc.), which is fine as historical method documentation.
 4. **Double-check TRACK_A_RESULTS.md** for any remaining numeric claims that reference un-verified output files. All 22 claims checked were verified against committed outputs.

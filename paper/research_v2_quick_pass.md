@@ -1,3 +1,5 @@
+> **HISTORICAL (2026-10-19 correction):** Incomplete old-GBM literature leads, not current project findings. All third-party figures, cohort details, recurrence-pattern claims and dataset license/access statements remain provisional unless explicitly source-verified below; exact primary tables/sections are missing here. Current goal/status: START_HERE.md.
+
 # Research prompt v2: quick pass (INTERIM)
 
 Scope: 8 web searches, search snippets only. NO full paper was read. Every row is "abstract/snippet level". This does NOT cover all 13 questions. Treat as leads, not findings.
@@ -6,7 +8,7 @@ Scope: 8 web searches, search snippets only. NO full paper was read. Every row i
 
 | Method / study | Link | Key number | Test design | Access | Full paper? | T4? |
 |---|---|---|---|---|---|---|
-| Tran et al. 2025, AI target from metabolic + diffusion MRI (npj Digit Med) | https://doi.org/10.1038/s41746-025-01861-2 | Specificity 0.89 vs 0.79 (p=0.004); sensitivity 0.92 vs 0.95 (p=0.10) vs uniform 2 cm | Not verified from snippet; UCSF group. Possible single-centre | Paper open; data not verified | No | Not verified |
+| Tran et al. 2025, AI target from metabolic + diffusion MRI (npj Digit Med) | https://doi.org/10.1038/s41746-025-01861-2 | Specificity 0.89 vs 0.79 (p=0.004); sensitivity 0.92 vs 0.95 (abstract p=0.10, later results note p=0.09) vs uniform 2 cm; see later update | Not verified from snippet; UCSF group. Possible single-centre | Paper open; data not verified | No | Not verified |
 | ISMRM 2025 abstract, Kukreja (CNN/ViT, pre-surgery MRI) | https://archive.ismrm.org/2025/2561.html | Claims better inclusion/exclusion than standard; no number seen | Abstract | n/a | No | Not verified |
 | Post-op + white-matter pathlength CTV (ASTRO 2025 abstract) | https://am25.astro.org/sessions/pqa-03-21637/planning-assessment-of-pre-rt-white-matter-mapping-enhanced-ctv-for-glioblastoma-radiation-th-107567 | 125 train / 12 test | Tiny test set | n/a | No | Not verified |
 
@@ -21,7 +23,7 @@ Weakest point: Tran 2025 compares to a 2 cm margin on sensitivity/specificity, n
 
 | Dataset | Link | Key fact | Access | Verdict |
 |---|---|---|---|---|
-| RHUH-GBM | https://arxiv.org/pdf/2305.00005 | n=40, pre-op, early post-op, recurrence | TCIA limited licence | Already in your training set. Not eligible. |
+| RHUH-GBM | https://arxiv.org/pdf/2305.00005 | n=40, pre-op, early post-op, recurrence | TCIA limited licence | Later included in H-4 training: `output/predictgbm/h4/retrain_pack_manifest.json:stats.rhuh.n=40`; earlier H-2 test now spent. No fresh locked eligibility. |
 | UCSD-PTGBM | https://escholarship.org/content/qt66w5w496/qt66w5w496.pdf | 178 patients, 243 timepoints, post-treatment | CC BY 4.0 (per TCIA notes) | Pre-op scans NOT confirmed. Likely not eligible. |
 | BraTS 2025 Task 1 (pre + post treatment) | https://zenodo.org/records/15094823 | Train/val on Synapse; hidden test closed | Synapse registration | Recurrence/enhancing-label pairing NOT verified. Check Synapse. |
 | GLIS-RT, IvyGAP, CPTAC-GBM, TCGA-GBM, ReMIND | none checked | Not searched | n/a | Not verified |
@@ -42,7 +44,7 @@ Weakest point: Tran 2025 compares to a 2 cm margin on sensitivity/specificity, n
 | Dataset / study | Link | Key fact |
 |---|---|---|
 | Burdenko B-GBM-PD | https://wiki.cancerimagingarchive.net/x/YgywC (per search) | 180 pts, RTDOSE/RTPLAN subset. You rejected it already. |
-| RHUH-GBM | arXiv link above | RT dose, systemic therapy, extent of resection. In your training set. |
+| RHUH-GBM | arXiv link above | RT dose, systemic therapy, extent of resection (source-field verification pending). Later H-4 training inclusion is documented by the manifest above. |
 | Mayo hypoxia + radiation model | https://mayoclinic.elsevierpure.com/en/publications/a-patient-specific-computational-model-of-hypoxia-modulated-radia | Radiosensitivity from 2 MRIs; proof of principle only |
 | Leder et al. Cell 2014 | https://www.jci.org/references/scholar/35152/B49 (listing only) | Mouse, not patients |
 
@@ -60,8 +62,9 @@ Everything not linked above. All Section A Q2-Q6. Pseudoprogression/registration
 ---
 # Update: 3 fetches done (INTERIM, still partial)
 
-## Tran 2025 (full text read, first 100k of 114k chars)
+## Tran 2025 (author-reported partial full-text read, first 100k of 114k chars)
 https://pmc.ncbi.nlm.nih.gov/articles/PMC12331921/
+These design/count notes remain unverified pending an exact retained table/section extraction; they supersede the initial snippet design guesses.
 - 101 patients, 2002-2012, split 67/16/18 -> test about 18 patients. Single centre (UCSF). Same-centre hold-out. No external test.
 - Input is POST-operative, pre-RT (within 1 week before RT). Not pre-op. Not your task.
 - Target mixes enhancing (CEL) and non-enhancing (T2L) progression. No enhancing-only result.
@@ -79,7 +82,7 @@ https://www.nationalacademies.org/read/26894/chapter/16
 
 ## BraTS 2025 Task 1 (partial)
 https://zenodo.org/records/15094823
-- Listed as "Pre- and Post-Treatment Adult Glioma". CC BY 4.0 record.
+- Listed as "Pre- and Post-Treatment Adult Glioma". License not verified: the accessible record does not establish CC BY 4.0; check Synapse terms.
 - 2025 case count, labels, and Synapse terms NOT found. 
 - Precursor BraTS 2024 post-treatment set had labels ET, NETC, SNFH and resection cavity RC; about 2200 training samples (https://arxiv.org/pdf/2411.17617). That is post-treatment only.
 - Open question: does 2025 give pre-op and later recurrence for the SAME patient? Not verified. Check the Synapse project directly (needs your login).
