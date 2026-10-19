@@ -1,3 +1,4 @@
+# NOTE (2026-10-19 audit): historical legacy script; not part of the current RANO project. Volume forecast, not Dice. Bootstrap seed 0 with 2,000 resamples (not the plan's 10,000). The MU-Glioma reference median rho is hard-coded. Freeze chronology is not verifiable from the code.
 """Script 91: LUMIERE as new real patients: growth rates and a volume forecast (limits L1, L3).
 
 LUMIERE (91 GBM patients, 638 study dates) gives tumour volumes but not masks here (masks are in the 30 GB zip,

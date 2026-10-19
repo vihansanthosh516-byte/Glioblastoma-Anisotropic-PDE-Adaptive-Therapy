@@ -1,3 +1,4 @@
+# NOTE (2026-10-19 audit): historical legacy script; not part of the current RANO project. The docstring's reproduction targets (10 earlier, 22 any progression, 39 both censored, drug 32.36% of MTD, mean VR 2.391) are typed reference values compared with the ratio-1000 summary. E_MAX ratios are sensitivity settings for an assumed kill scale.
 """Script 92: does the adaptive-therapy result depend on the assumed kill scale E_MAX_RATIO? (limit L8)
 
 Script 44 sets the TMZ kill rate per patient as E_MAX_RATIO x that patient's growth rate (default 1000, chosen by a

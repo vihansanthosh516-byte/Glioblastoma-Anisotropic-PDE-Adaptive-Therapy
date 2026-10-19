@@ -1,3 +1,4 @@
+# NOTE (2026-10-19 audit): historical legacy script; not part of the current RANO project. Permutation check seed 0, 20,000 permutations; the rho cutoff 0.02 is inherited from the post hoc script 85. It derives from existing outputs; no locked-data gate.
 """Script 87: three analyses that tighten limits without new data.
 
 L16  The rho > 0.02 threshold (script 85): exact CIs, a permutation test for a perfect split by

@@ -1,3 +1,4 @@
+# NOTE (2026-10-19 audit): historical legacy script; not part of the current RANO project. Adds the secondary drug on every TMZ off day to equalise drug budgets; kill effects are assumed simulation parameters, not clinical efficacy. Small (8-patient) simulation, TTP capped.
 """Script 89: fair baseline for the script-47 dual-agent arm (limit L10).
 
 Script 47 compares dual-agent MPC (TMZ plus a secondary drug on every TMZ-holiday day) against single-drug

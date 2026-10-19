@@ -1,3 +1,4 @@
+# NOTE (2026-10-19 audit): historical legacy script; not part of the current RANO project. Needs lifelines (not in Requirements.txt). The docstring says the tests were fixed before CGGA was viewed; that chronology cannot be verified from source. The TCGA comparator HRs (1.031, 1.15) and KM median (432 days) are typed into the prose, not computed here. No freeze gate.
 """Script 90: external check of the TCGA-GBM survival findings on CGGA (limit L7).
 
 Tests fixed BEFORE looking at any CGGA result (same covariates as script 36 on TCGA-GBM):

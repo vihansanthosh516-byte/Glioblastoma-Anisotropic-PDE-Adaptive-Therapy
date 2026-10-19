@@ -1,3 +1,4 @@
+# NOTE (2026-10-19 audit): historical legacy script; not part of the current RANO project. Needs scanpy (not in Requirements.txt). Patient-grouped StratifiedGroupKFold with an asserted patient-disjoint split, replacing the leaky cell-random split.
 """Script 86: patient-level cross-validation for the Track A zone classifiers (limit L0).
 
 Scripts 04-16 split the 15,000 cells at random, so cells from one patient sit in both train and

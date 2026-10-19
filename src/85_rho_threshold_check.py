@@ -1,3 +1,4 @@
+# NOTE (2026-10-19 audit): historical legacy script; not part of the current RANO project. The rho > 0.02 threshold and the bin boundaries are fixed post hoc analysis choices (exploratory, n=10 above the cutoff), not estimated cutoffs; it reads 61 existing model records.
 """Script 85: does adaptive therapy lose time-to-progression above a growth-rate threshold?
 
 Reads the per-patient adaptive-vs-MTD results of script 44 and reports, by rho bin, how many

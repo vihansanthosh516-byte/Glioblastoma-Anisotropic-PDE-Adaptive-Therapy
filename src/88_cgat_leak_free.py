@@ -1,3 +1,4 @@
+# NOTE (2026-10-19 audit): historical legacy script; not part of the current RANO project. Needs torch and torch_geometric (not in Requirements.txt). Re-evaluates C-GAT on script-86 patient folds with final-epoch scoring; the saved result is output/cgat_leak_free.json (gat_pca_clean accuracy 0.638).
 """Script 88: C-GAT re-evaluated without label leakage (limit L0).
 
 Problems found in the original C-GAT evaluation (scripts 12-13):
