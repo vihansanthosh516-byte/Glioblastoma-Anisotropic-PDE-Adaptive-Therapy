@@ -1,7 +1,9 @@
 """Leakage checks (analysis_plan_v1.md A1.1, masterplan §103).
 
-Importable helpers. Every experiment script calls these before fitting; tests call them on the
-committed manifests. Each helper raises AssertionError with the offending IDs.
+Importable helpers; callers must invoke them explicitly before fitting. Their
+presence does not prove every experiment uses them or avoids test-label access.
+Tests exercise committed manifests and crafted invalid inputs. Each helper raises
+AssertionError with the offending IDs.
 """
 from __future__ import annotations
 

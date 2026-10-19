@@ -2,8 +2,10 @@
 """
 Load UCSF-PDGM pre-computed DTI eigenvalue maps and build full diffusion tensors.
 
-GUARANTEED POSITIVE-DEFINITE: Uses eigenvalue decomposition D = R(theta) @ diag(L1, L2) @ R(-theta),
-which is always positive-semidefinite when L1, L2 >= 0.
+Uses eigenvalue decomposition D = R(theta) @ diag(L1, L2) @ R(-theta).
+Finite nonnegative eigenvalues give a positive-semidefinite tensor; zero
+eigenvalues do not imply strict positive-definiteness. The 2D helper explicitly
+floors finite eigenvalues at 1e-6. Gradient-derived directions are proxies.
 """
 from __future__ import annotations
 
@@ -21,11 +23,13 @@ def is_pd(D: np.ndarray) -> bool:
 
 def build_pd_tensor(l1: float, l2: float, theta: float) -> np.ndarray:
     """
-    Build guaranteed positive-definite 2x2 tensor from eigenvalues and angle.
+    Build a positive-definite 2x2 tensor from finite eigenvalues and angle.
     
     D = R(theta) @ diag(L1, L2) @ R(-theta)
-    Always PD if L1, L2 >= 0.
+    L1/L2 are floored at 1e-6; this is numerical regularization, not measurement.
     """
+    if not np.isfinite([l1, l2, theta]).all():
+        raise ValueError("eigenvalues and angle must be finite")
     c, s = np.cos(theta), np.sin(theta)
     R = np.array([[c, -s], [s, c]])
     Lambda = np.diag([max(l1, 1e-6), max(l2, 1e-6)])
@@ -43,7 +47,8 @@ def load_patient_tensors(
     """
     Load UCSF-PDGM DTI eigenvalue maps and build full diffusion tensor field.
 
-    Uses D = V @ diag(L1, L2, L3) @ V^T which is GUARANTEED positive-definite.
+    Uses D = V @ diag(L1, L2, L3) @ V^T with clipped nonnegative finite
+    eigenvalues: positive-semidefinite, not necessarily strictly definite.
 
     eigenvector_method:
       - "fa_grad": estimate principal eigenvector from FA gradient (proxy).
@@ -58,6 +63,8 @@ def load_patient_tensors(
     L3 = _load_nifti(patient_dir / f"{patient_id}_DTI_eddy_L3.nii.gz")
     fa = _load_nifti(patient_dir / f"{patient_id}_DTI_eddy_FA.nii.gz")
     md = _load_nifti(patient_dir / f"{patient_id}_DTI_eddy_MD.nii.gz")
+    if not all(np.isfinite(values).all() for values in (L1, L2, L3, fa, md)):
+        raise ValueError("DTI input maps must contain only finite values")
 
     original_shape = fa.shape
 
@@ -117,7 +124,7 @@ def load_patient_tensors(
         slice_idx = target_shape[2] // 2
 
     return {
-        'tensors': D,                          # (X, Y, Z, 3, 3) mm²/s, GUARANTEED PD
+        'tensors': D,                          # (X, Y, Z, 3, 3) mm²/s, PSD for finite inputs
         'eigenvalues': eigenvalues_stacked,    # (X, Y, Z, 3) [L1, L2, L3]
         'principal_eigenvector': v1,           # (X, Y, Z, 3)
         'tumor_mask': tumor_mask,              # (X, Y, Z)

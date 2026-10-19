@@ -7,9 +7,10 @@ Bridges the software control agent with physical/hardware-emulated drug delivery
 Components:
 - Pump Interface: Serial/TCP socket interface for Chemyx / Harvard Apparatus syringe pumps
 - Safety Watchdog: Deterministic safety override enforcing hard constraints
-- Latency Benchmarking: End-to-end pipeline < 500ms guarantee
+- Latency Benchmarking: empirical fraction of measured calls below 500 ms;
+  no end-to-end timing guarantee is enforced.
 
-Supported Pumps:
+Protocol examples (physical pump behavior is not validated here):
 - Chemyx Fusion 200/400 series (RS-232/USB)
 - Harvard Apparatus Pump 11 Elite (RS-232)
 - Generic syringe pump protocol emulation

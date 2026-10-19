@@ -24,7 +24,9 @@ A single tab-separated file `output/multiomic_features.tsv` holds the
 per-patient feature matrix plus the ground-truth rho/D labels (when known, e.g.
 from the inverse-estimation module 51). `build_multiomic_tsv(...)` synthesizes
 this file when real omics are unavailable, enabling end-to-end CI on synthetic
-cohorts.
+cohorts. Auxiliary omic features from this generator are synthetic by construction;
+supplied inverse-estimation targets are fitted model parameters, not ground truth.
+Neither synthetic fitting nor internal cross-validation is patient validation.
 
 Integration point: src/50_spatial_genomics_deconv.py map_fractions_to_parameters
 is augmented with a `multiomic_predict` flag that delegates rho/D prediction
@@ -63,8 +65,9 @@ CNV_FEATURES = ["EGFR_log2ratio", "PDGFRA_log2ratio",
 METABOLIC_FEATURES = ["glycolysis_flux", "OXPHOS_flux",
                       "glutaminolysis_flux", "PPP_flux"]
 
-MODEL_PATH = Path("output/multiomic_elasticnet.pkl")
-FEATURES_TSV_PATH = Path("output/multiomic_features.tsv")
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+MODEL_PATH = PROJECT_ROOT / "output/multiomic_elasticnet.pkl"
+FEATURES_TSV_PATH = PROJECT_ROOT / "output/multiomic_features.tsv"
 
 
 # --------------------------------------------------------------------------- #
@@ -89,7 +92,7 @@ def build_multiomic_tsv(
     out_path: Path = FEATURES_TSV_PATH,
     seed: int = 42,
 ) -> Path:
-    """Synthesize a multiomic_features.tsv (drops real omics where absent).
+    """Synthesize auxiliary omic features; this does not load measured omic assays.
 
     Parameters
     ----------
@@ -156,6 +159,8 @@ def build_multiomic_tsv(
 
     out_path.parent.mkdir(parents=True, exist_ok=True)
     df.to_csv(out_path, sep="\t", index=False)
+    if not out_path.is_file() or out_path.stat().st_size == 0:
+        raise RuntimeError(f"Missing or empty synthetic feature artifact: {out_path}")
     print(f"[multiomic] wrote {n} patient rows x {feature_dim()} features -> {out_path}")
     return out_path
 
@@ -226,6 +231,7 @@ def train_elasticnet(
     print(f"  D    alpha={D_model.alpha_:.5f}  l1_ratio={D_model.l1_ratio_:.2f}  R2={D_model.score(X, D_y):.3f}")
 
     bundle = {
+        "provenance_limit": "Input provenance needs an external manifest; bundled feature generator synthesizes auxiliary omics",
         "rho_model": rho_model,
         "D_model": D_model,
         "feature_columns": feature_columns(),
@@ -235,6 +241,8 @@ def train_elasticnet(
     model_path.parent.mkdir(parents=True, exist_ok=True)
     with open(model_path, "wb") as f:
         pickle.dump(bundle, f)
+    if not model_path.is_file() or model_path.stat().st_size == 0:
+        raise RuntimeError(f"Missing or empty model artifact: {model_path}")
     print(f"[multiomic] saved trained models -> {model_path}")
     return {
         "rho_r2": float(rho_model.score(X, rho_y)),

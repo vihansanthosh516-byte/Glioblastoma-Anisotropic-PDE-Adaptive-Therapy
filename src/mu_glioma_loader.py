@@ -174,7 +174,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Index MU-Glioma-Post longitudinal tumor masks")
     parser.add_argument("--data-root", type=Path, default=DEFAULT_DATA_ROOT)
     parser.add_argument("--clinical-excel", type=Path, default=DEFAULT_CLINICAL_EXCEL)
-    parser.add_argument("--output", type=Path, default=Path("output/mu_glioma_cohort.json"))
+    parser.add_argument("--output", type=Path, default=PROJECT_ROOT / "output/mu_glioma_cohort.json")
     parser.add_argument("--limit", type=int, default=None)
     parser.add_argument("--no-volumes", action="store_true")
     args = parser.parse_args()
@@ -199,7 +199,7 @@ def load_real_params_for_track_bc(
     Args:
         min_r2: minimum R^2 for fit quality filter (default 0.5)
         require_growing: if True, only return growing tumors
-        seed: random seed (unused, for reproducibility documentation)
+        seed: compatibility argument, unused; selection is not randomized or seeded here
     
     Returns:
         list of dicts with patient_id, rho_per_day, D_mm2_per_day, V0_mm3

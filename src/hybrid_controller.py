@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 """Trust-gated MPC-RL hybrid therapy controller.
 
+Policies operate in an assumed virtual environment. This module demonstrates
+no independent held-out clinical validation or real treatment effectiveness.
+
 Two architectures, both operating as policies inside the 3D anisotropic PDE
 environment (FastPDESolver + GbmTherapyEnv from 64_virtual_cohort_simulation):
 
