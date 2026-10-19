@@ -1,6 +1,8 @@
 # Literature check: what published work says about the open problems
 
-Scope: full texts read for three papers (open-access PDFs fetched and searched). A few other items surfaced in search snippets only (for example a preoperative-postoperative recurrence-risk model and TumorFlow); they were NOT read in full and are not relied on. Verify each citation yourself before using it.
+Historical scope (2026-10-19 audit correction): dated background from the 2026-10-17 audit of the older GBM platform. "Your" H-2/H-3 study means that older work, whose test sets are now spent/dev. It is not current project guidance (`START_HERE.md` §6). The current project is probabilistic RANO.
+
+Scope: full texts read for three papers (open-access PDFs fetched and searched). A few other items surfaced in search snippets only (for example a preoperative-postoperative recurrence-risk model and TumorFlow); they were NOT read in full and are not relied on. Verify each citation yourself before using it. The full-text reading and the exclusion of snippet-only items are author-reported; no search log or extraction notes are retained. Headline PREDICT-GBM figures match the paper abstract; the RHUH expert-label and ablation details were not checked against the paper's tables in the audit correction and remain unverified.
 
 ## 1. PREDICT-GBM platform paper (npj Digital Medicine 2026, 9:686; 243 patients, multicentre)
 doi 10.1038/s41746-026-03194-0. This is the benchmark your H-2 and H-3 study is built on.
@@ -20,7 +22,7 @@ doi 10.1109/tmi.2023.3298637. Fourteen untreated low-grade glioma patients. DTI-
 2. **A DTI or white-matter prior has not been shown to help on treated GBM.** A published ablation found a white-matter-weighted prior lowered coverage. Your exact-solver result (-0.0004) and the 14-patient LGG result do not conflict.
 3. **Documented but small levers:** more training data, extra channels and ensembling (each worth under a point in the benchmark), and a size-weighted loss (promising, but from a different design). Any of these must be tried on development data first, under a declared rule, because the H-2 and H-3 test sets are now dev (A12.1).
 4. **A label-quality analysis is well motivated.** The benchmark authors show the advantage depends on annotation quality, and you have already measured segmentation disagreement (script 104) and UPENN rater noise (script 109). A declared, exploratory re-score on RHUH with expert-corrected labels is a legitimate extension. It is post hoc because RHUH was used in the H-2 test.
-5. **Growth forecasting:** I found no published model that beats persistence on real treated-GBM longitudinal MRI. That fits your results and the README's "unverified" list; it is not proof that none exists.
+5. **Growth forecasting:** I found no published model that beats persistence on real treated-GBM longitudinal MRI in this limited, non-systematic search. That fits your results and the README's "unverified" list; it is not proof that none exists.
 
 ## Limits of this check
 - Three papers read in full; this is not a systematic review.

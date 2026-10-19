@@ -5,7 +5,7 @@ Status: exploratory sensitivity analysis of the script 44 simulation. Inputs are
 ## What was run
 - Script `src/44_adaptive_therapy.py`, unchanged, run from the repo with `ADAPTIVE_E_MAX_RATIO` set and `ADAPTIVE_OUT_DIR` pointing to the workspace. Nothing was written into the repo.
 - New ratios: 100, 250, 4000, 8000, plus a full re-run of 1000. Existing ratios 500, 1000, 2000 were read from `output/emax_sweep/` (ledger 2n).
-- Grid and rules were written before the new runs (see the declaration below).
+- Grid and rules were written before the new runs (see the declaration below). Provenance note (2026-10-19 audit correction): that ordering, the "unchanged" code and the output location are author-reported; no timestamped commit or run log is retained here, and run duration and exit status are not recorded. The numbers below match `kill_rate_grid_results.csv`.
 
 ## Reproduction check (declared in advance): passed
 The full ratio-1000 re-run matches the committed output exactly: maximum absolute difference 0.0 over 28 numeric metrics for all 61 patients; summary 10 earlier, 22 any progression, 39 both censored, drug 32.3551% of MTD, mean VR 2.3913. The new ratios are therefore comparable with the existing 500, 1000 and 2000 runs.
