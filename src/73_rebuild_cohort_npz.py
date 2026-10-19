@@ -51,7 +51,7 @@ def find_first_mask(patient_id: str) -> Path | None:
     for tp in tps:
         masks = list(tp.glob("*_tumorMask.nii.gz"))
         if masks:
-            return masks[0]
+            return sorted(masks)[0]  # sorted: deterministic choice independent of filesystem order
     return None
 
 

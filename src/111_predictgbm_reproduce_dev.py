@@ -73,10 +73,14 @@ def main():
                              "Coverage is geometric, not dose; retrospective.",
                              "Rebuilt U-Net / LMI / GlioMap plans differ from the released plan files (U-Net scores are raw values "
                              "outside 0-1 and are clipped as in evaluate.py); *_released_enh scores the released files."]
+    # every per-patient file this script reads (dev patients only), hashed in the manifest
+    names = ["tumor_seg.nii.gz", "wm_pbmap.nii.gz", "gm_pbmap.nii.gz", "csf_pbmap.nii.gz", "t1c_bet_mask.nii.gz",
+             "recurrence_preop.nii.gz", "standard_plan.nii.gz"] + [f"{m}_{k}.nii.gz" for m in pg.PUBLISHED_MODELS for k in ("pred", "plan")]
+    read_inputs = [pg.DATA / pid / n for pid in ids for n in names if (pg.DATA / pid / n).exists()]
     (OUT / "dev_reproduce.json").write_text(json.dumps(res, indent=1, default=float))
     write_run_manifest("predictgbm_dev_111", OUT / "dev_reproduce.manifest.json", script="src/111_predictgbm_reproduce_dev.py",
                        seed=ps.DEFAULT_SEED, config={"ctv_margin": pg.CTV_MARGIN, "models": pg.PUBLISHED_MODELS},
-                       inputs=[], dataset="PREDICT-GBM (TUM development)", patient_split="TUM dev; LUMIERE+RHUH test (locked)",
+                       inputs=read_inputs, dataset="PREDICT-GBM (TUM development)", patient_split="TUM dev; LUMIERE+RHUH test (locked)",
                        primary_endpoint="enhancing-recurrence coverage")
     print(json.dumps({k: res[k] for k in ("n_patients", "n_with_enhancing_recurrence", "plan_reproduction_voxel_mismatch",
                                           "coverage_enh_mean")}, indent=1, default=float))

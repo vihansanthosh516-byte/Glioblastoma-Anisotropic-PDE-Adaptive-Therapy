@@ -103,7 +103,7 @@ def run_inverse_estimation(mask_t0: str, mask_t1: str, delta_t: float, output_js
         return rho, D
     except Exception as e:
         print(f"[WARNING] Could not parse inverse estimation output: {e}")
-        return 0.015, 0.01
+        return None, None  # was a silent (0.015, 0.01); caller now records the population-default fallback explicitly
 
 
 def run_4d_simulation(patient_id: str, mask_path: str, rho: float, D: float, days: int, infusion_days: list, output_dir: str):
@@ -161,6 +161,8 @@ def main():
                         help="Path to clinical data Excel (for MU-Glioma-Post)")
     parser.add_argument("--output-dir", type=str, default="output/patient_digital_twin",
                         help="Output directory for results")
+    parser.add_argument("--require-fit", action="store_true",
+                        help="Stop with an error instead of falling back to population-default rho/D")
     parser.add_argument("--open-browser", action="store_true",
                         help="Open dashboard in browser after generation")
     
@@ -193,6 +195,7 @@ def main():
     
     # Step 2: Inverse estimation (if we have 2+ timepoints)
     rho, D = 0.015, 0.01  # Population defaults
+    params_source = "population_default"
     
     if len(masks) >= 2:
         # Step 2: Get clinical timing
@@ -218,6 +221,7 @@ def main():
         
         if est_rho is not None:
             rho, D = est_rho, est_D
+            params_source = "inverse_fit"
             print(f"[SUCCESS] Personalized parameters: rho={rho:.6f} /day, D={D:.6f} mm2/day")
         else:
             print(f"[FALLBACK] Using population defaults: rho={rho}, D={D}")
@@ -225,6 +229,12 @@ def main():
         print(f"\n[STEP 2] Single timepoint detected (BraTS format). Using population defaults: rho={rho}, D={D}")
         # For BraTS, use first mask for simulation
         masks = [masks[0]]
+
+    if params_source != "inverse_fit" and args.require_fit:
+        print("[ERROR] --require-fit set but no personalised fit was obtained; refusing population defaults.")
+        return 1
+    (output_dir / "params_source.json").write_text(json.dumps({"params_source": params_source, "rho": rho, "D": D}, indent=1))
+    print(f"[PARAMS] source = {params_source} (saved to params_source.json)")
     
     # Step 3: Run 4D simulation
     print(f"\n[STEP 3] Running 4D simulation ({args.days} days)...")
