@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# NOTE (2026-10-19 audit): historical legacy script; not part of the current RANO project. Sensitivity of a simulated policy to hand-tuned reward weights (seeded). Metrics/figure outputs were absent when audited. cwd anchored at project root.
 """
 Phase 7: Reward Weight Sensitivity Analysis
 ===========================================
@@ -125,6 +126,9 @@ OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 # --------------------------------------------------------------------------- #
 # Fast PDE Solver (Self-contained)
 # --------------------------------------------------------------------------- #
+import os as _os
+_os.chdir(_os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))))  # cwd-relative output/ paths below; anchor cwd at the project root
+
 class FastPDESolver:
     def __init__(
         self,

@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# NOTE (2026-10-19 audit): historical legacy script; not part of the current RANO project. The model outcome is deterministic in rho; the bootstrap measures cohort-threshold uncertainty, not biological noise. The 64-patient parameter set is exploratory; no freeze gate.
 """
 Script 62: Who benefits from starting treatment early at equal drug?
 ====================================================================

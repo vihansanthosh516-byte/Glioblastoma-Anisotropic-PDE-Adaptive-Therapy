@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# NOTE (2026-10-19 audit): historical legacy script; not part of the current RANO project. The docstring figure 'heuristic wins 10% in script 59' is a typed prior result. The real_cohort docstring says a fixed split of 91 growing MU patients, but the code permutes rows with the supplied seed and takes the first n_test (default 21) as test; the split is seed-dependent.
 """
 Script 66: Can a properly trained RL agent beat Stupp at EQUAL drug budget?
 ===========================================================================

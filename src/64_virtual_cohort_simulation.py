@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# NOTE (2026-10-19 audit): historical legacy script; not part of the current RANO project. Virtual patients are sampled from fixed distributions (rho, diffusion, chemo and RT kill), not measured per subject; representativeness is unverified and this is not clinical evidence.
 """
 Script 64: 20-Patient Virtual Cohort at an EQUAL DRUG BUDGET
 ============================================================

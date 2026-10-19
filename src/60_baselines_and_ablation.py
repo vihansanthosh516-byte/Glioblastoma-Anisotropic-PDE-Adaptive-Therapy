@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# NOTE (2026-10-19 audit): historical legacy script; not part of the current RANO project. As disclosed in its docstring, use_mechanics never enters pde_step, so 'No Mechanics' duplicates the full model, and use_dti=False is an x-aligned tensor, not isotropic. Scenarios are script-59 LHS simulations with modelled kill scaling; not clinical efficacy evidence.
 """
 Script 60: Baselines & Ablation under an EQUAL DRUG BUDGET
 ==========================================================

@@ -66,7 +66,7 @@ Audit evidence and original progress.md remain unchanged. Status tracks correcti
 | 058 | PARTIAL | Scripts 47-51 variants: header notes for assumed kill/resistance parameters, simulation scope, surrogate CDSS (not clinical), unseeded sampling, undeclared plotly/pymc, assumed prior; 49/50_clinical/50_spatial cwd anchored at project root (stopgap). py_compile only; nothing run. Deferred: explicit path constants, seeds, spent-set overlap checks. |
 | 059 | PARTIAL | Scripts 55-59: header notes for synthetic tensors/fields, assumed constants, unseeded randomness, undeclared torch/gymnasium, heavy 59; cwd anchored at project root for 55-58 (stopgap). Audit absent-output claims for phase2-4 outputs confirmed (not on disk); phase5 files exist. py_compile only; nothing run. Deferred: explicit paths and seeds. |
 | 060 | DONE | Same scripts as 059 (55-59). Every finding (cwd-relative paths, assumed constants, synthetic tensors, absent phase2-4 outputs, header claims 'Final Optimized'/40 episodes/<2 min unverified) covered by the 059 notes and cwd anchoring. 56 multi-scale/57 therapy absent-output claims confirmed. No new edits; py_compile only. |
-| 061 | TODO | Pending report/source review and corrections. |
+| 061 | PARTIAL | Scripts 60-67: header notes for duplicate no-mechanics ablation, bootstrap scope, virtual-cohort assumptions, COMPLETE status meaning, seed-dependent split in 66, typed results in 67; 61/63 cwd anchored at project root. py_compile only; nothing run. Deferred: explicit paths, spent-set overlap. |
 | 062 | TODO | Pending report/source review and corrections. |
 | 063 | TODO | Pending report/source review and corrections. |
 | 064 | TODO | Pending report/source review and corrections. |

@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# NOTE (2026-10-19 audit): historical legacy script; not part of the current RANO project. The docstring figures ('PPO win 25%, mean log-ratio +0.077', '15/20') are typed historical results from scripts 64/66, not computed here. The 2000/300/40 pools are synthetic patients (seeds 670-672), not a locked clinical test set.
 """
 Script 67: Equal-budget policies that know the patient's drug sensitivity
 =========================================================================

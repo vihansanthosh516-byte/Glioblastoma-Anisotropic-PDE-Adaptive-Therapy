@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# NOTE (2026-10-19 audit): historical legacy script; not part of the current RANO project. pipeline_status COMPLETE only means the nine input files were readable; it says nothing about the validity of their contents.
 """
 Script 65: Track C Final Report (equal-drug-budget framework)
 =============================================================
