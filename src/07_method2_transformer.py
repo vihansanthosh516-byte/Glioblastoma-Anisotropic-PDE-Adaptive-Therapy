@@ -2,9 +2,16 @@
 07_method2_transformer.py
 =========================
 Method 2: Efficient Transformer Encoder baseline for CPU training.
-Uses top 500 HVGs (not 2500) for tractable sequence length.
+Uses the first N_GENES = 100 columns (code: X[:, :N_GENES]; an earlier note said
+500). Script 04 keeps source feature order, not HVG-rank order, so these are not
+necessarily the top HVGs. Test accuracy is read every epoch and the best epoch
+is reported (random cell split), so it is optimistic.
 """
-import os, time, resource, json, gc
+import os, time, json, gc
+try:
+    import resource
+except ImportError:  # native Windows Python has no resource module; RSS then reports 0
+    resource = None
 os.environ["OMP_NUM_THREADS"] = "2"
 os.environ["MKL_NUM_THREADS"] = "2"
 
@@ -46,7 +53,7 @@ EPOCHS       = 5
 WEIGHT_DECAY = 1e-4
 DEVICE       = "cuda" if torch.cuda.is_available() else "cpu"
 
-def mem_mb(): return resource.getrusage(resource.RUSAGE_SELF).ru_maxrss/1024
+def mem_mb(): return (resource.getrusage(resource.RUSAGE_SELF).ru_maxrss if resource else 0)/1024
 def log(m): print(f"[{time.strftime('%H:%M:%S')}] {m}  RSS={mem_mb():.0f}MB  DEV={DEVICE}", flush=True)
 
 # ---- 1. Load data -----------------------------------------------------------

@@ -14,7 +14,11 @@ Architecture:
   - This injects the "statistical knowledge" from Method 1 into Method 2
   - Final classification head same as before
 """
-import os, time, resource, json, gc
+import os, time, json, gc
+try:
+    import resource
+except ImportError:  # native Windows Python has no resource module; RSS then reports 0
+    resource = None
 os.environ["OMP_NUM_THREADS"] = "2"
 os.environ["MKL_NUM_THREADS"] = "2"
 
@@ -62,7 +66,7 @@ DEVICE       = "cuda" if torch.cuda.is_available() else "cpu"
 # Hybrid-specific: scale factor for LR coefficient bias
 LR_BIAS_SCALE = 0.5  # how strongly to inject LR prior
 
-def mem_mb(): return resource.getrusage(resource.RUSAGE_SELF).ru_maxrss/1024
+def mem_mb(): return (resource.getrusage(resource.RUSAGE_SELF).ru_maxrss if resource else 0)/1024
 def log(m): print(f"[{time.strftime('%H:%M:%S')}] {m}  RSS={mem_mb():.0f}MB  DEV={DEVICE}", flush=True)
 
 # ---- 1. Load data + LR coefficients ----------------------------------------

@@ -8,7 +8,11 @@ on 2,500 HVGs from the 15k balanced subsample.
 - Stratified 80/20 split (same as deep model for fair comparison)
 - Outputs: metrics, per-class report, confusion matrices, feature importance
 """
-import os, time, resource, json, gc
+import os, time, json, gc
+try:
+    import resource
+except ImportError:  # native Windows Python has no resource module; RSS then reports 0
+    resource = None
 os.environ["OMP_NUM_THREADS"] = "2"
 os.environ["MKL_NUM_THREADS"] = "2"
 
@@ -36,7 +40,7 @@ TSV_METRICS = os.path.join(OUT_DIR, "method1_metrics.json")
 TSV_IMP = os.path.join(OUT_DIR, "method1_lr_coefficients.tsv")
 TSV_IMP_RF = os.path.join(OUT_DIR, "method1_rf_importance.tsv")
 
-def mem_mb(): return resource.getrusage(resource.RUSAGE_SELF).ru_maxrss/1024
+def mem_mb(): return (resource.getrusage(resource.RUSAGE_SELF).ru_maxrss if resource else 0)/1024
 def log(m): print(f"[{time.strftime('%H:%M:%S')}] {m}  RSS={mem_mb():.0f}MB", flush=True)
 
 # ---- 1. Load data (already filtered, HVG-subset, row-z-scored) --------------

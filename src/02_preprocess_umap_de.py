@@ -9,7 +9,14 @@
       - Generates cluster markers
       - Plots heatmaps of top marker genes
   Why subsample? UMAP on 140k is slow + RAM-heavy in WSL; 15k is plenty for
-  inspection, and it's the published-biology-fair standard.
+  inspection (a convenience choice; no source is cited for it being a standard).
+
+  NOTE (2026-10-19 audit): 02_de_Core_vs_Peri.tsv is NOT a pairwise
+  Core-vs-Periphery table. de_to_df(adata, 'Core') uses the default
+  reference='rest', so it is Core versus all other cells (Periphery + Healthy).
+  Only Core-vs-Healthy and Periphery-vs-Healthy are explicit pairwise tests.
+  The saved file name is kept for compatibility. Cell and gene counts and
+  memory/time statements in this header are unverified.
 - Differential EXPRESSION analysis uses ALL 140,355 cells (Wilcoxon via scanpy,
   one-vs-rest per class). DE tables are saved as TSV.
 
@@ -28,7 +35,11 @@ Run:
     cd "/mnt/c/Users/vihan/20206 science fair"
     python src/02_preprocess_umap_de.py
 """
-import os, gc, time, resource
+import os, gc, time
+try:
+    import resource
+except ImportError:  # native Windows Python has no resource module; RSS then reports 0
+    resource = None
 os.environ["OMP_NUM_THREADS"] = "22"
 os.environ["OPENBLAS_NUM_THREADS"] = "22"
 os.environ["MKL_NUM_THREADS"] = "22"
@@ -61,7 +72,7 @@ N_TOP_MARKERS = 10
 N_TOP_DE      = 100
 
 def mem_mb():
-    return resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024.0
+    return (resource.getrusage(resource.RUSAGE_SELF).ru_maxrss if resource else 0) / 1024.0
 def log(msg): print(f"[{time.strftime('%H:%M:%S')}] {msg}  RSS={mem_mb():.0f} MB", flush=True)
 
 sc.settings.verbosity = 1

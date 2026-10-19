@@ -22,7 +22,11 @@ Run order:
     cd "/mnt/c/Users/vihan/20206 science fair"
     python 01_load_and_filter.py
 """
-import os, gc, sys, time, json, resource
+import os, gc, sys, time, json
+try:
+    import resource
+except ImportError:  # native Windows Python has no resource module; RSS then reports 0
+    resource = None
 import numpy as np
 import pandas as pd
 import scanpy as sc
@@ -43,7 +47,7 @@ OUT_BC_COUNTS   = os.path.join(OUT_DIR, "01_class_counts.tsv")
 
 # ---- 0. Helpers -------------------------------------------------------------
 def mem_mb():
-    return resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024.0  # KB->MB
+    return (resource.getrusage(resource.RUSAGE_SELF).ru_maxrss if resource else 0) / 1024.0  # KB->MB
 
 def log(msg):
     print(f"[{time.strftime('%H:%M:%S')}] {msg}  RSS={mem_mb():.0f} MB", flush=True)

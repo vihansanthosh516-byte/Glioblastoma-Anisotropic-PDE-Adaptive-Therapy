@@ -26,7 +26,11 @@ Run:
     cd "."
     python src/04_export_for_attention_model.py
 """
-import os, gc, time, resource
+import os, gc, time
+try:
+    import resource
+except ImportError:  # native Windows Python has no resource module; RSS then reports 0
+    resource = None
 os.environ["OMP_NUM_THREADS"]        = "2"
 os.environ["OPENBLAS_NUM_THREADS"]   = "2"
 os.environ["MKL_NUM_THREADS"]        = "2"
@@ -48,7 +52,7 @@ TSV_CLASS  = os.path.join(OUT_DIR, "nn_class_names.tsv")
 TSV_SPLIT  = os.path.join(OUT_DIR, "nn_train_test_split.tsv")
 
 def mem_mb():
-    return resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024
+    return (resource.getrusage(resource.RUSAGE_SELF).ru_maxrss if resource else 0) / 1024
 def log(m): print(f"[{time.strftime('%H:%M:%S')}] {m}  RSS={mem_mb():.0f} MB", flush=True)
 
 # ---- 1. Load subsample, extract HVG, export dense matrix -------------------

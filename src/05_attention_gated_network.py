@@ -14,19 +14,26 @@ Architecture (attention-gated):
   gated_x  = a * v     ->  weighted per-gene features (N, D)
   dropout + 2 dense    ->  logits (N, 3)
 
-Why this is a great science fair model:
-  - It's *glass-box*: attention weights are interpretable per cell.
-  - It beats ~10,000 genes with a much smaller representation -- it is a
-    noise filter.
-  - The attention compares well to standard DE markers (great Paper Tie-In).
+Intent (original author notes; NOT demonstrated by this script, 2026-10-19 audit):
+  - Attention weights are saved per cell, but nothing here shows they explain
+    predictions (no ablation or comparison code).
+  - No comparison against a 10,000-gene model is run here.
+  - No test of agreement with DE markers beyond listing top weights.
+  - Test accuracy is read every epoch and the best epoch is reported, on a
+    random cell-level split (not patient-held-out), so it is optimistic.
 
-Memory: model has ~3.2M params. Trivial.
+Size: output/nn_metrics.json reports n_params = 488899 (the earlier "~3.2M"
+was wrong). No torch.save is called, so nn_model.pt is not produced here.
 
 Run:
     cd "."
     python src/05_attention_gated_network.py
 """
-import os, time, resource, json, gc
+import os, time, json, gc
+try:
+    import resource
+except ImportError:  # native Windows Python has no resource module; RSS then reports 0
+    resource = None
 os.environ["OMP_NUM_THREADS"]      = "2"
 os.environ["MKL_NUM_THREADS"]      = "2"
 
@@ -58,7 +65,7 @@ LR           = 1e-3
 EPOCHS       = 25
 DEVICE       = "cuda" if torch.cuda.is_available() else "cpu"
 
-def mem_mb(): return resource.getrusage(resource.RUSAGE_SELF).ru_maxrss/1024
+def mem_mb(): return (resource.getrusage(resource.RUSAGE_SELF).ru_maxrss if resource else 0)/1024
 def log(m): print(f"[{time.strftime('%H:%M:%S')}] {m}  RSS={mem_mb():.0f}MB  DEV={DEVICE}", flush=True)
 
 # ---- 1. Load -------------------------------------------------------------

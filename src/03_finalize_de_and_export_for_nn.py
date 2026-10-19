@@ -2,7 +2,9 @@
 03_finalize_de_and_export_for_nn.py
 ====================================
 Lightweight finalizer that:
-  - Re-reads the 3 pairwise DE tables saved by script 02
+  - Re-reads the 3 DE tables saved by script 02 (NOTE 2026-10-19 audit: the
+    one labelled Core-vs-Periphery is really Core vs rest, see script 02; the
+    top-100 and marker outputs inherit that label)
   - Builds 02_de_top100_per_pair.tsv (top 100 per comparison combined)
   - Builds the per-comparison marker lists (for SHAP / ablation later)
 The heavy work is done already; this script is for finishing up neatly.
@@ -11,7 +13,11 @@ Run:
     cd "."
     python src/03_finalize_de_and_export_for_nn.py
 """
-import os, time, resource, gc
+import os, time, gc
+try:
+    import resource
+except ImportError:  # native Windows Python has no resource module; RSS then reports 0
+    resource = None
 import numpy as np
 import pandas as pd
 
@@ -26,7 +32,7 @@ TSV_DE_PAPER  = os.path.join(OUT_DIR, "02_paper_key_markers_in_top_de.tsv")
 N_TOP = 100
 
 def mem_mb():
-    return resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024
+    return (resource.getrusage(resource.RUSAGE_SELF).ru_maxrss if resource else 0) / 1024
 def log(m): print(f"[{time.strftime('%H:%M:%S')}] {m}  RSS={mem_mb():.0f} MB", flush=True)
 
 # ---- 1. Read DE tables ------------------------------------------------------
