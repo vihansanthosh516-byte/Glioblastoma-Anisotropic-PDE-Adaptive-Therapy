@@ -1,3 +1,4 @@
+# NOTE (2026-10-19 audit): historical legacy Track A script; not part of the current RANO project. Needs torch (not in Requirements.txt). The header's 25x25 UMAP grid is not what the code does: it projects with PCA and bins to a grid. Sampling uses unseeded np.random.choice, so the plot sampling is not reproducible. Paths: cwd is now anchored at the project root.
 #!/usr/bin/env python3
 """
 Month 1: Biophysical Velocity Fields & Waddington Landscape Physics
@@ -19,6 +20,9 @@ import numpy as np
 import torch
 from matplotlib.colors import ListedColormap
 
+
+import os as _os
+_os.chdir(_os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))))  # historical script uses cwd-relative output/ paths; anchor cwd at the project root
 
 def load_data(device: torch.device) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
     """Load precomputed datasets directly to GPU memory."""

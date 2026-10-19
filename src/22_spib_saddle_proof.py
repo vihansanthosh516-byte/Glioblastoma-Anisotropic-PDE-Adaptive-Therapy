@@ -1,3 +1,4 @@
+# NOTE (2026-10-19 audit): historical legacy Track A script; not part of the current RANO project. Needs torch. Uses precomputed SPIB coordinates (output/spib_rc_3d.npy) whose split/freeze provenance is not recoverable here; a Hessian classification at a chosen coordinate is not a proof of a saddle point. Paths: cwd is now anchored at the project root.
 #!/usr/bin/env python3
 """
 22_spib_saddle_proof.py
@@ -21,6 +22,9 @@ K_NEIGHBORS = 200
 RIDGE_ALPHA = 1e-2
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
+
+import os as _os
+_os.chdir(_os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))))  # historical script uses cwd-relative output/ paths; anchor cwd at the project root
 
 def mem_mb():
     return resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024

@@ -1,3 +1,4 @@
+# NOTE (2026-10-19 audit): historical legacy Track A script; not part of the current RANO project. Needs umap. alpha=beta=0.5 and sigma=1.0 are model choices, not measured effects. Paths: cwd is now anchored at the project root.
 import os
 import json
 import numpy as np
@@ -7,6 +8,9 @@ import matplotlib.pyplot as plt
 import umap
 from scipy.stats import kruskal
 from scipy.spatial.distance import cdist
+
+import os as _os
+_os.chdir(_os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))))  # historical script uses cwd-relative output/ paths; anchor cwd at the project root
 
 def calculate_shannon_entropy(fractions):
     eps = 1e-10

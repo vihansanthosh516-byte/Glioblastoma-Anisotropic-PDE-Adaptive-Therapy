@@ -1,3 +1,4 @@
+# NOTE (2026-10-19 audit): historical legacy Track A script; not part of the current RANO project. Needs torch. The header calls the landscape CALIBRATED, but priors, weights and the KDE bandwidth are hard-coded design values; nothing here shows calibration to measured biology or proves the topology. Paths: cwd is now anchored at the project root.
 #!/usr/bin/env python3
 """
 Month 1, Week 2: Fokker-Planck Energy Landscape Reconstruction — CALIBRATED
@@ -22,6 +23,9 @@ import torch
 from matplotlib.colors import LinearSegmentedColormap
 from sklearn.decomposition import PCA
 
+
+import os as _os
+_os.chdir(_os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))))  # historical script uses cwd-relative output/ paths; anchor cwd at the project root
 
 def load_data(device: torch.device) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
     """Load precomputed datasets to GPU."""

@@ -1,3 +1,4 @@
+# NOTE (2026-10-19 audit): historical legacy Track A script; not part of the current RANO project. Needs torch. This is a computational diagnostic (PCA 5D, chosen kNN/bandwidth and eigenvalue noise thresholds), not a proof of a biological saddle point. Paths: cwd is now anchored at the project root.
 #!/usr/bin/env python3
 """
 22_saddle_point_proof.py (v3 — zone-aware)
@@ -33,6 +34,9 @@ RIDGE_ALPHA = 1e-2
 EIG_NOISE_FRACTION = 0.15
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
+
+import os as _os
+_os.chdir(_os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))))  # historical script uses cwd-relative output/ paths; anchor cwd at the project root
 
 def mem_mb():
     return resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024

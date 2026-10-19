@@ -1,3 +1,4 @@
+# NOTE (2026-10-19 audit): historical legacy Track A script; not part of the current RANO project. Needs torch. No random seed is set. Paths: cwd is now anchored at the project root.
 #!/usr/bin/env python3
 """
 Month 1 Week 3: Drift & Diffusion Tensor Analysis
@@ -15,6 +16,9 @@ import numpy as np
 import torch
 from torch import Tensor
 
+
+import os as _os
+_os.chdir(_os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))))  # historical script uses cwd-relative output/ paths; anchor cwd at the project root
 
 def load_velocity_data(device: torch.device) -> Tuple[Tensor, Tensor, Tensor, Tensor]:
     """Load latent, velocity, scores, and labels."""

@@ -1,3 +1,4 @@
+# NOTE (2026-10-19 audit): historical legacy Track A script; not part of the current RANO project. Needs torch. Alternate legacy implementation that writes the SAME output/saddle_point_metrics.json as 22_saddle_point_proof.py, so running both overwrites the result. Paths: cwd is now anchored at the project root.
 #!/usr/bin/env python3
 """
 Month 1, Week 4: Saddle Point Proof — Climbing Image NEB (CI-NEB) Solver
@@ -18,6 +19,9 @@ import numpy as np
 import torch
 from sklearn.cluster import KMeans
 
+
+import os as _os
+_os.chdir(_os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))))  # historical script uses cwd-relative output/ paths; anchor cwd at the project root
 
 def load_data(device: torch.device) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
     latent = torch.from_numpy(np.load("output/scvi_latent.npy")).to(device, dtype=torch.float32)
