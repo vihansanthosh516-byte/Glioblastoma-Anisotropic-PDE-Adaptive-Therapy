@@ -28,11 +28,16 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 FULL_H5AD = os.path.join(ROOT, "output", "01_filtered_three_class.h5ad")
 CVAE_MODEL = os.path.join(ROOT, "output", "cgat", "cvae_model.pt")
 OUT_DIR = os.path.join(ROOT, "output", "cgat")
+# GBM_SPLIT_MODE=patient: patient-disjoint split; this whole cVAE/graph chain then reads and writes under output/cgat/patient_split/
+# (default "cell" keeps the original behaviour and file names).
+SPLIT_MODE = os.environ.get("GBM_SPLIT_MODE", "cell")
+RES_DIR = OUT_DIR if SPLIT_MODE == "cell" else os.path.join(OUT_DIR, "patient_split")
+os.makedirs(RES_DIR, exist_ok=True)
 
-LATENT_FULL_PATH = os.path.join(OUT_DIR, "cvae_latent_full.npy")
-LABELS_FULL_PATH = os.path.join(OUT_DIR, "cvae_labels_full.npy")
-PATIENT_FULL_PATH = os.path.join(OUT_DIR, "cvae_patient_full.npy")
-REGION_FULL_PATH = os.path.join(OUT_DIR, "cvae_region_full.npy")
+LATENT_FULL_PATH = os.path.join(RES_DIR, "cvae_latent_full.npy")
+LABELS_FULL_PATH = os.path.join(RES_DIR, "cvae_labels_full.npy")
+PATIENT_FULL_PATH = os.path.join(RES_DIR, "cvae_patient_full.npy")
+REGION_FULL_PATH = os.path.join(RES_DIR, "cvae_region_full.npy")
 
 BATCH_SIZE = 2048
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"

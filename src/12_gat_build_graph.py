@@ -23,13 +23,18 @@ import anndata as ad
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 OUT_DIR = os.path.join(ROOT, "output", "cgat")
+# GBM_SPLIT_MODE=patient: patient-disjoint split; this whole cVAE/graph chain then reads and writes under output/cgat/patient_split/
+# (default "cell" keeps the original behaviour and file names).
+SPLIT_MODE = os.environ.get("GBM_SPLIT_MODE", "cell")
+RES_DIR = OUT_DIR if SPLIT_MODE == "cell" else os.path.join(OUT_DIR, "patient_split")
+os.makedirs(RES_DIR, exist_ok=True)
 
-LATENT_PATH = os.path.join(OUT_DIR, "cvae_latent.npy")      # (15000, 32)
+LATENT_PATH = os.path.join(RES_DIR, "cvae_latent.npy")      # (15000, 32)
 ADATA_SUB_PATH = os.path.join(ROOT, "output", "02_adata_subsampled.h5ad")
 
-GRAPH_EDGE_INDEX = os.path.join(OUT_DIR, "gat_edge_index.npy")
-GRAPH_EDGE_ATTR = os.path.join(OUT_DIR, "gat_edge_attr.npy")
-GRAPH_META = os.path.join(OUT_DIR, "gat_meta.json")
+GRAPH_EDGE_INDEX = os.path.join(RES_DIR, "gat_edge_index.npy")
+GRAPH_EDGE_ATTR = os.path.join(RES_DIR, "gat_edge_attr.npy")
+GRAPH_META = os.path.join(RES_DIR, "gat_meta.json")
 
 K = 15  # k-NN neighbors
 

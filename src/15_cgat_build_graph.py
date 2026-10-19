@@ -12,15 +12,20 @@ from sklearn.neighbors import NearestNeighbors
 
 ROOT = __import__("os").path.dirname(__import__("os").path.dirname(__import__("os").path.abspath(__file__)))  # was a hard-coded WSL path
 OUT_DIR = os.path.join(ROOT, "output", "cgat")
+# GBM_SPLIT_MODE=patient: patient-disjoint split; this whole cVAE/graph chain then reads and writes under output/cgat/patient_split/
+# (default "cell" keeps the original behaviour and file names).
+SPLIT_MODE = os.environ.get("GBM_SPLIT_MODE", "cell")
+RES_DIR = OUT_DIR if SPLIT_MODE == "cell" else os.path.join(OUT_DIR, "patient_split")
+os.makedirs(RES_DIR, exist_ok=True)
 
-LATENT_PATH = os.path.join(OUT_DIR, "cvae_latent_full.npy")
-LABELS_PATH = os.path.join(OUT_DIR, "cvae_labels_full.npy")
-PATIENT_PATH = os.path.join(OUT_DIR, "cvae_patient_full.npy")
-REGION_PATH = os.path.join(OUT_DIR, "cvae_region_full.npy")
+LATENT_PATH = os.path.join(RES_DIR, "cvae_latent_full.npy")
+LABELS_PATH = os.path.join(RES_DIR, "cvae_labels_full.npy")
+PATIENT_PATH = os.path.join(RES_DIR, "cvae_patient_full.npy")
+REGION_PATH = os.path.join(RES_DIR, "cvae_region_full.npy")
 
-EDGE_INDEX_PATH = os.path.join(OUT_DIR, "gat_edge_index_full.npy")
-EDGE_ATTR_PATH = os.path.join(OUT_DIR, "gat_edge_attr_full.npy")
-META_PATH = os.path.join(OUT_DIR, "gat_meta_full.json")
+EDGE_INDEX_PATH = os.path.join(RES_DIR, "gat_edge_index_full.npy")
+EDGE_ATTR_PATH = os.path.join(RES_DIR, "gat_edge_attr_full.npy")
+META_PATH = os.path.join(RES_DIR, "gat_meta_full.json")
 
 K = 15
 DEVICE = "cpu"

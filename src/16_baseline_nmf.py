@@ -9,6 +9,16 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import accuracy_score, f1_score, roc_auc_score
 
 _ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # project root, independent of cwd
+# GBM_SPLIT_MODE=patient: use the patient-disjoint split from script 04 and write under output/patient_split/ (default "cell" = original behaviour).
+SPLIT_MODE = os.environ.get("GBM_SPLIT_MODE", "cell")
+_RES = os.path.join(_ROOT, "output") if SPLIT_MODE == "cell" else os.path.join(_ROOT, "output", "patient_split")
+os.makedirs(_RES, exist_ok=True)
+def _patient_split_idx(n):
+    import pandas as _pd
+    sp = _pd.read_csv(os.path.join(_ROOT, "output", "nn_train_test_split_patient.tsv"), sep="\t")
+    m = dict(zip(sp["index"], sp["split"]))
+    tr = np.array([i for i in range(n) if m[i] == "train"]); te = np.array([i for i in range(n) if m[i] == "test"])
+    return tr, te
 
 def load_preprocessed_matrices():
     print("[DATA] Initializing data stream from preprocessed arrays...")
@@ -52,9 +62,13 @@ def main():
     print(f"   Meta-Modules: AC (0), MES (1), NPC (2), OPC (3)")
 
     print("\n[PHASE 2B] Executing Phase 2B: Frozen Fraction Linear Evaluation Head...")
-    X_train, X_test, y_train, y_test = train_test_split(
-        W, y, test_size=0.20, random_state=42, stratify=y
-    )
+    if SPLIT_MODE == "cell":
+        X_train, X_test, y_train, y_test = train_test_split(
+            W, y, test_size=0.20, random_state=42, stratify=y
+        )
+    else:
+        _tr, _te = _patient_split_idx(len(y))
+        X_train, X_test, y_train, y_test = W[_tr], W[_te], y[_tr], y[_te]
 
     clf = LogisticRegression(
         max_iter=1000,
@@ -78,12 +92,12 @@ def main():
     print(f"Macro-Averaged AUC (OvR):        {auc:.4f}")
     print("=========================================================================")
 
-    os.makedirs(os.path.join(_ROOT, "output"), exist_ok=True)
+    os.makedirs(_RES, exist_ok=True)
     metrics_export = {"accuracy": accuracy, "macro_f1": f1, "macro_auc": auc}
-    with open(os.path.join(_ROOT, "output", "nmf_metrics.json"), "w") as f:
+    with open(os.path.join(_RES, "nmf_metrics.json"), "w") as f:
         json.dump(metrics_export, f, indent=4)
 
-    np.save(os.path.join(_ROOT, "output", "nmf_fractions.npy"), W)
+    np.save(os.path.join(_RES, "nmf_fractions.npy"), W)
     print("[OK] Performance metrics saved to output/nmf_metrics.json")
     print("[OK] Cell-state fraction matrix saved to output/nmf_fractions.npy")
 

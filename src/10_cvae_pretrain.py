@@ -40,17 +40,22 @@ except ImportError:
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 OUT_DIR = os.path.join(ROOT, "output", "cgat")
 os.makedirs(OUT_DIR, exist_ok=True)
+# GBM_SPLIT_MODE=patient: patient-disjoint split; this whole cVAE/graph chain then reads and writes under output/cgat/patient_split/
+# (default "cell" keeps the original behaviour and file names).
+SPLIT_MODE = os.environ.get("GBM_SPLIT_MODE", "cell")
+RES_DIR = OUT_DIR if SPLIT_MODE == "cell" else os.path.join(OUT_DIR, "patient_split")
+os.makedirs(RES_DIR, exist_ok=True)
 
-MODEL_PATH = os.path.join(OUT_DIR, "cvae_model.pt")
-METRICS_PATH = os.path.join(OUT_DIR, "cvae_metrics.json")
-LATENT_PATH = os.path.join(OUT_DIR, "cvae_latent.npy")
+MODEL_PATH = os.path.join(RES_DIR, "cvae_model.pt")
+METRICS_PATH = os.path.join(RES_DIR, "cvae_metrics.json")
+LATENT_PATH = os.path.join(RES_DIR, "cvae_latent.npy")
 
 # Load pre-processed data
 NPY_X = os.path.join(ROOT, "output", "nn_X.npy")           # (15000, 2500) float32
 NPY_Y = os.path.join(ROOT, "output", "nn_y.npy")           # (15000,) int64
 TSV_GENE = os.path.join(ROOT, "output", "nn_gene_names.tsv")
 TSV_CLS = os.path.join(ROOT, "output", "nn_class_names.tsv")
-TSV_SPLIT = os.path.join(ROOT, "output", "nn_train_test_split.tsv")
+TSV_SPLIT = os.path.join(ROOT, "output", "nn_train_test_split.tsv" if SPLIT_MODE == "cell" else "nn_train_test_split_patient.tsv")
 
 # Hyperparameters
 LATENT_DIM = 32
@@ -300,6 +305,6 @@ np.save(LATENT_PATH, latent)
 log(f"Saved latent: {latent.shape} -> {LATENT_PATH}")
 
 # Save test set latent for downstream evaluation
-np.save(os.path.join(OUT_DIR, "cvae_latent_test.npy"), latent[test_mask])
-np.save(os.path.join(OUT_DIR, "cvae_labels_test.npy"), y[test_mask])
+np.save(os.path.join(RES_DIR, "cvae_latent_test.npy"), latent[test_mask])
+np.save(os.path.join(RES_DIR, "cvae_labels_test.npy"), y[test_mask])
 log("DONE.")

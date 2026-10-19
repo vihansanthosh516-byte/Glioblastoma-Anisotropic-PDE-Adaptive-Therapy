@@ -36,6 +36,16 @@ if DEVICE.type == 'cuda':
 # 2. DATA PROCESSING & STORAGE MANAGEMENT
 # =====================================================================
 _ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # project root, independent of cwd
+# GBM_SPLIT_MODE=patient: use the patient-disjoint split from script 04 and write under output/patient_split/ (default "cell" = original behaviour).
+SPLIT_MODE = os.environ.get("GBM_SPLIT_MODE", "cell")
+_RES = os.path.join(_ROOT, "output") if SPLIT_MODE == "cell" else os.path.join(_ROOT, "output", "patient_split")
+os.makedirs(_RES, exist_ok=True)
+def _patient_split_idx(n):
+    import pandas as _pd
+    sp = _pd.read_csv(os.path.join(_ROOT, "output", "nn_train_test_split_patient.tsv"), sep="\t")
+    m = dict(zip(sp["index"], sp["split"]))
+    tr = np.array([i for i in range(n) if m[i] == "train"]); te = np.array([i for i in range(n) if m[i] == "test"])
+    return tr, te
 
 class SingleCellDataset(Dataset):
     def __init__(self, X_sparse, y):
@@ -136,9 +146,13 @@ def main():
     
     # Stratified 80/20 train/test distribution split
     indices = np.arange(X_sparse.shape[0])
-    train_idx, test_idx, y_train, y_test = train_test_split(
-        indices, y, test_size=0.20, random_state=42, stratify=y
-    )
+    if SPLIT_MODE == "cell":
+        train_idx, test_idx, y_train, y_test = train_test_split(
+            indices, y, test_size=0.20, random_state=42, stratify=y
+        )
+    else:
+        train_idx, test_idx = _patient_split_idx(len(y))
+        y_train, y_test = y[train_idx], y[test_idx]
     
     train_loader = DataLoader(SingleCellDataset(X_sparse[train_idx], y_train), batch_size=256, shuffle=True)
     test_loader = DataLoader(SingleCellDataset(X_sparse[test_idx], y_test), batch_size=256, shuffle=False)
@@ -215,9 +229,9 @@ def main():
     print("=========================================================================")
     
     # Export metrics metadata
-    os.makedirs(os.path.join(_ROOT, "output"), exist_ok=True)
+    os.makedirs(_RES, exist_ok=True)
     metrics_export = {"accuracy": accuracy, "macro_f1": f1, "macro_auc": auc}
-    with open(os.path.join(_ROOT, "output", "scvi_metrics.json"), "w") as f:
+    with open(os.path.join(_RES, "scvi_metrics.json"), "w") as f:
         json.dump(metrics_export, f, indent=4)
         
     # Extract and persist full dataset latent embeddings for Phase 3 diagnostics
@@ -231,7 +245,7 @@ def main():
             mu, _ = vae.encode(batch_x)
             global_latent_matrix.extend(mu.cpu().numpy())
             
-    np.save(os.path.join(_ROOT, "output", "scvi_latent.npy"), np.array(global_latent_matrix))
+    np.save(os.path.join(_RES, "scvi_latent.npy"), np.array(global_latent_matrix))
     print("Complete latent matrix successfully saved at output/scvi_latent.npy!")
 
 if __name__ == "__main__":

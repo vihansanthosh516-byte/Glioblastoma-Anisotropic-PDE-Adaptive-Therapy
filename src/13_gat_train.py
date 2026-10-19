@@ -50,18 +50,22 @@ except ImportError:
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 OUT_DIR = os.path.join(ROOT, "output", "cgat")
+# GBM_SPLIT_MODE=patient: patient-disjoint split, results under output/cgat/patient_split/ (default "cell" keeps the original behaviour and names).
+SPLIT_MODE = os.environ.get("GBM_SPLIT_MODE", "cell")
+RES_DIR = OUT_DIR if SPLIT_MODE == "cell" else os.path.join(OUT_DIR, "patient_split")
+os.makedirs(RES_DIR, exist_ok=True)
 
-EDGE_INDEX_PATH = os.path.join(OUT_DIR, "gat_edge_index.npy")
-EDGE_ATTR_PATH = os.path.join(OUT_DIR, "gat_edge_attr.npy")
-LATENT_PATH = os.path.join(OUT_DIR, "cvae_latent.npy")
+EDGE_INDEX_PATH = os.path.join(RES_DIR, "gat_edge_index.npy")
+EDGE_ATTR_PATH = os.path.join(RES_DIR, "gat_edge_attr.npy")
+LATENT_PATH = os.path.join(RES_DIR, "cvae_latent.npy")
 ADATA_SUB_PATH = os.path.join(ROOT, "output", "02_adata_subsampled.h5ad")
-SPLIT_PATH = os.path.join(ROOT, "output", "nn_train_test_split.tsv")
+SPLIT_PATH = os.path.join(ROOT, "output", "nn_train_test_split.tsv" if SPLIT_MODE == "cell" else "nn_train_test_split_patient.tsv")
 
-MODEL_PATH = os.path.join(OUT_DIR, "gat_model.pt")
-METRICS_PATH = os.path.join(OUT_DIR, "gat_metrics.json")
-PRED_PATH = os.path.join(OUT_DIR, "gat_predictions.tsv")
-PNG_CM = os.path.join(OUT_DIR, "gat_confusion.png")
-PNG_LOSS = os.path.join(OUT_DIR, "gat_training_loss.png")
+MODEL_PATH = os.path.join(RES_DIR, "gat_model.pt")
+METRICS_PATH = os.path.join(RES_DIR, "gat_metrics.json")
+PRED_PATH = os.path.join(RES_DIR, "gat_predictions.tsv")
+PNG_CM = os.path.join(RES_DIR, "gat_confusion.png")
+PNG_LOSS = os.path.join(RES_DIR, "gat_training_loss.png")
 
 # Hyperparameters
 HIDDEN_DIM = 64
@@ -94,6 +98,11 @@ split_df = pd.read_csv(SPLIT_PATH, sep="\t")
 split_map = dict(zip(split_df["index"], split_df["split"]))
 train_mask = np.array([split_map.get(i, "train") == "train" for i in range(len(y))])
 test_mask = ~train_mask
+# Validation cells carved from TRAIN (10%, stratified, seed 42); epoch chosen on validation, test scored once.
+from sklearn.model_selection import train_test_split as _tts
+_tr_i, _va_i = _tts(np.where(train_mask)[0], test_size=0.10, random_state=42, stratify=y[train_mask])
+val_mask = np.zeros_like(train_mask); val_mask[_va_i] = True
+train_mask = np.zeros_like(train_mask); train_mask[_tr_i] = True
 
 log(f"Data: {len(y)} cells, {latent.shape[1]} features")
 log(f"Train: {train_mask.sum()}, Test: {test_mask.sum()}")
@@ -112,6 +121,7 @@ data = data.to(DEVICE)
 # Train/test masks
 train_mask_t = torch.from_numpy(train_mask).bool().to(DEVICE)
 test_mask_t = torch.from_numpy(test_mask).bool().to(DEVICE)
+val_mask_t = torch.from_numpy(val_mask).bool().to(DEVICE)
 
 # ---- 3. Edge-aware GAT ----
 class EdgeAwareGAT(torch.nn.Module):
@@ -189,9 +199,9 @@ for epoch in range(1, EPOCHS + 1):
     model.eval()
     with torch.no_grad():
         out = model(data.x, data.edge_index, data.edge_attr)
-        test_loss = criterion(out[test_mask_t], data.y[test_mask_t])
-        pred = out[test_mask_t].argmax(dim=-1)
-        acc = (pred == data.y[test_mask_t]).float().mean().item()
+        test_loss = criterion(out[val_mask_t], data.y[val_mask_t])  # validation loss (name kept)
+        pred = out[val_mask_t].argmax(dim=-1)
+        acc = (pred == data.y[val_mask_t]).float().mean().item()  # validation accuracy
     
     train_losses.append(loss.item())
     test_losses.append(test_loss.item())
@@ -201,7 +211,7 @@ for epoch in range(1, EPOCHS + 1):
         best_acc = acc
         torch.save(model.state_dict(), MODEL_PATH)
     
-    log(f"Epoch {epoch:3d}/{EPOCHS}  TrainLoss={loss.item():.4f}  TestLoss={test_loss.item():.4f}  TestAcc={acc:.4f}  ({time.time()-t0:.1f}s)")
+    log(f"Epoch {epoch:3d}/{EPOCHS}  TrainLoss={loss.item():.4f}  ValLoss={test_loss.item():.4f}  ValAcc={acc:.4f}  ({time.time()-t0:.1f}s)")
 
 # ---- 5. Final evaluation ----
 log("Final evaluation...")
@@ -233,8 +243,10 @@ metrics = {
     "macro_auc_ovr": float(auc),
     "confusion_matrix": cm.tolist(),
     "per_class": report,
-    "best_test_acc": best_acc,
+    "best_val_acc": best_acc,
+    "selection": "epoch chosen on a validation split carved from train; test scored once",
     "final_test_acc": float(acc),
+    "split_mode": SPLIT_MODE,
     "n_params": sum(p.numel() for p in model.parameters())
 }
 
@@ -260,10 +272,10 @@ import seaborn as sns
 
 fig, axes = plt.subplots(1, 2, figsize=(10, 4))
 axes[0].plot(train_losses, label="train")
-axes[0].plot(test_losses, label="test")
+axes[0].plot(test_losses, label="validation")
 axes[0].set_title("Loss"); axes[0].legend()
-axes[1].plot(test_accs, label="test acc", color="green")
-axes[1].set_title("Test Accuracy"); axes[1].legend()
+axes[1].plot(test_accs, label="validation acc", color="green")
+axes[1].set_title("Validation Accuracy"); axes[1].legend()
 fig.tight_layout()
 fig.savefig(PNG_LOSS, dpi=180); plt.close(fig)
 

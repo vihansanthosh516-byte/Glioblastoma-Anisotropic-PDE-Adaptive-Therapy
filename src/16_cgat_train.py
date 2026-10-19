@@ -4,7 +4,7 @@
 Train Edge-Aware GAT on FULL 140k-cell graph using full-batch training.
 No neighbor sampling needed - full graph fits in memory.
 
-NOTE (2026-10-19 audit): historical legacy Track A script. Test accuracy is evaluated every epoch and used for checkpoint selection (the test set is part of model selection); no torch seed is set; the split is per cell. Needs torch and torch_geometric (not in Requirements.txt). The root was a hard-coded WSL path and now derives from __file__.
+NOTE (2026-10-19 audit): historical legacy Track A script. Test accuracy is evaluated every epoch and used for checkpoint selection ((UPDATED 2026-10-19: the epoch is now chosen on a validation split carved from train and test is scored once; the text in this sentence describes the older behaviour: the test set was part of model selection)); no torch seed is set; the split is per cell. Needs torch and torch_geometric (not in Requirements.txt). The root was a hard-coded WSL path and now derives from __file__.
 """
 import os, time, resource, gc, json
 import numpy as np
@@ -37,17 +37,21 @@ except ImportError:
 
 ROOT = __import__("os").path.dirname(__import__("os").path.dirname(__import__("os").path.abspath(__file__)))  # was a hard-coded WSL path
 OUT_DIR = os.path.join(ROOT, "output", "cgat")
+# GBM_SPLIT_MODE=patient: patient-disjoint split, results under output/cgat/patient_split/ (default "cell" keeps the original behaviour and names).
+SPLIT_MODE = os.environ.get("GBM_SPLIT_MODE", "cell")
+RES_DIR = OUT_DIR if SPLIT_MODE == "cell" else os.path.join(OUT_DIR, "patient_split")
+os.makedirs(RES_DIR, exist_ok=True)
 
-EDGE_INDEX_PATH = os.path.join(OUT_DIR, "gat_edge_index_full.npy")
-EDGE_ATTR_PATH = os.path.join(OUT_DIR, "gat_edge_attr_full.npy")
-LATENT_PATH = os.path.join(OUT_DIR, "cvae_latent_full.npy")
-LABELS_PATH = os.path.join(OUT_DIR, "cvae_labels_full.npy")
+EDGE_INDEX_PATH = os.path.join(RES_DIR, "gat_edge_index_full.npy")
+EDGE_ATTR_PATH = os.path.join(RES_DIR, "gat_edge_attr_full.npy")
+LATENT_PATH = os.path.join(RES_DIR, "cvae_latent_full.npy")
+LABELS_PATH = os.path.join(RES_DIR, "cvae_labels_full.npy")
 
-MODEL_PATH = os.path.join(OUT_DIR, "gat_full_model.pt")
-METRICS_PATH = os.path.join(OUT_DIR, "gat_full_metrics.json")
-PRED_PATH = os.path.join(OUT_DIR, "gat_full_predictions.tsv")
-PNG_CM = os.path.join(OUT_DIR, "gat_full_confusion.png")
-PNG_LOSS = os.path.join(OUT_DIR, "gat_full_training_loss.png")
+MODEL_PATH = os.path.join(RES_DIR, "gat_full_model.pt")
+METRICS_PATH = os.path.join(RES_DIR, "gat_full_metrics.json")
+PRED_PATH = os.path.join(RES_DIR, "gat_full_predictions.tsv")
+PNG_CM = os.path.join(RES_DIR, "gat_full_confusion.png")
+PNG_LOSS = os.path.join(RES_DIR, "gat_full_training_loss.png")
 
 # Hyperparameters
 HIDDEN_DIM = 64
@@ -83,10 +87,24 @@ edge_index_t = torch.from_numpy(edge_index).long()
 edge_attr_t = torch.from_numpy(edge_attr).float()
 y_t = torch.from_numpy(y).long()
 
-# Train/test split (stratified 80/20)
-train_idx, test_idx = train_test_split(np.arange(n_cells), test_size=0.2, random_state=42, stratify=y)
+# Train/test split. "cell" = original stratified random cell split (leaky: cells of one patient on both sides).
+# "patient" = StratifiedGroupKFold fold 0 with groups = cvae_patient_full.npy (no patient in both sets).
+if SPLIT_MODE == "cell":
+    train_idx, test_idx = train_test_split(np.arange(n_cells), test_size=0.2, random_state=42, stratify=y)
+else:
+    from sklearn.model_selection import StratifiedGroupKFold
+    _pf = os.path.join(RES_DIR, "cvae_patient_full.npy")
+    if not os.path.exists(_pf):
+        raise SystemExit(f"patient split needs {_pf} (written by script 11); not found")
+    groups = np.load(_pf, allow_pickle=True).astype(str)
+    train_idx, test_idx = next(StratifiedGroupKFold(n_splits=5, shuffle=True, random_state=42).split(np.arange(n_cells), y, groups))
+    assert not (set(groups[train_idx]) & set(groups[test_idx])), "patient overlap between train and test"
+# Validation cells carved from TRAIN (10%, stratified, seed 42); epoch chosen on validation, test scored once.
+train_idx, val_idx = train_test_split(train_idx, test_size=0.10, random_state=42, stratify=y[train_idx])
 train_mask = torch.zeros(n_cells, dtype=torch.bool)
 train_mask[train_idx] = True
+val_mask = torch.zeros(n_cells, dtype=torch.bool)
+val_mask[val_idx] = True
 test_mask = torch.zeros(n_cells, dtype=torch.bool)
 test_mask[test_idx] = True
 
@@ -169,11 +187,11 @@ for epoch in range(1, EPOCHS + 1):
     model.eval()
     with torch.no_grad():
         out = model(data.x, data.edge_index, data.edge_attr)
-        test_loss = criterion(out[test_mask], data.y[test_mask]).item()
+        test_loss = criterion(out[val_mask], data.y[val_mask]).item()  # validation loss (name kept)
         test_losses.append(test_loss)
         
-        pred = out[test_mask].argmax(dim=-1)
-        acc = (pred == data.y[test_mask]).float().mean().item()
+        pred = out[val_mask].argmax(dim=-1)
+        acc = (pred == data.y[val_mask]).float().mean().item()  # validation accuracy
         test_accs.append(acc)
         
         if acc > best_acc:
@@ -213,6 +231,8 @@ metrics = {
     "confusion_matrix": cm.tolist(),
     "per_class": report,
     "best_val_acc": best_acc,
+    "selection": "epoch chosen on a validation split carved from train; test scored once",
+    "split_mode": SPLIT_MODE,
     "final_test_acc": float(acc),
     "n_params": sum(p.numel() for p in model.parameters()),
     "n_cells": int(n_cells),
