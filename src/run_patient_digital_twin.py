@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# NOTE (2026-10-19 audit): historical legacy script; not part of the current RANO project. If the inverse output is missing or invalid, it silently falls back to fixed rho=.015, D=.01 (and population defaults), so a 'patient-specific' twin can be generic. Paths are cwd-relative, so cwd is anchored at the project root. No freeze gate.
 """
 End-to-End Patient Digital Twin Pipeline
 =========================================
@@ -18,6 +19,9 @@ import numpy as np
 import nibabel as nib
 from pathlib import Path
 
+
+import os as _os
+_os.chdir(_os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))))  # cwd-relative output/ paths below; anchor cwd at the project root
 
 def find_tumor_masks(patient_dir: str):
     """Find tumor mask NIfTI files in patient directory (MU-Glioma-Post or BraTS format)."""

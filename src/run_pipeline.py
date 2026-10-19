@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# NOTE (2026-10-19 audit): historical legacy script; not part of the current RANO project. Orchestrator for the older phase scripts, which include synthetic/Bayesian-model assumptions; no seed or freeze gate. Relative src/ and output/ paths, so cwd is anchored at the project root.
 """
 Master Pipeline: Phase 1 (Spatial Genomics) -> Phase 2 (Poroelastic Mechanics)
 
@@ -18,6 +19,9 @@ import numpy as np
 # --------------------------------------------------------------------------- #
 # Phase Execution Utilities
 # --------------------------------------------------------------------------- #
+import os as _os
+_os.chdir(_os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))))  # cwd-relative output/ paths below; anchor cwd at the project root
+
 def load_module(module_path: Path) -> Any:
     """Dynamically load a module from file path."""
     spec = importlib.util.spec_from_file_location(module_path.stem, module_path)

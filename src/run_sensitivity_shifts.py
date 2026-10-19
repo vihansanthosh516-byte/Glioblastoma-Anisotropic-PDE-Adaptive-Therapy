@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# NOTE (2026-10-19 audit): historical legacy script; not part of the current RANO project. Post-freeze exploratory analysis of the already-used H-2 test outputs (spent set), not a fresh evaluation. The +2/+5 voxel shifts and >30 mm distance threshold are analysis choices; no seed.
 """Exploratory sensitivity on H-2 locked test outputs (does NOT touch frozen model).
 
 Reads frozen test logits + recurrence via the locked loader (freeze already in

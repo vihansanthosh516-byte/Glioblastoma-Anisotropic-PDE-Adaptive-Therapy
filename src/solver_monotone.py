@@ -1,3 +1,4 @@
+# NOTE (2026-10-19 audit): historical legacy script; not part of the current RANO project. Needs torch. The stated range-preservation condition (dt*rho and dt*kill <= .05, with clamp) is a numerical-scheme condition, not empirical validation.
 """Monotone (positivity-preserving) full-tensor Fisher-Kolmogorov solver (GRAND_PLAN #15; weak point W21).
 
 Why: run_improved_aniso.TensorFK uses central differences for the off-diagonal tensor terms. That stencil can make u

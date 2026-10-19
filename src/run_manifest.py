@@ -1,3 +1,4 @@
+# NOTE (2026-10-19 audit): historical legacy script; not part of the current RANO project. The writer records script, seed, config, environment and git metadata; this module alone cannot show that every primary script calls it.
 """Run manifest writer (analysis_plan_v1.md A1.17; masterplan §104, §106).
 
 Every primary result calls write_run_manifest() and saves the sidecar next to its output JSON.

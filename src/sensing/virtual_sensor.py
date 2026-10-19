@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# NOTE (2026-10-19 audit): historical legacy script; not part of the current RANO project. Virtual sensors use simulated/assumed modality parameters and stochastic noise; no data are measured here.
 """
 Phase 11: Virtual Biosensor Suite
 ==================================

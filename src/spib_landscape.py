@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# NOTE (2026-10-19 audit): historical legacy script; not part of the current RANO project. Reads/writes cwd-relative output/ paths, so cwd is anchored at the project root. The landscape is built from chosen coordinates and a KDE; it is a diagnostic, not a measured energy landscape.
 """
 Phase 3: Construct energy landscape in SPIB 3D space.
 """
@@ -9,6 +10,9 @@ from scipy.stats import gaussian_kde
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
+
+import os as _os
+_os.chdir(_os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))))  # cwd-relative output/ paths below; anchor cwd at the project root
 
 def construct_landscape(rc, bandwidth=0.3):
     """

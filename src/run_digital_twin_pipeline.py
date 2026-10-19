@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# NOTE (2026-10-19 audit): historical legacy script; not part of the current RANO project. Heavy: spawns per-patient inverse fitting, simulation and dashboard subprocesses; do not run in place. Clinical events are extracted, but the simulation uses fixed kill coefficients (alpha_drug .08, alpha_rt .05, beta_rt .03); no seed or freeze gate. Paths are cwd-relative, so cwd is anchored at the project root.
 """
 Integrated Clinical-Driven Digital Twin Pipeline
 =================================================
@@ -31,6 +32,9 @@ except ImportError:
 CLINICAL_EXCEL = "data/tcia/MU-Glioma-Post_ClinicalData-July2025.xlsx"
 SHEET_NAME = "MU Glioma Post"
 
+
+import os as _os
+_os.chdir(_os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))))  # cwd-relative output/ paths below; anchor cwd at the project root
 
 def load_clinical_data(patient_id: str) -> Optional[Dict]:
     """Load and parse clinical data for a specific patient."""
