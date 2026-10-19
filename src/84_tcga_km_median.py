@@ -1,3 +1,4 @@
+# NOTE (2026-10-19 audit): historical legacy script; not part of the current RANO project. Distinguishes the median among observed deaths from the Kaplan-Meier median with censoring; output values were not recalculated in the audit.
 """Script 84: Kaplan-Meier median overall survival for the TCGA-GBM cohort used in scripts 36-37.
 
 Script 36 reports np.median(time[event == 1]), the median among deaths only. That is not a

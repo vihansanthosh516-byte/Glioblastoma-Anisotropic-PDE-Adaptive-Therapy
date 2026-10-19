@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# NOTE (2026-10-19 audit): historical legacy script; not part of the current RANO project. The 'pre-specified' design and the cited script 77/74 numbers are author statements; the code cannot show the historical order. Simulation comparison only.
 """
 Script 78: Horizon-crossover ablation. At what horizon / diffusivity does DTI
 orientation start to matter? (Track B negative 2, follow-up to script 77.)

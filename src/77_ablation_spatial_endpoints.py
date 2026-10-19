@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# NOTE (2026-10-19 audit): historical legacy script; not part of the current RANO project. The header cites prior findings (diffusion effect 0.029%, mask Dice .994, diffusion length .46-1.18 mm) that are assertions, not recomputed here; check the saved JSON before quoting them.
 """
 Script 77: Is the script-60 "DTI/mechanics/diffusion < 0.01%" ablation a null
 finding, or a property of the endpoint?

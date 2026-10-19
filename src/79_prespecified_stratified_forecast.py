@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# NOTE (2026-10-19 audit): historical legacy script; not part of the current RANO project. Pre-forecast strata are separated from outcome-selected descriptive groups, but some secondary tests use the observed scan-2 volume and are labelled shape tests, not forecasts. Fold RNG seed 51.
 """
 Script 79: Pre-specified stratification forecast (Track B negative 1 follow-up).
 ================================================================================

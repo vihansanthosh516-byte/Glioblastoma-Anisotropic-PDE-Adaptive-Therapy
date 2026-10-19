@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# NOTE (2026-10-19 audit): historical legacy script; not part of the current RANO project. The 24 cell-by-arm tests are uncorrected corner analyses, run on real_test (spent for follow-up). The cited papers/DOIs for reversible drug-induced resistance were not independently verified; the model is an assumption.
 """
 Script 83: Drug-induced, reversible (plastic) resistance and adaptive therapy
 (Track C negative 3, model-class follow-up).

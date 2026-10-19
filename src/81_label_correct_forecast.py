@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# NOTE (2026-10-19 audit): historical legacy script; not part of the current RANO project. The header's volume-composition counts for 152 pairs and 130 core pairs are not recomputed here. Its forecast_labels_1_3 outputs were absent when audited (forecast_labels_core exists).
 """
 Script 81: Forecast scored on the correct tumour target (Track B negative 1, measurement validity).
 =================================================================================================

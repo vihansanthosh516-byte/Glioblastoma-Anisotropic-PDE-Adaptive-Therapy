@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# NOTE (2026-10-19 audit): historical legacy script; not part of the current RANO project. Needs lifelines. This script evaluates the treatment simulation on real_test, the only real-patient test set, so that set is spent for exploratory follow-up: label results as exploratory, not independent confirmation. MGMT motivates the resistance strata, but the resistant fraction and treatment simulation are model assumptions, not causal resistance.
 """
 Script 82: MGMT-calibrated resistance analysis (Track C negative 3, real-data follow-up).
 =========================================================================================

@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# NOTE (2026-10-19 audit): historical legacy script; not part of the current RANO project. Needs SALib (not in Requirements.txt). Sobol N=128, seed 42; the parameter ranges are declared synthetic settings, and the replaced S1(rho)=.998 comparison is not independently re-derived here.
 """
 Script 80: PDE-based Sobol sensitivity at legacy vs Swanson-type diffusivities.
 ==============================================================================
