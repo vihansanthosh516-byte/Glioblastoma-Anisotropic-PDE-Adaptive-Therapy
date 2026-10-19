@@ -2,6 +2,8 @@
 
 **How these reviews were run (disclosure).** Delegation is switched off for this session, so a separate reviewer agent could not be spawned (the delegation tool refused). Both rounds were run as single-shot model calls (single-shot model calls) using the exact system prompt stored in the PLAN_REVIEWER_BIOSTAT profile. This is the profile's prompt on the same underlying model, not a separate agent with its own tools. If you turn on Delegation in the session options, I can re-run the review as a real child agent with the profile.
 
+Audit correction (2026-10-19): this is a dated background record. The disclosure above and the verdicts ("approve_with_changes", "may_start: True") are author-reported; no profile prompt or call transcript is retained. Round 1 findings F2-F7 and Round 2 findings F8-F10 were resolved in `FIX_PLAN_v2_1_approved.md` (e.g. the C-B cutoff moved from 80% to <50%, a convention, not a clinical standard); do not treat them as open defects. F1 stays accurate: the 25% result is simulated cohort64 (n=20, blind PPO, `probe_paced_policies/evaluate.json`) and the 20/21 result is `real_test` (n=21) with assumed kill rates.
+
 ## Round 1 (plan v1)
 Verdict: **approve_with_changes**
 

@@ -4,6 +4,8 @@ Read-only audit of `README_STATUS.md` (written 2026-10-17) against `vault/PAPER_
 
 ## Result
 
+Audit correction (2026-10-19): dated background record. The tally below is the auditor's count; the file lists only selected rows, not all 35, so the tally is not reproducible from this file. Several requested README fixes were applied afterwards (ledger 2ba citation, `vault/failed_hypotheses.md` path, C2 +0.030, cohort64 25% vs real_test 20/21 split). The script counts (150 numbered, 207 `.py`) are of that snapshot; the 2026-10-18 inventory is 154 numbered and 202 `.py`. The 2.0 GB and 4.87 GB sizes were not remeasured; the 35th-row external dataset eligibility remains unchecked.
+
 35 claims checked: **25 match**, 2 minor, 7 need a fix or a re-check, 1 could not be checked from the repo.
 
 Every headline number in section 2 (positive results) matches its file, except that the adaptive-therapy count is cited to the wrong file. The problems are concentrated in section 3 (negative results).
