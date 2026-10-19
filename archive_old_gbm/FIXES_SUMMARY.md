@@ -52,9 +52,9 @@ inventory in `../CLAUDE.md`.
 
 Seven source files set `OMP_NUM_THREADS` to `2` (04–08 and 10–11); scripts 01–02
 set it to `22`. Potential underutilization is an inference, not a measured effect.
-`docs/VALIDATION_SUMMARY.md` in this archive reports four historical P0 gaps
+Before its 2026-10-19 correction, `docs/VALIDATION_SUMMARY.md` reported four historical P0 gaps
 (wave speed 31.6%, necrotic fraction 6.7%, TI_max=1.0, healthy-zone C=1.0).
-Those rows describe that archived report, not current calibration results.
+Those old rows are superseded in that report and are not current calibration results.
 
 Current goal and commands: `../START_HERE.md` and `../CLAUDE.md`. No pipeline,
 installation or scientific analysis was run to produce these corrections.
