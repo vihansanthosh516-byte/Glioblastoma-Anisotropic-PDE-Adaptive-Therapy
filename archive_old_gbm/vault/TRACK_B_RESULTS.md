@@ -1,9 +1,9 @@
 > **STATUS 2026-10-18: HISTORICAL.** Written before the pivot to the probabilistic-RANO project. Goals, plans, and words like "first", "novel", "revolutionary", "validated" in this file are NOT current and NOT supported. Numbers are records of past runs; check `vault/PAPER_FINDINGS_LEDGER.md` before you quote one. Current state: `START_HERE.md`.
 
-# Track B — Verified Results
+# Track B — Historical model results
 
-**Status:** Verified 2026-09-24
-**Scope:** Anisotropic PDE cohort + adaptive therapy pipeline on real MU-Glioma-Post data
+**Status:** Historical snapshot2026-09-24, corrected2026-10-19; not blanket verification
+**Scope:** Selected fitted MU-Glioma inputs drive numerical growth and assumed-treatment simulations, not observed treatment outcomes or clinical validation.
 
 ## Overview
 
@@ -14,16 +14,20 @@ MPC optimal control, and a 3D volumetric extension.
 
 ## Data & Cohort Selection
 
+Counts are endpoint-specific: data/manifests/consort_mu.json gives source203; output/mu_glioma_params_real.csv has154 data rows; adaptive_cohort_summary.json:cohort_filter gives103/61/42; dual_drug_comparison.json:parameters.cohort_patients identifies the eight selected cases. These are not one analytic cohort.
+
 - **203 patients** in the raw MU-Glioma-Post directory
 - **154 patients** with fitted growth parameters (R² > 0) via `src/72_estimate_params_real.py`
 - **103 patients** with usable tumor masks and longitudinal pairs (in `output/spatial_recurrence_profiles.npz`)
 - **61 patients** with positive fitted growth rate (rho > 0) — selected for adaptive therapy
-- **42 patients** with negative fitted rho — excluded (treatment responders; simulation assumes growing tumor)
+- **42 patients** with negative fitted rho — excluded (negative fitted growth, not established treatment response; model assumes growing tumor)
 - **8 patients** selected for MPC + 3D extension sims (spread across rho range, R² > 0.7)
 
 **Source:** `output/adaptive_cohort_summary.json`, `output/mu_glioma_params_real.csv`
 
 ## Script 43 — Stromal Feedback
+
+Historical mass/horizon/field/commit assertions below require exact saved scalar keys and execution/input provenance before being called verified. Outputs are simulations; no measured spatial-expression/MRI linkage is established. A commit hash proves a revision exists, not that it generated every artifact.
 
 - **103 patients** simulated over 500 days (dt=0.1, 5000 steps)
 - **Per-patient rho** loaded from `mu_glioma_params_real.csv` via `mu_glioma_loader`
@@ -36,24 +40,26 @@ MPC optimal control, and a 3D volumetric extension.
 
 - **61-patient** positive-rho cohort, 500-day simulation
 - **Adaptive dosing uses 32.36%** of the MTD dose (mean across cohort)
-- **Resistant fraction (median):** 99.2% under MTD vs 30.6% under adaptive
+- **Modeled resistant fraction medians:** about0.99 MTD vs0.31 adaptive at E_MAX1000 (`output/emax_sweep_summary.json`); exact old99.2/30.6 are vault-only, not freshly verified.
 - **54/61 patients:** MTD selects more resistance than adaptive
 - **0/61 patients:** adaptive selects more resistance than MTD
-- **39/61 patients:** TTP-censored in both arms (progression-equivalent)
+- **39/61 modeled cases:** both TTPs censored at500days; this does not establish equivalent progression times.
 - **10/61 patients:** adaptive progressed earlier than MTD
-- **Threshold sensitivity:** `THRESHOLD_OFF=0.50` test increases drug use to 43% and suppresses holidays (5.8 mean vs 48.9 at `THRESHOLD_OFF=0.80`)
+- **Threshold sensitivity:** old5.8-vs48.9 holiday assertion lacks a linked exact .50-run key; later eight-cell report/CSV in vault/audit_2026-10-18/P4_threshold_sweep_* and ledger2bn shows ON/OFF-dependent progression pattern. No retuning authorized.
 - **Source:** `output/adaptive_cohort_summary.json`, `output/adaptive_geometry_metrics.json`
 - **Commit:** `17bfade`
+
+Mean final mass MTD306.396 vs adaptive315.859; mean per-case adaptive/MTD mass ratio2.3913 (`adaptive_cohort_summary.json`), not the ratio of those cohort means. Lower modeled resistance does not establish equal tumor control.
 
 ## Script 46 — Sobol Sensitivity Analysis
 
 - **Correction (2026-10-03):** the original result below, rho_s S1 = 0.998, came from a reduced ODE (no PDE solve) with an arbitrary coupling (`k_diff` = 15) and D_white held within ±20% of 0.013 mm²/day, so rho dominated by construction. It is an artifact and should not be cited as a property of the PDE model.
-- **Sobol (real PDE, script 80):** α_sens dominates volume variance (S1 = 0.43), followed by ρ_s (S1 = 0.20). D_w contributes negligibly to volume (S1 = 0.000) at both the old and the Swanson-range diffusivity. Total-order indices sum above 1 (interactions). N = 128 base samples, wide CIs. Source: `output/sobol_pde_swanson_vs_legacy.json`, detail in [[Script-60-66-Swanson-D]].
+- **Sobol (real PDE, script 80):** alpha_sens has the largest point-estimate S1, with overlapping uncertainty (S1 = 0.43), followed by ρ_s (S1 = 0.20). D_w contributes negligibly to volume (S1 = 0.000) at both the old and the Swanson-range diffusivity. Total-order indices sum above 1 (interactions). N = 128 base samples, wide CIs. Source: `output/sobol_pde_swanson_vs_legacy.json`, detail in [[Script-60-66-Swanson-D]].
 - *Original (superseded) reduced-ODE result:* 154-patient cohort, 5-parameter Sobol, 6000 ODE evaluations (500 Saltelli samples); rho_s S1 = 0.998 (95% CI ± 0.086); other parameters ST < 0.015. Source: `output/sobol_sensitivity_results.json`
 
 ## Script 47 — MPC Optimal Control
 
-- **8 real patients**, rho range 0.0001 to 0.11 /day
+- **Eight selected fitted-input simulations**, rho range 0.0001 to 0.11 /day
 - **Dual-agent MPC** maintains 360d TTP for 6/8 patients
 - **Single-agent fails at high rho:** PatientID_0188 TTP 25d (vs MTD 40d)
 - **Resistant fraction ≤ 0.05** for 6/8 under dual-agent (vs 1.00 under MTD)
@@ -64,41 +70,43 @@ MPC optimal control, and a 3D volumetric extension.
 ## Script 48 — 3D Volumetric Extension
 
 - **8 patients** (same cohort as script 47), 50³ grid, 180 days
-- **MTD eradicates tumor** (0 mm³) for 5/8 patients at low rho
+- **MTD thresholded simulated volume reaches zero**, not biological eradication for 5/8 patients at low rho
 - **Adaptive holds** 8,339 – 41,503 mm³ residual with **10.9–98.9% dose sparing** (corrected 2026-10-04 from `output/3d_extension_summary.json`; sparing is 98.9% for rho <= 0.0039 and falls with rho)
 - **Diffusivity caveat:** script 48 uses D_parallel = 0.013 and D_perp = 0.0013 mm²/d, about 10x below the Swanson-type values (see [[Script-78-Horizon-Crossover]]). The 3D numbers inherit this.
 - **Literature-D re-run (2026-10-04):** `GBM_D_REGIME=swanson`, `output/3d_extension_summary_swanson.json`. Sparing: 0.989 for the four low-rho patients; 0.837, 0.887, 0.346, 0.051 for the four high-rho patients. See [[Script-48-3D-Extension]].
-- **Dose sparing collapses** as rho increases:
+- **Legacy-only selected-case sparing** by rho (alternate regime differs; not a general patient rule):
   - rho < 0.01: 89–99% sparing
   - rho = 0.012: 87.8%
   - rho = 0.037: 67.8%
   - rho = 0.11: 10.9%
-- **Aggregate:** MTD 6217 ± 11304 mm³, Adaptive 21318 ± 13227 mm³, sparing 81.4% ± 30.4%
+- **Legacy aggregate (n=8,mean±SD):** MTD 6217 ± 11304 mm³, Adaptive 21318 ± 13227 mm³, sparing 81.4% ± 30.4%
 - **Source:** `output/3d_extension_summary.json`
 - **Commit:** `7314f7e`
 
 ## Synthesis — Three Track B Findings
 
-### 1. Adaptive therapy suppresses resistance selection
+### 1. Lower modeled resistance under selected assumptions
 
 - **54/61 patients** under MTD select more resistance than under adaptive
 - **0/61 patients** show the reverse
-- Mechanism: preserving the drug-sensitive clone through dose holidays, competitive suppression of the resistant clone
+- Model explanation: assumed clone competition and drug holidays; no measured biological mechanism or treatment benefit is established. Mean adaptive final mass is higher.
 
 ### 2. Kill-rate scale and proliferation drive volume variance (corrected 2026-10-03)
 
-- Real-PDE Sobol (script 80): α_sens S1 = 0.43, ρ_s S1 = 0.20, D_w S1 = 0.000 for day-90 volume under Stupp. The earlier claim that ρ_s dominates (S1 = 0.998) came from a reduced ODE with an arbitrary coupling and was an artifact.
-- Interpretation: day-90 volume is set mainly by drug kill and proliferation, not by diffusivity; DTI affects the spatial shape of the tumour (script 78/80), not total volume.
+- Real-PDE Sobol (script 80): α_sens S1 = 0.43, ρ_s S1 = 0.20, D_w S1≈0.0000062 legacy (rounded0.000, not exactlyzero) for day-90 volume under Stupp. The earlier claim that ρ_s dominates (S1 = 0.998) came from a reduced ODE with an arbitrary coupling and was an artifact.
+- Interpretation: sensitivity is conditional on tested day90 schedules/parameter ranges. Small D volume sensitivity and simulated shape differences do not establish general biological irrelevance.
 
 ### 3. Dose sparing is inversely correlated with rho
 
-- **Pearson r = -0.84** between rho and drug reduction
-- Slow-growing tumors (rho < 0.002, n = 16): 57–90% dose sparing (corrected 2026-10-04 from `adaptive_geometry_metrics.json`; earlier "80–99%" did not match)
+- Verified Spearman rho=-0.8645 (`output/rho_threshold_check.json:spearman_rho_vs_dose_sparing`); old Pearson-.84 lacks an exact verified key.
+- Slow-growing tumors (rho < 0.002, n = 16): historical57–90% range unverified without exact rows/statistic; rho_threshold_check.json instead gives bin mean0.850
 - Fast-growing tumors (rho > 0.03): < 30% dose sparing
 - **Threshold test (script 85, `output/rho_threshold_check.json`):** all 10 patients with rho > 0.02 progress earlier under adaptive (10/10); none of the 51 with rho <= 0.02 does (0/51). The TTP penalty switches on between rho 0.0191 and 0.0277. Dose sparing falls smoothly instead (mean 0.85 for rho < 0.002; 0.84 for 0.002-0.01; 0.52 for 0.01-0.02; 0.18 above 0.03; Spearman -0.86). So 0.02 is a threshold for the TTP harm, not an inflection in sparing. Only 10 patients lie above it, and the cutoff was found after looking at the data.
-- Script 47 caveat: dual-agent drug exposure (AUC 944-1280) is 2.5-3.3x the MTD value (385) in `output/dual_drug_comparison.json`. Dual-agent rescues TTP and resistance but does **not** spare drug.
+- Script 47 caveat: dual-agent drug exposure (AUC 944-1280) is 2.5-3.3x the MTD value (385) in `output/dual_drug_comparison.json`. Added assumed drug changes TTP/resistance but does not spare drug; full-dose same-second-drug MTD has higher capped TTP than dual-adaptive.
 
 ## Limitations
+
+Every treatment endpoint is an assumed-parameter simulation. Alternate-regime3D values are separate from legacy81.4%±30.4%; high-rho cases do not all decrease (one rises), and synthetic tracts cannot establish patient-specific DTI benefit.
 
 - Scripts 47/48 use 8 patients (not full 61) for computational cost
 - PatientID_0123 (rho=0.11, V0=3 mm³) fails on all arms — model limit
@@ -113,7 +121,7 @@ MPC optimal control, and a 3D volumetric extension.
 | `output/stromal_feedback_metrics.json` | 43 | Per-patient tumor mass, kinetics |
 | `output/adaptive_cohort_summary.json` | 44 | Cohort-level adaptive therapy metrics |
 | `output/adaptive_geometry_metrics.json` | 44 | Per-patient adaptive metrics (61 records) |
-| `output/sobol_sensitivity_results.json` | 46 | Sobol indices for 5 parameters |
+| `output/sobol_sensitivity_results.json` | 46 | Superseded reduced-ODE artifact; current PDE result is output/sobol_pde_swanson_vs_legacy.json, script80 |
 | `output/dual_drug_comparison.json` | 47 | Per-patient MPC 3-arm results (8 records) |
 | `output/3d_extension_summary.json` | 48 | Per-patient 3D metrics (8 records) |
 
@@ -128,6 +136,6 @@ MPC optimal control, and a 3D volumetric extension.
 - [[Repo]] — master map
 
 ## New checks (2026-10-04)
-- Script 89: MTD plus the same second drug beats dual-adaptive on TTP (358.9 vs 305.6 d). The script 47 rescue is the second drug. [[Script-47-Optimal-Control]]
+- Script 89: MTD plus the same assumed second drug has higher horizon-capped mean simulated TTP358.9 vs305.6d and higher AUC1152.5 vs1015.5 (output/dual_mtd_baseline.json,ledger2i). The script 47 rescue is the second drug. [[Script-47-Optimal-Control]]
 - Script 91 (LUMIERE, volumes only): the growth-only forecast loses to no-change, as in MU-Glioma. [[PAPER_FINDINGS_LEDGER]] 2l
 - Script 87: rho > 0.02 threshold, permutation p 5e-5, leave-one-out 98.4%; still post hoc, n=10.

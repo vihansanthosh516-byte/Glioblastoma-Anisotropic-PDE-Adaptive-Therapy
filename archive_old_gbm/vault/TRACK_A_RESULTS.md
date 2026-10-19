@@ -1,13 +1,15 @@
 > **STATUS 2026-10-18: HISTORICAL.** Written before the pivot to the probabilistic-RANO project. Goals, plans, and words like "first", "novel", "revolutionary", "validated" in this file are NOT current and NOT supported. Numbers are records of past runs; check `vault/PAPER_FINDINGS_LEDGER.md` before you quote one. Current state: `START_HERE.md`.
 
-# Track A Results — Verified Outputs
+# Track A — Historical output notes and limits
 
-Scratchpad for the final README. Each entry is backed by a file on disk.
+Historical scratchpad, corrected2026-10-19. Artifact presence and numerical checks do not certify complete reproducibility or clinical validation. Missing sources are identified next to their claims.
 Last updated: 2026-09-21
 
 ---
 
 ## Scripts 01–09 — Data Preparation & Baselines
+
+Root sources checked: 01_class_counts.tsv (80828/47547/11980), nn_X.npy header(15000,2500), nn_metrics.json and benchmark_comparison.tsv. Scores are exploratory random-cell split metrics, not independent patient performance; exact seed/run lineage needs the manifest.
 
 | Script | Purpose | Output | Status |
 |---|---|---|---|
@@ -26,6 +28,7 @@ Last updated: 2026-09-21
 ## Scripts 10–16 — Latent Representation & C-GAT
 
 ### Script 10 — cVAE
+Historical training count/epochs/loss claims below need exact saved training metadata; checkpoint presence alone does not verify them. Read-only array headers confirm latent shapes(15000,32) and(140355,32); class-count TSV does not independently verify latent-row label alignment.
 - Latent dim: 32, trained on 12,000 cells, 60 epochs
 - Final MSE: 0.719, KL: 0.257, Contrastive: 4.888
 - Output: `output/cgat/cvae_model.pt` (5.53 MB), `output/cgat/cvae_latent.npy`
@@ -36,7 +39,7 @@ Last updated: 2026-09-21
 
 ### Script 12 — GAT graph
 - kNN graph (k=15) on 15k subsample
-- 15,000 nodes, 225,000 edges, 5 edge attributes
+- Historical expected graph counts15000/225000/five attributes are unverified: named edge_index,edge_attr and meta artifacts are absent.
 - Output: `output/cgat/gat_edge_index.npy`, `gat_edge_attr.npy`, `gat_meta.json`
 
 ### Script 13 — C-GAT
@@ -69,29 +72,32 @@ Last updated: 2026-09-21
 | 6 | Hybrid (script 08) | 0.5120 | 0.4939 | 0.6907 |
 | 7 | Transformer (script 07) | 0.4960 | 0.4840 | 0.6884 |
 
-> **Warning (2026-10-04):** this table uses a random cell-level split. A patient-ID lookup scores 82.8%, above C-GAT. Under patient-level folds LR, RF and scVI-LR score 60-66% (script 86). The leak-free C-GAT is script 88. See [[LIMITS_CURRENT]] L0.
+> **Warning (2026-10-04):** this table uses a random cell-level split. A patient-ID lookup scores 82.8%, above C-GAT. Under patient-level folds LR, RF and scVI-LR score 60-66% (script 86). Script88 gat_pca_clean is63.8% (SD13.3), within spread of cells-per-patient64.6% and PCA32+LR66.5%; donor/composition confounding remains. Other cVAE/no-label-edge variants retain feature leakage. See [[LIMITS_CURRENT]] L0.
 
-**Finding (on the random split only):** C-GAT (78.7%) outperforms scVI (73.0%) by 5.8 percentage points. Classical methods (LR, RF) reach 70–73%. Transformer-based methods underperform (49–51%), suggesting attention alone is insufficient without graph structure.
+**Finding (on the random split only):** C-GAT (78.7%) outperforms scVI (73.0%) by 5.8 percentage points. Classical methods (LR, RF) reach 70–73%. Transformer-based methods underperform (49–51%), no controlled independent-patient comparison establishes graph benefit or biological explanation.
 
 ---
 
 ## Scripts 17–18 — Gradient & CSGT
 
 ### Script 17 — Gradient diagnostic
+Numeric entropy/proportion summaries below lack a machine-readable table/key. They remain unverified descriptive assertions; a PNG is not independent biological evidence.
 - Entropy by zone: Core 1.2937, Periphery 1.2984, Healthy 1.1720
-- Periphery has highest entropy (transition zone confirmed)
+- Periphery has highest entropy (exploratory, not a confirmed biological transition)
 - NMF proportions: Core dominated by OPC (56.4%), Healthy by MES (44.0%)
 - Output: `output/gradient_failure_analysis.png`
 
-### Script 18 — CSGT proof
+### Script 18 — Exploratory CSGT score
 - Kruskal-Wallis H = 141.717, **p = 1.68 × 10⁻³¹** (corrected 2026-10-04 from `output/csgt_metrics.json`; earlier 141.4188 / 1.96e-31 did not match the file)
 - T-score: Healthy 0.587 → Periphery 0.649 → Core 0.647
-- Continuous transition confirmed (not discrete clusters)
+- Kruskal-Wallis detects group distribution differences, not continuity/order. Periphery mean exceeds Core slightly; no biological trajectory is proved.
 - Output: `output/csgt_mathematical_proof.png`, `output/csgt_metrics.json`, `output/csgt_transition_scores.npy`
 
 ---
 
-## Scripts 19–22 — Waddington Landscape & Saddle Proof
+## Scripts 19–22 — Modeled latent landscape
+
+Velocity/energy/drift/diffusion aggregate values need exact scalar summaries and calculation definitions; they are model-derived on an arbitrary latent scale. Those unlinked means/maxima are unverified, not biological measurements.
 
 ### Script 19 — Phenotypic velocity
 - 30-NN graph on 15k cells × 32D latent
@@ -107,9 +113,11 @@ Last updated: 2026-09-21
 - Diffusion trace: mean 5.98
 - Output: `output/drift_vectors.npy`, `diffusion_tensors.npy`
 
-### Script 22 — SPIB saddle point proof ✅ 5/5 PASS
+### Script 22 — Internal SPIB landscape checks
 
-**Method:** State Predictive Information Bottleneck (SPIB) on 3D reaction coordinate. Replaced the failed 32D cVAE Hessian analysis (which gave mixed-sign eigenvalues everywhere due to latent space noise and KDE over-smoothing at bandwidth=0.3).
+The recorded pass labels refer to internal numerical consistency on synthetic pseudo-trajectories. Core/Periphery merging does not establish three independently observed stable biological states. Failed-Hessian/oversmoothing rationale and training/frame settings need exact failure/run metadata before reuse.
+
+**Method:** SPIB numerical reaction coordinate. The old failed-Hessian/latent-noise/oversmoothing explanation is unverified without its failed-run artifact; it is not a measured cause.
 
 **Pipeline:**
 - Phase 1: 150,000 pseudo-trajectory frames from 15,000 cells via phenotypic velocity field (dt=0.2, n_steps=10)
@@ -120,29 +128,29 @@ Last updated: 2026-09-21
 **Result:**
 - **Saddle at E = 2.019**
 - **Mixed Hessian eigenvalues: +2 / −1** (index-1 saddle)
-- All three zone attractors classify as stable minima
+- Internal labels for attractor candidates do not establish three distinct observed minima.
 - Saddle energy > both attractor energies (0.008 and 0.016)
 
-**Biological interpretation:** SPIB converged to 2 metastable states — (Core+Periphery) merged, Healthy separate. Core and Periphery are kinetically indistinguishable at the chosen lag time; the transition state between the two basins is the true saddle.
+**Model interpretation:** Synthetic pseudo-trajectories were mapped to two merged computational states at the chosen lag. This is not observed biological kinetics or proof of a true patient transition saddle.
 
 **Outputs:**
 - `output/spib_traj_data.npy` (150k × 32)
 - `output/spib_traj_labels.npy`
 - `output/spib_rc_3d.npy` (15k × 3) — 3D SPIB reaction coordinate
 - `output/spib_landscape.npy`
-- `output/spib_saddle_point_metrics.json` — 5/5 validation
+- `output/spib_saddle_point_metrics.json` — reported internal numerical checks, not biological validation
 
 ---
 
-## Scripts 23–26 — Causal Network
+## Scripts 23–26 — Inferred network
 
 ### Script 23 — Transfer entropy
 - Runtime: 42,559 seconds (~11.8 hours)
 - 853/10,000 non-zero entries
-- Top causal links: APOD → PPP1R18, APOD → TNFRSF1B, S100B → GMFG, MT3 → TNFRSF1B
+- Top inferred links: APOD → PPP1R18, APOD → TNFRSF1B, S100B → GMFG, MT3 → TNFRSF1B
 - Output: `output/te_matrix.npy` (100×100), `output/te_gene_names.txt`
 
-### Script 24 — Causal GRN
+### Script 24 — Inferred GRN
 - 320 edges retained (95th percentile threshold)
 - Top master switches: **APOD (out-degree 46)**, S100B (42), MT3 (40)
 - Output: `output/causal_grn.graphml`, `output/master_switches.tsv`
@@ -153,7 +161,7 @@ Last updated: 2026-09-21
 
 ### Script 26 — GRN bootstrap validation
 - 50 resamples over 380 candidate edges
-- 37/380 edges significant (95% CI excludes 0)
+- Historical37/380 bootstrap survivors (ledger entry1). Exact bootstrap selection/resampling and scalar source must accompany inference; old TE runtime/nonzero and PID/pair/resample assertions remain unverified without their precise outputs.
 
 ---
 
@@ -163,8 +171,8 @@ Last updated: 2026-09-21
 
 - Grid: 512×512, 5 µm/pixel, 400 steps
 - Front velocity: "0.118–0.174 over 400 steps" is **not reproducible** from the current `output/aba_metrics.json` (150 steps; per-step front velocity 0.0013-0.0206). It likely comes from an older run. Do not cite. Cite the wave speed (26.6 µm/hr) instead.
-- **Wave speed: 26.6 µm/hr** ✅ in clinical range 10–50 (Harpold et al. 2007)
-- **Necrotic fraction: 38.1%** ✅ in clinical range 10–40
+- **Wave speed: 26.6 µm/hr** numerically in the stated comparator range under assumed rules; not patient validation 10–50 (Harpold et al. 2007)
+- **Necrotic fraction: 38.1%** numerically in the stated comparator range under assumed rules; not patient validation 10–40
 - Histological pattern: infiltrative
 
 **Necrotic core formation (oxygen-driven, Martinez-Gonzalez 2012)**
@@ -194,8 +202,8 @@ Last updated: 2026-09-21
 - Numerical wave speed: 3.6237 px/unit-time (radial), 3.6263 (mass), 3.6274 (axis)
 - Analytical prediction: 4.0000 px/unit-time
 - Error: 9.3–9.4%
-- Clinical velocity: **18.1 µm/hr** (within GBM range 10–50)
-- Method: finite-difference, RK4, Dirichlet BCs, 20,000 steps (t=20), 512×512 grid
+- Model-converted velocity: **18.1 µm/hr** (within GBM range 10–50)
+- Method: finite-difference, RK4, Dirichlet BCs, 20000 configured steps,20010 completed (`output/fk_metrics.json`), nominal t=20, 512×512 grid
 - Three independent detectors agree within 0.1%
 - Outputs: `output/fk_field_history.npy`, `fk_metrics.json`
 - Committed: 7bd7def
@@ -203,7 +211,7 @@ Last updated: 2026-09-21
 ### Script 29 — Integrated invasion simulator (CA+FK coupled)
 - Free-propagation velocity: **5.32 px/hr = 26.6 µm/hr** (measured hours 0–50)
 - FK analytical prediction: 5.66 px/hr = 28.3 µm/hr (D=10, r=0.8)
-- Error: 5.97% — coupled CA+FK reproduces the analytic FK wave speed
+- Relative error5.98%, free26.592883 vs analytic28.284271 um/hr (`output/invasion_summary.json`); selected coupled r=.8 differs from standalone r=.4.
 - Overall avg (boundary-limited, 150h): 2.34 px/hr = 11.7 µm/hr
 - Final state: 99.2% of healthy tissue invaded
 - Boundary stall documented: max front radius 359.2 (grid diagonal ≈ 362)
@@ -211,7 +219,7 @@ Last updated: 2026-09-21
 
 ### Combined invasion narrative
 
-Three independent models all produce a sustained traveling wave in the clinically observed GBM range (10–50 µm/hr):
+Three assumed simulations give different scale-converted velocities18.1–26.6 um/hr. They are not independent patient measurements or agreement not equivalent across model assumptions; boundary/rule assumptions differ:
 
 | Model | Script | Velocity | Type |
 |---|---|---|---|
@@ -219,13 +227,15 @@ Three independent models all produce a sustained traveling wave in the clinicall
 | FK-PDE | 28 | 18.1 µm/hr | Continuum, finite-difference |
 | Coupled CA+FK | 29 | 26.6 µm/hr | Hybrid |
 
-All three agree within numerical accuracy.
+All three agree not equivalent across model assumptions.
 
 ---
 
 ## Scripts 30–34 — Drug Screening
 
-### Script 30 — ABA Analysis & Clinical Correlation
+### Script 30 — Simulated ABA summaries
+
+Necrosis denominators differ: final_necrotic_fraction counts whole-grid cells, while clinical_correlation.necrotic_fraction counts tumor cells at step150. Oxygen/necrosis/histology rules are assumed; converted velocities are not clinical validation.
 - Wave speed: **26.59 µm/hr** ✅ in range (10–50)
 - Necrotic fraction: **38.1%** of tumour cells at step 150 ✅ in range (10–40) (`clinical_correlation.necrotic_fraction` = 0.3813 in `output/aba_analysis_results.json`). The same file also lists `final_necrotic_fraction` = 0.172 (a different denominator). The earlier "22.9%" is not in the file. Quote 38.1% and name the denominator.
 - Histological pattern: infiltrative
@@ -240,7 +250,7 @@ All three agree within numerical accuracy.
 ### Script 32 — Combinatorial Drug Screen
 - 21 dual KO pairs screened from top 7 genes
 - Top pairs by Bliss synergy: S100A11+S100A6 (C=0.0052, Bliss=-0.0021, Loewe=+0.0015), S100A6+MT-ATP6 (Bliss=-0.0027), MT-CO3+S100A11 (Bliss=-0.0061)
-- No pair showed positive Bliss synergy above noise level
+- No positive Bliss score appears in the output; no statistical above-noise claim without a noise model.
 - Outputs: `output/dual_ko_results.json`, `dual_ko_summary.tsv`
 
 ### Script 33 — Calibrated Therapeutic Index (fixed)
@@ -251,10 +261,10 @@ All three agree within numerical accuracy.
 
 | Gene | TI | Interpretation |
 |---|---|---|
-| MT-CO2 | **+4.82** | 32× tumor selectivity |
-| CCL3L1 | **+3.44** | 10× tumor selectivity |
-| MT-CO3 | **+3.27** | 9× tumor selectivity |
-| S100A8 | **+2.42** | 5× tumor selectivity |
+| MT-CO2 | **+4.82** | Floor-dependent model score, not32x measured selectivity |
+| CCL3L1 | **+3.44** | Floor-dependent model score |
+| MT-CO3 | **+3.27** | Floor-dependent model score |
+| S100A8 | **+2.42** | Floor-dependent model score |
 
 **Dual KOs:** range +0.44 to −0.98. No saturation. Best pair by TI is CCL3L1+S100A8 at TI = +0.44 (S100A11+S100A6 has TI = 0.00; it is the top pair by collapse score). Corrected 2026-10-04 from `output/dual_ko_ti.json`.
 
@@ -263,15 +273,15 @@ All three agree within numerical accuracy.
 ### Script 34 — Drug Gating Report
 
 - **Top single target: MT-CO2** (TI = +4.82)
-- **No dual combination meets clinical thresholds** (TI > 10, Tumor C > 0.05)
-- Conclusion: MT-CO2 is the strongest candidate target; combinations do not improve selectivity in this model
+- **No dual combination meets chosen model cutoffs** (TI > 10, Tumor C > 0.05)
+- MT-CO2 ranks highest in this calibrated in-silico score, not a candidate-target recommendation. Raw healthy zeros and the0.001 floor affect ranking; separate dose-response scores use other assumptions. No pharmacologic efficacy follows.
 - Outputs: `output/drug_gating_report.md`, `optimization_matrix.npy`, `optimization_matrix.png`, `optimization_matrix_genes.txt`
 
 ---
 
-## Scripts 35–41 — Clinical Validation 
+## Scripts 35–41 — Observational and modeled summaries
 
-## Scripts 35-37 — Real TCGA-GBM Clinical Validation
+## Scripts 35-37 — Observational TCGA-GBM survival analysis
 
 **Data:** 518 real TCGA-GBM patients from cBioPortal clinical dataset
 
@@ -298,13 +308,13 @@ All three agree within numerical accuracy.
 | Neural | 1.065 | 0.796–1.426 | 0.67 |
 | Proneural | 1.019 | 0.779–1.334 | 0.89 |
 
-**Interpretation:** Age is the dominant prognostic factor, HR ≈ 1.03/year, p = 8.88e-16. Matches published TCGA-GBM literature exactly. Gender and molecular subtype have no independent prognostic value in this cohort.
+**Interpretation:** Same-cohort age association HR≈1.031,p=8.88e-16 (`output/survival_stats_summary.json`); no independent pipeline/treatment validation. Sex/subtype null intervals do not prove no prognostic value. CGGA pooled HR1.009,Holm p=.082 attenuates the effect (ledger2k); detailed demographic/inferential claims require exact model keys.
 
 **Key files:**
-- `src/35_ivygap_clinical_ingest.py` (loads real TCGA data)
+- `src/35_ivygap_clinical_ingest.py` (can combine clinical inputs with mock expression; not measured IvyGAP spatial biology)
 - `src/36_survival_analysis.py` (univariate + multivariate Cox)
 - `src/37_clinical_validation_report.py` (aggregate report)
-- `output/clinical_validation_report.md` (final report)
+- `../output/clinical_validation_report.md` (moved historical report; root machine summary is output/survival_stats_summary.json)
 
 ## Scripts 38-41 — Real TCGA-GBM Expression & Clinical Gating
 
@@ -320,8 +330,8 @@ All three agree within numerical accuracy.
 ### Script 39 — Penalized Cox Survival
 - Elastic Net Cox regression (`lifelines`, penalizer=0.1, l1_ratio=0.5)
 - **C-index = 0.639** on 150 real patients
-- **Age at diagnosis: HR = 1.02/year, p = 0.01** (only significant predictor)
-- S100A8 (coef +0.043), CCL3L1 (+0.021), S100A11 (+0.004) show directional but non-significant hazard ratios
+- Age coefficient0.0186967 in penalized_survival_metrics.json; that file has no coefficient p-values/CIs, so p=.01/significance claim is withdrawn.
+- S100A8 (coef +0.043), CCL3L1 (+0.021), S100A11 (+0.004) are exploratory coefficient directions; significance cannot be assessed from this JSON alone
 - Gender and subtype dummies shrunk to zero by regularization
 - Outputs: `penalized_survival_metrics.json`, `penalized_coefficients.png`, `penalized_regularization_paths.png`, `penalized_survival_curves.png`
 
@@ -330,19 +340,19 @@ All three agree within numerical accuracy.
 - Real TCGA-GBM subtype survival:
   - Proneural: n=37, median OS 405 days
   - Classical: n=39, median OS 388 days
-  - Mesenchymal: n=48, median OS 338 days
+  - Mesenchymal: n=48, recorded descriptive median338.5 days
   - Neural: n=26, median OS 261 days
-- Invasion scores from penalized Cox weights correlate with clinical aggressiveness
+- No association test establishes correlation of modeled invasion scores with clinical aggressiveness.
 - Outputs: `subtype_recurrence_summary.json`, `subtype_invasion_scores.png`, `subtype_risk_profile.png`, `subtype_recurrence_risk.png`
 
-### Script 41 — Dose-Response & Clinical Gating
-- Monotherapy therapeutic indices (from real expression × Cox weights):
+### Script 41 — Assumed dose-response model gates
+- Monotherapy model selectivity scores (expression/Cox-derived inputs plus assumed dose-response constants; not measured therapy):
   - S100A6: TI = 5.44 (**caution:** its penalized-Cox weight is about -2e-7, i.e. zero. Do not call S100A6 prognostic.)
   - S100A11: TI = 5.24
   - S100A8: TI = 4.66
   - CCL3L1: TI = 3.72
 - 75 of 150 patients classified as high-risk (above median risk score)
-- All 4 target genes pass the therapeutic threshold (TI > 1)
+- Four scores exceed the chosen model cutoff1; not a clinical therapeutic threshold.
 - Outputs: `final_dose_response_matrix.csv`, `dose_response_report.json`, `dose_response_curves.png`, `clinical_gating_matrix.png`, `dual_therapy_isobolograms.png`
 
 
@@ -377,11 +387,13 @@ Three bugs corrected:
 `e76d26a`
 
 ### Key finding
-The inflammation signature (S100A8/S100A11) and CCL3L1 show directional adverse prognostic effects in real TCGA-GBM expression, and all four genes have therapeutic indices > 1. Age remains the dominant clinical predictor (p=0.01). This is a real-data clinical validation of the inflammation-targeting hypothesis.
+The inflammation signature (S100A8/S100A11) and CCL3L1 show directional adverse prognostic effects in real TCGA-GBM expression, and all four genes have floor-dependent model selectivity scores >1. Age coefficient is observational; the cited penalized JSON provides no p=.01 inference. No clinical validation of inflammation-targeted treatment follows; bulk-expression coefficients are observational and score gates are model-defined. S100A6 weight is near-zero (-2e-7); no gene-treatment benefit established.
 
 
 
 ## External checks (2026-10-04)
 - **Patient-level CV (script 86):** `output/patient_level_cv.json`. 21 patients; the Healthy class has 3.
 - **CGGA survival check (script 90):** `output/cgga_validation.json`. Age HR 1.009 pooled (TCGA 1.031); sex and MGMT null. See [[PAPER_FINDINGS_LEDGER]] 2k.
-- **Track A does not feed Track B.** The inflammation score is 1.0 for all 61 patients.
+- **No measured Track A-to-B link was tested.** The score1.0 is a fallback default with no overlapping IDs, not an observed biological null (ledger2ap/2m).
+
+Further evidence limits (2026-10-19): raw expression-matrix dimensions and exact merge lineage need the input manifest; n150/C-index0.638543 are read from penalized_survival_metrics.json, not independent validation. In-silico KO/Bliss values are network-collapse scores, not drug responses; no above-noise assertion is made without a noise definition. Script43 stromal results use assumed evolution and likely synthetic/defaulted zone inputs, not spatial-expression/MRI clinical linkage. Figures/checkpoint/file size assertions do not replace execution logs. Current goal: ../../START_HERE.md.
