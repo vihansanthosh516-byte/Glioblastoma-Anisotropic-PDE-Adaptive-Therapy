@@ -5,6 +5,9 @@ You know nothing about this project. Rate it honestly. I want hard feedback, not
 ## What it is
 A single-author science-fair project (Greater Austin regional fair, February 2027) in computational biology of glioblastoma. Question: RANO 2.0 calls tumour progression at a volume rise of 40% or more (partial response at a fall of 65% or more; progression is judged against the nadir; the 0.5 cm3 floor is our own rule, not part of RANO 2.0). NOTE: Result 1 compares CONSECUTIVE scans, not the nadir, so it is not the RANO rule itself. Volumes now come from automated segmentation. Are those lines above the measurement noise, and what does noise do to trial endpoints (progression-free survival, PFS)? All work is retrospective analysis of public data or simulation. Nothing was tested on live patients. No paper yet.
 
+## Scope and statistics
+Only the VOLUMETRIC component of RANO 2.0 is modelled (not new lesions, steroids, clinical status or human approval of segmentations). The two-scan confirmation rule is our simplification, not the RANO 2.0 algorithm. Confidence intervals for the real-data results are patient-cluster bootstrap (10,000 draws), because pairs from one patient are not independent. The four A19 predictions are four readings of ONE simulator, not four independent confirmations. The A19 change-SD rests on an ASSUMED conversion from a published repeatability coefficient (the paper gives no formula or scale); Amendment 21 audits it.
+
 ## Method rules
 Each test is written into `analysis_plan_v1.md` and committed before the code runs; the code is committed before the run; each runs once; no re-runs with other settings.
 

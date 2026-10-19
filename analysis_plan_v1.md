@@ -606,3 +606,29 @@ A single self-contained HTML file built by `src/144_rano_timeline_viewer.py` fro
 
 ### A20.4 Not declared
 No performance claim. No claim that bands equal true uncertainty for any patient. The bands show the A15 bracket, whose lower end is degenerate for larger tumours; the viewer says so in a note. No change of rules after the build.
+
+## Amendment 21 (2026-10-18): Audit of the A19 conversion from published repeatability to change-SD. SIMULATION. Written before the script exists or runs. A19 stands as run; this adds, never replaces.
+
+### A21.1 Why
+The anchor paper (Abu Khalaf 2021, PMC8191681) gives enhancing-tumour repeatability coefficients but no formula and no statement of whether they were computed on raw volume, percent change or log volume. A19 used one reading (s = RC%/1.96). This amendment states all readings that the published numbers allow, and tests the simulation at each.
+
+### A21.2 Readings (fixed now; s is the SD of the CHANGE of ln volume between two scans; per-scan SD = s / sqrt(2) in the simulator, as in A16)
+Published values: BraTumIA 1.2 RC% 46 (CI 33 to 67), RC 6.9 mL (4.9 to 10), mean volumes 24.2 and 26.3 mL; BraTumIA 2.0 RC% 39 (28 to 57), RC 5.2 mL (3.7 to 7.5), mean volumes 22.9 and 24.9 mL.
+- R1 linear percent: s = RC% / 1.96 (A19 used this).
+- R2 log back-transform: RC% = 100 (exp(RC_ln) - 1), so s = ln(1 + RC%/100) / 1.96.
+- R3 absolute: s = (RC_mL / mean enhancing volume in mL) / 1.96, with the mean of the two scan means.
+Each reading is computed for the point estimate and both confidence limits of both versions. All arithmetic is done by the script and written to the output; the table below is only the expected shape: R1 0.143 to 0.342, R2 0.126 to 0.262, R3 0.079 to 0.202.
+Not identifiable from the published numbers: which scale the RC was computed on; whether any systematic later-scan rise (about +8%) was removed before the RC was computed; the shape of the error distribution; dependence of the error on volume. These cannot be resolved without the raw data.
+
+### A21.3 Simulation (script 145)
+Same model, seed, draw order, R=2000, estimands and materiality rules as A16, A18, A19, normal independent error. Constant change-SD s in the union of the audit values: {0.08, 0.111, 0.126, 0.139, 0.168, 0.193, 0.262}; N in {50, 100}; D in {8, 12}; both rules; theta in {1.0, 0.7}. Reported per reading R1, R2, R3: the range of E1 (control median shift in weeks) and E2 (power change) over the reading's confidence range, at N=100, D=8, single-scan and two-scan.
+
+### A21.4 Predictions declared before the run (N=100, D=8)
+- PU1: single-scan E1 is material (|mean| >= 4.345 weeks, CI excludes 0) at every s >= 0.111 in the list.
+- PU2: single-scan power loss is material (<= -0.05, CI excludes 0) at every s >= 0.111.
+- PU3: single-scan E1 is NOT material at s = 0.08.
+- PU4: for the central points of R1, R2 and R3 (version 2.0 and 1.2 each), the single-scan E1 differs by more than 4 weeks between R1 and R3 (the choice of reading matters for the size of the effect).
+Report any failure unchanged.
+
+### A21.5 Limits and not declared
+All readings assume independent normal error and the A16 growth model. Asymmetric or heavy-tailed error, error that depends on volume or on the scan order, and a repeat-scan study in other tools or smaller tumours are not tested here. The simulation covers the volumetric component of progression only, with a simplified two-scan confirmation (not the RANO 2.0 algorithm). No re-run with other values.

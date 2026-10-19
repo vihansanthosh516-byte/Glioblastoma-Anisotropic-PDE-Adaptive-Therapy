@@ -130,3 +130,23 @@ Each claim checked against files or the source. No agreement by deference.
 | 10 | Keep the original simulation, label extras as sensitivity analyses | A16.6 | Agree. | A18 adds, never replaces. |
 
 What ChatGPT did not say: the 0.5 cm3 error came from my own earlier docs; the source check showed it.
+
+## Round 4 (2026-10-18): review of `paper/overview_for_review_rano.md` after Results 1 to 4 (A15, A16, A18, A19)
+Each claim checked against files or the source. No agreement by deference.
+
+| # | ChatGPT claim | Checked against | Verdict | Action |
+|---|---|---|---|---|
+| 1 | The conversion s = RC%/1.96 needs a sqrt(2) step for per-scan noise | `src/141_trial_sim.py` (noise = s/sqrt(2) x N(0,1) per scan), A16.2, A19.1 | Partly wrong. s is the SD of the CHANGE (difference of two log volumes) and the simulator already divides by sqrt(2) per scan. Right that the paper gives no formula and does not say whether RC% was computed on raw, percent or log scale (full text, PMC8191681). | A21: explicit conversion table, three readings, new simulation at the alternative values. |
+| 2 | Percent change and log change differ; scale must be established | Same full text | Right. The scale is unknown. Three readings give different s: linear RC%/1.96 (0.199 to 0.235), log back-transform ln(1+RC%)/1.96 (0.168 to 0.193), absolute mL RC over mean volume (0.111 to 0.139). | A21. |
+| 3 | A19 numbers are provisional until the audit | A19.1 already said "assumed conversion" | Right in substance. Wording: A19 is "anchored to an assumed conversion", never "calibrated". | Wording rule; overview updated. |
+| 4 | Four supported predictions in A19 are not four independent confirmations | `analysis_plan_v1.md` A19.4 | Right: same simulator, same model. | Overview now says so. |
+| 5 | The 121 pairs from 43 patients may be treated as independent | `src/140_rano_tool_dependence.py` `boot_ci` groups by Patient | Wrong. The CI is a patient-cluster bootstrap (10,000 draws). The overview did not say so. | Overview states it. |
+| 6 | The confirmation rule may not match RANO 2.0 | A16.2 | Right. The two-scan rule is our simplification (criterion at j and j+1 against the same nadir), not the RANO 2.0 confirmation algorithm. | Stated as a limit in the overview. |
+| 7 | RANO 2.0 is more than volume (new lesions, steroids, clinical status, human approval); do not claim full adjudication | RANO 2.0 text (PMC11630866) | Right. The project models only the volumetric component. | Stated in the overview and README. |
+| 8 | Asymmetric or volume-dependent error not tested | A16 scenario "vol" used the A15 upper-bound change-SD by size band (symmetric normal); no skewed error anywhere | Partly right. Volume-dependent SD was in A16; asymmetric error was not tested anywhere. | Listed as an untested limit; not added now. |
+| 9 | Novelty not established | `paper/problem_first_rano_noise.md` | Right. About 15 snippet-level searches. | None; wording stays "not found in our searches". |
+| 10 | Strongest contribution would be when calls are reliable and which assumptions change trial conclusions | plan | Agree. The calculator and the sensitivity maps already point that way. | Possible frame: "which noise levels change conclusions". |
+| 11 | Do the A19 audit before more building | plan | Agree. A19 is kept as run. | A21 declared. |
+| 12 | Scores (8/10, 8.5/10 regional, 7/10 ISEF) | n/a | Opinion; not checkable. Noted. | None. |
+
+What ChatGPT did not say: the absolute-mL reading of the same paper gives a LOWER s (0.111 to 0.139); the audit therefore widens the range downward, to 0.079 at the lowest confidence limit.
