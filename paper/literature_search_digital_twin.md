@@ -1,6 +1,6 @@
 # Literature search: digital-twin parts (2026-10-17)
 
-Status: FIRST PASS. Four web searches only. Every row below came from a search snippet, not from reading the full paper. Open each link and check numbers before you cite them.
+Status: FIRST PASS. Four web searches only. Every row below came from a search snippet, not from reading the full paper. Open each link and check numbers before you cite them. All third-party figures, study designs, dataset counts, fields, access and license descriptions remain provisional; exact primary-source tables/sections have not been recorded here.
 
 ## Part 1: recurrence target
 | Item | Link | Key number (from snippet) | Test design | Access | Fits compute |
@@ -10,7 +10,7 @@ Status: FIRST PASS. Four web searches only. Every row below came from a search s
 | Transformer-DenseNet 1-year recurrence, HGG | https://pmc.ncbi.nlm.nih.gov/articles/PMC13156239/ | not read | Predicts recurrence, not CTV replacement | Not checked | Not checked |
 | Multicentre protocol: DL to predict recurrence spread | https://pmc.ncbi.nlm.nih.gov/articles/PMC13395678/ | none (protocol) | Protocol only | Not checked | n/a |
 
-Weak point: none of these tests enhancing recurrence at equal volume. Our +0.009 is not contradicted, but we found no method that beats it.
+The snippets do not establish a directly comparable equal-volume enhancing-recurrence test. The local H-2 result was mean enhancing-recurrence coverage gain +0.0088 versus the 15 mm margin (98 patients; interval includes zero; ledger 2ax; `output/predictgbm/final/test_results.json:PRIMARY_final_minus_standard_enh`). This is distinct from the geometric growth baseline in ledger 2r. The short search found no directly comparable result; it cannot rank these methods.
 Item 2 (new datasets) and item 3 (why enhancing recurrence is hard): NOT searched yet.
 
 ## Part 2: growth forecast
@@ -23,7 +23,7 @@ Item 2 (new datasets) and item 3 (why enhancing recurrence is hard): NOT searche
 | CFB-GBM v2.0: 264 GBM, GTV at t0-t2, RANO | https://arxiv.org/html/2608.17884v1 | Possible new data. Dose/TMZ fields NOT confirmed. |
 | NASEM 2023 digital twin report | https://nap.nationalacademies.org/read/26894/chapter/3 | Twin = model + physical counterpart + two-way data flow, with verification, validation, uncertainty quantification. Exact wording NOT read. |
 
-Not found: a paper where a patient-specific GBM growth model beat a no-change baseline on held-out real scans. This does NOT prove none exists. Search was too short.
+Not found: a paper where a patient-specific GBM growth model beat a no-change baseline on held-out real scans. This does NOT prove none exists. Search was too short. Locally, the PDE forecast did not significantly beat persistence, whereas the population-rate geometric baseline had positive GBM-only mean gain +0.0149 (ledger 2w); those are different models.
 Honest term for our work: "patient-specific simulation", not "digital twin" (no two-way data flow, no validated forecast).
 
 ## Part 3: treatment effect

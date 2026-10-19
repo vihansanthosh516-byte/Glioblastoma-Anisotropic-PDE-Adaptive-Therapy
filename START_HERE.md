@@ -45,7 +45,7 @@ It is background, not the goal. Honest summary: `README_STATUS.md` (corrected af
 ## 6. Which files to trust
 | Status | Files |
 |---|---|
-| CURRENT | `START_HERE.md`, `CLAUDE.md`, `analysis_plan_v1.md`, `vault/PAPER_FINDINGS_LEDGER.md`, `paper/phd_level_plan_probabilistic_rano.md`, `paper/problem_first_rano_noise.md`, `README.md` (new), `README_STATUS.md` (old-work status, corrected) |
+| CURRENT | `START_HERE.md`, `CLAUDE.md`, `analysis_plan_v1.md`, `vault/PAPER_FINDINGS_LEDGER.md`, `paper/phd_level_plan_probabilistic_rano.md`, `paper/problem_first_rano_noise.md`, `paper/overview_for_review_rano.md` (dated review snapshot), `README.md` (new), `README_STATUS.md` (old-work status, corrected) |
 | BACKGROUND (still true as records, wrong as goals) | `paper/new_project_options.md`, `paper/literature_search_digital_twin.md`, `vault/LIMITS_CURRENT.md`, `vault/claim_ledger.md`, `vault/audit_2026-10-18/*` |
 | ARCHIVED (moved to `archive_old_gbm/`, same sub-paths; banner on each; do not use for goals or "first" claims) | all old GBM READMEs, summaries, plans, track results, `docs/*`, `output/*.md`, `vault/Script-*.md`, `vault/TRACK_*.md` |
 | ARCHIVE (retained as records) | `vault/audit_2026-10-18/originals/*`, `.claude/skills/*`, `graphify-out/*` |
