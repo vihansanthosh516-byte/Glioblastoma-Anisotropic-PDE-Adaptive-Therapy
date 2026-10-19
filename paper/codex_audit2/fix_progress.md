@@ -6,10 +6,10 @@ Audit evidence and original progress.md remain unchanged. Status tracks correcti
 |---|---|---|
 | 001 | DONE | vault/PAPER_FINDINGS_LEDGER.md and vault/Decisions.md: removed uncited claims, fixed script-78 count, added sources/scopes, superseded stray 10/23. Static JSON checks; TI minimum -0.978598582 confirms original rounded -0.98 despite report minimum error. |
 | 002 | DONE | vault/PAPER_FINDINGS_LEDGER.md entries 2g/2h/2e/2i/2j/3. Read JSON keys, computed velocity error and cohort summaries, counted src/*.py. Report 002 also misstates PatientID_0251 swanson sparing (actual 0.887222); used artifact. No output regenerated. |
-| 003 | TODO | Pending report/source review and corrections. |
-| 004 | TODO | Pending report/source review and corrections. |
-| 004a | TODO | Pending report/source review and corrections. |
-| 004b | TODO | Pending report/source review and corrections. |
+| 003 | DONE | vault/PAPER_FINDINGS_LEDGER.md: source/scope for LHS-30 result, removed uncited vault-only values, qualified CGGA chronology and zone-file provenance, scoped E_MAX sweep. Read script-90 header, CGGA assay Ns, zone CSV rows, fallback source and saved evaluation keys. Audit 003 names absent sets.lhs30.ppo; actual entropy-0.05 seed arms average 12.665606 mm3. No analysis rerun. |
+| 004 | DONE | Superseded draft reconciled against 004a and 004b. All actionable rows covered by split-report corrections; 2t already scoped exploratory and null-compatible, unchanged. |
+| 004a | DONE | vault/PAPER_FINDINGS_LEDGER.md 2o/2p: narrowed permutation interpretation, stated 100-draw/donor confounding, marked absent rolling-origin counts unverified, added LUMIERE n=55. Read trackA_audit.D_within_patient_permutation and cohort_tables shift rows. |
+| 004b | DONE | vault/PAPER_FINDINGS_LEDGER.md 2q/2r/2s: labeled V7b post hoc and inspection chronology author-reported; separated rough scale comparison; replaced stale 2,000-draw baseline intervals with current n_boot=10000 keys and 2y paired comparison; removed biological-change inference from assumed perturbation Dice. Static JSON/source checks; no forecasts rerun. |
 | 005 | TODO | Pending report/source review and corrections. |
 | 006 | TODO | Pending report/source review and corrections. |
 | 007 | TODO | Pending report/source review and corrections. |
