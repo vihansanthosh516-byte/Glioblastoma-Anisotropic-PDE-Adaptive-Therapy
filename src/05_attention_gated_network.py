@@ -105,6 +105,11 @@ y_train_t  = torch.from_numpy(y[train_mask]).long()
 X_test_t   = torch.from_numpy(X[test_mask]).float()
 y_test_t   = torch.from_numpy(y[test_mask]).long()
 log(f"X_train_t {X_train_t.shape}, X_test_t {X_test_t.shape}")
+# Validation split carved from TRAIN (10%, stratified, seed 42): the epoch is chosen on validation; the test set is scored once.
+from sklearn.model_selection import train_test_split as _tts
+_tr_i, _va_i = _tts(np.arange(len(y_train_t)), test_size=0.10, random_state=42, stratify=y_train_t.numpy())
+X_val_t, y_val_t = X_train_t[_va_i], y_train_t[_va_i]
+X_train_t, y_train_t = X_train_t[_tr_i], y_train_t[_tr_i]
 
 # ---- 3. Model: attention-gated ---------------------------------------------
 class AttnGated(nn.Module):
@@ -174,13 +179,17 @@ nparams = sum(p.numel() for p in model.parameters())
 log(f"model built, {nparams:,} params")
 
 train_ds = TensorDataset(X_train_t, y_train_t)
+val_ds   = TensorDataset(X_val_t, y_val_t)
 test_ds  = TensorDataset(X_test_t,  y_test_t)
 train_dl = DataLoader(train_ds, batch_size=BATCH, shuffle=True,  num_workers=0)
 test_dl  = DataLoader(test_ds,  batch_size=BATCH, shuffle=False, num_workers=0)
+val_dl   = DataLoader(val_ds,   batch_size=BATCH, shuffle=False, num_workers=0)
 
 # ---- 4. Train -------------------------------------------------------------
 log("Begin training...")
-tr_loss, te_loss, te_acc = [], [], []
+import copy as _copy
+best_val, best_epoch, best_state = -1.0, 0, None
+tr_loss, te_loss, te_acc = [], [], []  # NOTE: te_* now hold VALIDATION values per epoch
 for epoch in range(1, EPOCHS + 1):
     model.train(); t0=time.time(); loss_acc=0; n_acc=0
     for xb, yb in train_dl:
@@ -197,7 +206,7 @@ for epoch in range(1, EPOCHS + 1):
     model.eval()
     with torch.no_grad():
         loss_acc=0; n_acc=0; correct=0
-        for xb, yb in test_dl:
+        for xb, yb in val_dl:
             xb, yb = xb.to(DEVICE), yb.to(DEVICE)
             out, _ = model(xb)
             loss = crit(out, yb)
@@ -206,7 +215,12 @@ for epoch in range(1, EPOCHS + 1):
             correct  += (out.argmax(-1) == yb).sum().item()
     te_loss.append(loss_acc / max(n_acc,1))
     te_acc.append(correct / max(n_acc,1))
-    log(f"epoch {epoch:02d}/{EPOCHS} trLoss={tr_loss[-1]:.4f} teLoss={te_loss[-1]:.4f} teAcc={te_acc[-1]:.4f} ({time.time()-t0:.1f}s)")
+    if te_acc[-1] > best_val:
+        best_val, best_epoch, best_state = te_acc[-1], epoch, _copy.deepcopy(model.state_dict())
+    log(f"epoch {epoch:02d}/{EPOCHS} trLoss={tr_loss[-1]:.4f} valLoss={te_loss[-1]:.4f} valAcc={te_acc[-1]:.4f} ({time.time()-t0:.1f}s)")
+
+model.load_state_dict(best_state)  # epoch selected on validation
+log(f"selected epoch {best_epoch} (val acc {best_val:.4f})")
 
 # ---- 5. Plot training -----------------------------------------------------
 import matplotlib
@@ -214,11 +228,11 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 fig, ax = plt.subplots(1, 2, figsize=(11, 4))
 ax[0].plot(tr_loss, label="train", color="tab:blue")
-ax[0].plot(te_loss, label="test",  color="tab:orange")
+ax[0].plot(te_loss, label="validation",  color="tab:orange")
 ax[0].set_title("Loss")
 ax[0].set_xlabel("epoch"); ax[0].legend()
 ax[1].plot(te_acc, color="tab:green")
-ax[1].set_title("Test accuracy")
+ax[1].set_title("Validation accuracy")
 ax[1].set_xlabel("epoch")
 fig.tight_layout()
 fig.savefig(PNG_LOSS, dpi=180); plt.close(fig)
@@ -249,10 +263,12 @@ with open(TSV_CLASSIF_REQ, "w") as f:
 log(f"Wrote {TSV_CLASSIF_REQ}\n{report}")
 
 metrics = {
-    "best_test_accuracy": max(te_acc),
-    "final_test_accuracy": te_acc[-1],
+    "best_val_accuracy": best_val,
+    "selected_epoch": best_epoch,
+    "selection": "epoch chosen on a validation split carved from train; test scored once at that epoch",
+    "final_epoch_val_accuracy": te_acc[-1],
     "final_train_loss":   tr_loss[-1],
-    "final_test_loss":    te_loss[-1],
+    "final_epoch_val_loss": te_loss[-1],
     "n_params":            nparams,
     "epochs":              EPOCHS,
     "batch_size":          BATCH,

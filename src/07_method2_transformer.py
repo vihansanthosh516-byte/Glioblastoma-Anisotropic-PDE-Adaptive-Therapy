@@ -99,11 +99,18 @@ X_train_t = torch.from_numpy(X_train).float()
 y_train_t = torch.from_numpy(y_train).long()
 X_test_t  = torch.from_numpy(X_test).float()
 y_test_t  = torch.from_numpy(y_test).long()
+# Validation split carved from TRAIN (10%, stratified, seed 42): the epoch is chosen on validation; the test set is scored once.
+from sklearn.model_selection import train_test_split as _tts
+_tr_i, _va_i = _tts(np.arange(len(y_train_t)), test_size=0.10, random_state=42, stratify=y_train_t.numpy())
+X_val_t, y_val_t = X_train_t[_va_i], y_train_t[_va_i]
+X_train_t, y_train_t = X_train_t[_tr_i], y_train_t[_tr_i]
 
 train_ds = TensorDataset(X_train_t, y_train_t)
+val_ds   = TensorDataset(X_val_t, y_val_t)
 test_ds  = TensorDataset(X_test_t,  y_test_t)
 train_dl = DataLoader(train_ds, batch_size=BATCH_SIZE, shuffle=True,  num_workers=0)
 test_dl  = DataLoader(test_ds,  batch_size=BATCH_SIZE, shuffle=False, num_workers=0)
+val_dl   = DataLoader(val_ds,   batch_size=BATCH_SIZE, shuffle=False, num_workers=0)
 
 # ---- 3. Transformer Encoder Model ------------------------------------------
 class GeneTransformer(nn.Module):
@@ -164,7 +171,9 @@ scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=EPOCHS)
 
 # ---- 4. Training loop -------------------------------------------------------
 log("Training...")
-train_losses, test_losses, test_accs = [], [], []
+import copy as _copy
+best_val, best_epoch, best_state = -1.0, 0, None
+train_losses, test_losses, test_accs = [], [], []  # NOTE: test_* names now hold VALIDATION values per epoch
 for epoch in range(1, EPOCHS + 1):
     model.train()
     t0 = time.time()
@@ -184,19 +193,24 @@ for epoch in range(1, EPOCHS + 1):
     with torch.no_grad():
         te_loss_acc = 0.0
         correct = 0
-        for xb, yb in test_dl:
+        for xb, yb in val_dl:
             xb, yb = xb.to(DEVICE), yb.to(DEVICE)
             out = model(xb)
             loss = criterion(out, yb)
             te_loss_acc += loss.item() * xb.size(0)
             correct += (out.argmax(-1) == yb).sum().item()
-    te_loss = te_loss_acc / len(test_ds)
-    te_acc = correct / len(test_ds)
+    te_loss = te_loss_acc / len(val_ds)
+    te_acc = correct / len(val_ds)
     test_losses.append(te_loss)
     test_accs.append(te_acc)
+    if te_acc > best_val:
+        best_val, best_epoch, best_state = te_acc, epoch, _copy.deepcopy(model.state_dict())
 
     scheduler.step()
-    log(f"epoch {epoch:02d}/{EPOCHS}  trLoss={tr_loss:.4f}  teLoss={te_loss:.4f}  teAcc={te_acc:.4f}  ({time.time()-t0:.1f}s)")
+    log(f"epoch {epoch:02d}/{EPOCHS}  trLoss={tr_loss:.4f}  valLoss={te_loss:.4f}  valAcc={te_acc:.4f}  ({time.time()-t0:.1f}s)")
+
+model.load_state_dict(best_state)  # epoch selected on validation
+log(f"selected epoch {best_epoch} (val acc {best_val:.4f})")
 
 # ---- 5. Evaluation ----------------------------------------------------------
 log("Evaluating on test set...")
@@ -237,8 +251,10 @@ metrics = {
     "per_class": report,
     "n_params": n_params,
     "epochs": EPOCHS,
-    "best_test_acc": max(test_accs),
-    "final_test_acc": test_accs[-1]
+    "best_val_acc": best_val,
+    "selected_epoch": best_epoch,
+    "selection": "epoch chosen on a validation split carved from train; test scored once at that epoch",
+    "final_epoch_val_acc": test_accs[-1]
 }
 log(f"Transformer: acc={acc:.4f}, macro_f1={macro_f1:.4f}, AUC={auc:.4f}")
 
@@ -265,9 +281,9 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 fig, axes = plt.subplots(1, 2, figsize=(10, 4))
 axes[0].plot(train_losses, label="train")
-axes[0].plot(test_losses, label="test")
+axes[0].plot(test_losses, label="validation")
 axes[0].set_title("Loss"); axes[0].legend()
-axes[1].plot(test_accs, label="test acc", color="green")
+axes[1].plot(test_accs, label="validation acc", color="green")
 axes[1].set_title("Test Accuracy"); axes[1].legend()
 fig.tight_layout(); fig.savefig(PNG_LOSS, dpi=180); plt.close(fig)
 
