@@ -31,7 +31,7 @@ dependencies = [
 run-pipeline = "src.cli:main"
 
 [project.optional-dependencies]
-legacy-ml = ["torch", "gymnasium", "stable-baselines3", "nibabel", "scikit-learn", "plotly"]
+legacy-ml = ["torch", "torch-geometric", "gymnasium", "stable-baselines3", "nibabel", "scikit-learn", "plotly"]
 hil = ["pyserial"]
 
 [tool.setuptools.packages.find]

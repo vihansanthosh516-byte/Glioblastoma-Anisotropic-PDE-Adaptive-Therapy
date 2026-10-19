@@ -8,8 +8,18 @@ Architecture:
 - Edge features injected via attention bias (edge-aware attention)
 - Trained on 15k balanced cells (5k per class)
 - 80/20 train/test split (same as other methods for fair comparison)
+
+NOTE (2026-10-19 audit): historical Track A script. The split is per cell, not patient-held-out, and test accuracy is
+evaluated every epoch with the checkpoint saved when test accuracy improves, so the reported accuracy is selected on
+the test set (optimistic). No random seed is set. Needs torch, torch_geometric and anndata (not in Requirements.txt).
+The edge attributes come from script 12 and encode tissue-label information (see its note). Paths now derive from __file__.
+The (15000, 32) latent shape is an assumption, not checked.
 """
-import os, time, resource, gc, json
+import os, time, gc, json
+try:
+    import resource
+except ImportError:  # native Windows Python has no resource module; RSS then reports 0
+    resource = None
 import numpy as np
 import pandas as pd
 import torch
@@ -25,7 +35,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import seaborn as sns
 
-ROOT = "."
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 OUT_DIR = os.path.join(ROOT, "output", "cgat")
 
 EDGE_INDEX_PATH = os.path.join(OUT_DIR, "gat_edge_index.npy")
@@ -50,7 +60,7 @@ WEIGHT_DECAY = 1e-4
 EPOCHS = 100
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 
-def mem_mb(): return resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024
+def mem_mb(): return (resource.getrusage(resource.RUSAGE_SELF).ru_maxrss if resource else 0) / 1024
 def log(m): print(f"[{time.strftime('%H:%M:%S')}] {m}  RSS={mem_mb():.0f}MB  DEV={DEVICE}", flush=True)
 
 # ---- 1. Load data ----
