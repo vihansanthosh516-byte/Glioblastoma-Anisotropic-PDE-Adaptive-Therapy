@@ -1,28 +1,30 @@
+> **HISTORICAL BACKGROUND (checked 2026-10-19):** Older GBM figures; current RANO paper/poster are separate. Inventory is not publication approval. Patient-fold results supersede random-cell classifier bars; treatment/RL panels are simulations with assumed kill rates. Images below retain historical labels/numbers and must be checked against the corrected ledger before reuse. No images regenerated or edited.
+
 # Paper: Figure Inventory and Plan
 
-## STATUS 2026-10-04: all main-text figures are made
-Script: `scripts/make_paper_figures.py`. Every value is read from `output/` JSON/CSV. Rerun: `python scripts/make_paper_figures.py`. I viewed the three combined figures and two panels by eye after fixing layout.
-Output in `paper/figures/` (13 PNG, 300 dpi):
+## Historical creation status (2026-10-04), inventory checked 2026-10-19
+Script: `scripts/make_paper_figures.py`. The generator reads JSON/CSV but also contains handwritten labels/settings; this is not proof every displayed quantity is sourced. Its savefig setting is 300 dpi. Historical visual-review claim is author-reported, not an independent scientific check. Generation command is historical, not current run authorization.
+Output in `paper/figures/` (14 PNG; each PNG pHYs chunk reports 11811 pixels/metre, approximately 300 dpi):
 
 | File | Panels | Data source |
 |---|---|---|
-| `fig1_track_a.png` (+ `fig1a_classification`, `fig1b_spib_saddle`, `fig1c_tcga_survival`) | A zone-classification accuracy (7 methods); B SPIB energy levels + index-1 saddle; C TCGA univariate Cox forest + KM median 432 d | `cgat/gat_metrics.json`, `scvi_metrics.json`, `nmf_metrics.json`, `benchmark_comparison.tsv`, `spib_saddle_point_metrics.json`, `survival_stats_summary.json`, `tcga_km_summary.json` |
-| `fig2_track_b.png` (+ `fig2a_resistance`, `fig2b_final_mass`, `fig2c_forecast`, `fig2d_elongation`) | A resistant fraction MTD vs adaptive (54/61 below diagonal); B final-mass ratio vs rho with 0.02 line; C core-target forecast Dice (all / grew / shrank); D paired elongation | `adaptive_geometry_metrics.json`, `forecast_labels_core/results.json`, `fractal_aniso_vs_iso.json` |
+| `fig1_track_a.png` (+ `fig1a_classification`, `fig1b_spib_saddle`, `fig1c_tcga_survival`) | A zone-classification accuracy (7 methods); B SPIB energy levels + index-1 saddle; C TCGA univariate Cox forest + KM median 432 d | `cgat/gat_metrics.json` (exists at `output/cgat/gat_metrics.json`; random-cell result, superseded for interpretation by `output/cgat_leak_free.json:variants.gat_pca_clean.acc`), `scvi_metrics.json`, `nmf_metrics.json`, `benchmark_comparison.tsv`, `spib_saddle_point_metrics.json`, `survival_stats_summary.json`, `tcga_km_summary.json` |
+| `fig2_track_b.png` (+ `fig2a_resistance`, `fig2b_final_mass`, `fig2c_forecast`, `fig2d_elongation`) | A simulated resistant fraction MTD vs adaptive (old 54/61 summary unverified without its exact per-patient field); B final-mass ratio vs rho with 0.02 line; C core-target forecast Dice (all / grew / shrank); D paired elongation | `adaptive_geometry_metrics.json`, `forecast_labels_core/results.json`, `fractal_aniso_vs_iso.json` |
 | `fig3_track_c.png` (+ `fig3a_conditioned_policy`, `fig3b_probe_commit`, `fig3c_paced_ttp`) | A win rate by set, blind vs conditioned vs rule; B probe-then-commit vs noise; C paced TTP gain, 4 sets | `rl_kill_conditioned/evaluate.json`, `probe_paced_policies/evaluate.json` |
 
-Captions must say:
-- Fig 1A: 15,000-cell subsample, one seed, no CI. Fig 1B: SPIB found 2 metastable states; the three attractor energies are near zero. Fig 1C: age is a known factor.
+Required corrections before any reuse (not certification of existing raster text):
+- Fig 1A: historical random-cell score with patient/label leakage and test-epoch selection; use patient-fold clean-PCA mean 63.8% (SD 13.3), not the old C-GAT headline. Fig 1B: SPIB found 2 metastable states; the three attractor energies are near zero. Fig 1C: age is a known factor.
 - Fig 2B: adaptive ends with more tumour mass in most patients (ratio up to about 4.7), and ratio is 1.0 for the 10 patients above rho 0.02, who all progress earlier (orange).
 - Fig 2C: absolute Dice is low; DTI orientation adds nothing (iso is as good); the model loses on shrinking cores. Fig 2D: simulation vs simulation; tract alignment is lower under aniso (0.45 vs 0.50).
-- Fig 3A: win is on day-90 volume only, which does not translate to TTP. Fig 3C: orange = real parameters (+2.1 d); blue = synthetic parameter sets.
+- Fig 3A: win is on day-90 volume only, which does not translate to TTP. Fig 3C: orange = real growth inputs, assumed kills (+2.1 simulated days); blue = synthetic parameter sets, also simulations.
 
-Framework schematic made: `paper/figures/fig0_framework.png` (script `scripts/make_framework_figure.py`). Text is hand-written from [[PAPER_FINDINGS_LEDGER]]. The A-to-B link is drawn as weak: scripts 43-44 scale growth by an inflammation score built from S100A8, S100A11, LST1 expression; where those per-patient values come from was not audited. The "Do NOT use" and supplement notes below still apply.
+Framework schematic made: `paper/figures/fig0_framework.png` (script `scripts/make_framework_figure.py`). Text is hand-written from [[PAPER_FINDINGS_LEDGER]]. Visual inspection on 2026-10-19 confirms the image says "no link" and Track C says "Assumed kill rates". The old 78.7% C-GAT and 54/61 headlines remain in the raster; they are historical, caveated/unsourced claims, not current evidence. The exact per-patient inflammation artifact/provenance is missing here; ledger A24 records the constant 1.0 score. The "Do NOT use" and supplement notes below still apply.
 
 ---
-(older plan below, kept for reference)
+(SUPERSEDED older plan below, retained as history; no current generation instructions)
 
 Written 2026-10-04. I listed files and read the JSON that feeds them. **I have not opened any PNG.** Check each image by eye before use.
-`paper/figures/` exists and is empty.
+Original empty-directory statement is superseded: 14 PNG files now exist.
 
 ## Rule
 Make every paper figure from a JSON or CSV with one script (suggest `scripts/make_paper_figures.py`). Do not reuse old figures that were drawn when numbers were different.
@@ -53,10 +55,12 @@ Make every paper figure from a JSON or CSV with one script (suggest `scripts/mak
 ## Useful for supplement
 `output/mgmt_resistance/km_mgmt_ttp.png` (script 82, KM curves). `output/csgt_mathematical_proof.png`. `output/invasion_dynamics_analysis.png`. `output/fig1_bar_chart.png`, `fig2_scatter.png`, `fig3_delta_boxplot.png` (UCSF tensor study; check they match [[UCSF-PDGM-Tensor-Study]]). `output/batch_digital_twins/` holds about 150 per-patient plots (not needed).
 
-## Missing figures to make (7)
+## Original missing-figure proposal (superseded)
 A1 leaderboard, B1 final-mass panel, B2 forecast, B3 elongation, C2 probe-then-commit, C3 paced TTP, plus an optional framework schematic.
 
-## Edits 2026-10-04
-- Fig 3 (A, C): `real_test` label is now "real growth, assumed kill".
+## Intended/reported edits 2026-10-04 (not all independently visually checked)
+- Fig 3 (A, C): `real_test` intended label is "real growth, assumed kill".
 - Fig 0 (framework): Track A to Track B arrow removed, labelled "no link"; footer states the inflammation score is 1.0 for every patient. Track C data box says assumed kill rates.
 - Fig 1 (Track A): C-GAT accuracy bars must carry the script 86 / 88 caveat, or be dropped. Decide after script 88.
+
+Raster-use limitation: other than the framework image, panel labels were not visually rechecked in this correction. The existing warning list remains applicable; source keys and captions must be checked image by image before any paper use.
