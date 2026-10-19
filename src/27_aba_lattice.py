@@ -1,3 +1,4 @@
+# NOTE (2026-10-19 audit): historical legacy Track A script; not part of the current RANO project. Needs torch. The header calls the model calibrated, but the oxygen, transition and proliferation parameters are hand-set assumptions and some choices are stochastic without a recorded seed.
 #!/usr/bin/env python3
 """
 Month 3, Week 1: Stochastic Agent-Based Lattice Simulator — CALIBRATED

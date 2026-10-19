@@ -1,3 +1,4 @@
+# NOTE (2026-10-19 audit): historical legacy Track A script; not part of the current RANO project. The 'clinical correlation' compares simulated outputs with embedded literature ranges that have no citations. A missing free_front_velocity_um_per_hr silently defaults to 22.45 (two places). The proliferation, transition and necrosis event arrays are initialised to zeros, so the plotted event rates are not measured from aba_metrics.
 #!/usr/bin/env python3
 """
 Month 3, Week 4: ABA Analysis & Clinical Correlation

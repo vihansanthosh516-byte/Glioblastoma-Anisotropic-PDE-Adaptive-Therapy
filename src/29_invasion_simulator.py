@@ -1,3 +1,4 @@
+# NOTE (2026-10-19 audit): historical legacy Track A script; not part of the current RANO project. Needs torch. 'Calibrated' and 'biological realism' are not supported by any fit to patients: parameters (e.g. proliferation probability 0.06) are fixed assumptions, the 10-50 um/hr clinical band and the pixel conversion are assumed, and the reported front velocity comes from the first 50 simulated hours.
 #!/usr/bin/env python3
 """
 Month 3, Week 3: Integrated Invasion Simulator (Calibrated)

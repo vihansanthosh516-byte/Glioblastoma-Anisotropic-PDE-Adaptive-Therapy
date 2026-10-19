@@ -1,3 +1,4 @@
+# NOTE (2026-10-19 audit): historical legacy Track A script; not part of the current RANO project. Needs networkx. 'Causal GRN' and 'master switches' are labels: edges come from a global 95th-percentile threshold on transfer-entropy values with unit weights, and switches are ranked by out-degree, so they are not demonstrated causal regulators. Paths: cwd is now anchored at the project root.
 #!/usr/bin/env python3
 """
 Month 2, Week 2: Causal GRN Builder
@@ -15,6 +16,9 @@ from typing import List, Tuple
 import networkx as nx
 import numpy as np
 
+
+import os as _os
+_os.chdir(_os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))))  # historical script uses cwd-relative output/ paths; anchor cwd at the project root
 
 def load_data() -> Tuple[np.ndarray, List[str], np.ndarray]:
     """Load TE matrix, gene names, and cell labels."""

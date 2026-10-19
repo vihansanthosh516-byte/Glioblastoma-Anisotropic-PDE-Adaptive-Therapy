@@ -1,3 +1,4 @@
+# NOTE (2026-10-19 audit): historical legacy Track A script; not part of the current RANO project. Needs torch. This 'validation' is a cell bootstrap of a proxy transfer-entropy score (te_proxy) for candidate edges, not an independent validation set. The bootstrap has no seed and main uses 50 resamples although the function default is 100. Paths: cwd is now anchored at the project root.
 #!/usr/bin/env python3
 """
 Month 2, Week 4: GRN Validation via Bootstrap Resampling
@@ -14,6 +15,9 @@ from typing import List, Tuple
 import numpy as np
 import torch
 
+
+import os as _os
+_os.chdir(_os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))))  # historical script uses cwd-relative output/ paths; anchor cwd at the project root
 
 def load_data(device: torch.device) -> Tuple[torch.Tensor, List[str], torch.Tensor]:
     """Load expression data, gene names, and labels."""

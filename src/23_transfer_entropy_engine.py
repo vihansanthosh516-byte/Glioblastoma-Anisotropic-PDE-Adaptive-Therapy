@@ -1,3 +1,4 @@
+# NOTE (2026-10-19 audit): historical legacy Track A script; not part of the current RANO project. Needs torch. 'GPU-accelerated' is conditional (CUDA only if available). 'True conditional information flow' is a KSG estimate under chosen settings, not shown to be causal. A seed is set only for the jitter (seed=42). Paths: cwd is now anchored at the project root.
 #!/usr/bin/env python3
 """
 Month 2, Week 1: Transfer Entropy Engine — PATCHED VERSION
@@ -20,6 +21,9 @@ import numpy as np
 import torch
 import torch.nn.functional as F
 
+
+import os as _os
+_os.chdir(_os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))))  # historical script uses cwd-relative output/ paths; anchor cwd at the project root
 
 def load_data(device: torch.device) -> Tuple[torch.Tensor, np.ndarray, torch.Tensor]:
     """Load gene expression, gene names, and spatial labels."""

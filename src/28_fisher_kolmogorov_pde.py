@@ -1,3 +1,4 @@
+# NOTE (2026-10-19 audit): historical legacy Track A script; not part of the current RANO project. Needs torch. The header says calibrated for 10-50 um/hr, but D=10 and r=0.4 were chosen so that the analytical speed 2*sqrt(D*r)*5 = 20 um/hr; that is a chosen setting, not a fit to patient data.
 #!/usr/bin/env python3
 """
 Month 3, Week 2: Fisher-Kolmogorov PDE Solver — Finite Difference (Non-Periodic)

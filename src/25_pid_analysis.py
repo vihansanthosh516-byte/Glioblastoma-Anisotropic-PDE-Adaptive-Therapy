@@ -1,3 +1,4 @@
+# NOTE (2026-10-19 audit): historical legacy Track A script; not part of the current RANO project. The header describes PID with the dit package (not in Requirements.txt). If dit is missing, main() silently uses simplified_pid_analysis, so output/pid_decomposition.* can be a simplified decomposition, not dit PID. Paths: cwd is now anchored at the project root.
 #!/usr/bin/env python3
 """
 Month 2, Week 3: Partial Information Decomposition (PID) Analysis
@@ -23,6 +24,9 @@ except ImportError:
     print("[WARN] `dit` library not available. Install with: pip install dit")
     print("[WARN] Running simplified PID approximation...")
 
+
+import os as _os
+_os.chdir(_os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))))  # historical script uses cwd-relative output/ paths; anchor cwd at the project root
 
 def load_data() -> Tuple[np.ndarray, List[str], List[dict]]:
     """Load TE matrix, gene names, and master switches."""
