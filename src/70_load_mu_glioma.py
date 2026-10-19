@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# NOTE (2026-10-19 audit): historical legacy script; not part of the current RANO project. Volume tables come from mask NIfTI files; the saved summary reports 203 patients (Timepoint_1 n=187).
 """
 Load MU-Glioma-Post cohort and compute tumor volumes over time.
 

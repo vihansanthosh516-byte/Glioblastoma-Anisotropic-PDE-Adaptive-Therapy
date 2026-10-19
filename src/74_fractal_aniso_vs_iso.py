@@ -1,3 +1,4 @@
+# NOTE (2026-10-19 audit): historical legacy script; not part of the current RANO project. Both arms are model-generated maps, so this compares simulation with simulation (fractal dimension 0.925 aniso vs 0.943 iso, paired difference -0.01815, 8/103 aniso greater); it is not evidence that anisotropy improves real tumour prediction.
 """
 Script 74 -- Anisotropic vs matched-isotropic tumor geometry (Track B negative 3).
 

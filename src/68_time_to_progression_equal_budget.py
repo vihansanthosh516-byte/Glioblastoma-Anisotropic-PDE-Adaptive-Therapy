@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# NOTE (2026-10-19 audit): historical legacy script; not part of the current RANO project. Needs torch (not in Requirements.txt). 'Progression' here is a model endpoint (volume >= 1.4x nadir, called RANO 2.0 volumetric), not clinical RANO adjudication. Seeds are set for CEM and the paired bootstrap.
 """
 Script 68: Time to progression at an equal drug budget
 ======================================================

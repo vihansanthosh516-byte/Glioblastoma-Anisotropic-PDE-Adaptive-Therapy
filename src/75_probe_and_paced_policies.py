@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# NOTE (2026-10-19 audit): historical legacy script; not part of the current RANO project. The percentages in the header are simulation outputs under an assumed kill table (equal budget 35); real_test uses fitted growth rates with assumed kills (ledger C1/C3). Noise seeds 0, 1, 2; bootstrap seed 75.
 """
 Script 75: Equal-budget policies that do NOT receive kill rates
 ===============================================================

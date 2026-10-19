@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# NOTE (2026-10-19 audit): historical legacy script; not part of the current RANO project. Uses real MRI dates for the growth slope, but D_mm2_per_day = abs(rho)/10 is a fixed ratio, not estimated from DTI or any data. 154 patients, positive and negative growth; no freeze or test split defined here.
 """
 Estimate per-patient tumor growth parameters using REAL days from diagnosis.
 """

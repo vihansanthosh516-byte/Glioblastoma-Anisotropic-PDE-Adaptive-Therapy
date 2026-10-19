@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# NOTE (2026-10-19 audit): historical legacy script; not part of the current RANO project. rho is fitted with ASSIGNED 90-day intervals, not the observed MRI dates (the header says they are approximate), so the parameters cannot be presented as real-date patient growth rates; script 72 uses real dates.
 """
 Estimate per-patient tumor growth parameters (ρ, D) from longitudinal
 MU-Glioma-Post tumor volumes.

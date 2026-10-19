@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# NOTE (2026-10-19 audit): historical legacy script; not part of the current RANO project. Overwrites output/spatial_recurrence_profiles.npz (it intends to back up first; two .bak_* copies exist). It reads observed masks but synthesises the spatial rho; find_first_mask takes the first matching mask, so the source can depend on filesystem order. No seed.
 """
 Rebuild output/spatial_recurrence_profiles.npz using REAL tumor masks as
 initial conditions from MU-Glioma-Post Timepoint_1 imaging.

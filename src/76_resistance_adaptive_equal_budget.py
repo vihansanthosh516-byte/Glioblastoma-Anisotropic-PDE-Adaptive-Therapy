@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# NOTE (2026-10-19 audit): historical legacy script; not part of the current RANO project. Exploratory: the header discloses an initial confounded run and that the 365-day window was chosen afterwards. Resistance fraction and fitness cost are assumed. 'real_test' means fitted growth rates with the model's assumed kill table, not a clinical drug-effect validation. Per-cell seeds 7600+idx.
 """
 Script 76: Does adaptive therapy gain anything once resistance is in the model?
 ===============================================================================
