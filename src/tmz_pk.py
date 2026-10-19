@@ -1,3 +1,4 @@
+# NOTE (2026-10-19 audit): historical legacy script; not part of the current RANO project. One-compartment bolus PK helper in normalised units; no measured data.
 """One-compartment temozolomide pharmacokinetics.
 
 Concentrations are normalized to the amount of a single bolus. Time is in days.

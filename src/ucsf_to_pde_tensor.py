@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# NOTE (2026-10-19 audit): historical legacy script; not part of the current RANO project. Converts UCSF DTI to a solver tensor; the output is a prepared input for simulation, not a validated forecast. The __main__ passes a relative Path('output'), so cwd is anchored at the project root.
 """
 Convert UCSF-PDGM 3D DTI data to 2D tensor fields for the PDE solver (42_anisotropic_pde.py).
 
@@ -22,6 +23,9 @@ spec.loader.exec_module(aniso_mod)
 AnisotropicFKSolver = aniso_mod.AnisotropicFKSolver
 TensorFieldBuilder = aniso_mod.TensorFieldBuilder
 
+
+import os as _os
+_os.chdir(_os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))))  # cwd-relative output/ paths below; anchor cwd at the project root
 
 def ucsf_to_pde_tensor_fields(
     patient_dir: str | Path,

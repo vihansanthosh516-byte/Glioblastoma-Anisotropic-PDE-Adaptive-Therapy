@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# NOTE (2026-10-19 audit): historical legacy script; not part of the current RANO project. Needs the spib package and torch (not in Requirements.txt). Uses a sequential 80/20 split; if the test dataset passed to the trainer enters training or selection, the held-out evaluation is contaminated. Paths are cwd-relative, so cwd is anchored at the project root.
 """
 Phase 2: Train SPIB to learn 3D reaction coordinate.
 """
@@ -9,6 +10,9 @@ import torch
 import spib
 from spib.spib import SPIB
 from spib.utils import TimeLaggedDataset, DataNormalize
+
+import os as _os
+_os.chdir(_os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))))  # cwd-relative output/ paths below; anchor cwd at the project root
 
 def main():
     print("[PHASE 2] Training SPIB...")

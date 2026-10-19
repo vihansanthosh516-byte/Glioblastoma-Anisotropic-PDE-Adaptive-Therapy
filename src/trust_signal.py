@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# NOTE (2026-10-19 audit): historical legacy script; not part of the current RANO project. The trust score is a proposed proxy from a robust-MPC perturbation ensemble (seeded). It is not calibrated to empirical prediction correctness.
 """Trust signal extraction from the robust MPC controller.
 
 The robust MPC evaluates each control decision over a +/-15% parameter

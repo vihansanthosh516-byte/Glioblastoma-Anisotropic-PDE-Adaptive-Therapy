@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# NOTE (2026-10-19 audit): historical legacy script; not part of the current RANO project. Default ensemble/calibration/output paths are cwd-relative (cwd now anchored at the project root). The N=5 models and M=200 MC passes are header settings; calibration uses logged outcomes. The synthetic self-test (seed 0) does not verify clinical calibration.
 """
 Human-in-the-Loop (HIL) Uncertainty Quantification (Proposal 4)
 ================================================================
@@ -57,6 +58,9 @@ M_DEFAULT = 200
 # --------------------------------------------------------------------------- #
 # FNO ensemble
 # --------------------------------------------------------------------------- #
+import os as _os
+_os.chdir(_os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))))  # cwd-relative output/ paths below; anchor cwd at the project root
+
 def _build_fno(weights_path: Optional[Path] = None,
                grid_size: int = 32, modes: int = 8, width: int = 20):
     """Construct a fresh FNO3d and optionally load weights.

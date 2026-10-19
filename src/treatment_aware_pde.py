@@ -1,3 +1,4 @@
+# NOTE (2026-10-19 audit): historical legacy script; not part of the current RANO project. Volume-surrogate module; the treatment sink terms are specified model terms, not validated clinical effects.
 """Treatment-aware Fisher--Kolmogorov volume surrogate.
 
 The full spatial PDE can use the same sink terms pointwise. This module keeps

@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# NOTE (2026-10-19 audit): historical legacy script; not part of the current RANO project. 'Causal tumour response' in the header is not established: the model uses prescribed PK and kill parameters in a simulation. Paths are cwd-relative, so cwd is anchored at the project root.
 """
 Timed Drug Infusion & Dynamic Tumor Response Engine
 ====================================================
@@ -23,6 +24,9 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from scipy.ndimage import gaussian_filter
 
+
+import os as _os
+_os.chdir(_os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))))  # cwd-relative output/ paths below; anchor cwd at the project root
 
 def load_patient_mask(nii_path: str, downsample: int = 2) -> np.ndarray:
     """Load BraTS segmentation and return binary tumor mask."""

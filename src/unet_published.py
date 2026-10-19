@@ -1,3 +1,4 @@
+# NOTE (2026-10-19 audit): historical legacy script; not part of the current RANO project. Needs torch (excluded from the Docker image). The claim of state-dict key matching to MONAI and of the authors' container configuration (read 2026-10-12) is not backed by any bundled source file; equivalence is unverified here.
 """Rebuild of the released PREDICT-GBM U-Net (MONAI UNet layout, num_res_units=0) without MONAI.
 
 State-dict keys match MONAI: model.0 (down), model.1 (SkipConnection.submodule = Sequential(down, skip..., up)), model.2
