@@ -10,17 +10,13 @@
 #   - Requires a Python venv at ./venv or via $PYTHON env var.
 #   - Set GBM_PROJECT_ROOT if not using default path.
 
-# Resolve project root (directory containing this script).
-$scriptDir = $MyInvocation.MyCommand.Definition | Split-Path -Parent
-$scriptDir = Get-Item -Path $scriptDir -ErrorAction SilentlyContinue
-if (-not $scriptDir) {
-    $scriptDir = Get-Location
+# Resolve the checkout containing this historical runner.
+$projectRoot = if ($env:GBM_PROJECT_ROOT) { $env:GBM_PROJECT_ROOT } else { $PSScriptRoot }
+if (-not (Test-Path -LiteralPath (Join-Path $projectRoot 'src') -PathType Container)) {
+    Write-Error "Project root must contain src: $projectRoot"
+    exit 1
 }
-$projectRoot = $scriptDir.Parent.Parent
-if (-not $projectRoot) {
-    Write-Error "Could not determine project root." ; exit 1
-}
-cd $projectRoot
+Set-Location -LiteralPath $projectRoot
 
 # Determine Python interpreter.
 $py = $env:PYTHON
@@ -53,7 +49,7 @@ $months = @{
 }
 
 # --month10 switch => only run script 45
-if ($args -contains "-Month10") -or ($args -contains "-month10") -or ($args -contains "/Month10") -or ($args -contains "/month10") {
+if (($args -contains "-Month10") -or ($args -contains "/Month10")) {
     $scripts = @("45_validation_synthesis")
 }
 
@@ -66,7 +62,7 @@ Write-Host "  Scripts     : $($scripts -join ', ')"
 Write-Host "==================================================================" -ForegroundColor Cyan
 
 foreach ($s in $scripts) {
-    src = "src/${s}.py"
+    $src = Join-Path $projectRoot "src/${s}.py"
     if (-not (Test-Path $src)) {
         Write-Host "[run_all] ERROR: missing $src" -ForegroundColor Red ; exit 1
     }
