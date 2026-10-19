@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""Script 126: H-3 development scoring of candidates C2 / C4 / C5 (Amendment 9, A9.3 and A9.5).
+"""Script 126: H-3 development scoring of candidates (Amendment 9, A9.3 and A9.5). Header originally said C2 / C4 / C5; the saved
+output contains arms C1, C2, C2_C3, C1C3, C3 and unet, and Amendment 11 dropped C4/C5 (the declared comparison is C1/C2/C3).
 
 Members are out-of-fold maps per TUM dev patient:
   - learned arms of script 115: <UCSF_H3_DIR>/../colab_h3/out/oof_logits_<arm>.npz (2 mm logits, upsampled to 1 mm);

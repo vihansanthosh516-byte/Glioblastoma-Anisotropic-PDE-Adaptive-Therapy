@@ -7,13 +7,14 @@ Arms (out-of-fold on manifest folds, refit per outer fold on outer-train only):
 Split-conformal: outer-train patients split 75/25 proper-train/calibration
 (seed 20261004, per-fold RandomState(20261004+f)); q80/q90 from calibration
 patient-mean |residuals|; coverage on the outer-fold test patients.
-Populations: GBM-only (primary, 105 as analysed) + all-eligible (sensitivity).
+Populations: GBM-only (primary; 104 as analysed per output/h3v_dev.json after excluding 11 nonpositive-volume pairs; an earlier header said 105) + all-eligible (sensitivity).
 Exclusions: v_in<=0 or v_out<=0 (ln undefined), listed in output.
 Output: output/h3v_dev.json, output/h3v_dev_pairs.csv
 """
 from __future__ import annotations
 
 import json
+import os
 import sys
 import warnings
 from pathlib import Path as _Path
@@ -225,6 +226,8 @@ def write_freeze() -> None:
     """Refit MixedLM on ALL MU primary pairs (GBM-only, A5.1) and write the
     frozen config. Reads MU only; no LUMIERE access."""
     import yaml
+    if (PROJECT_ROOT / "configs" / "h3v_frozen.yaml").exists() and not os.environ.get("ALLOW_FREEZE_OVERWRITE"):
+        raise SystemExit("configs/h3v_frozen.yaml exists: refusing to overwrite frozen parameters; set ALLOW_FREEZE_OVERWRITE=1 to override")
     df = load_pairs()
     df = df[(df["v_in"] > 0) & (df["v_out"] > 0)].copy()
     firsts = df.sort_values(["patient_id", "day_in"]).drop_duplicates("patient_id")

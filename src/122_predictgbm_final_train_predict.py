@@ -2,10 +2,10 @@
 """Script 122: H-2 FINAL model (frozen in configs/h2_frozen.yaml): train once, predict the locked test patients.
 
 Final model by the GRAND_PLAN 15 selection rule (highest out-of-fold dev enhancing coverage at equal volume; on the
-137 common patients: hybrid_rank_mu 0.8529 > ensemble GliODIL+U-Net 0.8500 > hybrid_mri_rank_mu 0.8519; ledger 2aw).
+137 common patients: hybrid_rank_mu 0.8529 > hybrid_mri_rank_mu 0.8519 > ensemble GliODIL+U-Net 0.8500; ledger 2aw; the earlier header listed the last two in the wrong order).
 Arm hybrid_rank_mu of script 115: inputs core, edema, wm, gm, csf, brain, distance, M1 density; BCE + Dice + soft top-k
 ranking loss; training data = all 142 TUM development patients + the 334 MU pairs (script 121 pack); 15 epochs (the
-validated setting), seed 20261009, same network and optimiser as script 115.
+setting used in the development runs; not an external validation), seed 20261009, same network and optimiser as script 115.
 Test patients (LUMIERE, RHUH): ONLY pre-op inputs are read (no recurrence; none is in the Kaggle pack). Output: 2 mm
 logits per test patient. Scoring is script 123, which needs the freeze (loader lock).
 Output: output/predictgbm/final/test_logits_2mm.npz, final_train.json

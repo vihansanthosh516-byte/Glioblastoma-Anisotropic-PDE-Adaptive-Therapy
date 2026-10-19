@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""Script 123: H-2 locked TEST evaluation, run ONCE after the freeze (configs/h2_frozen.yaml + git tag h2-frozen).
+"""Script 123: H-2 TEST evaluation, run ONCE after the freeze (historical; per Amendment 12 these H-2 sets are now spent/post hoc
+development data, so the saved scores are historical results, not present locked-test evidence) (configs/h2_frozen.yaml + git tag h2-frozen).
 
 Reads the frozen config, checks that the logits file hash matches the one recorded in it, then scores the final model
 on the LUMIERE + RHUH test patients exactly as the benchmark: logits (2 mm) -> nearest upsample to 1 mm -> sigmoid ->
@@ -16,6 +17,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import sys
 from pathlib import Path as _Path
 
@@ -41,6 +43,8 @@ def up1(a):
 def main():
     if not pg.is_frozen():
         raise SystemExit("not frozen: configs/h2_frozen.yaml and tag h2-frozen are required")
+    if (OUT / "test_results.json").exists() and not os.environ.get("ALLOW_SPENT_RESCORE"):
+        raise SystemExit("test_results.json already exists: the H-2 test set is spent; set ALLOW_SPENT_RESCORE=1 only to deliberately overwrite")
     cfg = yaml.safe_load(pg.FROZEN.read_text())
     f = OUT / "test_logits_2mm.npz"
     sha = hashlib.sha256(f.read_bytes()).hexdigest()

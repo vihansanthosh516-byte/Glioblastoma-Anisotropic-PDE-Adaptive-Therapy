@@ -19,6 +19,9 @@ dependencies = [
     "joblib",
     "pydicom",
     "lifelines",
+    "pyyaml",
+    "statsmodels",
+    "SimpleITK",
     "nibabel",
     "scikit-image",
 ]

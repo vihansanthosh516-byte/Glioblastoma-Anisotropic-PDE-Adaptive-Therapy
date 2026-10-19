@@ -35,7 +35,8 @@ FORBIDDEN = ("seg", "subtraction")   # ALPTDG files never opened before the H-3 
 
 
 def zread(z, name):
-    assert not any(f in name for f in FORBIDDEN), name
+    if any(f in name for f in FORBIDDEN):  # explicit raise: assert is stripped under python -O
+        raise RuntimeError(f"forbidden archive member (label or follow-up data): {name}")
     return nib.Nifti1Image.from_bytes(gzip.decompress(z.read(name)))
 
 
