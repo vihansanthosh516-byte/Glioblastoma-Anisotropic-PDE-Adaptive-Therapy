@@ -1,3 +1,4 @@
+# NOTE (2026-10-19 audit): historical legacy Track A script. Test data is monitored during training (no separate validation set) and no global torch/numpy seed is set, so the reported test performance is not untouched. The latent is computed on all cells after evaluation. Needs torch (not in Requirements.txt). Paths now derive from __file__.
 import os
 import json
 import numpy as np
@@ -21,6 +22,8 @@ if DEVICE.type == 'cuda':
 # =====================================================================
 # 2. DATA PROCESSING & STORAGE MANAGEMENT
 # =====================================================================
+_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # project root, independent of cwd
+
 class SingleCellDataset(Dataset):
     def __init__(self, X_sparse, y):
         # Keep data in CPU RAM as sparse CSR format to prevent RAM explosion
@@ -37,8 +40,8 @@ class SingleCellDataset(Dataset):
 
 def load_preprocessed_matrices():
     print("Initializing data stream from preprocessed arrays...")
-    X_raw = np.load("output/nn_X.npy", allow_pickle=True)
-    y_raw = np.load("output/nn_y.npy")
+    X_raw = np.load(os.path.join(_ROOT, "output", "nn_X.npy"), allow_pickle=True)
+    y_raw = np.load(os.path.join(_ROOT, "output", "nn_y.npy"))
     
     if isinstance(X_raw, np.ndarray) and X_raw.dtype == object:
         X_sparse = sp.vstack(X_raw)
@@ -199,9 +202,9 @@ def main():
     print("=========================================================================")
     
     # Export metrics metadata
-    os.makedirs("output", exist_ok=True)
+    os.makedirs(os.path.join(_ROOT, "output"), exist_ok=True)
     metrics_export = {"accuracy": accuracy, "macro_f1": f1, "macro_auc": auc}
-    with open("output/scvi_metrics.json", "w") as f:
+    with open(os.path.join(_ROOT, "output", "scvi_metrics.json"), "w") as f:
         json.dump(metrics_export, f, indent=4)
         
     # Extract and persist full dataset latent embeddings for Phase 3 diagnostics
@@ -215,7 +218,7 @@ def main():
             mu, _ = vae.encode(batch_x)
             global_latent_matrix.extend(mu.cpu().numpy())
             
-    np.save("output/scvi_latent.npy", np.array(global_latent_matrix))
+    np.save(os.path.join(_ROOT, "output", "scvi_latent.npy"), np.array(global_latent_matrix))
     print("Complete latent matrix successfully saved at output/scvi_latent.npy!")
 
 if __name__ == "__main__":

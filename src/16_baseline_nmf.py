@@ -1,3 +1,4 @@
+# NOTE (2026-10-19 audit): historical legacy Track A script. Random split is per cell (random_state 42), not patient-held-out. Paths now derive from __file__.
 import os
 import json
 import numpy as np
@@ -7,10 +8,12 @@ from sklearn.model_selection import train_test_split
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import accuracy_score, f1_score, roc_auc_score
 
+_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # project root, independent of cwd
+
 def load_preprocessed_matrices():
     print("[DATA] Initializing data stream from preprocessed arrays...")
-    X_raw = np.load("output/nn_X.npy", allow_pickle=True)
-    y_raw = np.load("output/nn_y.npy")
+    X_raw = np.load(os.path.join(_ROOT, "output", "nn_X.npy"), allow_pickle=True)
+    y_raw = np.load(os.path.join(_ROOT, "output", "nn_y.npy"))
 
     if isinstance(X_raw, np.ndarray) and X_raw.dtype == object:
         X_sparse = sp.vstack(X_raw)
@@ -75,12 +78,12 @@ def main():
     print(f"Macro-Averaged AUC (OvR):        {auc:.4f}")
     print("=========================================================================")
 
-    os.makedirs("output", exist_ok=True)
+    os.makedirs(os.path.join(_ROOT, "output"), exist_ok=True)
     metrics_export = {"accuracy": accuracy, "macro_f1": f1, "macro_auc": auc}
-    with open("output/nmf_metrics.json", "w") as f:
+    with open(os.path.join(_ROOT, "output", "nmf_metrics.json"), "w") as f:
         json.dump(metrics_export, f, indent=4)
 
-    np.save("output/nmf_fractions.npy", W)
+    np.save(os.path.join(_ROOT, "output", "nmf_fractions.npy"), W)
     print("[OK] Performance metrics saved to output/nmf_metrics.json")
     print("[OK] Cell-state fraction matrix saved to output/nmf_fractions.npy")
 

@@ -3,6 +3,8 @@
 ================
 Train Edge-Aware GAT on FULL 140k-cell graph using full-batch training.
 No neighbor sampling needed - full graph fits in memory.
+
+NOTE (2026-10-19 audit): historical legacy Track A script. Test accuracy is evaluated every epoch and used for checkpoint selection (the test set is part of model selection); no torch seed is set; the split is per cell. Needs torch and torch_geometric (not in Requirements.txt). The root was a hard-coded WSL path and now derives from __file__.
 """
 import os, time, resource, gc, json
 import numpy as np
@@ -20,7 +22,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import seaborn as sns
 
-ROOT = "/mnt/c/Users/vihan/20206 science fair"
+ROOT = __import__("os").path.dirname(__import__("os").path.dirname(__import__("os").path.abspath(__file__)))  # was a hard-coded WSL path
 OUT_DIR = os.path.join(ROOT, "output", "cgat")
 
 EDGE_INDEX_PATH = os.path.join(OUT_DIR, "gat_edge_index_full.npy")

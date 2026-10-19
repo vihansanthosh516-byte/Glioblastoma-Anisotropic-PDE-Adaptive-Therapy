@@ -3,12 +3,14 @@
 ======================
 Build k-NN graph on FULL 140k cVAE latent space with edge features.
 Memory-efficient: uses sklearn NearestNeighbors with n_jobs.
+
+NOTE (2026-10-19 audit): historical legacy Track A script. The root was a hard-coded WSL path and now derives from __file__. The (140355, 32) latent shape in a comment is unverified; the expected output/cgat arrays were absent when audited.
 """
 import os, time, resource, gc, json
 import numpy as np
 from sklearn.neighbors import NearestNeighbors
 
-ROOT = "/mnt/c/Users/vihan/20206 science fair"
+ROOT = __import__("os").path.dirname(__import__("os").path.dirname(__import__("os").path.abspath(__file__)))  # was a hard-coded WSL path
 OUT_DIR = os.path.join(ROOT, "output", "cgat")
 
 LATENT_PATH = os.path.join(OUT_DIR, "cvae_latent_full.npy")

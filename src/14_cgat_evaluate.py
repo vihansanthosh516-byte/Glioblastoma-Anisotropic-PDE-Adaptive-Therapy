@@ -2,6 +2,10 @@
 14_cgat_evaluate.py
 ====================
 Final benchmark comparison including C-GAT vs Classical vs Deep Learning baselines.
+
+NOTE (2026-10-19 audit): historical legacy Track A script. Reads metrics that the legacy scripts 06-08 and 13 write; the benchmark TSV/plots/Markdown were absent when audited. Per-cell random split, not patient-held-out.
+
+NOTE (2026-10-19 audit): historical legacy Track A script. Reads metrics that the legacy scripts 06-08 and 13 write; the benchmark TSV/plots/Markdown were absent when audited. Per-cell random split, not patient-held-out.
 """
 import os, json
 import numpy as np
@@ -11,7 +15,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import seaborn as sns
 
-ROOT    = "."
+ROOT    = __import__("os").path.dirname(__import__("os").path.dirname(__import__("os").path.abspath(__file__)))  # project root, independent of cwd
 OUT_DIR = os.path.join(ROOT, "output")
 
 # Load all metrics
@@ -135,7 +139,7 @@ with open(md_path, "w") as f:
     f.write("# Final Benchmark: Core vs Periphery vs Healthy Classification\n\n")
     f.write("**Dataset:** 15,000 cells (5,000 per class) from multiomic-gbm scRNA-seq\n")
     f.write("**Features:** 2,500 HVGs (row-z-scored) / 32-dim cVAE latent\n")
-    f.write("**Split:** 80/20 stratified (12,000 train / 3,000 test)\n\n")
+    f.write("**Split:** 80/20 per-cell split as recorded by script 04 (not patient-held-out; historical, leakage-prone)\n\n")
     
     f.write("## Overall Metrics\n\n")
     f.write(df.to_markdown(index=False))
