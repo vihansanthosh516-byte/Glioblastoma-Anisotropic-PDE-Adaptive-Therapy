@@ -20,7 +20,7 @@ RANO 2.0 calls progression at a tumour volume rise of 40% or more and partial re
 Viewer: `output/viewer_rano/viewer_rano.html` (open in a browser; 62 LUMIERE patients; bands, nadir, +40% line, class probabilities; display only; ledger 2bw).
 
 ## Not done
- paper, poster. Novelty is unverified (about 15 snippet-level searches). Nothing here is a clinical claim.
+Paper, poster. Novelty is unverified (about 15 snippet-level searches). Nothing here is a clinical claim.
 
 ## Files
 `START_HERE.md` (state and rules), `analysis_plan_v1.md` (declarations), `vault/PAPER_FINDINGS_LEDGER.md` (results), `paper/` (plans), `src/140_*`, `src/141_*` (current scripts), `archive_old_gbm/` (old GBM documents), `CLAUDE.md` (run commands).
