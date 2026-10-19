@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# NOTE (2026-10-19 audit): historical legacy script; not part of the current RANO project. The header says patient-specific DTI, but the tensor field is synthetic (numpy seed 42): a controlled simulation, not patient DTI validation. Its phase3 PNG/JSON outputs were absent when audited.
 """
 Phase 3: 3D Anisotropic DTI Tensor Integration for GBM (STABLE)
 
@@ -44,6 +45,9 @@ T_TOTAL_DAYS = 30.0
 # --------------------------------------------------------------------------- #
 # CFL-Safe Time Step Calculation
 # --------------------------------------------------------------------------- #
+import os as _os
+_os.chdir(_os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))))  # cwd-relative output/ paths below; anchor cwd at the project root
+
 def compute_cfl_dt(tensor: np.ndarray, dx: float, safety: float = 0.25) -> Tuple[float, int]:
     """
     Compute maximum stable time step for 3D explicit anisotropic diffusion.

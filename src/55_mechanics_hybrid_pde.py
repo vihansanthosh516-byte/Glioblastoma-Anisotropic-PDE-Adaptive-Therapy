@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# NOTE (2026-10-19 audit): historical legacy script; not part of the current RANO project. When Phase 1 metrics are absent the code generates synthetic D (0.01-0.50) and rho (0.005-0.12/day) fields; mechanics parameters are model assumptions. Its phase2 PNG/JSON outputs were absent when audited.
 """
 Phase 2: Hybrid Discrete-Continuum Mechanics for GBM
 
@@ -52,6 +53,9 @@ BETA_PRESSURE = 100.0  # Pa per unit density (volumetric expansion modulus)
 # --------------------------------------------------------------------------- #
 # Core Physics Functions
 # --------------------------------------------------------------------------- #
+import os as _os
+_os.chdir(_os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))))  # cwd-relative output/ paths below; anchor cwd at the project root
+
 def load_or_generate_phase1_fields(
     grid_size: int = GRID_SIZE,
 ) -> Tuple[np.ndarray, np.ndarray]:

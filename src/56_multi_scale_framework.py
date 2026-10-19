@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# NOTE (2026-10-19 audit): historical legacy script; not part of the current RANO project. The header says T1/DTI scans and discovered regimes, but main builds synthetic initial and noisy fields with no file-backed scan input; rho 0.02/day and threshold 0.5 are fixed. np.random.normal is unseeded, so results vary. summary JSON absent when audited.
 """
 Step 5: Multi-Scale Moving-Boundary Framework
 ==============================================
@@ -42,6 +43,9 @@ D_GRAY = 0.0013  # mm²/day (isotropic baseline)
 ALPHA_ADHESION = 0.01  # Cell adhesion strength parameter
 BETA_ADHESION = 0.005  # Cross-tract adhesion suppression
 
+
+import os as _os
+_os.chdir(_os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))))  # cwd-relative output/ paths below; anchor cwd at the project root
 
 def create_t1_initial_conditions(grid_size=GRID_SIZE, dx=DX):
     """

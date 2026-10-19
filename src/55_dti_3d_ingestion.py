@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# NOTE (2026-10-19 audit): historical legacy script; not part of the current RANO project. Default D (0.013 / 0.0013 mm2/day), rho 0.02/day, the tract corridor and the 0.1 tumour threshold are assumptions; outputs are simulation. No random seed is set for the synthetic tensor/tract construction, so results can vary.
 """
 Month 7: Anisotropic Tensor Diffusion Engineering
 ====================================================
@@ -96,6 +97,9 @@ PATIENT_SAVE_INTERVAL = 250
 # =========================================================================== #
 # PHASE 1: Tensor Field Builder
 # =========================================================================== #
+import os as _os
+_os.chdir(_os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))))  # cwd-relative output/ paths below; anchor cwd at the project root
+
 class TensorFieldBuilder:
     """
     Constructs a 2x2 symmetric anisotropic diffusion tensor field over a

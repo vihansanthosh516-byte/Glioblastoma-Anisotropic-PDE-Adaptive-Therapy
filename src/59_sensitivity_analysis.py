@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# NOTE (2026-10-19 audit): historical legacy script; not part of the current RANO project. Heavy: 30 parameter sets x 2 protocols, each running PDE plus RL evaluation. Do not run casually. Sampler seed 42, but the baseline rho, geometry, kill constants and action preferences remain assumed, so sampling reproducibility does not make parameters empirical.
 """
 Phase 6: Global Sensitivity Analysis & Biomarker Optimization
 ==============================================================

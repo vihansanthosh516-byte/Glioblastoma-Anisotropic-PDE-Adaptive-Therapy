@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# NOTE (2026-10-19 audit): historical legacy script; not part of the current RANO project. 'Stupp protocol' simulation on a synthetic PDE: kill, radiation and growth constants are assumed, not calibrated clinical response. Seed 42. Outputs absent when audited.
 """
 Phase 4: Virtual Clinical Therapy Simulation (Stupp Protocol) — FIXED
 
@@ -58,6 +59,9 @@ T_TOTAL_DAYS = 90.0
 # --------------------------------------------------------------------------- #
 # Phase 3 Field Generators
 # --------------------------------------------------------------------------- #
+import os as _os
+_os.chdir(_os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))))  # cwd-relative output/ paths below; anchor cwd at the project root
+
 def generate_dti_tensor_field() -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
     nx, ny, nz = GRID_3D
     X, Y, Z = np.meshgrid(

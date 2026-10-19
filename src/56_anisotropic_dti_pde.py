@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# NOTE (2026-10-19 audit): historical legacy script; not part of the current RANO project. The header claims integration of Phase 1 rho/D and Phase 2 pressure, but main uses a self-contained generated tensor/field (no Phase 1/2 loader): a standalone synthetic PDE demo. Seed 42. Its outputs were absent when audited.
 """
 Phase 3: 3D Anisotropic DTI Tensor Integration for GBM
 
@@ -49,6 +50,9 @@ BETA_PRESSURE = 100.0 # Pa per unit density
 # --------------------------------------------------------------------------- #
 # Phase 1/2 Loaders
 # --------------------------------------------------------------------------- #
+import os as _os
+_os.chdir(_os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))))  # cwd-relative output/ paths below; anchor cwd at the project root
+
 def load_phase1_fields() -> Tuple[np.ndarray, np.ndarray]:
     """Load or generate D(x,y,z) and rho(x,y,z) matching Phase 1 statistics."""
     nx, ny, nz = GRID_3D

@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# NOTE (2026-10-19 audit): historical legacy script; not part of the current RANO project. GAMMA_CHEMO 0.05, GAMMA_RAD 0.08, rho 0.02 and the Gaussian seed (0.8, 5 mm) are assumed simulation constants; the 40-episode and timing statements are not clinical results. No global numpy/torch seed (REINFORCE sampling is stochastic). Needs torch and gymnasium (not in Requirements.txt).
 """
 Phase 5: RL Adaptive Therapy Steering for GBM (Final Optimized)
 ================================================================
@@ -74,6 +75,9 @@ OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 # --------------------------------------------------------------------------- #
 # Fast PDE Solver (Vectorized, 32^3 training / 64^3 eval)
 # --------------------------------------------------------------------------- #
+import os as _os
+_os.chdir(_os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))))  # cwd-relative output/ paths below; anchor cwd at the project root
+
 class FastPDESolver:
     def __init__(
         self,
