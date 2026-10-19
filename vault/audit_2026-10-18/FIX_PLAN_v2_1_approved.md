@@ -1,3 +1,5 @@
+> **HISTORICAL BACKGROUND (corrected 2026-10-19):** Dated old-GBM audit record, not current instructions or authorization to run analyses. Current goal/status: START_HERE.md. Simulation settings are assumptions, not measured treatment effects. Original approval, chronology and process claims are author-reported unless supported by retained logs. This plan is superseded by completed reports in this folder; v1 was superseded by v2.1. Review provenance is recorded in plan_review_record.md (reported model calls, not an independent-agent review).
+
 # Fix plan v2.1 (revised after review rounds 1 and 2): APPROVED TO START
 
 Author: analysis assistant. Date: 2026-10-18. Status: reviewed twice by PLAN_REVIEWER_BIOSTAT (round 2: approve with changes, may start; changes below applied). Nothing below has been started at the time of writing.
@@ -38,7 +40,7 @@ P3 H-4 blocker desk review. Candidates: BraTS 2025, UCSD-PTGBM, Duke longitudina
  Allowed sources: dataset description pages, licence terms, cohort and annotation documentation.
  Excluded: any page, table or section reporting model performance, benchmark results or leaderboard rankings for any candidate dataset. If encountered incidentally it is noted as excluded and not used.
  Output: yes / no / unknown per criterion with a source per cell. An 'unknown' is never inferred; an unknown on any criterion blocks selection until the user resolves it with the data provider. I do not download anything and I do not choose a dataset (A13.4 requires the user's amendment).
-P4 Controller-threshold sweep (exploratory, descriptive, no p-values). E_MAX ratio fixed at 1000. Crossed design: THRESHOLD_OFF in {0.50, 0.65, 0.80, 0.90} x THRESHOLD_ON in {1.0, 1.2}. The cell (0.80, 1.0) is the default, already reproduced exactly. Seven new runs in parallel (about 30 to 55 min; memory monitored). The simulation is deterministic (ratio-1000 re-run differed by 0.0), so no replicates are needed; spread is reported across the 61 patients.
+P4 Controller-threshold sweep (exploratory, descriptive, no p-values). E_MAX ratio fixed at 1000. Crossed design: THRESHOLD_OFF in {0.50, 0.65, 0.80, 0.90} x THRESHOLD_ON in {1.0, 1.2}. The cell (0.80, 1.0) is the default, already reproduced exactly. Seven new runs in parallel (about 30 to 55 min; memory monitored). The code is intended to be deterministic; the reported 0.0 check concerns the default cell only. No replicate-based uncertainty or independent repeated-run check across all cells is established; spread is across 61 patients.
  Reported per cell: MTD more resistant / tied / adaptive more resistant; median, IQR and range of per-patient VR (adaptive / MTD final mass) and of drug % of MTD; TTP adaptive earlier / later / same; the rho > 0.02 split (earlier counts above and below); fraction of time drug is on; both-censored count.
  Pre-specified interpretation rule (fixed before any run):
   C-A 'adaptive never selects more resistance' is called robust only if adaptive-more-resistant = 0 in all 8 cells; otherwise sensitive, naming the cells.
@@ -61,3 +63,5 @@ Running the H-4 locked test; choosing the H-4 dataset; fixing failing tests; ren
 1. Do R1 to R8 resolve each round-1 finding? Name any that do not.
 2. Is the P4 design and the pre-specified interpretation rule adequate? Are the thresholds in C-B declared reasonably (no look at results)?
 3. Any new blocker introduced by v2?
+
+Outcome pointer: `P4_threshold_sweep_report.md` and ledger 2bn supersede the near-inert ON expectation: C-E failed, with 12/16/16/26 patients changing. C-D progression pattern was threshold-sensitive. The numerical settings and interpretation rules in the original declaration remain unchanged.

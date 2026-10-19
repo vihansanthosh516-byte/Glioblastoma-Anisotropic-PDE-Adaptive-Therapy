@@ -1,3 +1,5 @@
+> **HISTORICAL BACKGROUND (corrected 2026-10-19):** Dated old-GBM audit record, not current instructions or authorization to run analyses. Current goal/status: START_HERE.md. Simulation settings are assumptions, not measured treatment effects. Original approval, chronology and process claims are author-reported unless supported by retained logs. This plan is superseded by completed reports in this folder; v1 was superseded by v2.1. Review provenance is recorded in plan_review_record.md (reported model calls, not an independent-agent review).
+
 # Fix plan v1 (before review): finish everything still open on the GBM project
 
 Author: analysis assistant. Date: 2026-10-18. Status: DRAFT for review by PLAN_REVIEWER_BIOSTAT. Nothing below has been started.
@@ -5,7 +7,7 @@ Author: analysis assistant. Date: 2026-10-18. Status: DRAFT for review by PLAN_R
 ## Context (verified earlier in this project)
 - README_STATUS.md was corrected after a 35-claim audit (25 match, 2 minor, 7 fixed or flagged, 1 unverifiable) and written into the repo with the user's approval. Original bytes are saved as an artifact.
 - A kill-rate sensitivity grid (E_MAX ratio 100 to 8000, 61-patient adaptive-therapy simulation) was run exploratorily. Ratio-1000 re-run reproduced the committed output exactly.
-- Open items from the audit: ledger entries that still carry the old source or stale CI; Requirements.txt merge-conflict markers; CLAUDE.md says 56 tests, tests/ has 101 `def test_`; REPO_MIND_MAP row 34 stale; script numbers reused (15, 16, 22, 50-56); untracked run kits (2.0 GB untracked, 4.87 GB in kaggle_run); H-4 step 3 blocked (no eligible locked test set); controller thresholds (ADAPTIVE_THRESHOLD_OFF 0.80 / ON 1.0) never varied in the sweep.
+- Open items from the audit: ledger entries that still carry the old source or stale CI; Requirements.txt merge-conflict markers; CLAUDE.md says 56 tests, the historical suite had 101 collected cases (not 101 function definitions); resolved by ledger 2bo and superseded by current scratch-suite record; REPO_MIND_MAP row 34 stale; script-number collisions (historical list; exact current mapping is in archive_old_gbm/REPO_MIND_MAP.md section 13b); untracked run kits (historical size figures withdrawn here; dated measurement manifest/method missing); H-4 step 3 blocked (no eligible locked test set); controller thresholds (ADAPTIVE_THRESHOLD_OFF 0.80 / ON 1.0) never varied in the sweep.
 - Study rules (analysis_plan_v1.md): each test declared before data is read; a locked test set is used once; negatives are reported. H-2 and H-3 primaries (enhancing recurrence) are null; all-recurrence is a secondary endpoint and positive.
 
 ## Guardrails (apply to every step)
