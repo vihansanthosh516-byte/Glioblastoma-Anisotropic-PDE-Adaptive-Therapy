@@ -17,6 +17,8 @@ dependencies = [
     "seaborn",
     "scikit-learn",
     "joblib",
+    "pydicom",
+    "scikit-image",
 ]
 
 [project.scripts]

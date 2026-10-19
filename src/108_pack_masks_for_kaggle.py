@@ -31,7 +31,7 @@ m100 = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(m100)
 
 CODE = ["run_improved_aniso.py", "src/__init__.py", "src/radiation_model.py", "src/treatment_aware_pde.py",
-        "src/tmz_pk.py", "src/tmz_pk.py", "src/100_pde_manifest.py", "src/solver_monotone.py", "src/patient_stats.py", "src/run_manifest.py"]
+        "src/tmz_pk.py", "src/100_pde_manifest.py", "src/solver_monotone.py", "src/patient_stats.py", "src/run_manifest.py"]
 DATA = ["data/manifests/forecast_pairs_mu.csv", "data/manifests/split_mu.csv", "output/mu_glioma_cohort.json",
         "output/forecast_validation/dti_atlas_2mm.npz"]
 
@@ -43,6 +43,8 @@ def sha(p):
 def main():
     assert not os.environ.get("GBM_MASK_PACK"), "unset GBM_MASK_PACK: masks must be read from the NIfTI files"
     if PACK.exists():
+        if not os.environ.get("ALLOW_PACK_OVERWRITE"):
+            raise SystemExit(f"{PACK} exists; set ALLOW_PACK_OVERWRITE=1 to delete and rebuild it.")
         shutil.rmtree(PACK)
     (PACK / "repo").mkdir(parents=True)
     pairs = pd.read_csv(PROJECT_ROOT / "data" / "manifests" / "forecast_pairs_mu.csv")

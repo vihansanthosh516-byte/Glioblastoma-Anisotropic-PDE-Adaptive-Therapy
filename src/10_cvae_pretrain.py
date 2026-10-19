@@ -3,8 +3,17 @@
 ====================
 Contrastive-VAE (cVAE) using pre-processed subsampled data (15k cells x 2500 HVGs).
 Uses the already-computed nn_X.npy which is row-z-scored and memory-efficient.
+
+NOTE (2026-10-19 audit): historical Track A script. Training runs at import time (no main guard;
+60 epochs). No random seed is set, so results are not reproducible from this script. The split is
+per cell, not patient-disjoint (see vault/PAPER_FINDINGS_LEDGER.md entry 2o). Needs torch and anndata,
+which are not in Requirements.txt. Output paths now derive from __file__.
 """
-import os, sys, time, gc, resource, json
+import os, sys, time, gc, json
+try:
+    import resource
+except ImportError:  # native Windows Python has no resource module; RSS then reports 0
+    resource = None
 os.environ["OMP_NUM_THREADS"] = "2"
 os.environ["MKL_NUM_THREADS"] = "2"
 
@@ -15,7 +24,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.utils.data import DataLoader, TensorDataset
 
-ROOT = "."
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 OUT_DIR = os.path.join(ROOT, "output", "cgat")
 os.makedirs(OUT_DIR, exist_ok=True)
 
@@ -44,7 +53,7 @@ DROPOUT_RATE = 0.1
 AUG_DROPOUT = 0.1
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 
-def mem_mb(): return resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024
+def mem_mb(): return (resource.getrusage(resource.RUSAGE_SELF).ru_maxrss if resource else 0) / 1024
 def log(m): print(f"[{time.strftime('%H:%M:%S')}] {m}  RSS={mem_mb():.0f}MB", flush=True)
 
 # ---- 1. Load pre-processed data ----

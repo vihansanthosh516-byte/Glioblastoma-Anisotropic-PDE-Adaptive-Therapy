@@ -1,7 +1,10 @@
 #!/usr/bin/env python3
 """Script 111: reproduce the PREDICT-GBM evaluation on DEVELOPMENT patients only (TUM; Amendment 6 A6.6, A7.6).
 
-Checks that src/predictgbm_io.py rebuilds the released standard plan and model plans voxel for voxel, then reports
+Checks how closely src/predictgbm_io.py rebuilds the released standard plan and model plans voxel for voxel
+(mismatches are recorded, not required to be zero; see output key plan_reproduction_voxel_mismatch: exact standard-plan
+match for only 32/142 patients, max 56 voxel differences). The run manifest lists inputs=[] although PREDICT-GBM
+cases and released plans are read; that is a known provenance gap. Then reports
 development coverage for the standard plan and each published model. Test patients are never read here (the loader
 lock would refuse their recurrence anyway). This gives the bar our models must clear on development data.
 Output: output/predictgbm/dev_reproduce.json, dev_coverage_pairs.csv (+ manifest)

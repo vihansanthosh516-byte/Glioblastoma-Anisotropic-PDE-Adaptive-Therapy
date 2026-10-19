@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import shutil
 import sys
 from pathlib import Path as _Path
@@ -28,6 +29,8 @@ CODE = ["run_improved_aniso.py", "src/__init__.py", "src/radiation_model.py", "s
 
 def main():
     if PACK.exists():
+        if not os.environ.get("ALLOW_PACK_OVERWRITE"):
+            raise SystemExit(f"{PACK} exists; set ALLOW_PACK_OVERWRITE=1 to delete and rebuild it.")
         shutil.rmtree(PACK)
     (PACK / "repo").mkdir(parents=True)
     test = pg.test_ids()

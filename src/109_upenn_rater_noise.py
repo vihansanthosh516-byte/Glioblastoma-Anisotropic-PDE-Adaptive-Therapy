@@ -5,6 +5,9 @@ Why: no open glioma scan-rescan data exists (RIDER Neuro MRI and QIN-GBM are NIH
 (TCIA, CC BY 4.0, via NCI Imaging Data Commons) has the AIMI/BAMF AI segmentation of each scan and, for 220 scans
 (55 patients), a version corrected by a board-certified radiologist (radiologist 3: 100 scans, radiologist 11: 120;
 no scan was corrected by both). So this measures how much an expert changes a tool's mask on the SAME scan.
+(2026-10-19 audit: the licence/access statements and the claim that no open scan-rescan set exists are the
+author's, not demonstrated by repository evidence; this is AI-vs-expert-corrected disagreement, not scan-rescan
+reliability.)
 Labels: 1 necrosis, 2 edema, 3 enhancing lesion. Regions: core = necrosis + enhancing (same definition as MU labels
 1 + 3), enhancing, whole = all three.
 Per scan and region (both masks non-empty): Dice, ASSD (mm), HD95 (mm), |ln(V_ai / V_rad)|; also Dice after

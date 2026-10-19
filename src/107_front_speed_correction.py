@@ -61,7 +61,7 @@ def main():
     for (D, rho), r7 in v7.items():
         c = 2 * math.sqrt(D * rho)
         target = r7[f"speed_h{m97.H_REF:g}"]
-        lo, hi = 0.05, 2.0
+        lo, hi = 0.05, 2.0  # NOTE 2026-10-19: no bracket check; pass_after below is the only validity test
         for _ in range(18):
             mid = math.sqrt(lo * hi)
             v = speed_at(mid * D, rho, H, c)

@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Script 110: 3D tumour-forecast viewer, research prototype of a clinical tool (GRAND_PLAN section 11; Amendment 7 A7.5).
 
-Not for patient care. Descriptive only: no endpoint is computed here.
+Not for patient care. Descriptive only: no cohort endpoint is computed here. The per-pair Dice against the next-scan truth and
+against persistence is computed, saved and displayed for the one selected pair.
 For one MU forecast pair it builds a single self-contained HTML page:
   brain outline (see-through) | tumour core today (input scan) | model forecast (visible-tumour surface u >= U_VISIBLE)
   at several days across the interval (slider) | true core at the next scan | panel with dates, volumes, Dice.
