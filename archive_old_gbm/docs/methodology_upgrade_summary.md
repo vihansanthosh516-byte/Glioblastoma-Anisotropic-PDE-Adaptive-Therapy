@@ -4,7 +4,7 @@
 
 ## Overview
 
-This document summarizes the transformation of the GBM computational oncology platform from a simulation framework into a patient-specific clinical decision support tool with algorithmic novelty and rigorous spatial validation.
+Historical description of proposed model-fitting, MPC and spatial-metric modules. No clinical decision-support utility or literature novelty is established. Corrected 2026-10-19; current goal is probabilistic RANO (`../../START_HERE.md`).
 
 ---
 
@@ -34,14 +34,14 @@ Solve: min_{ρ, D} ||V_sim(ρ, D, Δt) - V₁||²
 Subject to: 0.005 ≤ ρ ≤ 0.1 /day, 0.001 ≤ D ≤ 0.05 mm²/day
 ```
 
-**Algorithm**:
+**Algorithm (historical settings, not independently verified patient calibration):**
 - Surrogate ODE model: dV/dt = ρ·V·(1-V/K) + c_diff·D·V^(1/3) (proliferation + radial diffusion)
 - L-BFGS-B optimization with physiological bounds
 - Bootstrap resampling (N=100) for 95% confidence intervals
 
 **Integration**: `src/50_clinical_cdss_app.py` CLI flags `--estimate-params --t0-volume --t1-volume --delta-t`
 
-**Validation Benchmarks**:
+**Historical benchmark assertions — unverified without exact run metrics**:
 - RMSE < 5% for noise-free synthetic data ✓
 - RMSE < 15% for 10% Gaussian noise ✓
 - Convergence within 50 iterations ✓
@@ -49,7 +49,7 @@ Subject to: 0.005 ≤ ρ ≤ 0.1 /day, 0.001 ≤ D ≤ 0.05 mm²/day
 
 ---
 
-### Tier 2: Uncertainty-Aware Adaptive-Horizon MPC (Algorithmic Novelty)
+### Tier 2: Uncertainty-Aware Adaptive-Horizon MPC (historical model design)
 
 **Module**: `src/52_robust_mpc_controller.py`
 
@@ -73,7 +73,7 @@ where J is evaluated over (ρ±15%, D±15%) parameter samples
 
 **Integration**: Drop-in replacement for `run_mpc_adaptive_3d()` with identical output schema plus diagnostics (`horizon_history`, `growth_rate_history`, `cost_variance`)
 
-**Benchmark Results (50 Monte Carlo trials, ±15% parameter perturbation)**:
+**Saved model benchmark** (`../../output/robust_mpc_benchmark.json`; trial count and perturbation protocol need a run manifest):
 | Metric | Standard MPC | Robust MPC | Target |
 |--------|--------------|------------|--------|
 | Drug Administration | 32.0% ± 0.3% | 31.1% ± 0.4% | 25–40% |
@@ -81,14 +81,14 @@ where J is evaluated over (ρ±15%, D±15%) parameter samples
 | Final Volume (mm³) | 0.01 ± 0.01 | 0.05 ± 0.05 | <1 |
 | Cost Trajectory Variance | 0.634 | 0.632 | Reduced |
 
-**Key Achievements**:
+**Model-only interpretation:**
+
+The rounded table matches `robust.*`/`standard.*` in that JSON. It has conflicting variance fields: `cost_variance_reduction_pct=0.27573` versus `variance_reduction_pct=-31.75624`. They must not be silently equated or used to claim robust clinical benefit. Two-volume fitting has severe identifiability limits (rho lower-bound hits 124/154; D bound hits 147/154; ledger 2bj).
+
+**Historical assertions:**
 - Dose-sparing ≥60% ✓
 - Adaptive horizon adjusts 7–21 days based on dynamics ✓
-<<<<<<< HEAD
-- Non-inferior TTP vs standard MPC (paired t = −1.00, p = 0.35) ✓
-=======
-- Non-inferior TTP vs standard MPC (p > 0.05) ✓
->>>>>>> 1be6df8e9737fb3a9f7ee274b3822d40fcc8b97c
+- No confirmatory non-inferiority result is established. A nonsignificant paired superiority test is not a non-inferiority test; a prespecified margin and matching trial output are missing.
 
 ---
 
@@ -100,13 +100,13 @@ where J is evaluated over (ρ±15%, D±15%) parameter samples
 
 1. **Dice Similarity Coefficient (DSC)**
    - DSC = 2|A ∩ B| / (|A| + |B|)
-   - Clinical threshold: DSC ≥ 0.70 (good spatial agreement)
+   - Chosen research threshold (clinical source absent): DSC ≥ 0.70 (good spatial agreement)
    - Range: [0, 1], 1 = perfect overlap
 
 2. **Hausdorff Distance (HD / HD95)**
    - HD = max{ sup inf ||a-b||, sup inf ||b-a|| }
    - HD95: 95th percentile robust variant
-   - Clinical threshold: HD ≤ 5mm (good boundary alignment)
+   - Chosen research threshold (clinical source absent): HD ≤ 5mm (good boundary alignment)
    - Units: mm (grid spacing DX=1.0 mm)
 
 3. **Mean Surface Distance (MSD)**
@@ -121,31 +121,33 @@ where J is evaluated over (ρ±15%, D±15%) parameter samples
 - Added to `master_cohort_summary.json` under `spatial_metrics`
 - Three new panels in master canvas (E: DSC, F: HD, G: DSC vs HD scatter)
 
-**Validation Benchmarks** (Anisotropic vs Isotropic cohort):
+**Unverified historical spatial summaries** (aniso-vs-iso simulation, not observed recurrence):
+
+The current `../../output/master_cohort_summary.json` has no top-level `spatial_metrics` field. Exact per-patient source and aggregation for the following figures are missing; do not treat them as verified measurements.
 - Mean DSC: 0.21 ± 0.02 (low due to fundamental model difference - anisotropic tracts vs isotropic)
 - Mean HD: 26.3 ± 3.2 mm
 - Mean MSD: 9.0 ± 0.7 mm
-- Clinical thresholds NOT met (expected - different diffusion physics)
+- Chosen thresholds not met; failure does not validate distinct biology
 
-**Note**: The low DSC/high HD values are expected and scientifically meaningful - they quantify the spatial divergence between anisotropic tract-guided invasion and isotropic growth. This validates the anisotropic model's distinct spatial predictions.
+**Note**: The low DSC/high HD values are expected and scientifically meaningful - they quantify the spatial divergence between anisotropic tract-guided invasion and isotropic growth. Model disagreement does not validate either prediction against patients.
 
 ---
 
-## Clinical Relevance Discussion
+## Translation limits
 
-### From Simulation to Decision Support
+### Historical proposed uses (unvalidated)
 
 | Capability | Prior | Upgraded | Clinical Impact |
 |------------|-------|----------|-----------------|
-| Patient ρ/D | Population average | Patient-specific from longitudinal MRI | Enables personalized growth prediction |
-| MPC Robustness | Deterministic | Risk-averse (mean + λ·std) | Safer dosing under parameter uncertainty |
-| Horizon Adaptivity | Fixed 14 days | 7–21 days dynamic | Matches clinical monitoring cadence |
+| Patient ρ/D | Population average | Fitted model parameters | D is poorly identifiable from two volumes; patient forecast benefit unproven |
+| MPC Robustness | Deterministic | Risk-averse (mean + λ·std) | Assumed-model objective; no patient safety evidence |
+| Horizon Adaptivity | Fixed 14 days | 7–21 days dynamic | Chosen model horizon; clinical cadence match unverified |
 | Validation | Volume scalars only | DSC/HD/MSD 3D metrics | Rigorous spatial agreement assessment |
-| Reproducibility | Parameter hash | Mathematical provenance + SHA-256 | Audit-grade offline certification |
+| Reproducibility | Parameter hash | Mathematical provenance + SHA-256 | Hash presence alone does not certify complete provenance |
 
 ### Translational Pathway
 
-1. **Immediate**: Research decision support for adaptive therapy trial design
+1. **Historical proposal**: Simulated adaptive-policy comparisons; no validated trial-design tool
 2. **Near-term**: Integration with clinical MRI pipelines (DICOM import, segmentation)
 3. **Future**: Prospective clinical trial endpoint (TTP at reduced drug exposure)
 
@@ -153,46 +155,31 @@ where J is evaluated over (ρ±15%, D±15%) parameter samples
 
 ## Validation Checklist
 
-### Tier 1 Success Criteria ✓
+### Tier 1 Historical assertions (not independently verified)
 - [x] Parameter estimation converges in < 50 iterations
 - [x] RMSE < 5% for noise-free synthetic data
 - [x] RMSE < 15% for 10% Gaussian noise
 - [x] Estimates fall within physiological bounds
 - [x] HTML dossier displays estimated parameters + CIs
 
-### Tier 2 Success Criteria ✓
+### Tier 2 Historical model assertions
 - [x] Robust MPC achieves ≥60% dose-sparing
 - [x] Cost variance reduced vs standard MPC
 - [x] Adaptive horizon adjusts 7–21 days correctly
-<<<<<<< HEAD
-- [x] Non-inferior TTP vs standard MPC (paired t = −1.00, p = 0.35)
-=======
-- [x] TTP non-inferior to standard MPC (paired t-test p > 0.05)
->>>>>>> 1be6df8e9737fb3a9f7ee274b3822d40fcc8b97c
+- [ ] TTP non-inferiority remains unverified; the conflicting p-value alternatives do not establish it.
 
-### Tier 3 Success Criteria ✓
+### Tier 3 Historical integration assertions (unverified)
 - [x] DSC cohort mean computed (0.21 ± 0.02 - expected low for anisotropic vs isotropic)
 - [x] HD cohort mean computed (26.3 ± 3.2 mm)
 - [x] Spatial metrics added to `master_cohort_summary.json`
 - [x] New panels E, F, G in `master_cohort_synthesis.png`
 
-<<<<<<< HEAD
-### Tier 4 Success Criteria (In Progress)
-- [x] Abstract updated in `README.md`
-- [x] `docs/methodology_upgrade_summary.md` created
-- [ ] `POSTER_KEY_FINDINGS.md` template updated
-- [ ] Positioning statement reflects all 3 tiers
-=======
-### Tier 4 Success Criteria (Complete)
-- [x] Abstract updated in `README.md`
-- [x] `docs/methodology_upgrade_summary.md` created
-- [x] `POSTER_KEY_FINDINGS.md` template updated (in `output/`)
-- [x] Positioning statement reflects all 3 tiers
->>>>>>> 1be6df8e9737fb3a9f7ee274b3822d40fcc8b97c
+### Tier 4 Historical status unresolved
+The two merged versions disagree about completion. No dated run/edit record resolves that history; current guidance supersedes this checklist.
 
 ---
 
-## Files Modified / Added
+## Historical file list (not an execution record)
 
 | Path | Purpose |
 |------|---------|
@@ -201,15 +188,15 @@ where J is evaluated over (ρ±15%, D±15%) parameter samples
 | `src/53_spatial_metrics.py` | Tier 3: Spatial validation metrics |
 | `src/50_clinical_cdss_app.py` | CLI integration for Tiers 1 & 2 |
 | `src/45_validation_synthesis.py` | Tier 3 spatial metrics + canvas panels |
-| `tests/test_inverse_estimation.py` | Tier 1 unit tests (10 passed) |
-| `tests/test_robust_mpc.py` | Tier 2 unit tests (11 passed) |
-| `tests/test_spatial_metrics.py` | Tier 3 unit tests (17 passed) |
+| `tests/test_inverse_estimation.py` | Tier 1 unit tests (historical 10-pass report; transcript absent) |
+| `tests/test_robust_mpc.py` | Tier 2 unit tests (historical 11-pass report; transcript absent) |
+| `tests/test_spatial_metrics.py` | Tier 3 unit tests (historical 17-pass report; transcript absent) |
 | `docs/methodology_upgrade_summary.md` | This document |
 | `README.md` | Updated abstract & key findings table |
 
 ---
 
-## Post-Implementation Commands
+## Historical command examples (not authorized current runs)
 
 ```bash
 # Regenerate full pipeline with upgrades
@@ -232,8 +219,6 @@ venv\Scripts\python.exe src\53_spatial_metrics.py --validate
 
 ## Final Positioning Statement
 
-<<<<<<< HEAD
-> "We developed a patient-specific computational oncology platform that integrates 3D anisotropic DTI tract modeling, inverse biophysical parameter estimation, uncertainty-aware adaptive MPC control, and spatial validation with Dice/Hausdorff metrics into a unified research decision-support tool for glioblastoma treatment planning."
-=======
-> "We developed a patient-specific computational oncology platform that integrates **3D anisotropic DTI tract modeling**, **inverse biophysical parameter estimation**, **uncertainty-aware adaptive MPC control**, and **spatial validation with Dice/Hausdorff metrics** into a unified research decision-support tool for glioblastoma treatment planning. The framework spans three interlocking tracks: (A) MSOS — single-cell multi-omics through causal GRN to invasion dynamics and clinical validation; (B) 10-Month PDE Cohort — anisotropic diffusion, stromal coupling, adaptive therapy, and global sensitivity; (C) Digital Twin Reactor — inverse estimation, robust MPC, 3D DTI solver, RL adaptive steering, and virtual cohort validation. Together, these establish a reproducible, biophysically grounded pipeline for in-silico clinical trial design and adaptive therapy optimization."
->>>>>>> 1be6df8e9737fb3a9f7ee274b3822d40fcc8b97c
+> Historical computational modules explore assumed growth and therapy models. Patient-specific calibration, clinical benefit, safe dosing, complete reproducibility and clinical trial utility are not established.
+
+Historical prior constants, bootstrap settings, adaptive-horizon conditions and integration flags require exact code revision/run provenance before reuse. The checklist is author-reported, not proof each capability executed. No benchmark or pipeline rerun was performed; frozen/spent-set rules still apply.

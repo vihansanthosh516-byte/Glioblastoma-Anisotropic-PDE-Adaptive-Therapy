@@ -6,6 +6,8 @@
 **Features:** Top 100 HVGs (row-z-scored)
 **Split:** 80/20 stratified (12,000 train / 3,000 test)
 
+Evidence: root `../../output/benchmark_comparison.tsv`. Historical 80/20 split is by cell, not patient; donor overlap, class composition and test-set selection limit inference. The corrected patient-fold evaluation differs (`../../vault/PAPER_FINDINGS_LEDGER.md` 2o). Feature count is an implementation setting, not independent validation.
+
 ## Overall Metrics
 
 | Method                          |   Accuracy |   Macro F1 |   Weighted F1 |   Macro Precision |   Macro Recall |   Macro AUC (OvR) |   Params |   Best Test Acc |
@@ -27,7 +29,7 @@
 ## Key Findings
 
 - **Best overall: Random Forest (Classical)** (Macro F1 = 0.7248)
-- Classical methods (LR, RF) outperform deep learning on this small-feature, tabular-style data.
-- The Hybrid method (injecting LR coefficients as attention bias) did not improve over the Transformer baseline, likely due to the limited sequence length (100 genes) and shallow model.
-- All methods struggle most with **Periphery** class (intermediate biology between Core and Healthy).
-- Recommendation for science fair: Lead with **Random Forest** as the primary result, show Transformer as 'deep learning attempt', Hybrid as 'novel architecture exploration'.
+- LR/RF score higher than these two deep models on this selected cell split; no broad model-class conclusion follows.
+- Hybrid has slightly higher saved aggregate accuracy/F1/AUC than Transformer on this split. No independent uncertainty comparison establishes general superiority or the cause of the difference.
+- Periphery has the lowest listed per-class F1; this does not establish an intermediate biological state. Exact source for this per-class table remains unverified here.
+- RF has the highest macro-F1 among these four saved models, not a validated patient-level or novelty result. Current science-fair goal is in START_HERE; this benchmark does not determine presentation priorities.

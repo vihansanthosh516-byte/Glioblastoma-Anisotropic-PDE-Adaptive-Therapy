@@ -2,16 +2,20 @@
 
 # MONTH 10 AUDIT LOG
 
-Generated: 2026-09-03T19:14:59
+Recorded generation timestamp: 2026-09-03T19:14:59 (author-reported). Annotated 2026-10-19; not a current environment or full execution audit.
 
-## Environment
+## Recorded historical environment (not independently reproduced)
+
+No environment lock or original command log is linked. These versions are historical assertions, not current installed-version claims.
 - Python interpreter: `C:\Users\vihan\AppData\Local\Python\pythoncore-3.14-64\python.exe`
 - Python version: 3.14.4
 - numpy 2.4.4
 - scipy 1.18.0
 - matplotlib 3.11.1
 
-## Metric JSON inputs (read-only)
+## Historical root-output JSON inventory
+
+Paths refer to root output, not this archive. Sizes are the old recorded snapshot; original measurement log is absent. Current sizes checked 2026-10-19: 3d_extension_summary.json 6731 bytes and adaptive_geometry_metrics.json 81184 bytes. No artifact regenerated.
 | File | Size |
 |---|---|
 | `output\3d_extension_summary.json` | 5,600 bytes |
@@ -42,7 +46,9 @@ Generated: 2026-09-03T19:14:59
 | `output\sobol_sensitivity_results.json` | 894 bytes |
 | `output\stromal_feedback_metrics.json` | 6,260 bytes |
 
-## Generated PNG deliverables
+## Recorded PNG deliverables
+
+Dated inventory, not proof all files were generated in one successful run. Root master_cohort_synthesis.png remains 760412 bytes, 4081x3644. Other dimensions require individual checks.
 | File | Size | Pixel dims |
 |---|---|---|
 | `output\65_master_summary_figure.png` | 405,276 bytes | 4770x3543 |
@@ -71,23 +77,29 @@ Generated: 2026-09-03T19:14:59
 | `output\stromal_tensor_validation.png` | 460,901 bytes | 3940x2389 |
 
 ## Validation summary
-- Overall validation: **PASS**
+- Historical internal-check report: **PASS**. Not patient/biological validation; original execution transcript is absent.
 - Phase 1 (anisotropic) Df bounds (1.0, 2.0): 8/8 pass
 - Phase 2 (stromal) Df bounds (0.4, 1.0), front_corr floor 0.9: 8/8 pass
   (realized front_corr range 0.9355-0.9523)
 - Phase 3 (adaptive) drug_reduction in (0,1), TTP>0: 8/8 pass
 
-## Spherical baseline baseline (D3)
-- Isotropic baseline cache: `output\isotropic_baseline_metrics.json` (present)
+## Spherical baseline cache (D3)
+- Isotropic baseline cache: `output\isotropic_baseline_metrics.json` (present in root output as of 2026-10-19)
 
-## Spatial-render fallback usage (Panel A)
+## Historical self-reported fallback flags (Panel A)
+
+Original run log is absent; flags are not independently verified.
 - anisotropic fallback used: False
 - stromal fallback used: False
 
-## `__pycache__` cleanup
-- `2290` `__pycache__` directories removed under src/ and venv/ (D5 idempotency — bytecode regenerates on next run).
+## Historical self-reported cleanup
+
+No command log independently establishes this count; not a current filesystem inventory.
+- `2290` `__pycache__` directories removed under src/ and venv/ (D5 idempotency â€” bytecode regenerates on next run).
 
 ## Notes
 - Bash `run_all.sh` requires Git Bash / WSL on Windows. PowerShell equivalent can be substituted.
 - `output/*.npz` are git-ignored per D6 (heavy per-patient arrays not pushed; JSON + PNG evidence trail is tracked).
-- Untagged `.npz` arrays remain on disk for reproducibility but are excluded from git tracking.
+- Presence of all old untagged arrays is unverified. Untracked arrays do not establish reproducibility; exact input/configuration/hash manifests are required.
+
+The reported 8/8 checks apply only to chosen model ranges (Df, correlation, drug fraction and positive TTP), not patient efficacy or clinical acceptance. Exact source keys, criteria and original run log are needed before reuse. Model clamp/resolution limits remain (ledger 2q). Current goal: `../../START_HERE.md`.
