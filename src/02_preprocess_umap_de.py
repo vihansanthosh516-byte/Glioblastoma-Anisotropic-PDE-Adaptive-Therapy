@@ -53,7 +53,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import seaborn as sns
 
-ROOT = "."
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # project root (was "."; cwd-dependent)
 OUT_DIR       = os.path.join(ROOT, "output")
 H5_IN         = os.path.join(OUT_DIR, "01_filtered_three_class.h5ad")
 

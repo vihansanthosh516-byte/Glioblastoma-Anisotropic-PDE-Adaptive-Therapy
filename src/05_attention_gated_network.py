@@ -55,7 +55,7 @@ try:
 except ImportError:
     pass
 
-ROOT    = "."
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # project root (was "."; cwd-dependent)
 OUT_DIR = os.path.join(ROOT, "output")
 NPY_X   = os.path.join(OUT_DIR, "nn_X.npy")
 NPY_Y   = os.path.join(OUT_DIR, "nn_y.npy")

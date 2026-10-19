@@ -21,7 +21,7 @@ except ImportError:  # native Windows Python has no resource module; RSS then re
 import numpy as np
 import pandas as pd
 
-ROOT    = "."
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # project root (was "."; cwd-dependent)
 OUT_DIR = os.path.join(ROOT, "output")
 TSV_DE_CP     = os.path.join(OUT_DIR, "02_de_Core_vs_Peri.tsv")
 TSV_DE_CH     = os.path.join(OUT_DIR, "02_de_Core_vs_Healthy.tsv")

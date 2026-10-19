@@ -41,7 +41,7 @@ import pandas as pd
 import scanpy as sc
 from sklearn.model_selection import train_test_split
 
-ROOT    = "."
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # project root (was "."; cwd-dependent)
 OUT_DIR = os.path.join(ROOT, "output")
 H5_SUB  = os.path.join(OUT_DIR, "02_adata_subsampled.h5ad")
 

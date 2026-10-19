@@ -38,8 +38,8 @@ os.environ["OPENBLAS_NUM_THREADS"] = "22"
 os.environ["MKL_NUM_THREADS"] = "22"
 os.environ["NUMEXPR_NUM_THREADS"] = "22"
 
-DATA_DIR = "C:/Users/vihan/multiomic-gbm/scrna"
-OUT_DIR = "./output"
+DATA_DIR = os.environ.get("GBM_DATA_DIR", "C:/Users/vihan/multiomic-gbm") + "/scrna"  # override with GBM_DATA_DIR (default is the original machine path)
+OUT_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "output")  # was "./output" (cwd-dependent)
 os.makedirs(OUT_DIR, exist_ok=True)
 
 OUT_H5AD        = os.path.join(OUT_DIR, "01_filtered_three_class.h5ad")
