@@ -9,6 +9,19 @@ import torch.optim as optim
 from torch.utils.data import DataLoader, Dataset
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score, f1_score, roc_auc_score
+# GLOBAL_SEED_2026_10_19: fixed seed added by the audit corrections (legacy script was unseeded); outputs from earlier runs came from unseeded runs.
+import random as _random_seed
+_random_seed.seed(42)
+try:
+    import numpy as _np_seed
+    _np_seed.random.seed(42)
+except ImportError:
+    pass
+try:
+    import torch as _torch_seed
+    _torch_seed.manual_seed(42)
+except ImportError:
+    pass
 
 # =====================================================================
 # 1. HARDWARE ACCELERATION SETUP

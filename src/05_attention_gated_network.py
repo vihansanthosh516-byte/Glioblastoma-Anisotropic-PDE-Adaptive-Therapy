@@ -41,6 +41,19 @@ import numpy as np
 import pandas as pd
 import torch, torch.nn as nn, torch.nn.functional as F
 from torch.utils.data import DataLoader, TensorDataset
+# GLOBAL_SEED_2026_10_19: fixed seed added by the audit corrections (legacy script was unseeded); outputs from earlier runs came from unseeded runs.
+import random as _random_seed
+_random_seed.seed(42)
+try:
+    import numpy as _np_seed
+    _np_seed.random.seed(42)
+except ImportError:
+    pass
+try:
+    import torch as _torch_seed
+    _torch_seed.manual_seed(42)
+except ImportError:
+    pass
 
 ROOT    = "."
 OUT_DIR = os.path.join(ROOT, "output")

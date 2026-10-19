@@ -17,6 +17,19 @@ import torch
 
 
 import os as _os
+# GLOBAL_SEED_2026_10_19: fixed seed added by the audit corrections (legacy script was unseeded); outputs from earlier runs came from unseeded runs.
+import random as _random_seed
+_random_seed.seed(42)
+try:
+    import numpy as _np_seed
+    _np_seed.random.seed(42)
+except ImportError:
+    pass
+try:
+    import torch as _torch_seed
+    _torch_seed.manual_seed(42)
+except ImportError:
+    pass
 _os.chdir(_os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))))  # historical script uses cwd-relative output/ paths; anchor cwd at the project root
 
 def load_data(device: torch.device) -> Tuple[torch.Tensor, List[str], torch.Tensor]:

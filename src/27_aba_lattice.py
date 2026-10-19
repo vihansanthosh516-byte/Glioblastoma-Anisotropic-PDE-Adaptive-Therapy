@@ -27,6 +27,19 @@ OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
 import numpy as np
 import torch
+# GLOBAL_SEED_2026_10_19: fixed seed added by the audit corrections (legacy script was unseeded); outputs from earlier runs came from unseeded runs.
+import random as _random_seed
+_random_seed.seed(42)
+try:
+    import numpy as _np_seed
+    _np_seed.random.seed(42)
+except ImportError:
+    pass
+try:
+    import torch as _torch_seed
+    _torch_seed.manual_seed(42)
+except ImportError:
+    pass
 
 
 class CellularAutomaton:
