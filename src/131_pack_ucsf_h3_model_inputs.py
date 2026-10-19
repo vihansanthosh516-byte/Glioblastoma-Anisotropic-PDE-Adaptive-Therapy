@@ -74,6 +74,7 @@ def main():
     man = {"script": "131_pack_ucsf_h3_model_inputs", "n_patients": len(arr), "channels": 10, "alptdg_labels_read": 0,
            "pack_mb": round(out.stat().st_size / 1e6, 1), "pack_sha256": hashlib.sha256(out.read_bytes()).hexdigest(),
            "visibility": "private"}
+    (PROJECT_ROOT / "output" / "predictgbm" / "h3").mkdir(parents=True, exist_ok=True)
     (PROJECT_ROOT / "output" / "predictgbm" / "h3" / "ucsf_inputs_2mm_manifest.json").write_text(json.dumps(man, indent=1))
     print(json.dumps(man, indent=1))
 

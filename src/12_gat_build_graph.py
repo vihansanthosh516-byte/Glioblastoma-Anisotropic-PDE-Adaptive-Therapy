@@ -5,14 +5,23 @@ Build k-NN graph in cVAE latent space with categorical edge features.
 
 Uses the 15k subsampled cells (already balanced) from the cVAE latent space.
 Metadata (patient, region) loaded from the subsampled h5ad file.
+
+NOTE (2026-10-19 audit): historical Track A script. Runs at import (no main guard). Needs anndata (not in
+Requirements.txt). The edge attributes (same_region, transition type, region difference) are derived from the
+tissue labels, so the graph encodes class information; that is a leakage route for any classifier using them.
+Paths now derive from __file__. When audited, gat_edge_index.npy, gat_edge_attr.npy and gat_meta.json were absent.
 """
-import os, time, resource, gc, json
+import os, time, gc, json
+try:
+    import resource
+except ImportError:  # native Windows Python has no resource module; RSS then reports 0
+    resource = None
 import numpy as np
 import pandas as pd
 from sklearn.neighbors import NearestNeighbors
 import anndata as ad
 
-ROOT = "."
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 OUT_DIR = os.path.join(ROOT, "output", "cgat")
 
 LATENT_PATH = os.path.join(OUT_DIR, "cvae_latent.npy")      # (15000, 32)
@@ -24,7 +33,7 @@ GRAPH_META = os.path.join(OUT_DIR, "gat_meta.json")
 
 K = 15  # k-NN neighbors
 
-def mem_mb(): return resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024
+def mem_mb(): return (resource.getrusage(resource.RUSAGE_SELF).ru_maxrss if resource else 0) / 1024
 def log(m): print(f"[{time.strftime('%H:%M:%S')}] {m}  RSS={mem_mb():.0f}MB", flush=True)
 
 # ---- 1. Load latent embeddings ----

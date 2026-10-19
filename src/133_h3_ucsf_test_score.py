@@ -63,6 +63,9 @@ def label(z, sid, tp):
 def main():
     if not is_frozen():
         raise SystemExit("not frozen: configs/h3_frozen.yaml and tag h3-frozen are required")
+    if (OUT / "ucsf_test_results.json").exists() and not os.environ.get("ALLOW_SPENT_RESCORE"):
+        raise SystemExit("ucsf_test_results.json already exists: the UCSF H-3 set is spent; set ALLOW_SPENT_RESCORE=1 only to overwrite deliberately")
+    # NOTE 2026-10-19 audit: this gate does not check runs_allowed, nor hash the ALPTDG labels or the released U-Net inputs.
     cfg = yaml.safe_load(FROZEN.read_text())
     lf = OUT / "ucsf_logits_2mm.npz"
     if sha(lf) != cfg["final_model"]["ucsf_logits_sha256"]:

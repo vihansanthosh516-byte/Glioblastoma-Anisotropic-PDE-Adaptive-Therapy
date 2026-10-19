@@ -6,7 +6,10 @@ the script 131 pack (env GBM_UCSF_PACK; pre-op inputs only, no ALPTDG label). Sc
 
 
 Final model by the GRAND_PLAN 15 selection rule (highest out-of-fold dev enhancing coverage at equal volume; on the
-137 common patients: hybrid_rank_mu 0.8529 > ensemble GliODIL+U-Net 0.8500 > hybrid_mri_rank_mu 0.8519; ledger 2aw).
+137 common patients: hybrid_rank_mu 0.8529 > hybrid_mri_rank_mu 0.8519 > ensemble GliODIL+U-Net 0.8500; ledger 2aw; copied from script 122.
+NOTE 2026-10-19 audit: by these values hybrid_rank_mu is the highest, so choosing hybrid_mri_rank_mu rests on
+Amendment 11 (C1), not on this rule. Actual outputs: output/predictgbm/h3_final/ucsf_logits_2mm.npz,
+final_model_state.pt, final_train.json (the 'final/test_logits_2mm.npz' line below belongs to script 122).
 Arm hybrid_rank_mu of script 115: inputs core, edema, wm, gm, csf, brain, distance, M1 density; BCE + Dice + soft top-k
 ranking loss; training data = all 142 TUM development patients + the 334 MU pairs (script 121 pack); 15 epochs (the
 validated setting), seed 20261009, same network and optimiser as script 115.

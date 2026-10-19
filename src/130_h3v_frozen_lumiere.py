@@ -15,6 +15,7 @@ from __future__ import annotations
 import hashlib
 import importlib.util
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path as _Path
@@ -27,7 +28,9 @@ from scipy.stats import wilcoxon
 PROJECT_ROOT = _Path(__file__).resolve().parent.parent
 FROZEN = PROJECT_ROOT / "configs" / "h3v_frozen.yaml"
 OUT_JSON = PROJECT_ROOT / "output" / "h3v_test.json"
-OUT_CSV = PROJECT_ROOT / "output" / "h3v_test_pairs.csv"
+OUT_CSV = PROJECT_ROOT / "output" / "h3v_test_pairs.csv"  # only a name stem: the CSVs written are h3v_test_pairs_<segmenter>.csv
+# NOTE 2026-10-19 audit: is_frozen() checks that the config and tag exist; it does not verify the config equals the tagged
+# version or enforce runs_allowed. Missing daysRT/MGMT are imputed to the frozen median / unmethylated + indicator.
 sys.path.insert(0, str(PROJECT_ROOT))
 sys.path.insert(0, str(PROJECT_ROOT / "src"))
 
@@ -126,6 +129,8 @@ def run_segmenter(name: str, cfg: dict, demo: pd.DataFrame) -> dict:
 def main() -> None:
     if not is_frozen():
         raise SystemExit("not frozen: configs/h3v_frozen.yaml + tag h3v-frozen required")
+    if OUT_JSON.exists() and not os.environ.get("ALLOW_SPENT_RESCORE"):
+        raise SystemExit("h3v_test.json already exists: the LUMIERE set is spent; set ALLOW_SPENT_RESCORE=1 only to overwrite deliberately")
     cfg = yaml.safe_load(FROZEN.read_text())
     demo = load_demo()
     res = {"script": "130_h3v_frozen_lumiere",
