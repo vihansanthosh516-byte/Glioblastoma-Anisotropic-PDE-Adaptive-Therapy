@@ -1,3 +1,4 @@
+# NOTE (2026-10-19 audit): historical legacy script; not part of the current RANO project. Metric helpers only. dice_score returns 1.0 when both masks are empty (a convention that can inflate apparent agreement if empty cases are included).
 """Metrics for retrospective longitudinal tumor-volume validation."""
 from __future__ import annotations
 

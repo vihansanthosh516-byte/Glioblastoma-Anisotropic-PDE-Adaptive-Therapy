@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# NOTE (2026-10-19 audit): historical legacy script; not part of the current RANO project. Heavy multi-patient subprocess pipeline: do not run in place. The '203+ patients' count is a header claim, not checked against the current inventory; there is no global seed or freeze gate. Paths are cwd-relative, so cwd is anchored at the project root.
 """
 Batch Digital Twin Pipeline - Process All 203+ Patients
 =======================================================
@@ -28,6 +29,9 @@ log_lock = threading.Lock()
 results = []
 failures = []
 
+
+import os as _os
+_os.chdir(_os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))))  # cwd-relative output/ paths below; anchor cwd at the project root
 
 def log(msg: str):
     """Thread-safe logging with timestamp."""

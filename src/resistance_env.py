@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# NOTE (2026-10-19 audit): historical legacy script; not part of the current RANO project. The docstring's 'validated' refers to a prior model, not an external validation: this environment encodes assumed resistant-clone dynamics, so 'over-dosing selects for resistance' is a model consequence, not an empirical finding. Seed behaviour in reset was not verified.
 """Resistance-aware 3D anisotropic PDE environment for adaptive therapy.
 
 Extends the FastPDESolver from 64_virtual_cohort_simulation with a resistant

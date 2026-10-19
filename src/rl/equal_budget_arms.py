@@ -1,3 +1,4 @@
+# NOTE (2026-10-19 audit): historical legacy script; not part of the current RANO project. Simulation arm construction (four equal-drug-budget arms) that imports policy/training definitions from script 66; no independent clinical evidence.
 """
 Equal-drug-budget treatment arms shared by scripts 60, 62, 64 and 65.
 

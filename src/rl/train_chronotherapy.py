@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# NOTE (2026-10-19 audit): historical legacy script; not part of the current RANO project. A training job (default 200,000 timesteps, seed 42), not a check; do not run casually. Default model/log paths are now rooted at the project root.
 """
 Phase 13: Circadian-Aware RL Training (PPO/SAC)
 ================================================
@@ -62,8 +63,8 @@ def train_ppo(
     vf_coef: float = 0.5,
     max_grad_norm: float = 0.5,
     seed: int = 42,
-    save_path: str = "output/phase13_ppo_chronotherapy",
-    log_dir: str = "output/logs/phase13_ppo",
+    save_path: str = __import__("os").path.join(__import__("os").path.dirname(__import__("os").path.dirname(__import__("os").path.dirname(__import__("os").path.abspath(__file__)))), "output", "phase13_ppo_chronotherapy"),  # was cwd-relative
+    log_dir: str = __import__("os").path.join(__import__("os").path.dirname(__import__("os").path.dirname(__import__("os").path.dirname(__import__("os").path.abspath(__file__)))), "output", "logs", "phase13_ppo"),  # was cwd-relative
 ):
     """
     Train PPO agent on circadian-aware chronotherapy environment.

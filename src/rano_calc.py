@@ -1,3 +1,4 @@
+# NOTE (2026-10-19 audit): historical legacy script; not part of the current RANO project. Model-based one-centre/two-tool noise bracket; not validated and not for clinical use. The 500 mm3 floor is a project operational choice, and backward mode assumes a flat prior with normal error.
 """Probabilistic RANO calculator (Amendment 17, analysis_plan_v1.md).
 
 Model-based, noise bracket from one centre (LUMIERE, 2 tools); NOT for clinical use. Not validated on patients.

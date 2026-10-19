@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# NOTE (2026-10-19 audit): historical legacy script; not part of the current RANO project. Assumed drug half-lives, kill rates and initial resistant fraction. The __main__ block is a 10-step smoke demo, not clinical validation. Default FNO path is now rooted at the project root.
 """
 Phase 12: Closed-Loop Chronotherapy RL Environment
 ===================================================
@@ -39,7 +40,7 @@ class ChronotherapyEnv(gym.Env):
         grid_size: int = 64,
         dt_hours: float = 1.0,
         max_episode_hours: int = 240,  # 10 days
-        fno_model_path: str = "output/fno_model.pth",
+        fno_model_path: str = __import__("os").path.join(__import__("os").path.dirname(__import__("os").path.dirname(__import__("os").path.dirname(__import__("os").path.abspath(__file__)))), "output", "fno_model.pth"),  # was cwd-relative
         patient_id: str = "BraTS2021_00000",
         circadian: bool = True,
         seed: int = None,
