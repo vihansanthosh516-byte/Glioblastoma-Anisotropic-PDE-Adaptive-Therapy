@@ -19,7 +19,7 @@ Historical modeling scripts (`run_improved_aniso.py`, `cross_validation.py`, `is
 
 ## Environment Setup
 
-Historical setup examples below are not a verified clean environment. No supported Python/package lock is established here; ledger 2bo reports a partial-data Python 3.11 scratch environment. Resolve optional dependencies before any authorized run.
+Historical setup examples below are not a verified clean environment. No supported Python/package lock is established here; ledger 2bo reports a partial-data Python 3.11 scratch environment. Resolve optional dependencies before any authorized run. FNO/virtual-trial dependencies are declared in the `legacy-ml` extra (`pip install ".[legacy-ml]"`); this declaration has not been verified by a clean install.
 
 ```bash
 python -m venv venv

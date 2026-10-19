@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 """
-Phase 15: Virtual Clinical Trial - 1000-Patient In-Silico Evaluation
+Phase 15: exploratory synthetic-environment episode comparison
 =====================================================================
-Large-scale virtual cohort evaluation of the trained circadian-aware PPO policy
-against standard-of-care (Stupp protocol) and adaptive therapy baselines.
+Repeated episodes of one seeded environment compare a PPO policy with assumed
+schedule baselines. The default 1000 is a requested repetition count, not evidence
+of 1000 independent patients or of a completed run. No clinical cohort is loaded.
+Clearance/survival outputs are model-defined metrics, not patient outcomes.
 
 Requires GPU for fast FNO inference and parallel patient simulation.
 """
@@ -23,8 +25,8 @@ from rl.chronotherapy_env import ChronotherapyEnv
 from stable_baselines3 import PPO
 from stable_baselines3.common.vec_env import DummyVecEnv, VecNormalize
 
-OUTPUT_DIR = Path("/kaggle/working/output")
-OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+OUTPUT_DIR = PROJECT_ROOT / "output"
 
 def load_trained_policy(model_path: str, vecnorm_path: str):
     """Load trained PPO policy with VecNormalize."""
@@ -56,14 +58,15 @@ def run_virtual_trial(
     dt_hours: float = 2.0,
 ) -> Dict:
     """
-    Run virtual clinical trial with 1000 patients.
+    Repeat synthetic environment episodes; n_patients is a legacy argument name.
+    Resets are not independent real patients or a clinical-effectiveness test.
     
     Compares:
     - PPO policy (trained)
     - Standard Stupp protocol (control)
     - Adaptive threshold therapy (baseline)
     """
-    print(f"[Phase 15] Starting virtual trial with {n_patients} patients...")
+    print(f"[Phase 15] Starting synthetic comparison with {n_patients} episode repetitions...")
     print(f"[Phase 15] Episode length: {max_episode_hours}h, dt={2.0}h")
     
     results = {
@@ -77,7 +80,7 @@ def run_virtual_trial(
     
     for patient_idx in range(n_patients):
         if patient_idx % 100 == 0:
-            print(f"[Phase 15] Progress: {patient_idx}/{n_patients} patients")
+            print(f"[Phase 15] Progress: {patient_idx}/{n_patients} episode repetitions")
         
         # --- PPO Policy ---
         obs = eval_env.reset()
@@ -188,22 +191,25 @@ def compute_statistics(results: Dict) -> Dict:
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Phase 15: Virtual Clinical Trial")
-    parser.add_argument("--model-path", type=str, default="output/phase13_ppo_chronotherapy/ppo_chronotherapy_final.zip",
+    parser = argparse.ArgumentParser(description="Phase 15: synthetic environment repetitions, not patient validation")
+    parser.add_argument("--model-path", type=str, default=str(OUTPUT_DIR / "phase13_ppo_chronotherapy/ppo_chronotherapy_final.zip"),
                         help="Path to trained PPO model")
-    parser.add_argument("--vecnorm-path", type=str, default="output/phase13_ppo_chronotherapy/vecnormalize.pkl",
+    parser.add_argument("--vecnorm-path", type=str, default=str(OUTPUT_DIR / "phase13_ppo_chronotherapy/vecnormalize.pkl"),
                         help="Path to VecNormalize stats")
-    parser.add_argument("--n-patients", type=int, default=1000, help="Number of patients")
+    parser.add_argument("--n-patients", type=int, default=1000, help="Synthetic episode repetitions (legacy flag name)")
     parser.add_argument("--max-episode-hours", type=int, default=168, help="Max episode hours")
     args = parser.parse_args()
     
     print("=" * 70)
-    print("Phase 15: Virtual Clinical Trial")
+    print("Phase 15: Synthetic environment comparison")
     print("=" * 70)
     
     # Paths
-    model_path = args.model_path
-    vecnorm_path = args.vecnorm_path
+    model_path, vecnorm_path = Path(args.model_path), Path(args.vecnorm_path)
+    if not model_path.is_absolute():
+        model_path = PROJECT_ROOT / model_path
+    if not vecnorm_path.is_absolute():
+        vecnorm_path = PROJECT_ROOT / vecnorm_path
     
     if not os.path.exists(model_path):
         print(f"[ERROR] Model not found at {model_path}")
@@ -222,6 +228,9 @@ def main():
     
     # Save results
     output = {
+        "label": "Exploratory synthetic-environment repetitions; not independent patients or clinical evidence",
+        "environment_seed": 42,
+        "independent_patients": False,
         "timestamp": datetime.now().isoformat(),
         "n_patients": args.n_patients,
         "max_episode_hours": args.max_episode_hours,
@@ -230,8 +239,11 @@ def main():
     }
     
     output_path = OUTPUT_DIR / "phase15_virtual_trial_results.json"
+    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     with open(output_path, "w") as f:
         json.dump(output, f, indent=2, default=str)
+    if output_path.stat().st_size == 0:
+        raise RuntimeError(f"Empty results: {output_path}")
     
     # Print summary
     print("\n" + "=" * 70)

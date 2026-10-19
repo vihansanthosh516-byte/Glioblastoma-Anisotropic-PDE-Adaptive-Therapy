@@ -1,3 +1,7 @@
+"""FNO model component; callers seed torch before construction (see train_fno).
+
+Random initialization is not a scientific result or a reproducibility guarantee.
+"""
 import torch
 import torch.nn as nn
 import torch.nn.functional as F

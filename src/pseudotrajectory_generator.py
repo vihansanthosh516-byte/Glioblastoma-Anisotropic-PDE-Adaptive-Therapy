@@ -1,11 +1,15 @@
 #!/usr/bin/env python3
 """
 Phase 1: Generate pseudo-trajectories from phenotypic velocity field.
-SPIB requires time-resolved trajectory data (X_t, X_{t+dt}) pairs.
+Linear latent + velocity * dt extrapolations repeat existing labels. They are
+synthetic pseudo-trajectories, not observed longitudinal clinical measurements.
 """
 
 import numpy as np
 import os
+from pathlib import Path
+
+OUTPUT_DIR = Path(__file__).resolve().parent.parent / "output"
 
 def generate_pseudotrajectories(latent, velocity, labels, dt=0.05, n_steps=3):
     """
@@ -46,9 +50,9 @@ def main():
     print("[PHASE 1] Generating pseudo-trajectories for SPIB...")
     
     # Load data
-    latent = np.load("output/scvi_latent.npy")
-    velocity = np.load("output/phenotypic_velocity.npy")
-    labels = np.load("output/nn_y.npy")
+    latent = np.load(OUTPUT_DIR / "scvi_latent.npy")
+    velocity = np.load(OUTPUT_DIR / "phenotypic_velocity.npy")
+    labels = np.load(OUTPUT_DIR / "nn_y.npy")
     
     print(f"  Latent shape: {latent.shape}")
     print(f"  Velocity shape: {velocity.shape}")
@@ -60,13 +64,13 @@ def main():
     n_steps = 10
     traj_data, traj_labels = generate_pseudotrajectories(latent, velocity, labels, dt=dt, n_steps=n_steps)
     
-    print(f"  Trajectory data shape: {traj_data.shape}")  # (45000, 32)
+    print(f"  Synthetic trajectory data shape: {traj_data.shape}")
     print(f"  Trajectory labels shape: {traj_labels.shape}")
     
     # Save
-    os.makedirs("output", exist_ok=True)
-    np.save("output/spib_traj_data.npy", traj_data)
-    np.save("output/spib_traj_labels.npy", traj_labels)
+    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+    np.save(OUTPUT_DIR / "spib_traj_data.npy", traj_data)
+    np.save(OUTPUT_DIR / "spib_traj_labels.npy", traj_labels)
     
     print(f"  Saved: output/spib_traj_data.npy")
     print(f"  Saved: output/spib_traj_labels.npy")
@@ -96,8 +100,11 @@ def main():
     ax.legend()
     ax.grid(True, alpha=0.3)
     plt.tight_layout()
-    plt.savefig("output/spib_traj_validation.png", dpi=150, bbox_inches='tight')
+    plt.savefig(OUTPUT_DIR / "spib_traj_validation.png", dpi=150, bbox_inches='tight')
     plt.close()
+    for name in ("spib_traj_data.npy", "spib_traj_labels.npy", "spib_traj_validation.png"):
+        if not (OUTPUT_DIR / name).is_file() or (OUTPUT_DIR / name).stat().st_size == 0:
+            raise RuntimeError(f"Missing or empty artifact: {OUTPUT_DIR / name}")
     
     print(f"  Validation plot: output/spib_traj_validation.png")
     print("[PHASE 1] Complete.")

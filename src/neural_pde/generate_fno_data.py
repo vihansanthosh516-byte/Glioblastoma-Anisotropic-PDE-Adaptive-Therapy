@@ -1,38 +1,54 @@
+"""Seeded synthetic exponential-growth pairs; targets do not solve a diffusion PDE.
+
+Historical saved datasets are unchanged. New generated pairs are toy training data,
+not measured longitudinal tumor states or evidence of PDE surrogate accuracy.
+"""
 import os
 import sys
+from pathlib import Path
 import numpy as np
 import torch
 
 # Ensure src is in import path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-def generate_dataset(num_samples=100, grid_size=32, steps=10, output_path="output/fno_dataset.pt"):
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+
+
+def generate_dataset(num_samples=100, grid_size=32, steps=10,
+                     output_path=PROJECT_ROOT / "output" / "fno_dataset.pt", seed=42):
     """
     Generates training pairs for FNO.
     Inputs: u0 (initial tumor state), rho (proliferation)
-    Targets: u_next (tumor state at t + dt * steps)
+    Targets: clipped exponential growth without diffusion (synthetic toy model).
     """
-    print(f"[Phase 10 DataGen] Generating {num_samples} PDE trajectory samples on a {grid_size}^3 grid...")
-    os.makedirs(os.path.dirname(output_path), exist_ok=True)
+    output_path = Path(output_path)
+    if not output_path.is_absolute():
+        output_path = PROJECT_ROOT / output_path
+    if output_path.exists():
+        raise FileExistsError(f"Refusing to overwrite historical dataset: {output_path}")
+    print(f"[Phase 10 DataGen] Generating {num_samples} synthetic exponential-growth samples on a {grid_size}^3 grid...")
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    rng = np.random.default_rng(seed)
     
     inputs = []
     targets = []
     
     for i in range(num_samples):
         # Sample random physical parameters
-        rho = np.random.uniform(0.01, 0.05)
+        rho = rng.uniform(0.01, 0.05)
         
         # Random initial tumor sphere seed position
-        cx, cy, cz = np.random.randint(8, grid_size - 8, size=3)
+        cx, cy, cz = rng.integers(8, grid_size - 8, size=3)
         grid = np.zeros((grid_size, grid_size, grid_size), dtype=np.float32)
         
         z, y, x = np.ogrid[:grid_size, :grid_size, :grid_size]
-        mask = (x - cx)**2 + (y - cy)**2 + (z - cz)**2 <= np.random.uniform(3, 6)**2
-        grid[mask] = np.random.uniform(0.5, 1.0)
+        mask = (x - cx)**2 + (y - cy)**2 + (z - cz)**2 <= rng.uniform(3, 6)**2
+        grid[mask] = rng.uniform(0.5, 1.0)
         
         u0 = grid.copy()
         
-        # Run short PDE trajectory forward (simplified exponential growth for data gen)
+        # Toy reaction-only target; no spatial diffusion or PDE solver is used.
         u_next = u0 * np.exp(rho * steps * 0.5)
         u_next = np.clip(u_next, 0.0, 1.0)
         
@@ -49,7 +65,12 @@ def generate_dataset(num_samples=100, grid_size=32, steps=10, output_path="outpu
     x_data = torch.tensor(np.array(inputs), dtype=torch.float32)
     y_data = torch.tensor(np.array(targets), dtype=torch.float32)
     
-    torch.save({"x": x_data, "y": y_data}, output_path)
+    torch.save({"x": x_data, "y": y_data, "metadata": {
+        "seed": seed, "synthetic": True, "grid_size": grid_size, "steps": steps,
+        "target_method": "clipped exponential growth; no diffusion PDE",
+    }}, output_path)
+    if output_path.stat().st_size == 0:
+        raise RuntimeError(f"Empty dataset: {output_path}")
     print(f"[Phase 10 DataGen] Dataset saved to {output_path} (X: {x_data.shape}, Y: {y_data.shape})")
 
 if __name__ == "__main__":
