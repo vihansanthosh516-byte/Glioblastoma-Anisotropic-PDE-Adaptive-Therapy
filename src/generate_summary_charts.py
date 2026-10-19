@@ -1,3 +1,6 @@
+# NOTE (2026-10-19 audit): historical legacy script; not part of the current RANO project. The 'real validation metrics data' table is typed into the code (seven patient IDs, day intervals, volumes, rho/D), not read from outputs; trace each value to source records before citing it as measured. It writes cwd-relative outputs/validation_summary_dashboard.png (note: outputs, not output); cwd is now anchored at the project root.
+import os as _os
+_os.chdir(_os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))))
 import os
 import matplotlib.pyplot as plt
 import pandas as pd
