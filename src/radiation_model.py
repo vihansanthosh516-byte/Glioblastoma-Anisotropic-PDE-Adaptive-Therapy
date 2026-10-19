@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from math import floor
 from typing import Iterable
 
 
@@ -34,9 +35,9 @@ class RadiationSchedule:
         return self.corrected_dose_per_fraction if treatment_day % 7 < self.fractions_per_week else 0.0
 
     def total_dose(self) -> float:
-        first = int(self.start_day)
-        last = int(self.end_day)
-        return sum(self.dose_on_day(day) for day in range(first, last + 1))
+        """Sum scheduled fractions at offsets from start_day, including fractional starts."""
+        days = floor(self.end_day - self.start_day + 1e-9) + 1
+        return sum(self.dose_on_day(self.start_day + offset) for offset in range(days))
 
     def dose_rate(self, day: float, fraction_duration_days: float = 1.0) -> float:
         if fraction_duration_days <= 0:

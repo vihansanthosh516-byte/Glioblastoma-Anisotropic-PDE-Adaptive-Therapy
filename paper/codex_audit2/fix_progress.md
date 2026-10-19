@@ -74,7 +74,7 @@ Audit evidence and original progress.md remain unchanged. Status tracks correcti
 | 066 | TODO | Pending report/source review and corrections. |
 | 067 | TODO | Pending report/source review and corrections. |
 | 068 | TODO | Pending report/source review and corrections. |
-| 069 | TODO | Pending report/source review and corrections. |
+| 069 | DOING | src/patient_stats.py rejects empty patients/groups; src/radiation_model.py sums fractions relative to start_day. Added synthetic regression tests in tests/test_audit_utility_edges.py. py_compile passed with audit-local cache; scratch pytest: 111 passed, 13 warnings, 57.36 s. Audit missing-os claim rejected: test_ids/all_ids/_load already import os locally. Remaining FNO paths/targets/seeds/dependencies, virtual-trial paths/framing, pseudo-trajectory paths and utility dependency declarations. |
 | 070 | TODO | Pending report/source review and corrections. |
 | 071 | TODO | Pending report/source review and corrections. |
 | 072 | TODO | Pending report/source review and corrections. |
@@ -84,3 +84,7 @@ Audit evidence and original progress.md remain unchanged. Status tracks correcti
 ## Safety and continuation
 
 Initial state: d719f95; paper/codex_audit2/progress.md already modified; audit reports/SUMMARY and many data/cache directories already untracked. Do not stage these unrelated files. No analyses, output writes, compilation, or tests run. Batch 001/002 verified by read-only JSON arithmetic, filesystem inventory and git diff --check. Full diff reviewed; only ledger/Decisions and this tracker belong to the batch. Documentation-only batch needs no Python compilation or pytest; full scratch-suite verification remains pending for code/test changes.
+
+## Verified utility batch (2026-10-19)
+
+Command: `python -m pytest tests/ -q`, only in Git-backed scratch clone `C:/Users/vihan/AppData/Local/Temp/codex-audit-fixes-cb6465fc6a954447827c279dd844c9f5`. Clone based on commit 4700f31, with the three edited source/test files copied in; SHA-256 byte comparisons match the working files. Python 3.14. Result: 111 passed, 13 warnings in 57.36 seconds, exit 0. Warnings: 12 SciPy OptimizeWarning messages for unknown solver option disp (six inverse-estimation tests, optimizer and bootstrap calls); one scikit-learn ElasticNet ConvergenceWarning. Scratch includes tracked artifacts and manifests, excludes unrelated untracked caches/run kits; tests do not establish clinical/scientific validation. No analysis pipeline or training script run; no working-tree pytest. Syntax command: `python -m py_compile src/patient_stats.py src/radiation_model.py tests/test_audit_utility_edges.py`, with PYTHONPYCACHEPREFIX under paper/codex_audit2/pycache_fixes.

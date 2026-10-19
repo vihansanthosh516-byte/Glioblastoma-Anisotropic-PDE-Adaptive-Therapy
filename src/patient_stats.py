@@ -21,6 +21,8 @@ def patient_means(df: pd.DataFrame, value: str, patient: str = "patient_id") -> 
 def bootstrap_ci(x, stat=np.mean, n_boot: int = DEFAULT_N_BOOT, seed: int = DEFAULT_SEED, alpha: float = 0.05):
     """Percentile bootstrap CI of stat(x), resampling the entries of x (each entry = one patient)."""
     x = np.asarray(x, float)
+    if x.size == 0:
+        raise ValueError("bootstrap_ci requires at least one patient value")
     rng = np.random.default_rng(seed)
     idx = rng.integers(0, len(x), size=(n_boot, len(x)))
     vals = np.array([stat(x[i]) for i in idx]) if stat not in (np.mean,) else x[idx].mean(1)
@@ -31,6 +33,8 @@ def cluster_bootstrap(df: pd.DataFrame, fn, patient: str = "patient_id", n_boot:
                       seed: int = DEFAULT_SEED, alpha: float = 0.05):
     """CI of fn(dataframe) when patients are resampled with ALL of their rows (for forecast-level analyses)."""
     groups = {p: g for p, g in df.groupby(patient)}
+    if not groups:
+        raise ValueError("cluster_bootstrap requires at least one patient group")
     ids = np.array(list(groups))
     rng = np.random.default_rng(seed)
     vals = []
