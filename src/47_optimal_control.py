@@ -1,3 +1,4 @@
+# NOTE (2026-10-19 audit): historical legacy script; not part of the current RANO project. Cohort filter is positive rho and R2 > 0.7. RHO_R = 0.75*RHO_S, GAMMA_R = 0.4, the mutation rate and the efficacy calibration are model assumptions, not measured drug kill or resistance. Overlap of the MU cohort with any spent set was not checked.
 """Phase 3: MPC Optimal Control & Dual-Drug Protocol.
 Evaluated on 8 real MU-Glioma patients selected from the 154-patient
 cohort (positive rho, R² > 0.7, spread across rho range).

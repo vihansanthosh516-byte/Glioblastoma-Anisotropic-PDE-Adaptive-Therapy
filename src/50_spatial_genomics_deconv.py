@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# NOTE (2026-10-19 audit): historical legacy script; not part of the current RANO project. Needs pymc and pytensor (not in Requirements.txt). Bayesian deconvolution draws synthetic signatures and observations with a seed; it is a model output, not a direct measurement. The posterior arrays and metrics were absent from output/ when audited.
 """
 Phase 1: Spatial Genomics Deconvolution & Bayesian Parameter Mapping (OPTIMIZED)
 
@@ -56,6 +57,9 @@ np.random.seed(SEED)
 # --------------------------------------------------------------------------- #
 # Synthetic Spatial Transcriptomics Generation
 # --------------------------------------------------------------------------- #
+import os as _os
+_os.chdir(_os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))))  # cwd-relative output/ paths below; anchor cwd at the project root
+
 def generate_neftel_signatures() -> np.ndarray:
     """Generate synthetic gene expression signatures for 4 Neftel states."""
     signatures = np.zeros((N_STATES, N_GENES))

@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# NOTE (2026-10-19 audit): historical legacy script; not part of the current RANO project. 'Clinical decision support' and 'personalized treatment planning' are not established: the dossier comes from a surrogate PDE and simplified MPC (the full PDE is too slow), with no seed and no data-freeze check. Not for patient care.
 """Clinical Decision Support System (CDSS) for Personalized GBM Treatment Planning.
 
 This module provides an interactive clinical intake interface for neuro-oncologists
@@ -96,6 +97,9 @@ TARGET_VOLUME_MM3 = 50.0  # Target tumor volume threshold (mm3)
 # ============================================================================ #
 # CLI Argument Parser
 # ============================================================================ #
+import os as _os
+_os.chdir(_os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))))  # cwd-relative output/ paths below; anchor cwd at the project root
+
 def parse_args() -> argparse.Namespace:
     """Parse command-line arguments."""
     parser = argparse.ArgumentParser(

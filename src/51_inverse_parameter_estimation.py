@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# NOTE (2026-10-19 audit): historical legacy script; not part of the current RANO project. The --test checks use typed known parameters and seeded synthetic trajectories (recovery under simulation); NOISE_STD = 0.10 is an assumed robustness noise. Patient fits use cohort JSON with no freeze gate.
 """Inverse Biophysical Parameter Estimation for Patient-Specific GBM Modeling.
 
 This module estimates patient-specific biophysical parameters (ρ, D) from

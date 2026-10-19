@@ -1,3 +1,4 @@
+# NOTE (2026-10-19 audit): historical legacy script; not part of the current RANO project. The fit penalises distance from a prior (regularization, prior, prior_scale), so estimates depend on that assumed prior and penalty. No seed.
 """Joint longitudinal inverse estimation for treatment-aware FK surrogates."""
 from __future__ import annotations
 

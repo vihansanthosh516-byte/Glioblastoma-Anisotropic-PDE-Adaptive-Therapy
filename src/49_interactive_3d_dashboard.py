@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# NOTE (2026-10-19 audit): historical legacy script; not part of the current RANO project. Needs plotly (not in Requirements.txt). The point subsample uses unseeded np.random.choice, so the displayed subsample varies. It only visualises existing simulation outputs.
 """Interactive 3D Dashboard for 8-Patient 3D Cohort Visualization.
 
 This module creates an interactive Plotly dashboard for exploring 3D tumor
@@ -44,6 +45,9 @@ DX = 1.0  # mm
 GRID_SIZE = 50
 COHORT_PATIENTS = [f"PAT_{i:04d}" for i in range(8)]
 
+
+import os as _os
+_os.chdir(_os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))))  # cwd-relative output/ paths below; anchor cwd at the project root
 
 def load_cohort_data() -> tuple:
     """Load 3D cohort volumes and summary metrics."""

@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# NOTE (2026-10-19 audit): historical legacy script; not part of the current RANO project. The 8 'real' patients only supply growth rates; 3D trajectories are simulations (modelled initial conditions, tract orientation and PDE; E_MAX = RHO*1000 is an assumed kill scale). Seeded default_rng (seed 42).
 """Phase 3 Extension: Optimized 3D Volumetric Anisotropic Tumor Growth (8-Patient Cohort).
 
 Optimizations for speed:
