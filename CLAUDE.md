@@ -4,9 +4,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**Read `START_HERE.md` first.** CURRENT PROJECT (2026-10-18): "probabilistic RANO" (measurement noise of RANO 2.0 volume lines and its effect on PFS and trial power; see `START_HERE.md`, `analysis_plan_v1.md` Amendments 14-16, `paper/phd_level_plan_probabilistic_rano.md`). The four tracks below are the OLDER GBM platform: background, not the goal. Old files that say "first", "novel" or "revolutionary" are not supported.
+**Read `START_HERE.md` first.** CURRENT PROJECT (2026-10-18): "probabilistic RANO" (measurement noise of RANO 2.0 volume lines and its effect on PFS and trial power; see `START_HERE.md`, `analysis_plan_v1.md` Amendments 14-21, `paper/phd_level_plan_probabilistic_rano.md`). The four tracks below are the OLDER GBM platform: background, not the goal. Old files that say "first", "novel" or "revolutionary" are not supported.
 
-Older platform: four tracks, 154 numbered scripts in `src/` (01 to 140, with number collisions; 202 `.py` files in total):
+Older platform: four tracks, 159 numbered top-level source files (maximum prefix 145, with collisions), 208 top-level and 217 recursive source `.py` files, counted 2026-10-19; file counts do not establish safe runnable pipelines:
 
 | Track | Scripts | Domain |
 |-------|---------|--------|
@@ -15,9 +15,11 @@ Older platform: four tracks, 154 numbered scripts in `src/` (01 to 140, with num
 | **C — Digital Twin** | `src/49–65` | Inverse parameter estimation, robust MPC, RL adaptive steering, virtual cohort |
 | **C-Extended** | `src/neural_pde/`, `src/rl/`, `src/sensing/`, `src/hil/` | FNO surrogate, virtual biosensors, PPO chronotherapy, HIL pump interface |
 
-A real-patient validation study (`run_improved_aniso.py`, `cross_validation.py`, `isef_figures.py`) tests anisotropic vs. isotropic tensor modeling against 62 UCSF-PDGM patients.
+Historical modeling scripts (`run_improved_aniso.py`, `cross_validation.py`, `isef_figures.py`) compare tensor assumptions on imaging-derived inputs. The former 62-patient validation claim has no direct result-key citation here and is withdrawn as a validation statement.
 
 ## Environment Setup
+
+Historical setup examples below are not a verified clean environment. No supported Python/package lock is established here; ledger 2bo reports a partial-data Python 3.11 scratch environment. Resolve optional dependencies before any authorized run.
 
 ```bash
 python -m venv venv
@@ -30,9 +32,11 @@ pip install numpy scipy matplotlib pillow pandas
 # networkx seaborn pymc pytensor nibabel dipy SALib plotly h5py scikit-learn
 ```
 
-**Path configuration:** Most scripts read `GBM_PROJECT_ROOT` (defaults to `/mnt/c/Users/vihan/20206 science fair` on WSL, `C:/Users/vihan/20206 science fair` on Windows). Track A scripts also use `GBM_DATA_DIR` for the external multiomic-gbm dataset.
+**Path configuration:** `GBM_PROJECT_ROOT` and `GBM_DATA_DIR` are intended overrides in parts of the older code; support/defaults vary by script and have not been exhaustively verified. The required path convention remains derivation from `__file__`.
 
 ## Running Scripts
+
+The following CLI, Track B/C, validation and Phase 15 commands are historical examples, not verified current pipelines. Their paths/options/input artifacts have not all been checked. Do not run project scripts during audit correction; many write output or train models. `--run-all` is not a safe audit command. Current RANO scripts are 140-145; frozen/spent analyses require their plan rules, not these examples.
 
 **Run a single numbered script:**
 ```bash
@@ -75,12 +79,14 @@ python src/phase15_virtual_trial.py \
 ## Testing
 
 ```bash
-pytest tests/
+pytest tests/ -q  # scratch copy only; never the working tree
 ```
 
-15 test files, 101 tests (all passed on 2026-10-18 in a copy with partial data; see ledger 2bo) covering: `test_inverse_estimation`, `test_joint_inverse_estimation`, `test_robust_mpc`, `test_spatial_metrics`, `test_multiomic_fusion`, `test_hybrid_controller`, `test_mu_glioma_loader`, `test_retrospective_validation`, `test_treatment_models`, `test_baselines`, `test_metrics_stats`, `test_no_leakage`, `test_run_manifest`, `test_solver`, `test_solver_monotone`.
+Static inventory checked 2026-10-19: 16 test files and 108 test functions (including calculator tests test1-test7). This is not a fresh test run. Ledger 2bo is an author-reported historical 101-test result assembled across multiple runs with partial data; its transcripts are absent. The prior audit reports 108 passed/13 warnings in a Git-backed scratch clone (`paper/codex_audit_report.md`, section E). Modules include: `test_inverse_estimation`, `test_joint_inverse_estimation`, `test_robust_mpc`, `test_spatial_metrics`, `test_multiomic_fusion`, `test_hybrid_controller`, `test_mu_glioma_loader`, `test_retrospective_validation`, `test_treatment_models`, `test_baselines`, `test_metrics_stats`, `test_no_leakage`, `test_run_manifest`, `test_solver`, `test_solver_monotone`, `test_rano_calc`.
 
 ## Docker (Track B + C)
+
+Historical target descriptions below are unverified against the current Makefile/compose definitions; they are not authorization to run benchmarks or delete output.
 
 ```bash
 make build && make run        # full benchmark
@@ -105,22 +111,22 @@ Never use relative paths like `Path("output")` or `"output/file.json"` — they 
 
 ## Architecture Notes
 
-**Core PDE:** 2D/3D anisotropic Fisher-Kolmogorov equation — `∂u/∂t = ∇·(D(x)∇u) + ρu(1−u/K) − γC(t)u`. The diffusion tensor D encodes white-matter tract anisotropy (10× parallel vs. perpendicular in Track B synthetic cohort).
+**Core PDE:** 2D/3D anisotropic Fisher-Kolmogorov equation — `∂u/∂t = ∇·(D(x)∇u) + ρu(1−u/K) − γC(t)u`. The diffusion tensor D encodes white-matter tract anisotropy (assumed 10× parallel vs. perpendicular in the historical Track B synthetic configuration; see `src/42_anisotropic_pde.py`, not measured patient anisotropy).
 
 **Key modules in `src/`:**
 - `51_inverse_parameter_estimation.py` / `51_joint_inverse_estimation.py` — L-BFGS-B bounded optimization to estimate ρ and D from longitudinal imaging volumes
 - `52_robust_mpc_controller.py` — uncertainty-aware MPC over confidence intervals (ρ±15%, D±15%), dynamic horizon 7–21 days
 - `53_spatial_metrics.py` — DSC and Hausdorff Distance between simulated and observed tumor masks
 - `58_rl_adaptive_steering.py` — RL agent (behavioral cloning from optimal controller)
-- `neural_pde/fno_solver.py` — Fourier Neural Operator surrogate (>1000× faster than PDE solver)
+- `neural_pde/fno_solver.py` — Fourier Neural Operator surrogate; the uncited >1000× speed claim is withdrawn
 - `sensing/virtual_sensor.py` — 4-modality virtual biosensor (MRI, PET, ctDNA, ICP)
-- `hil/pump_interface.py` — hardware-in-the-loop pump interface with safety watchdog
+- `hil/pump_interface.py` — hardware-in-the-loop pump interface; watchdog behavior requires implementation-specific tests and is not a clinical safety guarantee
 
-**Output directory:** All generated artifacts (JSON, PNG, MD, NPZ) go to `output/`. Heavy `.npz` binary arrays are git-ignored; the JSON + PNG evidence trail is tracked.
+**Output directory:** The convention is to write generated artifacts under `output/` using `__file__`-derived paths. Historical scripts 15, 18, 20, 49 and 58 have known cwd-relative exceptions. Tracking/ignore state is artifact-specific; existence does not establish provenance or validation.
 
-**Script numbering collisions:** Several script numbers have multiple variants (e.g., `51_inverse_parameter_estimation.py` and `51_joint_inverse_estimation.py`, `52_dti_anisotropic_solver.py` and `52_robust_mpc_controller.py`). The CLI and `run_all.sh` use the canonical versions listed in their respective script arrays.
+**Script numbering collisions:** Several script numbers have multiple variants (e.g., `51_inverse_parameter_estimation.py` and `51_joint_inverse_estimation.py`, `52_dti_anisotropic_solver.py` and `52_robust_mpc_controller.py`). `src/cli.py:SCRIPTS` and the `run_all.sh` arrays select specific variants; these selections are historical and do not designate validated current pipelines.
 
-**Track A data dependency:** Scripts `01`–`41` require the external UCSC Cell Browser `multiomic-gbm` dataset (~1.4 GB) pointed to via `GBM_DATA_DIR`. Without it, Track A scripts will fail at data loading.
+**Track A data dependency:** Some Track A scripts require the external UCSC Cell Browser `multiomic-gbm` dataset via `GBM_DATA_DIR`; exact requirements vary. The former blanket 01-41 dependency and uncited dataset size are omitted. Inspect each script and input manifest before an authorized run.
 
 **`Requirements.txt` had merge conflict markers; resolved 2026-10-18 by keeping the union of both sides (SALib, nibabel, dipy, scikit-learn, h5py).** `pyproject.toml` does not list these packages yet, so use `Requirements.txt` together with the install lines under Environment Setup.
 
