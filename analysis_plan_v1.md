@@ -583,3 +583,26 @@ Report any failure unchanged.
 
 ### A19.5 Not declared
 No re-run with other anchors or conversions. If a reader prefers a different conversion (for example, RC% as a ratio of raw volumes), that is a new amendment. Results are labelled "simulation anchored to one published repeatability study; assumed conversion; large lesions only".
+
+## Amendment 20 (2026-10-18): Patient timeline viewer with uncertainty bands and RANO class probabilities (Aim 4). TOOL / DISPLAY, not a result. Written before the script exists.
+
+### A20.1 Status and framing
+A single self-contained HTML file built by `src/144_rano_timeline_viewer.py` from the LUMIERE tool volumes (HD-GLIO-AUTO, DeepBraTumIA; contrast-enhancing label; same loader and post-operative rule as scripts 140 and 142) and `src/rano_calc.py`. Every probability shown is computed by `rano_calc.rano_calc`; the viewer does no statistics of its own. It is a display of model-based quantities, not a diagnosis, forecast or clinical tool. Title bar and footer carry: "model-based, noise bracket from one centre (LUMIERE, 2 tools); tool volumes, not a diagnosis; not for clinical use". The 500 mm3 floor is our operational rule, not a RANO 2.0 rule.
+
+### A20.2 Content (fixed now)
+- One panel per selected patient and tool (HD-GLIO-AUTO, DeepBraTumIA, or both). X = weeks from the first post-operative scan; Y = enhancing volume in mm3 on a log axis.
+- Per scan, two nested uncertainty bands around the tool volume, from the A15 bracket for the size band of that volume: inner = volume x exp(+/-1.96 s_low / sqrt(2)), outer = volume x exp(+/-1.96 s_high / sqrt(2)) (single-scan SD = change-SD / sqrt(2), as in A16).
+- Nadir step line (smallest earlier volume of the same tool among volumes >= 500 mm3) and the +40% line (1.40 x nadir).
+- For each scan after the first with a nadir: P(true change from nadir >= +40%) at the low and the high end of the bracket, from `rano_calc.rano_calc(nadir, volume)`, plotted as bars in a second panel; the deterministic class is shown as text; expert rating (LUMIERE) as a marker label where present.
+- Scans below 500 mm3, missing, or without a nadir are drawn greyed and carry no probability ("not measurable / no reference").
+- Patients included: every LUMIERE patient with at least 3 post-operative scans having a volume >= 500 mm3 for the displayed tool. The viewer lists how many patients each tool contributes.
+
+### A20.3 Checks with pass rules (fixed now, run once at build)
+1. Probability integrity: for 30 randomly chosen displayed (patient, tool, scan) points (seed 20261018), the probability stored in the HTML data equals `rano_calc.rano_calc` recomputed from the same volumes, difference < 1e-9.
+2. File exists, size > 0 and < 8 MB.
+3. Every included patient has 3 or more eligible scans for the tool it is listed under.
+4. The three required labels (model-based line, "not a diagnosis", "not for clinical use") appear in the HTML.
+5. Manual check in a browser pane after the build: it loads without console errors, the patient list and tool toggle work, and bands and bars render. Reported as a manual check, not automated.
+
+### A20.4 Not declared
+No performance claim. No claim that bands equal true uncertainty for any patient. The bands show the A15 bracket, whose lower end is degenerate for larger tumours; the viewer says so in a note. No change of rules after the build.
