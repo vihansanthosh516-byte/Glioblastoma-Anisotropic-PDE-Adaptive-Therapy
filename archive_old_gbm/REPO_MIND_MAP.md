@@ -2,21 +2,21 @@
 
 # Repo Mind Map: 20206 science fair (detailed)
 
-Made 2026-10-14. Read-only map. No code or data was changed.
+Original map reports creation on 2026-10-14; some inventory notes are dated 2026-10-17/18. Corrected 2026-10-19. This is a historical navigation snapshot, not an execution or completeness audit.
 
 ## How to read this
 
-- ✅ **Positive**: the code runs, or the result supports the idea. Often simulation only, or dev data only. The note says which.
+- ✅ **Historical positive label**: author-reported interpretation, not proof the code runs. Results may be simulated or development-only.
 - ❌ **Negative**: the code is broken, the result does not support the idea, or there is a known problem.
 - ⚪ **Neutral / not checked**: a plain file, or I did not read a result for it.
 - "Output paths in code: found / total" = how many output file names written in the script exist on disk. A "0 / N" can mean the name is built at run time (for example with `{pid}`), so it is not a sure sign of failure.
-- Numbers come from files. Each one names its source file.
+- Source coverage is incomplete. Unsourced counts and numbers are unverified historical assertions; a named source does not mean this map checked its contents.
 
 ## Weakest points of this map
 
 1. Status is from vault notes and a few JSON files. I did not re-run any script.
-2. 196 script rows: purpose text is each file's first docstring line. Scripts with no docstring show the name only.
-3. Pytest was run on 2026-10-18 on a copy with partial data: 101 collected, 101 passed (ledger 2bo). CLAUDE.md said 56 tests and now says 101 in 15 files.
+2. Old script-row counts and purpose strings are an unchecked snapshot, not an exhaustive current inventory. Docstrings can themselves overclaim.
+3. Ledger 2bo records author-reported split scratch runs totaling 101 tests, without retained transcripts. Current audit-fix scratch run: 118 cases passed, 13 warnings, 30.98 s; 18 test files and 116 functions. See `../paper/codex_audit2/fix_progress.md` for scope and warnings.
 
 ---
 
@@ -31,19 +31,19 @@ mindmap
       ❌ leak-free C-GAT 0.638
     Track B PDE + adaptive
       ✅ adaptive therapy sim (61 pts)
-      ✅ forecast on core target +0.026
+      ⚪ historical +0.026; later paired test negative
       ❌ PDE beats persistence (H1)
       ❌ DTI direction helps forecast
       ✅ elongation from anisotropy (sim)
     Track C digital twin + RL
-      ✅ biomarker rho* 0.075/day
+      ⚪ modeled threshold rho* 0.075/day (simulation)
       ❌ inverse estimates of D
-      ❌ RL 25% win on simulated cohort64 (real_test 20/21, day-90 volume only)
+      ❌ RL 25% win on simulated cohort64 (real_test 20/21, assumed kill rates; day-90 volume only)
       ✅ conditioned policy (needs kill rates)
-    H-2 PREDICT-GBM (locked test)
+    H-2 PREDICT-GBM (former test, spent)
       ❌ primary: +0.009, CI crosses 0
       ✅ secondary all-recurrence +0.081
-    H-3 UCSF (locked test done)
+    H-3 UCSF (former test, spent)
       ❌ primary: +0.004, CI crosses 0
       ✅ secondary all-recurrence +0.085
       ✅ interim dev C1 +0.030 (dev only)
@@ -61,6 +61,8 @@ mindmap
 ---
 
 ## 2. Root folder (`/`)
+
+Root docs, helper purposes, paths and sizes below are unchecked historical inventory. Consult current START_HERE trust hierarchy; do not use old rows as current setup instructions.
 
 ### 2a. Documents and config
 
@@ -131,9 +133,11 @@ These are older or one-off helpers. They sit beside the pipeline. Many are debug
 
 ---
 
-## 3. `src/` (192 files, the code)
+## 3. `src/` (historical inventory, superseded)
 
-Every `.py` file in `src/`, one row each. Purpose = the file's own first docstring line. Status is from the vault notes and result files named in the row. Script numbers 01–99 are the main pipeline. Numbers 100–126 are newer (PREDICT-GBM and UCSF H-2/H-3 work).
+Source inventory is superseded. Checked 2026-10-19: 208 top-level Python files, 159 numbered top-level files and 217 recursively; maximum prefix 145 with collisions. Old row sizes, output-path counts, purposes and statuses below are unverified snapshot claims, not runnable/validation certification.
+
+The old selection of `.py` files in `src/`; completeness is unverified. Purpose = the file's own first docstring line. Status is from the vault notes and result files named in the row. Script numbers 01–99 are the main pipeline. Numbers 100–126 are newer (PREDICT-GBM and UCSF H-2/H-3 work).
 
 The table below lists the `src/` files. Support modules are in §4b. Subfolders (`hil`, `neural_pde`, `rl`, `sensing`) are in §4.
 
@@ -172,8 +176,8 @@ The table below lists the `src/` files. Support modules are in §4b. Subfolders 
 | `11_cvae_extract_latent.py` | 5 | 11_cvae_extract_latent.py | 0 / 0 | ✅ | latents for 140,355 cells |
 | `120_predictgbm_ensembles.py` | 4 | Script 120: GRAND_PLAN 15 Z1 (= 13 X3) ensembles, PREDICT-GBM development (TUM). | 0 / 0 | ⚪ |  |
 | `121_pack_mu_training.py` | 4 | Script 121: pack MU-Glioma-Post pairs as extra U-Net TRAINING samples (GRAND_PLAN 15 Z2, declared before the run). | 0 / 0 | ⚪ |  |
-| `122_predictgbm_final_train_predict.py` | 3 | Script 122: H-2 FINAL model (frozen in configs/h2_frozen.yaml): train once, predict the locked test patients. | 0 / 0 | ✅ | final model trained, 84 min; test not read by script |
-| `123_predictgbm_test_score.py` | 4 | Script 123: H-2 locked TEST evaluation, run ONCE after the freeze (configs/h2_frozen.yaml + git tag h2-frozen). | 0 / 0 | ❌ | H-2 locked test: primary CI crosses 0, fails own rule |
+| `122_predictgbm_final_train_predict.py` | 3 | Script 122: H-2 FINAL model (frozen in configs/h2_frozen.yaml): train once, predict the former test patients (now spent). | 0 / 0 | ✅ | final model trained, 84 min; test not read by script |
+| `123_predictgbm_test_score.py` | 4 | Script 123: H-2 locked TEST evaluation, run ONCE after the freeze (configs/h2_frozen.yaml + git tag h2-frozen). | 0 / 0 | ❌ | H-2 former test (now spent): primary CI crosses 0, fails own rule |
 | `124_pack_ucsf_h3_inputs.py` | 6 | Script 124: H-3 test INPUTS from UCSF-PDGM pre-op scans, aligned to UCSF-ALPTDG time1 space (Amendment 9). | 0 / 0 | ✅ | 59 UCSF pts packed for H-3 |
 | `125_published_unet_inference.py` | 6 | Script 125: run the released PREDICT-GBM U-Net (rebuild in unet_published.py) leak-free (Amendment 9, A9.5). | 0 / 0 | ✅ | released U-Net rebuilt; validation json exists |
 | `126_h3_dev_ensembles.py` | 4 | Script 126: H-3 development scoring of candidates C2 / C4 / C5 (Amendment 9, A9.3 and A9.5). | 0 / 0 | ✅ | INTERIM dev C1 +0.030 (CI 0.005–0.060) |
@@ -222,7 +226,7 @@ The table below lists the `src/` files. Support modules are in §4b. Subfolders 
 | `50_clinical_cdss_app.py` | 39 | (no docstring) name says: 50 clinical cdss app | 0 / 0 | ⚪ |  |
 | `50_dicom_loader.py` | 21 | Real 3D Medical Imaging Loader for GBM Digital Twin | 0 / 0 | ⚪ |  |
 | `50_spatial_genomics_deconv.py` | 22 | Phase 1: Spatial Genomics Deconvolution & Bayesian Parameter Mapping (OPTIMIZED) | 0 / 1 | ⚪ |  |
-| `51_inverse_parameter_estimation.py` | 34 | Inverse Biophysical Parameter Estimation for Patient-Specific GBM Modeling. | 0 / 0 | ❌ | 124/154 at growth bound; D not identifiable |
+| `51_inverse_parameter_estimation.py` | 34 | Inverse Biophysical Parameter Estimation for Patient-Specific GBM Modeling. | 0 / 0 | ❌ | rho lower-bound hits 124/154; D bound hits 147/154; D not identifiable |
 | `51_joint_inverse_estimation.py` | 2 | Joint longitudinal inverse estimation for treatment-aware FK surrogates. | 0 / 0 | ⚪ |  |
 | `51_poroelastic_hybrid_solver.py` | 22 | Phase 2: Biot Poroelastic Hybrid Solver | 0 / 0 | ⚪ |  |
 | `52_dti_anisotropic_solver.py` | 25 | Phase 3: 3D Anisotropic DTI Tensor Integration for GBM | 0 / 0 | ⚪ |  |
@@ -342,15 +346,19 @@ The table below lists the `src/` files. Support modules are in §4b. Subfolders 
 
 ## 4. `src/` subfolders
 
+Inventory, module behavior, sizes, data availability and statuses in this section are unverified historical assertions. No complete per-file or current filesystem audit is implied.
+
 | Folder | Files | What it is | Status |
 |---|---|---|:---:|
 | `src/hil/` | `pump_interface.py` (31 KB) | Phase 14. Hardware-in-the-loop pump interface with safety watchdog. | ⚪ not run |
-| `src/neural_pde/` | `benchmark_fno.py`, `fno_solver.py`, `generate_fno_data.py`, `train_fno.py` | Fourier Neural Operator surrogate for the PDE. Writes `output/fno_dataset.pt`. | ⚪ speed claim (>1000×) not verified here |
+| `src/neural_pde/` | `benchmark_fno.py`, `fno_solver.py`, `generate_fno_data.py`, `train_fno.py` | Synthetic reaction-target FNO experiment; PDE equivalence unverified. Writes `output/fno_dataset.pt`. | ⚪ No measured FD comparator; speedup claim withdrawn |
 | `src/rl/` | `chronotherapy_env.py` (15 KB), `equal_budget_arms.py` (5 KB), `train_chronotherapy.py` (9 KB) | Phase 12-13. Circadian RL environment and PPO/SAC training. `equal_budget_arms.py` is shared by scripts 60, 62, 64, 65. | ⚪ |
 | `src/sensing/` | `virtual_sensor.py` (13 KB) | Phase 11. Four virtual biosensors (MRI, PET, ctDNA, ICP). | ⚪ |
 | `src/__pycache__/`, `src/*/__pycache__/` | Python cache | Not needed. Git-ignored. | ⚪ |
 
 ## 4b. Loader and support modules (`src/` root, no number)
+
+Inventory, module behavior, sizes, data availability and statuses in this section are unverified historical assertions. No complete per-file or current filesystem audit is implied.
 
 | File | KB | What it does | Status |
 |---|---:|---|:---:|
@@ -404,36 +412,20 @@ The table below lists the `src/` files. Support modules are in §4b. Subfolders 
 
 ---
 
-## 5. `tests/` (16 files)
+## 5. `tests/` (dated inventory)
 
-Count = number of `def test_` lines per file (grep). Not run.
-
-| File | `def test_` count | Covers |
-|---|---:|---|
-| `test_spatial_metrics.py` | 17 | Dice, Hausdorff |
-| `test_metrics_stats.py` | 11 | Statistics helpers |
-| `test_robust_mpc.py` | 11 | Robust MPC controller |
-| `test_no_leakage.py` | 12 | Leakage guards |
-| `test_inverse_estimation.py` | 10 | Inverse parameter estimation |
-| `test_solver.py` | 8 | PDE solver |
-| `test_solver_monotone.py` | 8 | Monotone solver |
-| `test_hybrid_controller.py` | 7 | MPC-RL hybrid |
-| `test_multiomic_fusion.py` | 4 | Multi-omic fusion |
-| `test_baselines.py` | 4 | Baselines |
-| `test_treatment_models.py` | 3 | Treatment models |
-| `test_retrospective_validation.py` | 2 | Retrospective validation |
-| `test_run_manifest.py` | 2 | Run manifest |
-| `test_joint_inverse_estimation.py` | 1 | Joint inverse |
-| `test_mu_glioma_loader.py` | 1 | MU loader |
-| `__init__.py` | — | Package marker |
-| **Total** | **101** | |
-
-- ❌ CLAUDE.md says "9 test files, 56 tests". Real count: 15 test files, 101 test functions (by grep); all 101 passed on 2026-10-18 in a copy with partial data. CLAUDE.md was updated to match.
-- ⚪ Pass/fail status: not run. Run `pytest tests/` to know.
+As of 2026-10-19: 18 `test_*.py` files, 116 test functions, 118 collected cases
+because of parametrization. Calculator functions test1–test7 count even without
+an underscore. Latest Git-backed scratch run: 118 passed, 13 warnings in 30.98 s.
+Command and scratch limitations: `../paper/codex_audit2/fix_progress.md`.
+This is not scientific validation. The old 101 count/15-file list is superseded;
+ledger 2bo describes split historical runs, not one full-suite invocation.
 
 ---
 
-## 6. `output/` (33 folders + 785 loose files; 2,724 JSON files in total)
+## 6. `output/` (unchecked historical inventory)
+
+All folder/file counts, sizes and per-folder result/status labels below are unverified historical measurements. No current recount or complete result-family review supports this inventory; use the ledger and exact artifacts before quoting a row.
 
 Sizes from `du`. Tracked evidence is JSON + PNG. `.npz` and large arrays are git-ignored.
 
@@ -528,7 +520,7 @@ Sizes from `du`. Tracked evidence is JSON + PNG. `.npz` and large arrays are git
 - ❌ Old summary files (`MONTH10_AUDIT.md`, `POSTER_KEY_FINDINGS.md`, `EXECUTIVE_SUMMARY.md`) predate the H-2 and H-3 tests. Do not quote them for the current paper.
 
 **PredictGBM (H-2 and H-3), see §12 for numbers:**
-- ❌ `predictgbm/final/test_results.json` (H-2 locked test): primary fails its own rule.
+- ❌ `predictgbm/final/test_results.json` (H-2 former test (now spent)): primary fails its own rule.
 - ✅ `predictgbm/final/final_train.json`: 142 TUM dev patients + 334 MU pairs, 15 epochs, 84 min. `recurrence_read_for_test: False`.
 - ✅ `predictgbm/final/test_logits_2mm.npz`: test logits. Its SHA-256 matches `test_logits_sha256` in `configs/h2_frozen.yaml`.
 - ✅ `predictgbm/h3/dev_ensembles.json`: H-3 dev (interim, dev only)
@@ -542,7 +534,9 @@ These exist but I did not read them: `kaggle` logs, `*.log` files, `*.manifest.j
 
 ---
 
-## 7. `data/` (17,591 files, about 99 GB)
+## 7. `data/` (unverified historical sizes/counts)
+
+Inventory, module behavior, sizes, data availability and statuses in this section are unverified historical assertions. No complete per-file or current filesystem audit is implied.
 
 Git-ignored. Not in the repo. Needed to re-run scripts.
 
@@ -563,6 +557,8 @@ Git-ignored. Not in the repo. Needed to re-run scripts.
 
 ## 8. `kaggle_run/` (1,421 files; 4.87 GB on disk in the 2026-10-17 audit, of which 1.73 GB is untracked by git and 3.14 GB is gitignored)
 
+Inventory, module behavior, sizes, data availability and statuses in this section are unverified historical assertions. No complete per-file or current filesystem audit is implied.
+
 Kaggle kernel kits. Each `kernel_*` is a notebook run, each `pack_*` is an input bundle, each `out_*` is the returned output.
 
 | Group | Folders | Meaning | Status |
@@ -576,7 +572,9 @@ Kaggle kernel kits. Each `kernel_*` is a notebook run, each `pack_*` is an input
 
 ---
 
-## 9. `vault/` (48 notes, project memory)
+## 9. `vault/` (historical navigation; count unverified)
+
+Inventory, module behavior, sizes, data availability and statuses in this section are unverified historical assertions. No complete per-file or current filesystem audit is implied.
 
 Start with `Welcome.md`. It is the index.
 
@@ -609,6 +607,8 @@ Start with `Welcome.md`. It is the index.
 ---
 
 ## 10. Other top-level folders
+
+Inventory, module behavior, sizes, data availability and statuses in this section are unverified historical assertions. No complete per-file or current filesystem audit is implied.
 
 ### 10a. `paper/` (19 files)
 
@@ -678,7 +678,7 @@ Note: `archive/track_a/` has the same names as live scripts. Do not run them by 
 | Folder | Item | What it is | Status |
 |---|---|---|:---:|
 | `colab/` | `h3_dev_train.ipynb` | H-3 dev training in Colab | ⚪ |
-| `configs/` | `h2_frozen.yaml` | H-2 freeze file. Written 2026-10-11 before any test recurrence was read. Final model, test set, primary endpoint, success rule. | ✅ important |
+| `configs/` | `h2_frozen.yaml` | H-2 freeze file. Repository freeze chronology is recorded for 2026-10-11; external/manual pre-freeze access cannot be ruled out by static files. Final model, test set, primary endpoint, success rule. | ✅ important |
 | `outputs/` | `validation_summary_dashboard.png` | One dashboard image | ✅ |
 | `reports/` | `Glioblastoma oncology professors US.md` | Notes on professors (US) | ⚪ |
 | `research_notes/` | `Glioblastoma oncology professors US` (5 files, no extension) | Same topic, research notes | ⚪ |
@@ -698,6 +698,8 @@ Note: `archive/track_a/` has the same names as live scripts. Do not run them by 
 
 ## 11. Git state
 
+The following branch, commit/tag and untracked-file list is a reported 2026-10-14 session snapshot, not current Git state. Recheck git log/status before relying on it.
+
 | Item | Value | Status |
 |---|---|:---:|
 | Branch | `main` | ⚪ |
@@ -711,16 +713,18 @@ Note: `archive/track_a/` has the same names as live scripts. Do not run them by 
 
 ## 12. Results scoreboard (numbers, with source files)
 
-Only results I read in files or the vault ledger. Interim = labelled interim in the source.
+These are historical claims, not independently verified by this map. Current corrected interpretations and exact artifact keys are in `../vault/PAPER_FINDINGS_LEDGER.md`; every retained result needs that source check. All therapy/RL/biomarker gains are assumed-parameter simulations, including fitted real-patient growth inputs. No clinical benefit is established.
+
+Original author reports reading selected files or ledger entries. This is not direct verification of every JSON. Interim remains interim.
 
 | # | Claim | Number | Source file | Status | Weakest point |
 |---|---|---|---|:---:|---|
-| 1 | Track A C-GAT, random split | acc 0.787, macro F1 0.783, AUC 0.922 | `output/cgat/gat_metrics.json` (via `TRACK_A_RESULTS.md`) | ❌ | Random split leaks. Patient-ID lookup gets 82.8%. |
-| 2 | Track A C-GAT, leak-free (script 88) | acc 0.638 (sd 0.133), macro F1 0.557 | `output/cgat_leak_free.json` | ❌ | Large fold spread: 0.47–0.78 |
+| 1 | Track A C-GAT, random split | acc 0.787, macro F1 0.783, AUC 0.922 | `output/cgat/gat_metrics.json` (via `TRACK_A_RESULTS.md`) | ❌ | Random-cell split leaks; not a biology result. Patient-ID lookup gets 82.8%. |
+| 2 | Track A C-GAT, leak-free (script 88) | acc 0.638 (sd 0.133), macro F1 0.557 | `output/cgat_leak_free.json` | ❌ | Large fold spread, donor/composition confounding; not a validated biology result (ledger 2o). |
 | 3 | Track A scVI baseline | acc 0.730, F1 0.729, AUC 0.880 | `output/scvi_metrics.json` | ✅ | Baseline only |
-| 4 | Track B forecast on core target (script 81) | Dice +0.026 vs no-change, Holm p 0.0015 (133 scored, 19 skipped) | `output/forecast_labels_core/results.json` | ✅ | Post hoc target choice; DTI adds nothing |
+| 4 | Track B forecast on core target (script 81) | Dice +0.026 vs no-change, Holm p 0.0015 (133 scored, 19 skipped) | `output/forecast_labels_core/results.json` | ✅ | Post hoc target choice; +0.026 uses a different split. Later paired manifest PDE-vs-geometric contrast is negative/inconclusive; see ledger 2w/2y. |
 | 5 | DTI orientation on forecast | −0.001 Dice (p 0.97) | `forecast_labels_core/results.json` (via `failed_hypotheses.md`) | ❌ | — |
-| 6 | H1: PDE beats persistence (GBM-only) | +0.0130 (CI −0.0043 to +0.0302) | `output/pde_manifest/results.json` | ❌ | CI crosses 0 |
+| 6 | H1: PDE beats persistence (GBM-only) | +0.0130 (CI −0.0038 to +0.0292) | `output/pde_manifest/results.json` | ❌ | CI crosses 0 |
 | 7 | H3 exact solver, DTI direction | −0.0004 (CI −0.0009 to −0.0001), r=10: −0.0030 | `output/pde_manifest_monotone/results.json` | ❌ | Old solver's +0.0002 was a clamp artefact |
 | 8 | Growth-only vs no-change on LUMIERE volumes | worse (n=40 p 0.0003; n=50 p 0.004) | `output/lumiere_volume_forecast.json` | ❌ | — |
 | 9 | Adaptive therapy, 61 patients (sim) | MTD more resistant in 54/61; 7 tied; 0/61 adaptive more resistant (E_MAX ratio 1000) | `output/emax_sweep_summary.json` | ✅ | Simulation; assumed kill rates |
@@ -729,7 +733,7 @@ Only results I read in files or the vault ledger. Interim = labelled interim in 
 | 12 | Fractal D_f tracks anisotropy | wrong direction | `output/fractal_aniso_vs_iso.json` | ❌ | Drop D_f |
 | 13 | Script 60 "DTI < 0.01%" ablation | Artefact: D ≈ 10× too low. At D = 0.1, DTI effect 8% Dice at 90 d | `output/ablation_spatial_endpoints*.json`, `ablation_horizon_crossover.json` | ❌ (claim) / ✅ (rerun) | Parameter artefact |
 | 14 | Spatial ablation at Swanson D | Dice 0.994 → 0.886 | `output/*swanson*.json` | ✅ | Volume ablation stays flat |
-| 15 | Inverse estimation of D | 124/154 at growth bound; D not identifiable | `output/inverse_est_metrics.json` | ❌ | Cannot identify D from volumes |
+| 15 | Inverse estimation of D | rho lower-bound hits 124/154; D bound hits 147/154; D not identifiable | `output/inverse_est_metrics.json` | ❌ | Cannot identify D from volumes |
 | 16 | Robust MPC | 68.9% dose sparing; variance −31.8% | `output/robust_mpc_benchmark.json` | ✅ / ❌ | Variance worse |
 | 17 | Biomarker: start early | rho* ≈ 0.075/day, CI [0.0746, 0.0820] | `output/biomarker_stability_metrics.json` | ✅ | Simulation; fit on equal-budget arms |
 | 18 | RL vs Stupp (PPO, equal budget) | 25% win on simulated cohort64 (n=20); on real_test (n=21) PPO wins 20/21 on day-90 volume with assumed kill rates, never on time to progression | `output/rl_kill_conditioned/evaluate.json`, `output/rl_equal_budget/evaluate.json`, ledger C1 | ❌ | — |
@@ -737,7 +741,7 @@ Only results I read in files or the vault ledger. Interim = labelled interim in 
 | 20 | Time to progression vs Stupp | never wins | `output/ttp_equal_budget/evaluate.json` | ❌ | — |
 | 21 | Pacing gain on real parameters | +2.1 d, mostly explained | script 87 (per `failed_hypotheses.md`) | ❌ | Shared assumed kill rates |
 | 22 | Dual MTD vs dual adaptive | 358.9 d vs 305.6 d | `output/dual_mtd_baseline.json` | ❌ | "Rescue" is not adaptivity |
-| 23 | Resistance-driven gain (real) | 0 of 6 cells | `output/plastic_resistance/results.json` | ❌ | — |
+| 23 | Resistance-driven gain (fitted inputs, assumed simulation) | 0 of 6 cells | `output/plastic_resistance/results.json` | ❌ | — |
 | 24 | MGMT-calibrated TTP (script 82) | median TTP 169 vs 181 d, log-rank p 0.60 | `output/mgmt_resistance/` | ❌ | Underpowered |
 | 25 | MGMT predicts TTP | HR 1.11, p 0.60 | `output/limit_checks.json` | ❌ | Direction matches literature |
 | 26 | Age predicts survival (TCGA → CGGA) | TCGA HR 1.031; CGGA pooled HR 1.009 (Holm p 0.082); adjusted HR 1.011 (1.002–1.021, p 0.018) | `output/cgga_validation.json`, `cgga_adjusted_age_mgmt.json` | ✅ weaker | About 1/3 the TCGA size |
@@ -745,10 +749,10 @@ Only results I read in files or the vault ledger. Interim = labelled interim in 
 | 28 | Volume-matched shape gain (script 105) | −0.0002 (CI −0.0033 to +0.0029) | `output/shape_skill_matched.json` | ❌ | — |
 | 29 | Stratified forecast (script 79) | classifier AUC 0.46; no arm beats no-change | `output/forecast_stratified/` | ❌ | — |
 | 30 | Track A forecast `pde_manifest` cell count | 328 pairs, 133 patients | `output/pde_manifest/results.json` | ⚪ | — |
-| 31 | **H-2 locked test (PREDICT-GBM), primary** | mean diff **+0.0088**, CI **−0.0115 to +0.0307**, n = 98, pct improved 35%, pct worse 39% | `output/predictgbm/final/test_results.json` | ❌ | **Success rule: lower CI bound > 0. Not met.** |
-| 32 | H-2 locked test, secondary all-recurrence | mean +0.081, CI +0.065 to +0.097, n = 101 | same file | ✅ secondary | Secondary endpoint; not the primary |
+| 31 | **H-2 former test (now spent) (PREDICT-GBM), primary** | mean diff **+0.0088**, CI **−0.0115 to +0.0307**, n = 98, pct improved 35%, pct worse 39% | `output/predictgbm/final/test_results.json` | ❌ | **Success rule: lower CI bound > 0. Not met.** |
+| 32 | H-2 former test (now spent), secondary all-recurrence | mean +0.081, CI +0.065 to +0.097, n = 101 | same file | ✅ secondary | Secondary endpoint; not the primary |
 | 33 | H-3 dev arms (INTERIM, dev only, n = 137) | C1 +0.030 (CI 0.005–0.060); C3 +0.027 (CI 0.014–0.044); U-Net +0.019 (CI −0.004 to +0.046); C2 +0.030 (CI 0.006–0.059) | `output/predictgbm/h3/dev_ensembles.json` | ✅ interim | Dev only. Commit notes say combined arms C1+C3 and C3+U-Net are undeclared, not selectable. |
-| 34 | **H-3 locked test (UCSF), primary** | mean diff **+0.0044**, CI **−0.0182 to +0.0369**, n = 49 (time1 enhancing); secondary all-recurrence +0.0849, CI +0.0588 to +0.1150, n = 59 | `output/predictgbm/h3_final/ucsf_test_results.json`, ledger 2bd | ❌ primary / ✅ secondary | **Success rule: lower CI bound > 0. Not met for the primary.** Run once on 2026-10-16. In 32 of 49 patients the 15 mm plan already covers at least 0.999 of enhancing tissue. Secondary endpoint; not the primary. |
+| 34 | **H-3 former test (now spent) (UCSF), primary** | mean diff **+0.0044**, CI **−0.0182 to +0.0369**, n = 49 (time1 enhancing); secondary all-recurrence +0.0849, CI +0.0588 to +0.1150, n = 59 | `output/predictgbm/h3_final/ucsf_test_results.json`, ledger 2bd | ❌ primary / ✅ secondary | **Success rule: lower CI bound > 0. Not met for the primary.** Run once on 2026-10-16. In 32 of 49 patients the 15 mm plan already covers at least 0.999 of enhancing tissue. Secondary endpoint; not the primary. |
 
 - ❌ Row 31 is the most important one. The frozen rule says success only if the lower CI bound is above zero. It is not. The result is negative under the pre-set rule. Do not write it up as a win.
 - ⚪ Row 33 is interim. Label it interim wherever it appears.
@@ -759,7 +763,7 @@ Only results I read in files or the vault ledger. Interim = labelled interim in 
 
 1. ✅ `Requirements.txt` had merge conflict markers; resolved 2026-10-18 (union of both sides kept). `pyproject.toml` does not list SALib, nibabel, dipy, scikit-learn or h5py, so keep `Requirements.txt` until they are added there.
 2. ❌ Script numbers reused: `15` (2 files), `16` (2), `22` (3), `50` (3), `51` (3), `52` (2), `53` (2), `54` (2), `55` (3), `56` (3). Easy to run the wrong one.
-3. ✅ CLAUDE.md test count was stale (56 vs 101 functions, 9 vs 15 files); corrected 2026-10-18, and all 101 tests passed in a copy with partial data (ledger 2bo).
+3. Historical CLAUDE counts are superseded. Ledger 2bo is an author-reported split-run total without saved transcripts; current dated inventory and scratch result are in section 5.
 4. ❌ README is stale (vault `README_STALE_CLAIMS.md` lists wrong claims). Do not cite it.
 5. ❌ Track A C-GAT headline (0.787) is leak-prone. Use script 88.
 6. ❌ `archive/track_a/` has the same file names as live scripts.
@@ -792,15 +796,15 @@ When a ledger entry or README cites "script N" for one of these numbers, name th
 
 ---
 
-## 14. Positives (things that work)
+## 14. Historical result claims (not execution certification)
 
-1. ✅ Full data pipeline for Track A runs (scripts 01–12): 140,355 cells.
-2. ✅ Forecast on the right target (script 81): +0.026 Dice, Holm p 0.0015, vs no-change.
+1. ⚪ Author-reported historical data pipeline for Track A (scripts 01–12): 140,355 cells.
+2. ⚪ Historical script-81 +0.026 Dice is exploratory; later paired manifest comparison does not demonstrate PDE advantage over persistence/geometric baseline (ledger 2w/2y).
 3. ✅ Adaptive therapy simulation: MTD more resistant in 54/61, 7 tied, 0 reversed (sim, assumed kill rates; adaptive ends with a larger final tumour).
 4. ✅ Elongation from anisotropy (sim): +0.178, p 4e-19.
-5. ✅ Biomarker: starting early helps; rho* ≈ 0.075/day, stable.
+5. ⚪ Model threshold rho* ≈ 0.075/day under assumed treatment parameters; no patient benefit established.
 6. ✅ Spatial ablation real at Swanson D (Dice 0.994 → 0.886).
-7. ✅ Measured segmentation noise, a real measurement that changes the assumed value.
+7. ⚪ Cross-tool volume disagreement; not measured scan-rescan error or isolated segmentation noise.
 8. ✅ H-2 freeze file with hashes (`configs/h2_frozen.yaml`, tag `h2-frozen`). H-3 rules declared in Amendment 9. Negatives kept (`failed_hypotheses.md`).
 9. ✅ Paper figures made by script from JSON, no hand-typed numbers (`make_paper_figures.py`).
 10. ✅ Ledger and limits in the vault, with source files.
@@ -816,13 +820,41 @@ When a ledger entry or README cites "script N" for one of these numbers, name th
 - **CI**: confidence interval. If the CI crosses 0, the effect is not clearly positive.
 - **Persistence**: "tumour stays the same" forecast.
 - **No-change**: same as persistence.
-- **Anisotropic**: direction-dependent (white matter tracts make tumours grow faster along them).
+- **Anisotropic**: direction-dependent; tract-guided spread is a model assumption, not established by this definition.
 - **DTI**: diffusion tensor imaging. Maps white matter direction.
 - **rho (ρ)**: growth rate per day.
 - **D**: diffusion coefficient (how fast cells spread).
 - **MTD**: maximum tolerated dose (standard full dosing).
 - **Stupp**: standard GBM treatment (surgery, radiation, temozolomide).
 - **TTP**: time to progression.
-- **H-2, H-3**: pre-registered hypotheses on PREDICT-GBM and UCSF data (Amendments 6–9 in `analysis_plan_v1.md`).
+- **H-2, H-3**: historical declared hypotheses on PREDICT-GBM and UCSF data. Both former test sets are SPENT and reused as development data under Amendment 12; never future locked tests.
 - **Interim**: a partial result. Labelled so in the source. Do not quote as final.
 - **Leak**: when test data sneaks into training. Inflates scores.
+
+## Audit corrections and evidence gaps (2026-10-19)
+
+The old “problems” and “positives” lists are historical assertions. Root README
+and CLAUDE guidance have since been corrected; scripts 49/50 conflict markers
+are resolved. The old dependency-completeness statement is superseded by current
+pyproject optional extras; no clean install is certified. Duplicate script
+numbers still require exact filenames, not only numbers. Bulk CLI execution is
+disabled and the empty batch placeholder is excluded.
+
+No current claim is made for output/data/Kaggle/vault/paper/hidden-folder sizes,
+file counts, local dataset presence, 290 commits, fourteen figures, or complete
+per-script/output auditing. Exact dated measurement logs, cohort/configuration
+manifests, output keys and execution transcripts are missing for those claims.
+The root helper sizes and purpose descriptions are not a reproducibility guide.
+The author-reported paper/poster status is dated in START_HERE, not inferred from
+file counts. The original diagram and lists describe background work only.
+
+The historical +0.026 forecast result must not be compared directly to a
+geometric score from another split. Current paired manifest contrast is PDE minus
+geometric -0.0019 (CI -0.0173 to +0.0130); ledger 2y cites the 10,000-draw output.
+No advantage is demonstrated; this is not equivalence. Freeze files and tags
+support repository chronology only, not absence of outside access. Both H-2/H-3
+primary endpoints failed their declared rules; positive secondary estimates do
+not rescue those endpoints. Later spent-set reuse cannot create new locked tests.
+All historical therapy “positives,” including conditioned RL and fitted-input
+studies, remain model simulations with assumed drug effects. A viewer/calculator
+is arithmetic/display research software, not a validated clinical tool.
