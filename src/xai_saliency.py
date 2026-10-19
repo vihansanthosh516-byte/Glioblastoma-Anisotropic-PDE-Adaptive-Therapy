@@ -32,11 +32,16 @@ policy network parameters and the *input tensor* u that constructs the
 scalar observation `[norm_vol, u_max, ...]`.
 
 Usage
+import os as _os
+_PROJECT_ROOT = _os.path.dirname(_os.path.dirname(_os.path.abspath(__file__)))
+def _P(rel):  # project-root-relative path, independent of the current working directory
+    return _os.path.join(_PROJECT_ROOT, rel)
+
 -----
     from src.xai_saliency import compute_saliency
     sal = compute_saliency(env, policy, target="action")  # returns (Z,Y,X) saliency
     saliency_to_html(env, policy, day=10, patient_id="PAT_01",
-                     output="output/saliency_day_10.html")
+                     output=_P("output/saliency_day_10.html"))
 """
 from __future__ import annotations
 
@@ -75,9 +80,6 @@ except ImportError:
 # module does not blow up when those deps are absent.
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
-
-import os as _os
-_os.chdir(_os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))))  # cwd-relative output/ paths below; anchor cwd at the project root
 
 def _load_module_by_path(name: str, path: Path):
     spec = importlib.util.spec_from_file_location(name, path)
@@ -331,7 +333,7 @@ def saliency_to_html(
     policy: Any,
     day: int,
     patient_id: str,
-    output: Path = Path("output/saliency_day_00.html"),
+    output: Path = Path(_P("output/saliency_day_00.html")),
 ) -> Path:
     """Drive the env to ``day``, compute saliency, write a self-contained HTML."""
     obs = get_obs(env)
@@ -354,7 +356,7 @@ def generate_xai_report(
     n_days: int = 90,
     capture_interval: int = 10,
     patient_id: str = "PAT_01",
-    output_dir: Path = Path("output/xai_reports"),
+    output_dir: Path = Path(_P("output/xai_reports")),
 ) -> Dict:
     """Generates the per-day dose-on saliency HTML pages plus a compact
     summary report consumed by the HIL UI (Phase 14 iframe).
@@ -423,7 +425,7 @@ if __name__ == "__main__":
     p.add_argument("--day", type=int, default=10, help="Decision day to inspect")
     p.add_argument("--patient-id", type=str, default="PAT_01")
     p.add_argument("--output", type=str,
-                   default="output/saliency_day_10.html")
+                   default=_P("output/saliency_day_10.html"))
     p.add_argument("--self-test", action="store_true")
     args = p.parse_args()
     if args.self_test:

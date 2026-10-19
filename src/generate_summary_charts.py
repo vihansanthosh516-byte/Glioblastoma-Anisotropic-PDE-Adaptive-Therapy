@@ -1,12 +1,15 @@
-# NOTE (2026-10-19 audit): historical legacy script; not part of the current RANO project. The 'real validation metrics data' table is typed into the code (seven patient IDs, day intervals, volumes, rho/D), not read from outputs; trace each value to source records before citing it as measured. It writes cwd-relative outputs/validation_summary_dashboard.png (note: outputs, not output); cwd is now anchored at the project root.
-import os as _os
-_os.chdir(_os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))))
+# NOTE (2026-10-19 audit): historical legacy script; not part of the current RANO project. The 'real validation metrics data' table is typed into the code (seven patient IDs, day intervals, volumes, rho/D), not read from outputs; trace each value to source records before citing it as measured. It writes cwd-relative outputs/validation_summary_dashboard.png (note: outputs, not output); paths are rooted at the project root via _P().
 import os
 import matplotlib.pyplot as plt
 import pandas as pd
 
 # Ensure output directory exists
-os.makedirs("outputs", exist_ok=True)
+import os as _os
+_PROJECT_ROOT = _os.path.dirname(_os.path.dirname(_os.path.abspath(__file__)))
+def _P(rel):  # project-root-relative path, independent of the current working directory
+    return _os.path.join(_PROJECT_ROOT, rel)
+
+os.makedirs(_P("outputs"), exist_ok=True)
 
 # 1. Ingest real validation metrics data
 data = {
@@ -55,6 +58,6 @@ for _, row in df_active.iterrows():
     axes[1].annotate(f"Pt {row['PatientID']}", (row['Rho'], row['D']), textcoords="offset points", xytext=(6,6), ha='left', fontsize=9, fontweight='semibold')
 
 # Save output chart
-output_path = 'outputs/validation_summary_dashboard.png'
+output_path = _P('outputs/validation_summary_dashboard.png')
 plt.savefig(output_path, dpi=300)
 print(f"Summary validation plots successfully compiled and saved to: {output_path}")

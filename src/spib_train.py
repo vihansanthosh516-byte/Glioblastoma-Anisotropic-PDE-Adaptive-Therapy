@@ -12,14 +12,16 @@ from spib.spib import SPIB
 from spib.utils import TimeLaggedDataset, DataNormalize
 
 import os as _os
-_os.chdir(_os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))))  # cwd-relative output/ paths below; anchor cwd at the project root
+_PROJECT_ROOT = _os.path.dirname(_os.path.dirname(_os.path.abspath(__file__)))
+def _P(rel):  # project-root-relative path, independent of the current working directory
+    return _os.path.join(_PROJECT_ROOT, rel)
 
 def main():
     print("[PHASE 2] Training SPIB...")
     
     # Load pseudo-trajectories
-    traj_data = np.load("output/spib_traj_data.npy")  # (45000, 32)
-    traj_labels = np.load("output/spib_traj_labels.npy")  # (45000,)
+    traj_data = np.load(_P("output/spib_traj_data.npy"))  # (45000, 32)
+    traj_labels = np.load(_P("output/spib_traj_labels.npy"))  # (45000,)
     
     print(f"  Trajectory data shape: {traj_data.shape}")
     print(f"  Trajectory labels shape: {traj_labels.shape}")
@@ -93,7 +95,7 @@ def main():
         neuron_num2=64,
         UpdateLabel=True,
         device=torch.device('cpu'),
-        path='output/spib_model'
+        path=_P('output/spib_model')
     )
     
     print("  SPIB model initialized.")
@@ -113,8 +115,8 @@ def main():
     print("[PHASE 2] Training complete!")
     
     # Save the normalizer parameters
-    np.save("output/spib_normalizer_mean.npy", data_mean)
-    np.save("output/spib_normalizer_std.npy", data_std)
+    np.save(_P("output/spib_normalizer_mean.npy"), data_mean)
+    np.save(_P("output/spib_normalizer_std.npy"), data_std)
     
     # Extract reaction coordinates for all cells
     spib_model.eval()
@@ -129,11 +131,11 @@ def main():
         # First 15000 are original cells (step 0)
         rc_original = rc_all[:n_cells]
         
-    np.save("output/spib_rc_3d.npy", rc_original)
+    np.save(_P("output/spib_rc_3d.npy"), rc_original)
     print(f"  Saved SPIB RC: output/spib_rc_3d.npy (shape: {rc_original.shape})")
     
     # Also save the full RC for analysis
-    np.save("output/spib_rc_all.npy", rc_all)
+    np.save(_P("output/spib_rc_all.npy"), rc_all)
     print(f"  Saved all SPIB RC: output/spib_rc_all.npy (shape: {rc_all.shape})")
     
     # Validation plot
@@ -141,7 +143,7 @@ def main():
     matplotlib.use('Agg')
     import matplotlib.pyplot as plt
     
-    labels = np.load("output/nn_y.npy")
+    labels = np.load(_P("output/nn_y.npy"))
     
     fig, axes = plt.subplots(1, 2, figsize=(16, 6))
     
@@ -175,7 +177,7 @@ def main():
     ax.grid(True, alpha=0.3)
     
     plt.tight_layout()
-    plt.savefig("output/spib_rc_validation.png", dpi=150, bbox_inches='tight')
+    plt.savefig(_P("output/spib_rc_validation.png"), dpi=150, bbox_inches='tight')
     plt.close()
     
     print(f"  Validation plot: output/spib_rc_validation.png")
@@ -187,7 +189,7 @@ def main():
         probs = torch.exp(log_probs).cpu().numpy()
         state_assignments = probs.argmax(axis=1)  # (45000,)
         
-    np.save("output/spib_state_assignments.npy", state_assignments)
+    np.save(_P("output/spib_state_assignments.npy"), state_assignments)
     print(f"  State assignments: {np.bincount(state_assignments[:n_cells])}")
 
 if __name__ == "__main__":

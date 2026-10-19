@@ -1,4 +1,4 @@
-# NOTE (2026-10-19 audit): historical legacy Track A script; not part of the current RANO project. Needs umap (not in Requirements.txt). Paths: cwd is now anchored at the project root.
+# NOTE (2026-10-19 audit): historical legacy Track A script; not part of the current RANO project. Needs umap (not in Requirements.txt). Paths: paths are rooted at the project root via _P().
 import os
 import json
 import numpy as np
@@ -7,20 +7,22 @@ matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import umap
 
-import os as _os
-_os.chdir(_os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))))  # historical script uses cwd-relative output/ paths; anchor cwd at the project root
-
 def calculate_shannon_entropy(fractions):
     eps = 1e-10
     probs = np.clip(fractions, eps, 1.0)
     probs = probs / probs.sum(axis=1, keepdims=True)
     return -np.sum(probs * np.log2(probs), axis=1)
 
+import os as _os
+_PROJECT_ROOT = _os.path.dirname(_os.path.dirname(_os.path.abspath(__file__)))
+def _P(rel):  # project-root-relative path, independent of the current working directory
+    return _os.path.join(_PROJECT_ROOT, rel)
+
 def main():
     print("[LOAD] Loading data artifacts...")
-    y = np.load("output/nn_y.npy")
-    scvi_latent = np.load("output/scvi_latent.npy")
-    nmf_fractions = np.load("output/nmf_fractions.npy")
+    y = np.load(_P("output/nn_y.npy"))
+    scvi_latent = np.load(_P("output/scvi_latent.npy"))
+    nmf_fractions = np.load(_P("output/nmf_fractions.npy"))
     
     zone_names = {0: "Core", 1: "Periphery", 2: "Healthy"}
     meta_module_names = ["AC", "MES", "NPC", "OPC"]
@@ -85,8 +87,8 @@ def main():
                      ha='center', va='bottom', fontsize=10, fontweight='bold')
     
     plt.tight_layout()
-    os.makedirs("output", exist_ok=True)
-    fig.savefig("output/gradient_failure_analysis.png", dpi=300, bbox_inches='tight')
+    os.makedirs(_P("output"), exist_ok=True)
+    fig.savefig(_P("output/gradient_failure_analysis.png"), dpi=300, bbox_inches='tight')
     plt.close(fig)
     print("[OK] Diagnostic plot saved to output/gradient_failure_analysis.png")
     

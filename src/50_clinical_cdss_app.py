@@ -64,7 +64,12 @@ except Exception:
     run_robust_mpc_simulation = None
 
 # Clinical report output directory
-CLINICAL_REPORTS_DIR = Path("output/clinical_reports")
+import os as _os
+_PROJECT_ROOT = _os.path.dirname(_os.path.dirname(_os.path.abspath(__file__)))
+def _P(rel):  # project-root-relative path, independent of the current working directory
+    return _os.path.join(_PROJECT_ROOT, rel)
+
+CLINICAL_REPORTS_DIR = Path(_P("output/clinical_reports"))
 CLINICAL_REPORTS_DIR.mkdir(parents=True, exist_ok=True)
 
 # Physical constants (Phase 1/3D)
@@ -97,9 +102,6 @@ TARGET_VOLUME_MM3 = 50.0  # Target tumor volume threshold (mm3)
 # ============================================================================ #
 # CLI Argument Parser
 # ============================================================================ #
-import os as _os
-_os.chdir(_os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))))  # cwd-relative output/ paths below; anchor cwd at the project root
-
 def parse_args() -> argparse.Namespace:
     """Parse command-line arguments."""
     parser = argparse.ArgumentParser(

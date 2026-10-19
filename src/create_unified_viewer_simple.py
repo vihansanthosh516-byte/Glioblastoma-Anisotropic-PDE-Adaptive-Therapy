@@ -15,11 +15,13 @@ from pathlib import Path
 import glob
 
 
-BASE_OUTPUT = Path("output/batch_digital_twins")
-
-
 import os as _os
-_os.chdir(_os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))))  # cwd-relative output/ paths below; anchor cwd at the project root
+_PROJECT_ROOT = _os.path.dirname(_os.path.dirname(_os.path.abspath(__file__)))
+def _P(rel):  # project-root-relative path, independent of the current working directory
+    return _os.path.join(_PROJECT_ROOT, rel)
+
+BASE_OUTPUT = Path(_P("output/batch_digital_twins"))
+
 
 def load_all_patient_4d_data():
     """Load 4D simulation data for all patients."""

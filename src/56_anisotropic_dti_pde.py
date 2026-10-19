@@ -50,9 +50,6 @@ BETA_PRESSURE = 100.0 # Pa per unit density
 # --------------------------------------------------------------------------- #
 # Phase 1/2 Loaders
 # --------------------------------------------------------------------------- #
-import os as _os
-_os.chdir(_os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))))  # cwd-relative output/ paths below; anchor cwd at the project root
-
 def load_phase1_fields() -> Tuple[np.ndarray, np.ndarray]:
     """Load or generate D(x,y,z) and rho(x,y,z) matching Phase 1 statistics."""
     nx, ny, nz = GRID_3D
@@ -461,8 +458,13 @@ def save_outputs_3d(
 # --------------------------------------------------------------------------- #
 # Main Pipeline
 # --------------------------------------------------------------------------- #
+import os as _os
+_PROJECT_ROOT = _os.path.dirname(_os.path.dirname(_os.path.abspath(__file__)))
+def _P(rel):  # project-root-relative path, independent of the current working directory
+    return _os.path.join(_PROJECT_ROOT, rel)
+
 def main() -> None:
-    os.makedirs("output", exist_ok=True)
+    os.makedirs(_P("output"), exist_ok=True)
 
     print("[PHASE 3] Loading Phase 1 fields...")
     D_base, rho = load_phase1_fields()
@@ -505,7 +507,7 @@ def main() -> None:
     print(f"[METRICS] Max invasion: {metrics['max_fiber_tract_invasion_mm']:.2f} mm")
     print(f"[METRICS] Asymmetry index: {metrics['asymmetry_index']:.3f}")
 
-    save_outputs_3d(u_aniso, u_iso, tensor, FA, e1, metrics, Path("output"))
+    save_outputs_3d(u_aniso, u_iso, tensor, FA, e1, metrics, Path(_P("output")))
 
     print("[PHASE 3] Complete.")
 

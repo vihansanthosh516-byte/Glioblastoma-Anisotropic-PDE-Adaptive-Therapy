@@ -35,7 +35,12 @@ except ImportError:
     print("ERROR: plotly not installed. Run: pip install plotly")
     exit(1)
 
-OUTPUT_DIR = Path("output")
+import os as _os
+_PROJECT_ROOT = _os.path.dirname(_os.path.dirname(_os.path.abspath(__file__)))
+def _P(rel):  # project-root-relative path, independent of the current working directory
+    return _os.path.join(_PROJECT_ROOT, rel)
+
+OUTPUT_DIR = Path(_P("output"))
 COHORT_NPZ = OUTPUT_DIR / "3d_master_cohort_volumes.npz"
 COHORT_JSON = OUTPUT_DIR / "3d_extension_summary.json"
 DASHBOARD_HTML = OUTPUT_DIR / "3d_interactive_tumor_dashboard.html"
@@ -60,7 +65,7 @@ try:
     _torch_seed.manual_seed(42)
 except ImportError:
     pass
-_os.chdir(_os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))))  # cwd-relative output/ paths below; anchor cwd at the project root
+_os.chdir(_os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))))  # cwd-relative output/ paths below; 
 
 def load_cohort_data() -> tuple:
     """Load 3D cohort volumes and summary metrics."""

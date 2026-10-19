@@ -1,4 +1,4 @@
-# NOTE (2026-10-19 audit): historical legacy Track A script; not part of the current RANO project. Needs torch. This is a computational diagnostic (PCA 5D, chosen kNN/bandwidth and eigenvalue noise thresholds), not a proof of a biological saddle point. Paths: cwd is now anchored at the project root.
+# NOTE (2026-10-19 audit): historical legacy Track A script; not part of the current RANO project. Needs torch. This is a computational diagnostic (PCA 5D, chosen kNN/bandwidth and eigenvalue noise thresholds), not a proof of a biological saddle point. Paths: paths are rooted at the project root via _P().
 #!/usr/bin/env python3
 """
 22_saddle_point_proof.py (v3 — zone-aware)
@@ -35,9 +35,6 @@ EIG_NOISE_FRACTION = 0.15
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
-import os as _os
-_os.chdir(_os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))))  # historical script uses cwd-relative output/ paths; anchor cwd at the project root
-
 def mem_mb():
     return resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024
 
@@ -46,10 +43,15 @@ def log(msg):
     print(f"[{time.strftime('%H:%M:%S')}] {msg}  RSS={mem_mb():.0f} MB", flush=True)
 
 
+import os as _os
+_PROJECT_ROOT = _os.path.dirname(_os.path.dirname(_os.path.abspath(__file__)))
+def _P(rel):  # project-root-relative path, independent of the current working directory
+    return _os.path.join(_PROJECT_ROOT, rel)
+
 def load_data(device):
     log("Loading data...")
 
-    latent_paths = ["output/cgat/cvae_latent.npy", "output/scvi_latent.npy"]
+    latent_paths = [_P("output/cgat/cvae_latent.npy"), _P("output/scvi_latent.npy")]
     latent_32d = None
     for p in latent_paths:
         if Path(p).exists():
@@ -64,10 +66,10 @@ def load_data(device):
     latent = pca.fit_transform(latent_32d)
     log(f"  PCA->{PCA_DIM}D: explained var = {pca.explained_variance_ratio_.sum():.4f}")
 
-    energy_1d = np.load("output/waddington_landscape.npy").astype(np.float32)
+    energy_1d = np.load(_P("output/waddington_landscape.npy")).astype(np.float32)
 
     labels_1d = None
-    for p in ["output/cgat/cvae_labels.npy", "output/nn_y.npy"]:
+    for p in [_P("output/cgat/cvae_labels.npy"), _P("output/nn_y.npy")]:
         if Path(p).exists():
             labels_1d = np.load(p, allow_pickle=True)
             break
@@ -80,8 +82,8 @@ def load_data(device):
     else:
         labels_int = labels_1d.astype(np.int64)
 
-    if Path("output/drift_vectors.npy").exists():
-        drift_32d = np.load("output/drift_vectors.npy").astype(np.float32)
+    if Path(_P("output/drift_vectors.npy")).exists():
+        drift_32d = np.load(_P("output/drift_vectors.npy")).astype(np.float32)
         drift = drift_32d @ pca.components_.T
     else:
         drift = np.zeros_like(latent)
@@ -383,7 +385,7 @@ def main():
             "overall_pass": bool(overall),
         },
     }
-    out = Path("output/saddle_point_metrics.json")
+    out = Path(_P("output/saddle_point_metrics.json"))
     out.parent.mkdir(exist_ok=True)
     with open(out, "w") as f:
         json.dump(proof, f, indent=2)

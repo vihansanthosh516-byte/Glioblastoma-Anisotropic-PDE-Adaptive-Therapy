@@ -19,9 +19,14 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 import threading
 
 
-CLINICAL_EXCEL = "data/tcia/MU-Glioma-Post_ClinicalData-July2025.xlsx"
+import os as _os
+_PROJECT_ROOT = _os.path.dirname(_os.path.dirname(_os.path.abspath(__file__)))
+def _P(rel):  # project-root-relative path, independent of the current working directory
+    return _os.path.join(_PROJECT_ROOT, rel)
+
+CLINICAL_EXCEL = _P("data/tcia/MU-Glioma-Post_ClinicalData-July2025.xlsx")
 SHEET_NAME = "MU Glioma Post"
-BASE_OUTPUT = Path("output/batch_digital_twins")
+BASE_OUTPUT = Path(_P("output/batch_digital_twins"))
 BASE_OUTPUT.mkdir(parents=True, exist_ok=True)
 
 # Thread-safe logging
@@ -29,9 +34,6 @@ log_lock = threading.Lock()
 results = []
 failures = []
 
-
-import os as _os
-_os.chdir(_os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))))  # cwd-relative output/ paths below; anchor cwd at the project root
 
 def log(msg: str):
     """Thread-safe logging with timestamp."""
@@ -45,7 +47,7 @@ def log(msg: str):
 def get_all_patients() -> list:
     """Get list of all patient directories."""
     patients = []
-    base = Path("data/tcia/MU-Glioma-Post")
+    base = Path(_P("data/tcia/MU-Glioma-Post"))
     for d in base.iterdir():
         if d.is_dir() and d.name.startswith("PatientID_"):
             # Check if has at least one tumor mask
@@ -62,7 +64,7 @@ def get_all_patients() -> list:
 
 def run_single_patient(patient_id: str, days: int = 120) -> dict:
     """Run digital twin pipeline for a single patient."""
-    patient_dir = f"data/tcia/MU-Glioma-Post/{patient_id}"
+    patient_dir = _P(f"data/tcia/MU-Glioma-Post/{patient_id}")
     output_dir = BASE_OUTPUT / patient_id
     output_dir.mkdir(parents=True, exist_ok=True)
     
@@ -72,7 +74,7 @@ def run_single_patient(patient_id: str, days: int = 120) -> dict:
     try:
         # Run the pipeline
         cmd = [
-            sys.executable, "src/run_digital_twin_pipeline.py",
+            sys.executable, _P("src/run_digital_twin_pipeline.py"),
             "--patient-dir", patient_dir,
             "--days", str(days),
             "--output-dir", str(output_dir)
@@ -82,7 +84,7 @@ def run_single_patient(patient_id: str, days: int = 120) -> dict:
             cmd, 
             capture_output=True, 
             text=True, 
-            cwd=".",
+            cwd=_PROJECT_ROOT,
             timeout=600  # 10 min per patient
         )
         

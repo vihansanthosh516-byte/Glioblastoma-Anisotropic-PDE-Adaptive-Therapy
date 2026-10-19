@@ -21,11 +21,13 @@ from pathlib import Path
 import glob
 
 
-BASE_OUTPUT = Path("output/batch_digital_twins")
-
-
 import os as _os
-_os.chdir(_os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))))  # cwd-relative output/ paths below; anchor cwd at the project root
+_PROJECT_ROOT = _os.path.dirname(_os.path.dirname(_os.path.abspath(__file__)))
+def _P(rel):  # project-root-relative path, independent of the current working directory
+    return _os.path.join(_PROJECT_ROOT, rel)
+
+BASE_OUTPUT = Path(_P("output/batch_digital_twins"))
+
 
 def load_all_patient_data():
     """Load data from all successful patient runs."""
@@ -92,12 +94,12 @@ def load_all_patient_data():
             treatment_types.add(t)
         
         # Load clinical timing
-        clinical_file = Path(f"data/tcia/MU-Glioma-Post/{patient_dir.name}")
+        clinical_file = Path(_P(f"data/tcia/MU-Glioma-Post/{patient_dir.name}"))
         clinical_data = {}
         if clinical_file.exists():
             try:
                 import pandas as pd
-                df = pd.read_excel("data/tcia/MU-Glioma-Post_ClinicalData-July2025.xlsx", sheet_name="MU Glioma Post")
+                df = pd.read_excel(_P("data/tcia/MU-Glioma-Post_ClinicalData-July2025.xlsx"), sheet_name="MU Glioma Post")
                 row = df[df['Patient_ID'] == patient_dir.name]
                 if len(row) > 0:
                     r = row.iloc[0]

@@ -17,15 +17,17 @@ from scipy.ndimage import gaussian_filter, zoom
 
 # Load the PDE solver module by executing its source
 import importlib.util
-spec = importlib.util.spec_from_file_location("aniso_mod", "src/42_anisotropic_pde.py")
+import os as _os
+_PROJECT_ROOT = _os.path.dirname(_os.path.dirname(_os.path.abspath(__file__)))
+def _P(rel):  # project-root-relative path, independent of the current working directory
+    return _os.path.join(_PROJECT_ROOT, rel)
+
+spec = importlib.util.spec_from_file_location("aniso_mod", _P("src/42_anisotropic_pde.py"))
 aniso_mod = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(aniso_mod)
 AnisotropicFKSolver = aniso_mod.AnisotropicFKSolver
 TensorFieldBuilder = aniso_mod.TensorFieldBuilder
 
-
-import os as _os
-_os.chdir(_os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))))  # cwd-relative output/ paths below; anchor cwd at the project root
 
 def ucsf_to_pde_tensor_fields(
     patient_dir: str | Path,
@@ -197,7 +199,7 @@ if __name__ == "__main__":
     print("UCSF-PDGM to PDE Solver Integration Test")
     print("=" * 60)
 
-    result = run_pde_with_ucsf_tensor(patient_dir, Path("output"))
+    result = run_pde_with_ucsf_tensor(patient_dir, Path(_P("output")))
 
     print("\n=== Integration Test Complete ===")
     print(f"Patient: {result['tensor_fields']['patient_id']}")

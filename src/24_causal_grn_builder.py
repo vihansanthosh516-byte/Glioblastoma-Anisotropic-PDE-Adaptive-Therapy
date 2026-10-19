@@ -1,4 +1,4 @@
-# NOTE (2026-10-19 audit): historical legacy Track A script; not part of the current RANO project. Needs networkx. 'Causal GRN' and 'master switches' are labels: edges come from a global 95th-percentile threshold on transfer-entropy values with unit weights, and switches are ranked by out-degree, so they are not demonstrated causal regulators. Paths: cwd is now anchored at the project root.
+# NOTE (2026-10-19 audit): historical legacy Track A script; not part of the current RANO project. Needs networkx. 'Causal GRN' and 'master switches' are labels: edges come from a global 95th-percentile threshold on transfer-entropy values with unit weights, and switches are ranked by out-degree, so they are not demonstrated causal regulators. Paths: paths are rooted at the project root via _P().
 #!/usr/bin/env python3
 """
 Month 2, Week 2: Causal GRN Builder
@@ -18,19 +18,21 @@ import numpy as np
 
 
 import os as _os
-_os.chdir(_os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))))  # historical script uses cwd-relative output/ paths; anchor cwd at the project root
+_PROJECT_ROOT = _os.path.dirname(_os.path.dirname(_os.path.abspath(__file__)))
+def _P(rel):  # project-root-relative path, independent of the current working directory
+    return _os.path.join(_PROJECT_ROOT, rel)
 
 def load_data() -> Tuple[np.ndarray, List[str], np.ndarray]:
     """Load TE matrix, gene names, and cell labels."""
     t0 = time.perf_counter()
     
-    te_matrix = np.load("output/te_matrix.npy")
+    te_matrix = np.load(_P("output/te_matrix.npy"))
     
-    with open("output/te_gene_names.txt") as f:
+    with open(_P("output/te_gene_names.txt")) as f:
         raw_genes = [line.strip() for line in f]
     gene_names = [g.split('\t')[-1] for g in raw_genes]
     
-    labels = np.load("output/nn_y.npy")
+    labels = np.load(_P("output/nn_y.npy"))
     
     elapsed = time.perf_counter() - t0
     print(f"[LOAD] TE matrix: {te_matrix.shape}, genes: {len(gene_names)}, labels: {labels.shape} in {elapsed:.3f}s")
@@ -142,14 +144,14 @@ def export_grn_assets(
 ) -> None:
     """Export all GRN artifacts."""
     print("[EXPORT] Saving GRN assets...")
-    Path("output").mkdir(exist_ok=True)
+    Path(_P("output")).mkdir(exist_ok=True)
     
     # GraphML for Cytoscape
-    nx.write_graphml(G, "output/causal_grn.graphml")
+    nx.write_graphml(G, _P("output/causal_grn.graphml"))
     print("  output/causal_grn.graphml")
     
     # Master switches TSV
-    with open("output/master_switches.tsv", "w") as f:
+    with open(_P("output/master_switches.tsv"), "w") as f:
         f.write("rank\tgene_id\tgene_name\tout_degree\tin_degree\ttotal_degree\tn_targets\tdownstream_targets\n")
         for ms in master_switches:
             targets_str = ",".join(ms["downstream_targets"])
@@ -159,7 +161,7 @@ def export_grn_assets(
     print("  output/master_switches.tsv")
     
     # Adjacency matrix
-    np.save("output/grn_adjacency.npy", adj_matrix)
+    np.save(_P("output/grn_adjacency.npy"), adj_matrix)
     print("  output/grn_adjacency.npy")
     
     # Network metrics
@@ -175,7 +177,7 @@ def export_grn_assets(
         "master_switches": master_switches,
     }
     
-    with open("output/grn_metrics.json", "w") as f:
+    with open(_P("output/grn_metrics.json"), "w") as f:
         json.dump(metrics, f, indent=2)
     print("  output/grn_metrics.json")
 

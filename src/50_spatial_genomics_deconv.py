@@ -57,9 +57,6 @@ np.random.seed(SEED)
 # --------------------------------------------------------------------------- #
 # Synthetic Spatial Transcriptomics Generation
 # --------------------------------------------------------------------------- #
-import os as _os
-_os.chdir(_os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))))  # cwd-relative output/ paths below; anchor cwd at the project root
-
 def generate_neftel_signatures() -> np.ndarray:
     """Generate synthetic gene expression signatures for 4 Neftel states."""
     signatures = np.zeros((N_STATES, N_GENES))
@@ -175,6 +172,11 @@ def run_deconvolution(
 # --------------------------------------------------------------------------- #
 # Biophysical Parameter Mapping (Bayesian Hierarchical)
 # --------------------------------------------------------------------------- #
+import os as _os
+_PROJECT_ROOT = _os.path.dirname(_os.path.dirname(_os.path.abspath(__file__)))
+def _P(rel):  # project-root-relative path, independent of the current working directory
+    return _os.path.join(_PROJECT_ROOT, rel)
+
 def map_fractions_to_parameters(
     frac_mean: np.ndarray,
     frac_lower: np.ndarray,
@@ -208,7 +210,7 @@ def map_fractions_to_parameters(
                 NEFTEL_STATES,
             )
             fpath = Path(multiomic_features_path) if multiomic_features_path \
-                else Path("output/multiomic_features.tsv")
+                else Path(_P("output/multiomic_features.tsv"))
             # Spot-level X: Neftel fractions (from deconvolution) +
             # patient-level omic block (shared across spots for that patient).
             if patient_id is not None and fpath.exists():
@@ -432,7 +434,7 @@ def main() -> None:
     parser.add_argument("--patient-id", type=str, default=None)
     args_deconv = parser.parse_args()
 
-    out_dir = Path("output")
+    out_dir = Path(_P("output"))
     out_dir.mkdir(parents=True, exist_ok=True)
     
     print("[PHASE 1] Generating synthetic 10x Visium-like spatial transcriptomics...")

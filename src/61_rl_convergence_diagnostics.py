@@ -58,15 +58,17 @@ COMBO_TOX_PER_RL_STEP = 0.08
 SEED_SIGMA_MM = 5.0
 SEED_AMPLITUDE = 0.8
 
-OUTPUT_DIR = Path("output")
+import os as _os
+_PROJECT_ROOT = _os.path.dirname(_os.path.dirname(_os.path.abspath(__file__)))
+def _P(rel):  # project-root-relative path, independent of the current working directory
+    return _os.path.join(_PROJECT_ROOT, rel)
+
+OUTPUT_DIR = Path(_P("output"))
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
 # --------------------------------------------------------------------------- #
 # Fast PDE Solver (Self-contained)
 # --------------------------------------------------------------------------- #
-import os as _os
-_os.chdir(_os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))))  # cwd-relative output/ paths below; anchor cwd at the project root
-
 class FastPDESolver:
     def __init__(
         self,

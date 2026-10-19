@@ -111,7 +111,7 @@ try:
     _torch_seed.manual_seed(42)
 except ImportError:
     pass
-_os.chdir(_os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))))  # cwd-relative output/ paths below; anchor cwd at the project root
+_os.chdir(_os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))))  # cwd-relative output/ paths below; 
 
 class TensorFieldBuilder:
     """
@@ -664,6 +664,11 @@ class AnisotropicFKSolver:
 # =========================================================================== #
 # PHASE 3: Cohort Expression Profile Coupling
 # =========================================================================== #
+import os as _os
+_PROJECT_ROOT = _os.path.dirname(_os.path.dirname(_os.path.abspath(__file__)))
+def _P(rel):  # project-root-relative path, independent of the current working directory
+    return _os.path.join(_PROJECT_ROOT, rel)
+
 class PatientParameterMapper:
     """
     Loads Month 6 spatial recurrence data + zone-stratified gene expression
@@ -675,8 +680,8 @@ class PatientParameterMapper:
 
     def __init__(
         self,
-        cohort_npz: Path = Path("output/spatial_recurrence_profiles.npz"),
-        zone_csv_root: Path = Path("output"),
+        cohort_npz: Path = Path(_P("output/spatial_recurrence_profiles.npz")),
+        zone_csv_root: Path = Path(_P("output")),
     ) -> None:
         self.cohort_npz = cohort_npz
         self.zone_csv_root = zone_csv_root
@@ -884,7 +889,7 @@ class CohortSimulator:
     def run_cohort(
         self,
         base_builder: TensorFieldBuilder,
-        output_dir: Path = Path("output"),
+        output_dir: Path = Path(_P("output")),
     ) -> List[Dict]:
         if not self.mapper.data:
             self.mapper.load()
@@ -1192,7 +1197,7 @@ def main():
     print("=" * 70)
     print("MONTH 7: ANISOTROPIC TENSOR DIFFUSION ENGINEERING")
     print("=" * 70)
-    output_dir = Path("output")
+    output_dir = Path(_P("output"))
     output_dir.mkdir(exist_ok=True)
 
     # ------------------ PHASE 1 -------------------------------

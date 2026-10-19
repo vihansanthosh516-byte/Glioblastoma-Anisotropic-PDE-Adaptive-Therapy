@@ -29,12 +29,14 @@ except ImportError:
     from src.treatment_aware_pde import TreatmentSchedule
 
 
-CLINICAL_EXCEL = "data/tcia/MU-Glioma-Post_ClinicalData-July2025.xlsx"
+import os as _os
+_PROJECT_ROOT = _os.path.dirname(_os.path.dirname(_os.path.abspath(__file__)))
+def _P(rel):  # project-root-relative path, independent of the current working directory
+    return _os.path.join(_PROJECT_ROOT, rel)
+
+CLINICAL_EXCEL = _P("data/tcia/MU-Glioma-Post_ClinicalData-July2025.xlsx")
 SHEET_NAME = "MU Glioma Post"
 
-
-import os as _os
-_os.chdir(_os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))))  # cwd-relative output/ paths below; anchor cwd at the project root
 
 def load_clinical_data(patient_id: str) -> Optional[Dict]:
     """Load and parse clinical data for a specific patient."""
@@ -403,8 +405,8 @@ total_days = {total_days}
 n_steps = len(drug_conc)
 
 # Save snapshots
-os.makedirs("output/time_series", exist_ok=True)
-np.save("output/time_series/tumor_3d_day_000.npy", u)
+os.makedirs(_P("output/time_series"), exist_ok=True)
+np.save(_P("output/time_series/tumor_3d_day_000.npy"), u)
 
 volume_history = []
 surgery_done = False
@@ -507,7 +509,7 @@ print("[SUCCESS] Clinical 4D simulation complete")
         f.write(sim_script)
     
     cmd = [sys.executable, str(script_path)]
-    result = subprocess.run(cmd, capture_output=True, text=True, cwd=".", timeout=300)
+    result = subprocess.run(cmd, capture_output=True, text=True, cwd=_PROJECT_ROOT, timeout=300)
     
     if result.returncode != 0:
         print(f"[ERROR] Clinical simulation failed:")
@@ -525,7 +527,7 @@ def generate_dashboard(time_series_dir: str, output_html: str) -> bool:
         "--input-dir", time_series_dir,
         "--output", output_html
     ]
-    result = subprocess.run(cmd, capture_output=True, text=True, cwd=".")
+    result = subprocess.run(cmd, capture_output=True, text=True, cwd=_PROJECT_ROOT)
     
     if result.returncode != 0:
         print(f"[ERROR] Dashboard generation failed: {result.stderr}")
@@ -543,7 +545,7 @@ def main():
                         help="Path to patient directory (MU-Glioma-Post or BraTS)")
     parser.add_argument("--days", type=int, default=120,
                         help="Total simulation days")
-    parser.add_argument("--output-dir", type=str, default="output/clinical_digital_twin",
+    parser.add_argument("--output-dir", type=str, default=_P("output/clinical_digital_twin"),
                         help="Output directory")
     parser.add_argument("--open-browser", action="store_true",
                         help="Open dashboard in browser")
@@ -644,7 +646,7 @@ def main():
     
     # Step 7: Generate dashboard
     print("\n[STEP 7] Generating interactive 4D dashboard...")
-    time_series_dir = "output/time_series"
+    time_series_dir = _P("output/time_series")
     dashboard_path = output_dir / "clinical_4d_dashboard.html"
     
     success = generate_dashboard(time_series_dir, str(dashboard_path))

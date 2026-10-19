@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# NOTE (2026-10-19 audit): historical legacy script; not part of the current RANO project. The header speaks of patient-specific calibration, but the code uses fixed simulation defaults; nothing here shows per-patient fitting. Defaults use cwd-relative Path('output'), so cwd is now anchored at the project root.
+# NOTE (2026-10-19 audit): historical legacy script; not part of the current RANO project. The header speaks of patient-specific calibration, but the code uses fixed simulation defaults; nothing here shows per-patient fitting. Defaults use cwd-relative Path('output'), so paths are rooted at the project root via _P().
 """
 Month 8: Stromal Feedback Coupled PDE Solver
 ==============================================
@@ -102,9 +102,6 @@ COHORT_PATIENTS = None
 # =========================================================================== #
 # PHASE 1: Tensor Field Builder (reusing Month 7 anisotropic tensor builder)
 # =========================================================================== #
-import os as _os
-_os.chdir(_os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))))  # cwd-relative output/ defaults below; anchor cwd at the project root
-
 class TensorFieldBuilder:
     """
     Constructs a 2x2 symmetric anisotropic diffusion tensor field over a
@@ -869,6 +866,11 @@ class StromalFeedbackSolver:
 # =========================================================================== #
 # PHASE 3: Patient Parameter Mapper (Multi-omic calibration)
 # =========================================================================== #
+import os as _os
+_PROJECT_ROOT = _os.path.dirname(_os.path.dirname(_os.path.abspath(__file__)))
+def _P(rel):  # project-root-relative path, independent of the current working directory
+    return _os.path.join(_PROJECT_ROOT, rel)
+
 class PatientParameterMapper:
     """
     Loads Month 6 spatial recurrence data + zone-stratified gene expression
@@ -880,8 +882,8 @@ class PatientParameterMapper:
 
     def __init__(
         self,
-        cohort_npz: Path = Path("output/spatial_recurrence_profiles.npz"),
-        zone_csv_root: Path = Path("output"),
+        cohort_npz: Path = Path(_P("output/spatial_recurrence_profiles.npz")),
+        zone_csv_root: Path = Path(_P("output")),
     ) -> None:
         self.cohort_npz = cohort_npz
         self.zone_csv_root = zone_csv_root
@@ -1125,7 +1127,7 @@ class CohortSimulator:
     # ------------------------------------------------------------------ #
     def run_cohort(
         self,
-        output_dir: Path = Path("output"),
+        output_dir: Path = Path(_P("output")),
     ) -> List[Dict]:
         if not self.mapper.data:
             self.mapper.load()
@@ -1639,7 +1641,7 @@ def run_week1_tensor_and_sanity():
     print("WEEK 1: Dual-Grid Solver & Coupled Parameter Framework")
     print("=" * 60)
 
-    output_dir = Path("output")
+    output_dir = Path(_P("output"))
     output_dir.mkdir(parents=True, exist_ok=True)
 
     # Build tensor field (reused from Month 7)
@@ -1692,7 +1694,7 @@ def run_week2_chemical_diffusion(solver: StromalFeedbackSolver):
     print("WEEK 2: Isotropic Chemical Diffusion & Divergence Integration")
     print("=" * 60)
 
-    output_dir = Path("output")
+    output_dir = Path(_P("output"))
     output_dir.mkdir(parents=True, exist_ok=True)
 
     chem_test = solver.run_chemical_mass_test(
@@ -1709,7 +1711,7 @@ def run_week3_cohort_calibration(builder: TensorFieldBuilder):
     print("WEEK 3: Multi-Omic Pathway Calibration & Cohort Sweep")
     print("=" * 60)
 
-    output_dir = Path("output")
+    output_dir = Path(_P("output"))
     output_dir.mkdir(parents=True, exist_ok=True)
 
     # Load mapper
@@ -1733,7 +1735,7 @@ def run_week4_visualization(builder: TensorFieldBuilder, results: List[Dict]):
     print("WEEK 4: Dual-Panel Canvas Visualization & Metrics Summary")
     print("=" * 60)
 
-    output_dir = Path("output")
+    output_dir = Path(_P("output"))
     output_dir.mkdir(parents=True, exist_ok=True)
 
     # Load baseline anisotropic results for comparison

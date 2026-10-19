@@ -54,7 +54,9 @@ BETA_PRESSURE = 100.0  # Pa per unit density (volumetric expansion modulus)
 # Core Physics Functions
 # --------------------------------------------------------------------------- #
 import os as _os
-_os.chdir(_os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))))  # cwd-relative output/ paths below; anchor cwd at the project root
+_PROJECT_ROOT = _os.path.dirname(_os.path.dirname(_os.path.abspath(__file__)))
+def _P(rel):  # project-root-relative path, independent of the current working directory
+    return _os.path.join(_PROJECT_ROOT, rel)
 
 def load_or_generate_phase1_fields(
     grid_size: int = GRID_SIZE,
@@ -63,7 +65,7 @@ def load_or_generate_phase1_fields(
     Load D(x,y) and rho(x,y) from Phase 1 metrics, or generate synthetic
     if Phase 1 outputs don't exist.
     """
-    metrics_path = Path("output/phase1_deconv_metrics.json")
+    metrics_path = Path(_P("output/phase1_deconv_metrics.json"))
 
     if metrics_path.exists():
         # We only have summary stats, so regenerate fields matching those stats
@@ -326,7 +328,7 @@ def save_outputs(
 # Main Pipeline
 # --------------------------------------------------------------------------- #
 def main() -> None:
-    os.makedirs("output", exist_ok=True)
+    os.makedirs(_P("output"), exist_ok=True)
     
     print("[PHASE 2] Loading/generating D(x,y) and rho(x,y)...")
     D, rho = load_or_generate_phase1_fields(GRID_SIZE)
@@ -345,7 +347,7 @@ def main() -> None:
     print(f"[METRICS] Max stress: {metrics['max_stress_magnitude_Pa']:.1f} Pa")
     print(f"[METRICS] Mean displacement: {metrics['mean_displacement_rate_mm_per_day']:.4f} mm/day")
     
-    save_outputs(D, rho, results, metrics, Path("output"))
+    save_outputs(D, rho, results, metrics, Path(_P("output")))
     
     print("[PHASE 2] Complete.")
 

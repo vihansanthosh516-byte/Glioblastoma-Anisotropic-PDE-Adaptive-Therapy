@@ -1,4 +1,4 @@
-# NOTE (2026-10-19 audit): historical legacy Track A script; not part of the current RANO project. Needs torch. Uses precomputed SPIB coordinates (output/spib_rc_3d.npy) whose split/freeze provenance is not recoverable here; a Hessian classification at a chosen coordinate is not a proof of a saddle point. Paths: cwd is now anchored at the project root.
+# NOTE (2026-10-19 audit): historical legacy Track A script; not part of the current RANO project. Needs torch. Uses precomputed SPIB coordinates (output/spib_rc_3d.npy) whose split/freeze provenance is not recoverable here; a Hessian classification at a chosen coordinate is not a proof of a saddle point. Paths: paths are rooted at the project root via _P().
 #!/usr/bin/env python3
 """
 22_spib_saddle_proof.py
@@ -23,9 +23,6 @@ RIDGE_ALPHA = 1e-2
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
-import os as _os
-_os.chdir(_os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))))  # historical script uses cwd-relative output/ paths; anchor cwd at the project root
-
 def mem_mb():
     return resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024
 
@@ -34,13 +31,18 @@ def log(msg):
     print(f"[{time.strftime('%H:%M:%S')}] {msg}  RSS={mem_mb():.0f} MB", flush=True)
 
 
+import os as _os
+_PROJECT_ROOT = _os.path.dirname(_os.path.dirname(_os.path.abspath(__file__)))
+def _P(rel):  # project-root-relative path, independent of the current working directory
+    return _os.path.join(_PROJECT_ROOT, rel)
+
 def load_data(device):
     log("Loading SPIB coordinates and landscape...")
 
-    rc = np.load("output/spib_rc_3d.npy").astype(np.float32)
-    energy = np.load("output/spib_landscape.npy").astype(np.float32)
+    rc = np.load(_P("output/spib_rc_3d.npy")).astype(np.float32)
+    energy = np.load(_P("output/spib_landscape.npy")).astype(np.float32)
 
-    labels_1d = np.load("output/nn_y.npy")
+    labels_1d = np.load(_P("output/nn_y.npy"))
     labels_int = labels_1d.astype(np.int64)
 
     log(f"  SPIB RC: {rc.shape}")
@@ -291,7 +293,7 @@ def main():
             "overall_pass": bool(overall),
         },
     }
-    out = Path("output/spib_saddle_point_metrics.json")
+    out = Path(_P("output/spib_saddle_point_metrics.json"))
     with open(out, "w") as f:
         json.dump(proof, f, indent=2)
     log(f"Saved: {out}")

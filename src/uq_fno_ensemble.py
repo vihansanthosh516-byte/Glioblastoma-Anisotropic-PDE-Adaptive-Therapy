@@ -46,8 +46,13 @@ except ImportError:
     _HAVE_PLOTLY = False
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-DEFAULT_ENSEMBLE_DIR = Path("output/fno_ensemble")
-DEFAULT_CALIB_PATH = Path("output/uq_calibration.jsonl")
+import os as _os
+_PROJECT_ROOT = _os.path.dirname(_os.path.dirname(_os.path.abspath(__file__)))
+def _P(rel):  # project-root-relative path, independent of the current working directory
+    return _os.path.join(_PROJECT_ROOT, rel)
+
+DEFAULT_ENSEMBLE_DIR = Path(_P("output/fno_ensemble"))
+DEFAULT_CALIB_PATH = Path(_P("output/uq_calibration.jsonl"))
 
 # Default policy thresholds
 DEFAULT_CRITICAL_VOLUME_MM3 = 150.0
@@ -58,9 +63,6 @@ M_DEFAULT = 200
 # --------------------------------------------------------------------------- #
 # FNO ensemble
 # --------------------------------------------------------------------------- #
-import os as _os
-_os.chdir(_os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))))  # cwd-relative output/ paths below; anchor cwd at the project root
-
 def _build_fno(weights_path: Optional[Path] = None,
                grid_size: int = 32, modes: int = 8, width: int = 20):
     """Construct a fresh FNO3d and optionally load weights.
@@ -180,7 +182,7 @@ class FNOEnsemble:
 def plot_volume_trajectory_html(
     forecast: Dict,
     patient_id: str,
-    output: Path = Path("output/uq_forecast.html"),
+    output: Path = Path(_P("output/uq_forecast.html")),
     critical_volume_mm3: float = DEFAULT_CRITICAL_VOLUME_MM3,
 ) -> Path:
     """Render a Plotly HTML figure with the mean volume trajectory + 95% band."""
@@ -315,7 +317,7 @@ def predict_and_render(
     horizon_days: int = DEFAULT_FORECAST_HORIZON_DAYS,
     M: int = M_DEFAULT,
     critical_volume_mm3: float = DEFAULT_CRITICAL_VOLUME_MM3,
-    output_dir: Path = Path("output/uq"),
+    output_dir: Path = Path(_P("output/uq")),
 ) -> Dict:
     forecast = ensemble.monte_carlo_predict(
         u0, rho, horizon_days=horizon_days, M=M
@@ -367,22 +369,22 @@ def _self_test() -> None:
     trig = trigger_eval(forecast, critical_volume_mm3=forecast["upper"][-1] + 1.0)
     assert isinstance(trig["flag"], bool)
     # calibration roundtrip
-    log = CalibrationLog(Path("output/_uq_calib_test.jsonl"))
-    log._path = Path("output/_uq_calib_test.jsonl")
+    log = CalibrationLog(Path(_P("output/_uq_calib_test.jsonl")))
+    log._path = Path(_P("output/_uq_calib_test.jsonl"))
     if log._path.exists():
         log._path.unlink()
-    lk = CalibrationLog(Path("output/_uq_calib_test.jsonl"))
+    lk = CalibrationLog(Path(_P("output/_uq_calib_test.jsonl")))
     lk.record("P01", day=7, forecast_lower=forecast["lower"][-1],
               forecast_upper=forecast["upper"][-1],
               forecast_mean=forecast["mean"][-1],
               realized_volume=forecast["mean"][-1] * 1.1)
     cov = lk.coverage()
     assert isinstance(cov["n"], int)
-    Path("output/_uq_calib_test.jsonl").unlink(missing_ok=True)
+    Path(_P("output/_uq_calib_test.jsonl")).unlink(missing_ok=True)
     html = plot_volume_trajectory_html(forecast, "P01",
-                                       Path("output/_uq_test.html"))
+                                       Path(_P("output/_uq_test.html")))
     assert Path(html).exists()
-    Path("output/_uq_test.html").unlink(missing_ok=True)
+    Path(_P("output/_uq_test.html")).unlink(missing_ok=True)
     print(f"[uq] self-test OK: M=5 horizon=3 "
           f"mean[-1]={forecast['mean'][-1]:.3f}, "
           f"CI=[{forecast['lower'][-1]:.3f},{forecast['upper'][-1]:.3f}]")
@@ -402,7 +404,7 @@ if __name__ == "__main__":
     p.add_argument("--grid-size", type=int, default=32)
     p.add_argument("--critical-volume", type=float,
                    default=DEFAULT_CRITICAL_VOLUME_MM3)
-    p.add_argument("--output-dir", type=str, default="output/uq")
+    p.add_argument("--output-dir", type=str, default=_P("output/uq"))
     args = p.parse_args()
 
     if args.self_test:

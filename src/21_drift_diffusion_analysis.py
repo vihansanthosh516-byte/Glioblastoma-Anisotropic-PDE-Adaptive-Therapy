@@ -1,4 +1,4 @@
-# NOTE (2026-10-19 audit): historical legacy Track A script; not part of the current RANO project. Needs torch. No random seed is set. Paths: cwd is now anchored at the project root.
+# NOTE (2026-10-19 audit): historical legacy Track A script; not part of the current RANO project. Needs torch. No random seed is set. Paths: paths are rooted at the project root via _P().
 #!/usr/bin/env python3
 """
 Month 1 Week 3: Drift & Diffusion Tensor Analysis
@@ -31,15 +31,20 @@ try:
     _torch_seed.manual_seed(42)
 except ImportError:
     pass
-_os.chdir(_os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))))  # historical script uses cwd-relative output/ paths; anchor cwd at the project root
+_os.chdir(_os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))))  # historical script uses cwd-relative output/ paths; 
+
+import os as _os
+_PROJECT_ROOT = _os.path.dirname(_os.path.dirname(_os.path.abspath(__file__)))
+def _P(rel):  # project-root-relative path, independent of the current working directory
+    return _os.path.join(_PROJECT_ROOT, rel)
 
 def load_velocity_data(device: torch.device) -> Tuple[Tensor, Tensor, Tensor, Tensor]:
     """Load latent, velocity, scores, and labels."""
     t0 = time.perf_counter()
-    latent = torch.from_numpy(np.load("output/scvi_latent.npy")).to(device, dtype=torch.float32)
-    velocity = torch.from_numpy(np.load("output/phenotypic_velocity.npy")).to(device, dtype=torch.float32)
-    scores = torch.from_numpy(np.load("output/csgt_transition_scores.npy")).to(device, dtype=torch.float32)
-    labels = torch.from_numpy(np.load("output/nn_y.npy")).to(device, dtype=torch.int64)
+    latent = torch.from_numpy(np.load(_P("output/scvi_latent.npy"))).to(device, dtype=torch.float32)
+    velocity = torch.from_numpy(np.load(_P("output/phenotypic_velocity.npy"))).to(device, dtype=torch.float32)
+    scores = torch.from_numpy(np.load(_P("output/csgt_transition_scores.npy"))).to(device, dtype=torch.float32)
+    labels = torch.from_numpy(np.load(_P("output/nn_y.npy"))).to(device, dtype=torch.int64)
     elapsed = time.perf_counter() - t0
     print(f"[LOAD] Data loaded in {elapsed:.3f}s")
     return latent, velocity, scores, labels
@@ -157,12 +162,12 @@ def export_results(
 ) -> None:
     """Export all drift/diffusion arrays."""
     print("[EXPORT] Saving drift/diffusion tensors...")
-    Path("output").mkdir(exist_ok=True)
+    Path(_P("output")).mkdir(exist_ok=True)
     
-    np.save("output/drift_vectors.npy", drift.cpu().numpy().astype(np.float32))
-    np.save("output/diffusion_tensors.npy", diffusion.cpu().numpy().astype(np.float32))
-    np.save("output/drift_magnitude.npy", drift_mag.cpu().numpy().astype(np.float32))
-    np.save("output/diffusion_trace.npy", diff_trace.cpu().numpy().astype(np.float32))
+    np.save(_P("output/drift_vectors.npy"), drift.cpu().numpy().astype(np.float32))
+    np.save(_P("output/diffusion_tensors.npy"), diffusion.cpu().numpy().astype(np.float32))
+    np.save(_P("output/drift_magnitude.npy"), drift_mag.cpu().numpy().astype(np.float32))
+    np.save(_P("output/diffusion_trace.npy"), diff_trace.cpu().numpy().astype(np.float32))
     
     print("[EXPORT] Saved:")
     print("   output/drift_vectors.npy")

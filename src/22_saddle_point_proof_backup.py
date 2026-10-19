@@ -1,4 +1,4 @@
-# NOTE (2026-10-19 audit): historical legacy Track A script; not part of the current RANO project. Needs torch. Alternate legacy implementation that writes the SAME output/saddle_point_metrics.json as 22_saddle_point_proof.py, so running both overwrites the result. Paths: cwd is now anchored at the project root.
+# NOTE (2026-10-19 audit): historical legacy Track A script; not part of the current RANO project. Needs torch. Alternate legacy implementation that writes the SAME output/saddle_point_metrics.json as 22_saddle_point_proof.py, so running both overwrites the result. Paths: paths are rooted at the project root via _P().
 #!/usr/bin/env python3
 """
 Month 1, Week 4: Saddle Point Proof — Climbing Image NEB (CI-NEB) Solver
@@ -21,13 +21,15 @@ from sklearn.cluster import KMeans
 
 
 import os as _os
-_os.chdir(_os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))))  # historical script uses cwd-relative output/ paths; anchor cwd at the project root
+_PROJECT_ROOT = _os.path.dirname(_os.path.dirname(_os.path.abspath(__file__)))
+def _P(rel):  # project-root-relative path, independent of the current working directory
+    return _os.path.join(_PROJECT_ROOT, rel)
 
 def load_data(device: torch.device) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
-    latent = torch.from_numpy(np.load("output/scvi_latent.npy")).to(device, dtype=torch.float32)
-    energy = torch.from_numpy(np.load("output/waddington_landscape.npy")).to(device, dtype=torch.float32)
-    labels = torch.from_numpy(np.load("output/nn_y.npy")).to(device, dtype=torch.int64)
-    drift = torch.from_numpy(np.load("output/drift_vectors.npy")).to(device, dtype=torch.float32)
+    latent = torch.from_numpy(np.load(_P("output/scvi_latent.npy"))).to(device, dtype=torch.float32)
+    energy = torch.from_numpy(np.load(_P("output/waddington_landscape.npy"))).to(device, dtype=torch.float32)
+    labels = torch.from_numpy(np.load(_P("output/nn_y.npy"))).to(device, dtype=torch.int64)
+    drift = torch.from_numpy(np.load(_P("output/drift_vectors.npy"))).to(device, dtype=torch.float32)
     return latent, energy, labels, drift
 
 
@@ -504,7 +506,7 @@ def main() -> None:
         ),
     }
 
-    output_path = Path("output/saddle_point_metrics.json")
+    output_path = Path(_P("output/saddle_point_metrics.json"))
     output_path.parent.mkdir(exist_ok=True)
     with open(output_path, "w") as f:
         json.dump(proof, f, indent=2)

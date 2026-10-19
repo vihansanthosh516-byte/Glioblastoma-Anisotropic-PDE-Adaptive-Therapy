@@ -26,12 +26,14 @@ from scipy.ndimage import gaussian_filter
 
 
 import os as _os
-_os.chdir(_os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))))  # cwd-relative output/ paths below; anchor cwd at the project root
+_PROJECT_ROOT = _os.path.dirname(_os.path.dirname(_os.path.abspath(__file__)))
+def _P(rel):  # project-root-relative path, independent of the current working directory
+    return _os.path.join(_PROJECT_ROOT, rel)
 
 def load_patient_mask(nii_path: str, downsample: int = 2) -> np.ndarray:
     """Load BraTS segmentation and return binary tumor mask."""
     if not os.path.exists(nii_path):
-        found = glob.glob("data/brats/*/*seg.nii.gz")
+        found = glob.glob(_P("data/brats/*/*seg.nii.gz"))
         if not found:
             raise FileNotFoundError(f"No BraTS segmentation found at {nii_path}")
         nii_path = found[0]
@@ -56,7 +58,7 @@ def run_pk_pde_simulation(
     alpha: float = 0.08,
     k_elim: float = 0.1,
     infusion_days: list = None,
-    output_path: str = "output/real_patient_timed_infusion.png",
+    output_path: str = _P("output/real_patient_timed_infusion.png"),
 ):
     """
     Run PK/PD tumor simulation with timed drug infusions.
@@ -96,11 +98,11 @@ def run_pk_pde_simulation(
         nii_path = mask_path
         print(f"[LOAD] Loading custom mask from: {nii_path}")
     else:
-        base_dir = f"data/brats/{patient_id}"
+        base_dir = _P(f"data/brats/{patient_id}")
         nii_path = os.path.join(base_dir, f"{patient_id}_seg.nii.gz")
         
         if not os.path.exists(nii_path):
-            found = glob.glob("data/brats/*/*seg.nii.gz")
+            found = glob.glob(_P("data/brats/*/*seg.nii.gz"))
             if found:
                 nii_path = found[0]
                 print(f"[INFO] Using fallback: {nii_path}")
@@ -125,8 +127,8 @@ def run_pk_pde_simulation(
     
     # NEW: Save 3D time-series snapshots for interactive 4D visualization
     save_3d_interval = 5  # Save every 5 days
-    os.makedirs("output/time_series", exist_ok=True)
-    np.save(f"output/time_series/tumor_3d_day_000.npy", u)
+    os.makedirs(_P("output/time_series"), exist_ok=True)
+    np.save(_P("output/time_series/tumor_3d_day_000.npy"), u)
 
     # Convert infusion days to set for O(1) lookup
     infusion_set = set(infusion_days)
@@ -167,7 +169,7 @@ def run_pk_pde_simulation(
 
         # NEW: Save 3D snapshot every N days for time-slider visualization
         if day % save_3d_interval == 0:
-            np.save(f"output/time_series/tumor_3d_day_{day:03d}.npy", u)
+            np.save(_P(f"output/time_series/tumor_3d_day_{day:03d}.npy"), u)
 
         # Store key timepoint snapshots (for static figure)
         if day in infusion_days:
@@ -282,7 +284,7 @@ def main():
                         help="Drug elimination rate (/day)")
     parser.add_argument("--infusion-days", type=int, nargs="+", default=[60],
                         help="Days when drug infusions occur")
-    parser.add_argument("--output", type=str, default="output/real_patient_timed_infusion.png",
+    parser.add_argument("--output", type=str, default=_P("output/real_patient_timed_infusion.png"),
                         help="Output figure path")
     
     args = parser.parse_args()

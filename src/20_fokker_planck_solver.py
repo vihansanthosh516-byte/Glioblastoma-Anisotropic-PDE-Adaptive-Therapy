@@ -1,4 +1,4 @@
-# NOTE (2026-10-19 audit): historical legacy Track A script; not part of the current RANO project. Needs torch. The header calls the landscape CALIBRATED, but priors, weights and the KDE bandwidth are hard-coded design values; nothing here shows calibration to measured biology or proves the topology. Paths: cwd is now anchored at the project root.
+# NOTE (2026-10-19 audit): historical legacy Track A script; not part of the current RANO project. Needs torch. The header calls the landscape CALIBRATED, but priors, weights and the KDE bandwidth are hard-coded design values; nothing here shows calibration to measured biology or proves the topology. Paths: paths are rooted at the project root via _P().
 #!/usr/bin/env python3
 """
 Month 1, Week 2: Fokker-Planck Energy Landscape Reconstruction — CALIBRATED
@@ -25,14 +25,16 @@ from sklearn.decomposition import PCA
 
 
 import os as _os
-_os.chdir(_os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))))  # historical script uses cwd-relative output/ paths; anchor cwd at the project root
+_PROJECT_ROOT = _os.path.dirname(_os.path.dirname(_os.path.abspath(__file__)))
+def _P(rel):  # project-root-relative path, independent of the current working directory
+    return _os.path.join(_PROJECT_ROOT, rel)
 
 def load_data(device: torch.device) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
     """Load precomputed datasets to GPU."""
     t0 = time.perf_counter()
-    latent = torch.from_numpy(np.load("output/scvi_latent.npy")).to(device, dtype=torch.float32)
-    velocity = torch.from_numpy(np.load("output/phenotypic_velocity.npy")).to(device, dtype=torch.float32)
-    labels = torch.from_numpy(np.load("output/nn_y.npy")).to(device, dtype=torch.int64)
+    latent = torch.from_numpy(np.load(_P("output/scvi_latent.npy"))).to(device, dtype=torch.float32)
+    velocity = torch.from_numpy(np.load(_P("output/phenotypic_velocity.npy"))).to(device, dtype=torch.float32)
+    labels = torch.from_numpy(np.load(_P("output/nn_y.npy"))).to(device, dtype=torch.int64)
     elapsed = time.perf_counter() - t0
     print(f"[LOAD] Latent {tuple(latent.shape)}, Velocity {tuple(velocity.shape)}, Labels {tuple(labels.shape)} in {elapsed:.3f}s")
     return latent, velocity, labels
@@ -40,14 +42,14 @@ def load_data(device: torch.device) -> Tuple[torch.Tensor, torch.Tensor, torch.T
 
 def load_transition_scores(device: torch.device) -> torch.Tensor:
     """Load CSGT transition scores for energy landscape modulation."""
-    scores = torch.from_numpy(np.load("output/csgt_transition_scores.npy")).to(device, dtype=torch.float32)
+    scores = torch.from_numpy(np.load(_P("output/csgt_transition_scores.npy"))).to(device, dtype=torch.float32)
     print(f"[TRANSITION] Loaded scores: shape={tuple(scores.shape)}, range=[{scores.min():.4f}, {scores.max():.4f}]")
     return scores
 
 
 def load_te_weights() -> Tuple[np.ndarray, np.ndarray]:
     """Load TE matrix and compute out-degree weights."""
-    te_path = "output/te_matrix.npy"
+    te_path = _P("output/te_matrix.npy")
     if os.path.exists(te_path):
         te_matrix = np.load(te_path)
         out_degree = te_matrix.sum(axis=1)
@@ -185,7 +187,7 @@ def render_energy_contour(
     coords_2d: np.ndarray,
     energy: torch.Tensor,
     labels: torch.Tensor,
-    output_path: str = "output/energy_potential.png",
+    output_path: str = _P("output/energy_potential.png"),
 ) -> None:
     """Render publication-grade energy contour map."""
     print(f"[PLOT] Rendering energy contour map to {output_path}...")
@@ -242,9 +244,9 @@ def export_arrays(
 ) -> None:
     """Export all computed arrays."""
     print("[EXPORT] Saving energy landscape arrays...")
-    np.save("output/waddington_landscape.npy", energy.cpu().numpy().astype(np.float32))
-    np.save("output/waddington_energy_density.npy", densities.cpu().numpy().astype(np.float32))
-    np.save("output/waddington_pca2d.npy", coords_2d.astype(np.float32))
+    np.save(_P("output/waddington_landscape.npy"), energy.cpu().numpy().astype(np.float32))
+    np.save(_P("output/waddington_energy_density.npy"), densities.cpu().numpy().astype(np.float32))
+    np.save(_P("output/waddington_pca2d.npy"), coords_2d.astype(np.float32))
     print("[EXPORT] Arrays saved.")
 
 
@@ -255,7 +257,7 @@ def main() -> None:
         print(f"   GPU: {torch.cuda.get_device_name(0)}")
         print(f"   VRAM: {torch.cuda.get_device_properties(0).total_memory / 1e9:.1f} GB")
 
-    Path("output").mkdir(exist_ok=True)
+    Path(_P("output")).mkdir(exist_ok=True)
 
     latent, velocity, labels = load_data(device)
     transition_scores = load_transition_scores(device)

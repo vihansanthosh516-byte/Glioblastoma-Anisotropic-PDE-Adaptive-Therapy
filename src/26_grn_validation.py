@@ -1,4 +1,4 @@
-# NOTE (2026-10-19 audit): historical legacy Track A script; not part of the current RANO project. Needs torch. This 'validation' is a cell bootstrap of a proxy transfer-entropy score (te_proxy) for candidate edges, not an independent validation set. The bootstrap has no seed and main uses 50 resamples although the function default is 100. Paths: cwd is now anchored at the project root.
+# NOTE (2026-10-19 audit): historical legacy Track A script; not part of the current RANO project. Needs torch. This 'validation' is a cell bootstrap of a proxy transfer-entropy score (te_proxy) for candidate edges, not an independent validation set. The bootstrap has no seed and main uses 50 resamples although the function default is 100. Paths: paths are rooted at the project root via _P().
 #!/usr/bin/env python3
 """
 Month 2, Week 4: GRN Validation via Bootstrap Resampling
@@ -30,16 +30,21 @@ try:
     _torch_seed.manual_seed(42)
 except ImportError:
     pass
-_os.chdir(_os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))))  # historical script uses cwd-relative output/ paths; anchor cwd at the project root
+_os.chdir(_os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))))  # historical script uses cwd-relative output/ paths; 
+
+import os as _os
+_PROJECT_ROOT = _os.path.dirname(_os.path.dirname(_os.path.abspath(__file__)))
+def _P(rel):  # project-root-relative path, independent of the current working directory
+    return _os.path.join(_PROJECT_ROOT, rel)
 
 def load_data(device: torch.device) -> Tuple[torch.Tensor, List[str], torch.Tensor]:
     """Load expression data, gene names, and labels."""
     t0 = time.perf_counter()
-    X = torch.from_numpy(np.load("output/nn_X.npy")).to(device, dtype=torch.float32)
-    with open("output/te_gene_names.txt") as f:
+    X = torch.from_numpy(np.load(_P("output/nn_X.npy"))).to(device, dtype=torch.float32)
+    with open(_P("output/te_gene_names.txt")) as f:
         raw_genes = [line.strip() for line in f]
     gene_names = [g.split('\t')[-1] for g in raw_genes]
-    y = torch.from_numpy(np.load("output/nn_y.npy")).to(device, dtype=torch.int64)
+    y = torch.from_numpy(np.load(_P("output/nn_y.npy"))).to(device, dtype=torch.int64)
     elapsed = time.perf_counter() - t0
     print(f"[LOAD] X: {tuple(X.shape)}, genes: {len(gene_names)}, y: {tuple(y.shape)} in {elapsed:.3f}s")
     return X, gene_names, y
@@ -67,7 +72,7 @@ def bootstrap_te_validation(
     n_genes = len(gene_names)
     
     # Use transition scores for ordering
-    scores = torch.from_numpy(np.load("output/csgt_transition_scores.npy")).to(X.device)
+    scores = torch.from_numpy(np.load(_P("output/csgt_transition_scores.npy"))).to(X.device)
     scores_zone = scores[mask]
     order = scores_zone.argsort()
     X_ordered = X_zone[order]
@@ -146,14 +151,14 @@ def bootstrap_te_validation(
 def export_bootstrap_results(ci_results: dict) -> None:
     """Export bootstrap confidence intervals."""
     print("[EXPORT] Saving bootstrap validation results...")
-    Path("output").mkdir(exist_ok=True)
+    Path(_P("output")).mkdir(exist_ok=True)
     
-    with open("output/grn_bootstrap_ci.json", "w") as f:
+    with open(_P("output/grn_bootstrap_ci.json"), "w") as f:
         json.dump(ci_results, f, indent=2)
     print("  output/grn_bootstrap_ci.json")
     
     # TSV summary
-    with open("output/grn_bootstrap_summary.tsv", "w") as f:
+    with open(_P("output/grn_bootstrap_summary.tsv"), "w") as f:
         f.write("edge\tmean_te\tstd_te\tci_lower\tci_upper\tsignificant\n")
         for edge, stats in ci_results.items():
             f.write(f"{edge}\t{stats['mean']:.6f}\t{stats['std']:.6f}\t"

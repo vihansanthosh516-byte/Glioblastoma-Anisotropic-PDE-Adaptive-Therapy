@@ -59,9 +59,6 @@ T_TOTAL_DAYS = 90.0
 # --------------------------------------------------------------------------- #
 # Phase 3 Field Generators
 # --------------------------------------------------------------------------- #
-import os as _os
-_os.chdir(_os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))))  # cwd-relative output/ paths below; anchor cwd at the project root
-
 def generate_dti_tensor_field() -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
     nx, ny, nz = GRID_3D
     X, Y, Z = np.meshgrid(
@@ -429,8 +426,13 @@ def save_outputs(
 # --------------------------------------------------------------------------- #
 # Main
 # --------------------------------------------------------------------------- #
+import os as _os
+_PROJECT_ROOT = _os.path.dirname(_os.path.dirname(_os.path.abspath(__file__)))
+def _P(rel):  # project-root-relative path, independent of the current working directory
+    return _os.path.join(_PROJECT_ROOT, rel)
+
 def main() -> None:
-    os.makedirs("output", exist_ok=True)
+    os.makedirs(_P("output"), exist_ok=True)
 
     print("[PHASE 4] Generating 3D DTI tensor field...")
     tensor, FA, e1 = generate_dti_tensor_field()
@@ -458,7 +460,7 @@ def main() -> None:
     print(f"[METRICS] Day 90 volume: {metrics['final_day90_volume_mm3']:.1f} mm^3")
     print(f"[METRICS] Recurrence asymmetry: {metrics['recurrence_asymmetry_index']:.3f}")
 
-    save_outputs(u_final, u_pre, u_post, vol_hist, t_pts, metrics, Path("output"))
+    save_outputs(u_final, u_pre, u_post, vol_hist, t_pts, metrics, Path(_P("output")))
 
     print("[PHASE 4] Complete.")
 

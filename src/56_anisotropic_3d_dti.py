@@ -45,9 +45,6 @@ T_TOTAL_DAYS = 30.0
 # --------------------------------------------------------------------------- #
 # CFL-Safe Time Step Calculation
 # --------------------------------------------------------------------------- #
-import os as _os
-_os.chdir(_os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))))  # cwd-relative output/ paths below; anchor cwd at the project root
-
 def compute_cfl_dt(tensor: np.ndarray, dx: float, safety: float = 0.25) -> Tuple[float, int]:
     """
     Compute maximum stable time step for 3D explicit anisotropic diffusion.
@@ -426,8 +423,13 @@ def save_outputs_3d(
 # --------------------------------------------------------------------------- #
 # Main
 # --------------------------------------------------------------------------- #
+import os as _os
+_PROJECT_ROOT = _os.path.dirname(_os.path.dirname(_os.path.abspath(__file__)))
+def _P(rel):  # project-root-relative path, independent of the current working directory
+    return _os.path.join(_PROJECT_ROOT, rel)
+
 def main() -> None:
-    os.makedirs("output", exist_ok=True)
+    os.makedirs(_P("output"), exist_ok=True)
 
     print("[PHASE 3] Generating 3D DTI tensor field...")
     D_base, rho = load_phase1_fields()
@@ -466,7 +468,7 @@ def main() -> None:
     print(f"[METRICS] Asymmetry index (X-Y): {metrics['asymmetry_index']:.3f}")
     print(f"[METRICS] Preferred angle: {metrics['preferred_migration_angle_deg']:.1f} deg")
 
-    save_outputs_3d(u, u_iso, tensor, metrics, Path("output"))
+    save_outputs_3d(u, u_iso, tensor, metrics, Path(_P("output")))
 
     print("[PHASE 3] Complete.")
 

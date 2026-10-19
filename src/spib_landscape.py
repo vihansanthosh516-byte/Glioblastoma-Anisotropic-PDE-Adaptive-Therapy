@@ -11,9 +11,6 @@ import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 
-import os as _os
-_os.chdir(_os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))))  # cwd-relative output/ paths below; anchor cwd at the project root
-
 def construct_landscape(rc, bandwidth=0.3):
     """
     Construct energy landscape U(x) = -log P(x) in SPIB 3D space.
@@ -34,12 +31,17 @@ def construct_landscape(rc, bandwidth=0.3):
     
     return energy
 
+import os as _os
+_PROJECT_ROOT = _os.path.dirname(_os.path.dirname(_os.path.abspath(__file__)))
+def _P(rel):  # project-root-relative path, independent of the current working directory
+    return _os.path.join(_PROJECT_ROOT, rel)
+
 def main():
     print("[PHASE 3] Constructing energy landscape in SPIB space...")
     
     # Load SPIB reaction coordinates
-    rc = np.load("output/spib_rc_3d.npy")  # (15000, 3)
-    labels = np.load("output/nn_y.npy")  # (15000,)
+    rc = np.load(_P("output/spib_rc_3d.npy"))  # (15000, 3)
+    labels = np.load(_P("output/nn_y.npy"))  # (15000,)
     
     print(f"  RC shape: {rc.shape}")
     print(f"  RC ranges: RC1=[{rc[:,0].min():.3f}, {rc[:,0].max():.3f}], "
@@ -63,7 +65,7 @@ def main():
                   f"range=[{zone_energy.min():.3f}, {zone_energy.max():.3f}]")
     
     # Save
-    np.save("output/spib_landscape.npy", energy.astype(np.float32))
+    np.save(_P("output/spib_landscape.npy"), energy.astype(np.float32))
     print(f"  Saved: output/spib_landscape.npy")
     
     # Visualization
@@ -112,7 +114,7 @@ def main():
     ax.legend()
     
     plt.tight_layout()
-    plt.savefig("output/spib_landscape_validation.png", dpi=150, bbox_inches='tight')
+    plt.savefig(_P("output/spib_landscape_validation.png"), dpi=150, bbox_inches='tight')
     plt.close()
     
     print(f"  Validation plot: output/spib_landscape_validation.png")

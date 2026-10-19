@@ -1,4 +1,4 @@
-# NOTE (2026-10-19 audit): historical legacy Track A script; not part of the current RANO project. Needs torch (not in Requirements.txt). The header's 25x25 UMAP grid is not what the code does: it projects with PCA and bins to a grid. Sampling uses unseeded np.random.choice, so the plot sampling is not reproducible. Paths: cwd is now anchored at the project root.
+# NOTE (2026-10-19 audit): historical legacy Track A script; not part of the current RANO project. Needs torch (not in Requirements.txt). The header's 25x25 UMAP grid is not what the code does: it projects with PCA and bins to a grid. Sampling uses unseeded np.random.choice, so the plot sampling is not reproducible. Paths: paths are rooted at the project root via _P().
 #!/usr/bin/env python3
 """
 Month 1: Biophysical Velocity Fields & Waddington Landscape Physics
@@ -35,14 +35,19 @@ try:
     _torch_seed.manual_seed(42)
 except ImportError:
     pass
-_os.chdir(_os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))))  # historical script uses cwd-relative output/ paths; anchor cwd at the project root
+_os.chdir(_os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))))  # historical script uses cwd-relative output/ paths; 
+
+import os as _os
+_PROJECT_ROOT = _os.path.dirname(_os.path.dirname(_os.path.abspath(__file__)))
+def _P(rel):  # project-root-relative path, independent of the current working directory
+    return _os.path.join(_PROJECT_ROOT, rel)
 
 def load_data(device: torch.device) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
     """Load precomputed datasets directly to GPU memory."""
     t0 = time.perf_counter()
-    latent = torch.from_numpy(np.load("output/scvi_latent.npy")).to(device, dtype=torch.float32)
-    scores = torch.from_numpy(np.load("output/csgt_transition_scores.npy")).to(device, dtype=torch.float32)
-    labels = torch.from_numpy(np.load("output/nn_y.npy")).to(device, dtype=torch.int64)
+    latent = torch.from_numpy(np.load(_P("output/scvi_latent.npy"))).to(device, dtype=torch.float32)
+    scores = torch.from_numpy(np.load(_P("output/csgt_transition_scores.npy"))).to(device, dtype=torch.float32)
+    labels = torch.from_numpy(np.load(_P("output/nn_y.npy"))).to(device, dtype=torch.int64)
     elapsed = time.perf_counter() - t0
     print(f"[LOAD] Loaded latent {tuple(latent.shape)}, scores {tuple(scores.shape)}, labels {tuple(labels.shape)} in {elapsed:.3f}s")
     print(f"[LOAD] Latent range: [{latent.min():.4f}, {latent.max():.4f}], Scores range: [{scores.min():.4f}, {scores.max():.4f}]")
@@ -293,7 +298,7 @@ def main() -> None:
     )
     
     # ─── Publication Graphics ─────────────────────────────────────────────
-    output_path = Path('output/tumor_phenotypic_flux.png')
+    output_path = Path(_P('output/tumor_phenotypic_flux.png'))
     output_path.parent.mkdir(exist_ok=True)
     plot_phenotypic_flux(
         coords_2d, labels_cpu,
@@ -302,9 +307,9 @@ def main() -> None:
     )
     
     # ─── Export velocity data for downstream months ───────────────────────
-    np.save('output/phenotypic_velocity.npy', velocity.cpu().numpy())
-    np.save('output/phenotypic_velocity_magnitude.npy', magnitude.cpu().numpy())
-    np.save('output/phenotypic_velocity_pca2d.npy', coords_2d)
+    np.save(_P('output/phenotypic_velocity.npy'), velocity.cpu().numpy())
+    np.save(_P('output/phenotypic_velocity_magnitude.npy'), magnitude.cpu().numpy())
+    np.save(_P('output/phenotypic_velocity_pca2d.npy'), coords_2d)
     print(f'[EXPORT] Saved velocity vectors to output/phenotypic_velocity.npy')
     print(f'[EXPORT] Saved velocity magnitudes to output/phenotypic_velocity_magnitude.npy')
     print(f'[EXPORT] Saved PCA 2D coords to output/phenotypic_velocity_pca2d.npy')

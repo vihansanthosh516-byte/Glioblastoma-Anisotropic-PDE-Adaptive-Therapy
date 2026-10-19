@@ -58,7 +58,7 @@ try:
     _torch_seed.manual_seed(42)
 except ImportError:
     pass
-_os.chdir(_os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))))  # cwd-relative output/ paths below; anchor cwd at the project root
+_os.chdir(_os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))))  # cwd-relative output/ paths below; 
 
 def create_t1_initial_conditions(grid_size=GRID_SIZE, dx=DX):
     """
@@ -404,6 +404,11 @@ def run_multi_scale_simulation(grid_size=GRID_SIZE, n_steps=100, dt=DT,
     }
 
 
+import os as _os
+_PROJECT_ROOT = _os.path.dirname(_os.path.dirname(_os.path.abspath(__file__)))
+def _P(rel):  # project-root-relative path, independent of the current working directory
+    return _os.path.join(_PROJECT_ROOT, rel)
+
 def main():
     """Main entry point for the multi-scale moving-boundary framework."""
     print("=" * 60)
@@ -441,7 +446,7 @@ def main():
     print(f"  Anisotropy matters (without adhesion): {result_no_adhesion['anisotropy_matters']}")
     
     # Save results
-    output_path = Path("output")
+    output_path = Path(_P("output"))
     output_path.mkdir(exist_ok=True)
     
     with open(output_path / "multi_scale_framework_summary.json", "w") as f:

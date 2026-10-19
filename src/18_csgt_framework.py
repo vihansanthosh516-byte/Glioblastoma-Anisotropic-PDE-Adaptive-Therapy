@@ -1,4 +1,4 @@
-# NOTE (2026-10-19 audit): historical legacy Track A script; not part of the current RANO project. Needs umap. alpha=beta=0.5 and sigma=1.0 are model choices, not measured effects. Paths: cwd is now anchored at the project root.
+# NOTE (2026-10-19 audit): historical legacy Track A script; not part of the current RANO project. Needs umap. alpha=beta=0.5 and sigma=1.0 are model choices, not measured effects. Paths: paths are rooted at the project root via _P().
 import os
 import json
 import numpy as np
@@ -9,20 +9,22 @@ import umap
 from scipy.stats import kruskal
 from scipy.spatial.distance import cdist
 
-import os as _os
-_os.chdir(_os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))))  # historical script uses cwd-relative output/ paths; anchor cwd at the project root
-
 def calculate_shannon_entropy(fractions):
     eps = 1e-10
     probs = np.clip(fractions, eps, 1.0)
     probs = probs / probs.sum(axis=1, keepdims=True)
     return -np.sum(probs * np.log2(probs), axis=1)
 
+import os as _os
+_PROJECT_ROOT = _os.path.dirname(_os.path.dirname(_os.path.abspath(__file__)))
+def _P(rel):  # project-root-relative path, independent of the current working directory
+    return _os.path.join(_PROJECT_ROOT, rel)
+
 def main():
     print("[CSGT] Loading precomputed latent spaces...")
-    scvi_latent = np.load("output/scvi_latent.npy")
-    nmf_fractions = np.load("output/nmf_fractions.npy")
-    y = np.load("output/nn_y.npy")
+    scvi_latent = np.load(_P("output/scvi_latent.npy"))
+    nmf_fractions = np.load(_P("output/nmf_fractions.npy"))
+    y = np.load(_P("output/nn_y.npy"))
     
     zone_names = {0: "Core", 1: "Periphery", 2: "Healthy"}
     zone_order = [2, 1, 0]
@@ -116,12 +118,12 @@ def main():
                  fontsize=16, fontweight='bold', y=0.98)
     
     plt.tight_layout()
-    os.makedirs("output", exist_ok=True)
-    fig.savefig("output/csgt_mathematical_proof.png", dpi=300, bbox_inches='tight')
+    os.makedirs(_P("output"), exist_ok=True)
+    fig.savefig(_P("output/csgt_mathematical_proof.png"), dpi=300, bbox_inches='tight')
     plt.close(fig)
     print("[OK] Mathematical proof saved to output/csgt_mathematical_proof.png")
     
-    np.save("output/csgt_transition_scores.npy", T_scores)
+    np.save(_P("output/csgt_transition_scores.npy"), T_scores)
     
     metrics = {
         "alpha": alpha,
@@ -150,7 +152,7 @@ def main():
         }
     }
     
-    with open("output/csgt_metrics.json", "w") as f:
+    with open(_P("output/csgt_metrics.json"), "w") as f:
         json.dump(metrics, f, indent=4)
     print("[OK] CSGT metrics saved to output/csgt_metrics.json")
     print("[OK] Transition scores saved to output/csgt_transition_scores.npy")

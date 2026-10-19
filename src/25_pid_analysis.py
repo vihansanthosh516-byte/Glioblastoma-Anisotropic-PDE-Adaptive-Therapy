@@ -1,4 +1,4 @@
-# NOTE (2026-10-19 audit): historical legacy Track A script; not part of the current RANO project. The header describes PID with the dit package (not in Requirements.txt). If dit is missing, main() silently uses simplified_pid_analysis, so output/pid_decomposition.* can be a simplified decomposition, not dit PID. Paths: cwd is now anchored at the project root.
+# NOTE (2026-10-19 audit): historical legacy Track A script; not part of the current RANO project. The header describes PID with the dit package (not in Requirements.txt). If dit is missing, main() silently uses simplified_pid_analysis, so output/pid_decomposition.* can be a simplified decomposition, not dit PID. Paths: paths are rooted at the project root via _P().
 #!/usr/bin/env python3
 """
 Month 2, Week 3: Partial Information Decomposition (PID) Analysis
@@ -26,22 +26,24 @@ except ImportError:
 
 
 import os as _os
-_os.chdir(_os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))))  # historical script uses cwd-relative output/ paths; anchor cwd at the project root
+_PROJECT_ROOT = _os.path.dirname(_os.path.dirname(_os.path.abspath(__file__)))
+def _P(rel):  # project-root-relative path, independent of the current working directory
+    return _os.path.join(_PROJECT_ROOT, rel)
 
 def load_data() -> Tuple[np.ndarray, List[str], List[dict]]:
     """Load TE matrix, gene names, and master switches."""
     t0 = time.perf_counter()
     
-    te_matrix = np.load("output/te_matrix.npy")
+    te_matrix = np.load(_P("output/te_matrix.npy"))
     
-    with open("output/te_gene_names.txt") as f:
+    with open(_P("output/te_gene_names.txt")) as f:
         raw_genes = [line.strip() for line in f]
     gene_names = [g.split('\t')[-1] for g in raw_genes]
     
     # Load master switches
     master_switches = []
     try:
-        with open("output/master_switches.tsv") as f:
+        with open(_P("output/master_switches.tsv")) as f:
             lines = f.readlines()[1:]  # skip header
             for line in lines:
                 parts = line.strip().split('\t')
@@ -127,10 +129,10 @@ def dit_pid_analysis(
 def export_pid_results(pid_results: List[dict]) -> None:
     """Export PID decomposition results."""
     print("[EXPORT] Saving PID results...")
-    Path("output").mkdir(exist_ok=True)
+    Path(_P("output")).mkdir(exist_ok=True)
     
     # TSV
-    with open("output/pid_decomposition.tsv", "w") as f:
+    with open(_P("output/pid_decomposition.tsv"), "w") as f:
         f.write("source\ttarget\tte_value\tunique_info\tredundant_info\tsynergistic_info\ttotal_info\n")
         for r in pid_results:
             f.write(f"{r['source']}\t{r['target']}\t{r['te_value']:.6f}\t"
@@ -139,7 +141,7 @@ def export_pid_results(pid_results: List[dict]) -> None:
     print("  output/pid_decomposition.tsv")
     
     # JSON
-    with open("output/pid_decomposition.json", "w") as f:
+    with open(_P("output/pid_decomposition.json"), "w") as f:
         json.dump(pid_results, f, indent=2)
     print("  output/pid_decomposition.json")
 

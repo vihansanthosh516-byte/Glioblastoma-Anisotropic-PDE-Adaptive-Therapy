@@ -1,4 +1,4 @@
-# NOTE (2026-10-19 audit): historical legacy Track A script; not part of the current RANO project. Needs torch. 'GPU-accelerated' is conditional (CUDA only if available). 'True conditional information flow' is a KSG estimate under chosen settings, not shown to be causal. A seed is set only for the jitter (seed=42). Paths: cwd is now anchored at the project root.
+# NOTE (2026-10-19 audit): historical legacy Track A script; not part of the current RANO project. Needs torch. 'GPU-accelerated' is conditional (CUDA only if available). 'True conditional information flow' is a KSG estimate under chosen settings, not shown to be causal. A seed is set only for the jitter (seed=42). Paths: paths are rooted at the project root via _P().
 #!/usr/bin/env python3
 """
 Month 2, Week 1: Transfer Entropy Engine — PATCHED VERSION
@@ -23,14 +23,16 @@ import torch.nn.functional as F
 
 
 import os as _os
-_os.chdir(_os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))))  # historical script uses cwd-relative output/ paths; anchor cwd at the project root
+_PROJECT_ROOT = _os.path.dirname(_os.path.dirname(_os.path.abspath(__file__)))
+def _P(rel):  # project-root-relative path, independent of the current working directory
+    return _os.path.join(_PROJECT_ROOT, rel)
 
 def load_data(device: torch.device) -> Tuple[torch.Tensor, np.ndarray, torch.Tensor]:
     """Load gene expression, gene names, and spatial labels."""
     t0 = time.perf_counter()
-    X = torch.from_numpy(np.load("output/nn_X.npy")).to(device, dtype=torch.float32)  # (15000, 2500)
-    gene_names = np.loadtxt("output/nn_gene_names.tsv", dtype=str, delimiter='\t')
-    y = torch.from_numpy(np.load("output/nn_y.npy")).to(device, dtype=torch.int64)  # (15000,)
+    X = torch.from_numpy(np.load(_P("output/nn_X.npy"))).to(device, dtype=torch.float32)  # (15000, 2500)
+    gene_names = np.loadtxt(_P("output/nn_gene_names.tsv"), dtype=str, delimiter='\t')
+    y = torch.from_numpy(np.load(_P("output/nn_y.npy"))).to(device, dtype=torch.int64)  # (15000,)
     elapsed = time.perf_counter() - t0
     print(f"[LOAD] X {tuple(X.shape)}, gene_names {gene_names.shape}, y {tuple(y.shape)} in {elapsed:.3f}s")
     print(f"[LOAD] Zones: {torch.unique(y).cpu().numpy()}")
@@ -85,8 +87,8 @@ def inject_jitter(
 def load_velocity_field(device: torch.device) -> Tuple[torch.Tensor, torch.Tensor]:
     """Load phenotypic velocity vectors and magnitudes from Month 1."""
     print("[VELOCITY] Loading Month 1 phenotypic velocity field...")
-    velocity = torch.from_numpy(np.load("output/phenotypic_velocity.npy")).to(device, dtype=torch.float32)
-    magnitude = torch.from_numpy(np.load("output/phenotypic_velocity_magnitude.npy")).to(device, dtype=torch.float32)
+    velocity = torch.from_numpy(np.load(_P("output/phenotypic_velocity.npy"))).to(device, dtype=torch.float32)
+    magnitude = torch.from_numpy(np.load(_P("output/phenotypic_velocity_magnitude.npy"))).to(device, dtype=torch.float32)
     print(f"[VELOCITY] Velocity: {tuple(velocity.shape)}, Magnitude: {tuple(magnitude.shape)}")
     print(f"[VELOCITY] Magnitude range: [{magnitude.min():.4f}, {magnitude.max():.4f}]")
     return velocity, magnitude
@@ -133,7 +135,7 @@ def construct_pseudotime_neighbors(
     # in latent space, then map to expression space
     
     # Load latent coordinates for zone cells
-    latent = torch.from_numpy(np.load("output/scvi_latent.npy")).to(device, dtype=torch.float32)
+    latent = torch.from_numpy(np.load(_P("output/scvi_latent.npy"))).to(device, dtype=torch.float32)
     latent_zone = latent[zone_mask]  # (N_zone, 32)
     
     # For each cell, find k nearest neighbors along velocity direction
@@ -315,7 +317,7 @@ def transfer_entropy(
     if N_eff < 50:
         print("[TE] WARNING: Too few valid samples, falling back to index shift")
         # Fallback: simple index shift by transition score ordering
-        scores = torch.from_numpy(np.load("output/csgt_transition_scores.npy")).to(X.device)
+        scores = torch.from_numpy(np.load(_P("output/csgt_transition_scores.npy"))).to(X.device)
         scores_zone = scores[mask]
         order = scores_zone.argsort()
         X_ordered = X_zone[order]
@@ -381,10 +383,10 @@ def export_results(
 ) -> None:
     """Save TE matrix and report top links."""
     print("[EXPORT] Saving Transfer Entropy matrix...")
-    np.save("output/te_matrix.npy", te_matrix.astype(np.float32))
+    np.save(_P("output/te_matrix.npy"), te_matrix.astype(np.float32))
     
     # Save gene names mapping
-    with open("output/te_gene_names.txt", "w") as f:
+    with open(_P("output/te_gene_names.txt"), "w") as f:
         for i, name in enumerate(gene_names):
             f.write(f"{i}\t{name}\n")
     
@@ -413,7 +415,7 @@ def main() -> None:
         print(f"   GPU: {torch.cuda.get_device_name(0)}")
         print(f"   VRAM: {torch.cuda.get_device_properties(0).total_memory / 1e9:.1f} GB")
     
-    Path("output").mkdir(exist_ok=True)
+    Path(_P("output")).mkdir(exist_ok=True)
     
     # Load data
     X, gene_names, y = load_data(device)

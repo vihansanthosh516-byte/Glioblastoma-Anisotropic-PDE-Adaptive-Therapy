@@ -19,9 +19,6 @@ import numpy as np
 # --------------------------------------------------------------------------- #
 # Phase Execution Utilities
 # --------------------------------------------------------------------------- #
-import os as _os
-_os.chdir(_os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))))  # cwd-relative output/ paths below; anchor cwd at the project root
-
 def load_module(module_path: Path) -> Any:
     """Dynamically load a module from file path."""
     spec = importlib.util.spec_from_file_location(module_path.stem, module_path)
@@ -29,6 +26,11 @@ def load_module(module_path: Path) -> Any:
     spec.loader.exec_module(module)
     return module
 
+
+import os as _os
+_PROJECT_ROOT = _os.path.dirname(_os.path.dirname(_os.path.abspath(__file__)))
+def _P(rel):  # project-root-relative path, independent of the current working directory
+    return _os.path.join(_PROJECT_ROOT, rel)
 
 def run_phase1() -> Dict[str, np.ndarray]:
     """
@@ -40,7 +42,7 @@ def run_phase1() -> Dict[str, np.ndarray]:
     print("=" * 70)
     
     start = time.time()
-    phase1 = load_module(Path("src/50_spatial_genomics_deconv.py"))
+    phase1 = load_module(Path(_P("src/50_spatial_genomics_deconv.py")))
     phase1.main()
     elapsed = time.time() - start
     
@@ -48,7 +50,7 @@ def run_phase1() -> Dict[str, np.ndarray]:
     print("=" * 70)
     
     # Load outputs
-    out_dir = Path("output")
+    out_dir = Path(_P("output"))
     rho_data = np.load(out_dir / "phase1_rho_posterior.npy")
     D_data = np.load(out_dir / "phase1_D_posterior.npy")
     
@@ -72,7 +74,7 @@ def run_phase2(phase1_posteriors: Dict[str, np.ndarray]) -> Dict[str, np.ndarray
     print("=" * 70)
     
     start = time.time()
-    phase2 = load_module(Path("src/51_poroelastic_hybrid_solver.py"))
+    phase2 = load_module(Path(_P("src/51_poroelastic_hybrid_solver.py")))
     
     # Patch Phase 2 to use Phase 1 posteriors directly (no file I/O)
     original_load = phase2.load_phase1_posteriors
@@ -91,7 +93,7 @@ def run_phase2(phase1_posteriors: Dict[str, np.ndarray]) -> Dict[str, np.ndarray
     print("=" * 70)
     
     # Load Phase 2 outputs
-    out_dir = Path("output")
+    out_dir = Path(_P("output"))
     pressure = np.load(out_dir / "phase2_pressure_field.npy")
     disp = np.load(out_dir / "phase2_displacement_field.npy")  # (3, nx, ny, nz)
     
@@ -155,7 +157,7 @@ def main() -> None:
     print("[PIPELINE] Computing cross-phase validation metrics...")
     cross_metrics = compute_cross_phase_metrics(phase1_posteriors, phase2_outputs)
     
-    out_dir = Path("output")
+    out_dir = Path(_P("output"))
     with open(out_dir / "pipeline_cross_metrics.json", "w") as f:
         json.dump(cross_metrics, f, indent=2)
     

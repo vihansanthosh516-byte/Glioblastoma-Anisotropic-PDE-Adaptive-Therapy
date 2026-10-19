@@ -20,9 +20,6 @@ import nibabel as nib
 from pathlib import Path
 
 
-import os as _os
-_os.chdir(_os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))))  # cwd-relative output/ paths below; anchor cwd at the project root
-
 def find_tumor_masks(patient_dir: str):
     """Find tumor mask NIfTI files in patient directory (MU-Glioma-Post or BraTS format)."""
     patient_path = Path(patient_dir)
@@ -79,16 +76,21 @@ def load_clinical_timing(clinical_excel: str, patient_id: str):
         return None
 
 
+import os as _os
+_PROJECT_ROOT = _os.path.dirname(_os.path.dirname(_os.path.abspath(__file__)))
+def _P(rel):  # project-root-relative path, independent of the current working directory
+    return _os.path.join(_PROJECT_ROOT, rel)
+
 def run_inverse_estimation(mask_t0: str, mask_t1: str, delta_t: float, output_json: str):
     """Run inverse parameter estimation and return rho, D."""
     cmd = [
-        sys.executable, "src/51_inverse_parameter_estimation.py",
+        sys.executable, _P("src/51_inverse_parameter_estimation.py"),
         "--nifti-t0", mask_t0,
         "--nifti-t1", mask_t1,
         "--delta-t", str(delta_t),
         "--output", output_json
     ]
-    result = subprocess.run(cmd, capture_output=True, text=True, cwd=".")
+    result = subprocess.run(cmd, capture_output=True, text=True, cwd=_PROJECT_ROOT)
     
     if result.returncode != 0:
         print(f"[ERROR] Inverse estimation failed: {result.stderr}")
@@ -110,7 +112,7 @@ def run_4d_simulation(patient_id: str, mask_path: str, rho: float, D: float, day
     """Run 4D simulation with personalized parameters."""
     # Use the timed_drug_infusion.py with custom parameters
     cmd = [
-        sys.executable, "src/timed_drug_infusion.py",
+        sys.executable, _P("src/timed_drug_infusion.py"),
         "--patient", patient_id,
         "--mask-path", mask_path,
         "--days", str(days),
@@ -120,7 +122,7 @@ def run_4d_simulation(patient_id: str, mask_path: str, rho: float, D: float, day
         "--infusion-days", *[str(d) for d in infusion_days],
         "--output", f"{output_dir}/patient_4d_simulation.png"
     ]
-    result = subprocess.run(cmd, capture_output=True, text=True, cwd=".")
+    result = subprocess.run(cmd, capture_output=True, text=True, cwd=_PROJECT_ROOT)
     
     if result.returncode != 0:
         print(f"[ERROR] 4D simulation failed: {result.stderr}")
@@ -137,7 +139,7 @@ def generate_dashboard(time_series_dir: str, output_html: str):
         "--input-dir", time_series_dir,
         "--output", output_html
     ]
-    result = subprocess.run(cmd, capture_output=True, text=True, cwd=".")
+    result = subprocess.run(cmd, capture_output=True, text=True, cwd=_PROJECT_ROOT)
     
     if result.returncode != 0:
         print(f"[ERROR] Dashboard generation failed: {result.stderr}")
@@ -159,7 +161,7 @@ def main():
                         help="Days when drug infusions occur")
     parser.add_argument("--clinical-excel", type=str, default=None,
                         help="Path to clinical data Excel (for MU-Glioma-Post)")
-    parser.add_argument("--output-dir", type=str, default="output/patient_digital_twin",
+    parser.add_argument("--output-dir", type=str, default=_P("output/patient_digital_twin"),
                         help="Output directory for results")
     parser.add_argument("--require-fit", action="store_true",
                         help="Stop with an error instead of falling back to population-default rho/D")
@@ -253,7 +255,7 @@ def main():
     
     # Step 4: Generate interactive dashboard
     print(f"\n[STEP 4] Generating interactive 4D dashboard...")
-    time_series_dir = "output/time_series"
+    time_series_dir = _P("output/time_series")
     dashboard_path = output_dir / "patient_4d_dashboard.html"
     
     success = generate_dashboard(time_series_dir, str(dashboard_path))
