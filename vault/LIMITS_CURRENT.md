@@ -28,7 +28,7 @@ Status words: **Fixed** = rerun and the limit is gone. **Checked** = tested, the
 | ID | Limit | Status | Note |
 |---|---|---|---|
 | L8 | Adaptive results rest on assumed kill scale (E_MAX = rho x 1000) | **Checked: sensitivity 500-2000** | Simulation with assumed kill rates, ledger 2j: TTP split and rho > 0.02 split identical at 500/1000/2000; resistance advantage 57/54/51 of 61. Kill rates stay assumed. |
-| L9 | Script 48 (3D) compared legacy and 10x-higher diffusivity regimes | **Checked, model sensitivity** | Alternate 0.13/0.013 regime changes selected high-rho results (0.678 to 0.346; 0.109 to 0.051); not proof of a literature-calibrated model or general robustness. See ledger 2h and `output/cohort_3d_summary.json`; regime comparisons are also summarized in `archive_old_gbm/vault/Script-48-3D-Extension.md`. |
+| L9 | Script 48 (3D) compared legacy and 10x-higher diffusivity regimes | **Checked, model sensitivity** | Alternate 0.13/0.013 regime changes selected high-rho results (0.678 to 0.346; 0.109 to 0.051); not proof of a literature-calibrated model or general robustness. See ledger 2h and `output/3d_extension_summary.json`; regime comparisons are also summarized in `archive_old_gbm/vault/Script-48-3D-Extension.md`. |
 | L11 | No clonal competition; resistance is a fixed fraction | Open | Model upgrade. |
 | L12 | Anisotropy not matched to real tumour shape; alignment lower under aniso | Open | Later manifest contrasts show no measurable tract-anisotropy gain, ledger 2w/2y; the cause remains unproved. |
 
