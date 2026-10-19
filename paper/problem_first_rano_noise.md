@@ -1,6 +1,6 @@
 # Problem-first brief: are the RANO 2.0 volume thresholds above the measurement noise? (DRAFT 2026-10-18)
 
-Status: research brief only. Nothing here is declared or run. Novelty = not found in about 12 searches (snippet level); UNVERIFIED.
+Status: ORIGINAL research brief of 2026-10-18 (kept for the record). Its tests were later declared and run (Amendments 15 to 21; ledger 2br to 2bx); see START_HERE.md for current state. Novelty = not found in about 12 searches (snippet level); UNVERIFIED.
 
 ## 1. The problem (from the literature)
 - RANO 2.0 volumetric rules: progression = volume increase of 40% or more; partial response = decrease of 65% or more; reference = nadir for progression, baseline for response. The 0.5 cm3 floor is our operational choice, NOT in the RANO 2.0 text (checked 2026-10-18). Sources: https://pmc.ncbi.nlm.nih.gov/articles/PMC11630866/ (guide), https://pmc.ncbi.nlm.nih.gov/articles/PMC12986764/ (RANO 2.0 vs mRANO vs RANO, 137 patients).

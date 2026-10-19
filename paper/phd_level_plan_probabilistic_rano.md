@@ -1,6 +1,6 @@
 # How noisy is the line? Measurement error and the reliability of volumetric progression criteria (RANO 2.0) in glioblastoma
 
-PLAN, written 2026-10-18; UPDATED the same day: Aims A2 (partly) and A3 are now run (ledger 2br, 2bs); A1 proof, A4 calculator and viewer are not done. See START_HERE.md for state. Novelty is UNVERIFIED (about 15 searches, snippet level). "PhD-level" here means method standards (formal model, partial identification, pre-declaration, simulation checks, sensitivity analysis). It does not mean the results are publishable; that depends on what the data show.
+PLAN, written 2026-10-18; UPDATED the same day: Aims A2 (partly) and A3 are now run (ledger 2br, 2bs); A1 proof is not done; A4 calculator and viewer are built (ledger 2bv, 2bw); sensitivity and anchoring work is in Amendments 18 to 21 (ledger 2bt to 2bx). See START_HERE.md for state. Novelty is UNVERIFIED (about 15 searches, snippet level). "PhD-level" here means method standards (formal model, partial identification, pre-declaration, simulation checks, sensitivity analysis). It does not mean the results are publishable; that depends on what the data show.
 
 ## 1. Problem and why it matters
 - RANO 2.0 calls progression at a volume increase of 40% or more and partial response at a decrease of 65% or more, (progression is compared with the nadir, response with baseline; the 0.5 cm3 floor is OUR operational rule, not stated in RANO 2.0) (https://pmc.ncbi.nlm.nih.gov/articles/PMC11630866/). Volumes now come from automated segmentation.

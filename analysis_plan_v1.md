@@ -632,3 +632,7 @@ Report any failure unchanged.
 
 ### A21.5 Limits and not declared
 All readings assume independent normal error and the A16 growth model. Asymmetric or heavy-tailed error, error that depends on volume or on the scan order, and a repeat-scan study in other tools or smaller tumours are not tested here. The simulation covers the volumetric component of progression only, with a simplified two-scan confirmation (not the RANO 2.0 algorithm). No re-run with other values.
+
+
+### A21 ERRATUM (2026-10-19, after an outside audit)
+A21.3 called the seven simulated values 'the union of the audit values'. That was wrong: the readings give 17 distinct values (0.079 to 0.342); script 145 simulated a SELECTED grid of seven. PU1 and PU2 are statements about that grid only. The result is not changed and not re-run.

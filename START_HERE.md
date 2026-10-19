@@ -17,7 +17,8 @@ Question: are the RANO 2.0 volume lines (progression at +40%, partial response a
 | A15 test 1: RANO class differs between the two tools | DONE. 54.5% of 121 eligible pairs (CI 45.6% to 63.8%), "material" | `output/rano_noise/rano_tool_dependence.json`, ledger 2br |
 | A15 test 2: minimal detectable change vs the +40% line | DONE. Smallest size band: inside the noise. Two larger bands: undetermined (noise lower bound is degenerate) | same |
 | A16 trial simulation (Aim 3) | DONE (simulation, assumed parameters). Noise makes PFS earlier and cuts power a lot (H-S1, H-S2 supported; H-S3, H-S4 NOT supported as declared) | `output/trial_sim/trial_sim_summary.json`, ledger 2bs |
-| Calculator, patient timeline viewer, paper, poster | NOT started | plan |
+| Calculator (`src/rano_calc.py`) and patient timeline viewer (`output/viewer_rano/viewer_rano.html`) | DONE (display and arithmetic only) | ledger 2bv, 2bw |
+| Paper, poster | NOT started | plan |
 
 Weakest point of A16: effect sizes depend on the assumed noise model; s=0.25 alone already gives -15 weeks. Weakest points of A15: the two tools are not a scan-rescan pair; 71.9% of pairs fell below the floor or had a missing volume; one centre; exploratory.
 
@@ -50,3 +51,11 @@ It is background, not the goal. Honest summary: `README_STATUS.md` (corrected af
 
 ## 7. Next step
 Aim 3 is done. Amendment 18 is DONE (script 142, ledger 2bt: bias appears from a change-SD of about 0.10; correlation shrinks it but does not remove it; flip rate stays 53% to 63% across floors and 54% against the nadir, n=68 pairs). Amendment 19 is DONE (script 143, ledger 2bu): with the change-SD taken from a published 2-day repeat-scan study (assumed conversion, large lesions, one study), the model still gives about 8 to 20 weeks earlier PFS and a large power loss. Calculator DONE (`src/rano_calc.py`, 7 of 7 declared tests pass, ledger 2bv; arithmetic only, not clinical). Timeline viewer DONE (`output/viewer_rano/viewer_rano.html`, ledger 2bw). Amendment 21 is DONE (script 145, ledger 2bx): the published repeatability can be converted to a noise level in three ways (change-SD 0.079 to 0.342); the direction of the PFS bias holds under all, the size varies about 2.5 times, and at the lowest reading the two-scan rule keeps the bias under a month. Next: paper draft and poster. Check GARSEF 2027 handbook (dates, categories, forms) and ask a clinician or faculty member to review the framing.
+
+## 8. Known issues (from the Codex audit of 2026-10-19; see `paper/codex_audit_report.md`)
+- Old scripts 15, 18, 20, 49 and 58 use working-directory-relative output paths (against the CLAUDE.md rule). Not fixed; they belong to the archived GBM work.
+- `src/49_interactive_3d_dashboard.py` and `src/50_clinical_cdss_app.py` had merge-conflict markers (identical both sides); resolved 2026-10-19.
+- Archived documents in `archive_old_gbm/` still contain unsupported claims ("first", "clinically viable", "validated"). Each has a banner. Do not quote them.
+- Pre-2br ledger entries and old Markdown files were audited by sampling only; a full claim-by-claim check of the old tracks was not done.
+- Scripts 140 to 145 were not re-run by the auditor; outputs were compared statically.
+- `output/drug_gating_report.md` and similar old reports were moved to `archive_old_gbm/output/`; scripts that name them will not find them.

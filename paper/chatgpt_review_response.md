@@ -150,3 +150,23 @@ Each claim checked against files or the source. No agreement by deference.
 | 12 | Scores (8/10, 8.5/10 regional, 7/10 ISEF) | n/a | Opinion; not checkable. Noted. | None. |
 
 What ChatGPT did not say: the absolute-mL reading of the same paper gives a LOWER s (0.111 to 0.139); the audit therefore widens the range downward, to 0.079 at the lowest confidence limit.
+
+## Round 5 (2026-10-19): Codex audit of the whole repo (`paper/codex_audit_report.md`)
+Each finding checked against files. No agreement by deference. The auditor sampled the old work and did not re-run scripts 140 to 145.
+
+| # | Codex finding | Checked against | Verdict | Action |
+|---|---|---|---|---|
+| 1 | A21 simulated grid (7 values) does not cover the conversion table (18 values) | `output/conversion_audit/conversion_table.csv` | Right in substance; the count is 17 distinct rounded values, not 18. A21.3 wrongly called the grid a union. | Errata in the plan and ledger 2bx; PU1 and PU2 limited to the 7-value grid. No re-run. |
+| 2 | A21 overview power range -0.07 to -0.46 omits -0.703 | `conversion_audit_summary.json`, `anchored_sim_cells.csv` | Right, and my range was wrong: R1 point estimates give -0.48 and -0.63 (A19), so the point-estimate range is -0.07 to -0.63; -0.70 is at s=0.262. | Fixed in the overview and ledger 2bx. |
+| 3 | START_HERE says calculator and viewer not started | `START_HERE.md` line 20 | Right (stale). | Fixed. |
+| 4 | Overview, plan and brief list finished work as undone | those files | Right (stale). | Fixed. |
+| 5 | Ledger 2br calls the consecutive-scan class a RANO 2.0 class | ledger 2br | Right; A18 corrected it in 2bt but 2br still read that way. | Erratum appended to 2br. |
+| 6 | Scripts 49 and 50 have merge-conflict markers | the files | Right. Both sides were identical `main()` calls. | Resolved; `py_compile` passes. Not run (old work). |
+| 7 | Old scripts 15, 18, 20, 49, 58 use relative output paths | scripts 15 and 58 opened | Right. | Listed as a known issue; not fixed (archived work). |
+| 8 | Archived docs still overclaim | `archive_old_gbm/` | Right; each has a banner. | Known issue in START_HERE section 8. |
+| 9 | `paper/_apply7.py` left behind | git status | Right (my leftover from a failed command). | Deleted. |
+| 10 | Two output files named by old scripts are absent | `output/` | `drug_gating_report.md` was moved by me to `archive_old_gbm/output/` when archiving; `h3v_test_pairs.csv` not checked. | Noted in START_HERE section 8. |
+| 11 | Ledger 2br to 2bx numbers match outputs; amendment order holds for 15 to 21; predictions match saved outputs; tests 7 and 108 pass | auditor report | Accepted as reported; not independently re-run by me except the calculator tests (run by me earlier). | None. |
+| 12 | Old-work claims audited by sampling only; old-code check by AST only | auditor limits | True. A full old-claim audit was not done. | Known issue in START_HERE section 8. |
+
+What Codex did not say: my first overview range was wrong, found only because the auditor compared it with the JSON.
