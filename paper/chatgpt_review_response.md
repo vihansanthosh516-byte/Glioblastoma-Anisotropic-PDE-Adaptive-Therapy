@@ -1,6 +1,6 @@
 # Response to the outside review (ChatGPT)
 
-Written 2026-10-04. The reviewer saw only `overview_for_review.md`. It could not open any file. Below are the points I think are wrong or overstated, with the evidence. Points I agree with are listed at the end.
+Written 2026-10-04; annotated 2026-10-19. Early rounds are dated historical review records, not current run commitments. Current RANO state and later amendments govern (START_HERE.md and vault/PAPER_FINDINGS_LEDGER.md). The reviewer saw only `overview_for_review.md`. It could not open any file. Below are the points I think are wrong or overstated, with the evidence. Points I agree with are listed at the end.
 
 ## 1. WRONG: "The model also loses on LUMIERE"
 The review says the forecast "also loses on LUMIERE" and builds advice on it ("did not maintain the advantage on independent data").
@@ -17,7 +17,7 @@ The review lists strengths and leaves out the weaknesses that are in the vault:
 - Absolute Dice is low (0.26).
 - 19 patients were skipped (empty core).
 - It has no outside test.
-It is still the best Track B result. It is a moderate result, not a strong one.
+This was the author's historical assessment, not an externally verified ranking. Later paired manifest results supersede the cross-run framing (ledger 2y); current project is RANO.
 
 ## 3. ALREADY DONE: "Choose the threshold using training data only; test it on held-out patients"
 Script 87 (`output/limit_checks.json`) did this for the 0.02/day cutoff:
@@ -30,19 +30,19 @@ What is still true: n = 10, the cutoff was first picked after seeing the data, a
 That is the pooled all-GBM row (n = 374). It includes IDH-mutant secondary tumours, which behave differently. In the cohort closest to TCGA (IDH-wild-type, primary, pooled n = 179) the age HR is 1.018 (1.005-1.032), Holm p = 0.016 (`output/cgga_validation.json`). So age replicates in direction, with a weaker size. Cutting it from the headline is still right, because age is a known factor. But it did not fail to replicate.
 
 ## 5. UNVERIFIED: "If patient-level C-GAT ends up around 68-74%, that is believable"
-The reviewer took this from my interim numbers (2 of 5 folds). The final result is not in yet (script 88). Do not use this range. The first two folds already vary from 58% to 78% for the clean variants.
+The reviewer took this from my interim numbers (2 of 5 folds). That was the two-fold interim state. The completed five-fold output/cgat_leak_free.json now records gat_pca_clean accuracy 63.8% (SD 13.3), with donor/composition confounding (ledger 2o). Do not use this range. The first two folds already vary from 58% to 78% for the clean variants.
 
 ## 6. MISSING CONTEXT: "The simple paced rule beating the standard schedule is more interesting if it survives validation"
 It leaves out what the data say:
 - The rule is evaluated only in simulation, with **assumed** kill rates.
-- It extends time to progression (+8 to +9 days on 91 MU patients, +16 to +19 days on LUMIERE growth rates, all CIs above 0, random kill rates, script 93) but it **loses** on day-90 tumour volume.
+- The old +8–9-day MU and +16–19-day LUMIERE/randomized-kill ranges are author-reported script-93 claims; exact cohort/arm/CI keys must accompany them before reuse. The separate preserved script-75 shared-kill real_test result is +2.1 days (not the same assumptions/cohort). All remain simulations; no observed therapy benefit follows.
 - There is nothing to "validate" against a real patient outcome. No real treatment-response data are in the project.
 Say "simulation evidence" every time.
 
 ## 7. MINOR
 - The review rates against "ISEF" and "high school". That came from my overview, which assumed a level. It is the author's call, not a fact.
 - "Honesty 9/10" and the ratings are opinions from a text summary. The reviewer could not check any number.
-- "97 scripts producing a huge number of claims" is fair as style advice. The paper plan already limits the main text to the top 3 findings per track (`PAPER_FINDINGS_LEDGER.md`).
+- The reviewer's "97 scripts" count is an unverified old inventory, not a current count; the statement is style advice, not evidence. The paper plan already limits the main text to the top 3 findings per track (`PAPER_FINDINGS_LEDGER.md`).
 
 ## Where the review is right (keep)
 - The title overpromises. Use the conservative title.
@@ -50,7 +50,7 @@ Say "simulation evidence" every time.
 - Track A's 78.7% must not be a headline. Report the drop under patient-level splitting.
 - RL adds nothing over a one-line rule. Say so.
 - Cut or downgrade: age to survival, simulated elongation, DTI, the dual-drug rescue.
-- Make Track B the centre. Make Track A exploratory and Track C a simulation study.
+- Historical framing advice only: Track A exploratory and Track C simulated; the current probabilistic-RANO goal supersedes the proposed Track B emphasis.
 - Every main finding needs: baseline, effect size, uncertainty, limit.
 
 
@@ -58,7 +58,7 @@ Say "simulation evidence" every time.
 
 # Review of analysis_plan_v1 (2026-10-04, pre-commit checklist from ChatGPT)
 
-Each item was checked against `analysis_plan_v1.md` and the code. The "9/10" rating was not used. All fixes are in Amendment 1 of the plan.
+The original author reports checking each item against `analysis_plan_v1.md` and the code; independent execution/access chronology is not established by this review record. The "9/10" rating was not used. All fixes are in Amendment 1 of the plan.
 
 | # | Review claim | Check | Verdict |
 |---|---|---|---|
@@ -89,7 +89,7 @@ Each item was checked against `analysis_plan_v1.md` and the code. The "9/10" rat
 3. Script 81 forecasts only scan 1 to 2. Rolling-origin needs the count of patients with 3 or more scans, which is not known yet. A1.1 sets a rule.
 4. The "grew / shrank-or-same" split uses the target scan, so it is outcome-defined.
 
-## Round 2 (2026-10-05): review of `paper/review_packet_phase0-3.md`
+## Round 2 (2026-10-05; historical actions/status, superseded): review of `paper/review_packet_phase0-3.md`
 Each claim checked against files. No agreement by deference.
 
 | # | ChatGPT claim | Checked against | Verdict | Action |
@@ -170,3 +170,27 @@ Each finding checked against files. No agreement by deference. The auditor sampl
 | 12 | Old-work claims audited by sampling only; old-code check by AST only | auditor limits | True. A full old-claim audit was not done. | Known issue in START_HERE section 8. |
 
 What Codex did not say: my first overview range was wrong, found only because the auditor compared it with the JSON.
+
+## Audit annotations (2026-10-19; no new scientific runs)
+
+Early Round-1/2 output references exist in root output. This corrects Round-2
+audit chunk033's erroneous missing-artifact premise; it does not turn review
+opinions or author-reported command history into independent evidence. Exact
+forecast/threshold/CGGA values are indexed by ledger B2,2j,2k and their JSONs.
+The threshold remains post hoc and low-n; controller-threshold sensitivity
+(2bn) prevents a robustness claim. A known age association is not a new finding.
+Old queued solver/baseline/LUMIERE work is dated history; latest registered and
+sensitivity contrasts are 2y/2ak, with H-2/H-3 later spent under Amendment12.
+The old 93-pass and later relayed 7/108-pass reports are distinct historical
+claims. Latest observed audit-fix Git-backed scratch result is 119 passed,
+13 warnings,27.74 seconds; command/scope in codex_audit2/fix_progress.md.
+
+Rounds3–4 retain operational floor, consecutive-scan class, assumed simulation
+noise, one-study anchoring and simplified confirmation limitations. Ledger2bx
+and output/conversion_audit/conversion_audit_summary.json give current exact
+A21 conversions: only seven selected values were simulated, not every converted
+value. Round5's test/chronology and prior script/deletion actions remain
+attributed to the earlier auditor/change record; this annotation is not a new
+execution of those scripts. Current source-path fixes are tracked separately
+in codex_audit2/fix_progress.md. No scientific result, frozen hash or output
+artifact was changed to match a narrative.

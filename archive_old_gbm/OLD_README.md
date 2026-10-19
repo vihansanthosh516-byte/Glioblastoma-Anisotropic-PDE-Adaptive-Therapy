@@ -521,8 +521,10 @@ count does not establish independent patients or a clinical trial.
 The old three-way UCSF-PDGM comparison is an exploratory retrospective image/model
 comparison. Its claimed 62-case eligibility (WHO grade 2–3, IDH-mutant), seed-42
 42/20 split, per-patient DSC/p-value tables and three figure references lack a
-linked, verified cohort manifest and result bundle in this README. Those numeric
-tables and figure-availability claims are withdrawn pending those exact sources.
+linked, verified cohort manifest and result bundle in this README. The numeric tables are superseded by the read-only CSV verification in
+`vault/UCSF-PDGM-Tensor-Study.md` (corrected2026-10-19): Standard means
+0.784316/0.946408, Atlas wins12/62, DKI wins60/62. Diagnosis/eligibility and
+independent run provenance remain unverified; figure availability is not inferred.
 The drivers `../run_improved_aniso.py` and `../cross_validation.py` depend on local
 external inputs. Heuristic eigenvalue multipliers are not measured atlas tensors
 or a validated kurtosis correction. No causal inference or tensor recommendation
