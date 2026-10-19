@@ -2,6 +2,9 @@
 
 # Grand plan: answer every blocker (2026-10-07)
 
+
+> **Audit correction 2026-10-19:** Source-list provenance is author-reported: the exact 27-blocker/author-note record is not linked. Creation/compute notes are not an independently measured machine inventory.
+
 Written 2026-10-07. Source list: the 27 blockers + "not done" list given by the author today.
 Every number cites a file in `output/` or `vault/PAPER_FINDINGS_LEDGER.md` (ledger IDs like "2w").
 Literature tags: **[S]** = found by web search today (summary read, full paper not read; check before citing). **[VERIFY]** = detail not confirmed.
@@ -19,22 +22,31 @@ There are two kinds of blockers.
 
 Tuning the PDE until it beats persistence on the same MU data is **not allowed**. A reviewer will find it. It is p-hacking.
 
+
+> **Audit correction 2026-10-19:** Candidate historical question only; literature novelty is unverified. PREDICT counts 243/253 below are inconsistent and must not be treated as one analytic N without an exact paper/cohort manifest. No first/revolutionary claim is supported.
+
 So the plan has three parts:
 - **Part A. Fix every bug.** Then re-run once, with the final settings, and report what comes out.
 - **Part B. Turn the findings into a result.** "How much of next-scan GBM change can anyone forecast?" with a *measured* noise floor. This is a real, defensible result.
 - **Part C. Test the PDE where theory says it should help.** That is not next-scan shape. It is **where the tumour comes back after surgery** (pre-op scan → recurrence). A public 3-centre benchmark exists for this (PREDICT-GBM, 253 patients). Its authors say anisotropic diffusion is **not modelled** yet. That is an open gap we can test.
 
-"Revolutionary" here means: a pre-registered, public-benchmark answer to an open question. It may be positive or negative. Both are publishable if done right. Nothing in this plan promises a positive result.
+Historical project aspiration (not a supported novelty claim): a pre-registered, public-benchmark answer to an open question. It may be positive or negative. Both are publishable if done right. Nothing in this plan promises a positive result.
 
 ---
 
 ## 1. The three headlines we aim for
+
+
+> **Audit correction 2026-10-19:** This is the old question/status table. Later H-2 primary +0.0088 (CI -0.0115,+0.0307; p=.50; ledger 2ax) fails its rule; H-3 primary also fails (2bd). Both former test sets are SPENT under Amendment 12. The old proposed volume H-3 is distinct from later UCSF H-3; do not transfer results between questions. Oracle +0.128 is all-eligible; GBM-only is +0.0943 (ledger 2y).
 
 | ID | Question | Data | Status |
 |---|---|---|---|
 | **H-1** (keep) | How forecastable is next-scan GBM change? Does any model beat persistence beyond the measured noise? | MU-Glioma-Post (105 GBM as analysed, ledger 2x), LUMIERE, RHUH-GBM | Results exist (2r, 2s, 2w). Needs measured noise floor + final run. |
 | **H-2** (new primary, pre-register first) | Does a tract-anisotropic growth model cover more of the later recurrence than (a) the standard 15 mm margin and (b) an isotropic model, at the same target volume? | PREDICT-GBM: 253 patients, 3 centres, MIT licence, recurrence masks already in pre-op space | Not started. Must write Amendment 6 before any run. |
 | **H-3** (new secondary) | Can we forecast **volume** change and next-scan progression with honest (calibrated) uncertainty? | MU (develop) → LUMIERE (frozen external test) | Not started. The oracle with true volume gives +0.128 Dice (2r), so volume is where the signal is. |
+
+
+> **Audit correction 2026-10-19:** Literature values and n=14 item remain source summaries, not verified original-paper results here. Later exact-solver anisotropy direction is negative: r=1 -0.0004 [-0.0009,-0.0001], r=10 -0.0030 [-0.0050,-0.0009] (ledger 2ak). Old clamp-based advantages are superseded; the primary H-2 endpoint was negative, not proof of clinical utility.
 
 Why H-2 is the right place for the PDE:
 - Reaction-diffusion models exist to estimate tumour cells **beyond the visible edge**. Recurrence after surgery comes from those cells. Next-scan shape after treatment is driven by surgery, radiotherapy and cavity change, which our PDE does not model.
@@ -46,6 +58,9 @@ Risk, stated now: on MU, anisotropy changed Dice by +0.0002 (2w) and DTI alignme
 ---
 
 ## 2. Compute setup (Docker + Kaggle GPU)
+
+
+> **Audit correction 2026-10-19:** Machine/Docker/disk, Kaggle quotas and dataset availability/license assertions in this section are dated author notes. Exact environment/measurement logs, dataset versions and license records are missing; do not use as current installation/access evidence.
 
 ### 2.1 Docker Desktop (this PC)
 **Installed and tested 2026-10-08** (Docker Desktop 4.94.0, WSL2 backend; `docker run hello-world` printed "Hello from Docker!"). Fix needed on the way: a leftover non-admin `C:\ProgramData\DockerDesktop` folder blocked the installer; deleted from an admin shell, then reinstalled.
@@ -85,6 +100,9 @@ Type key: **Fix** = bug or gap, can be repaired. **Finding** = true result, repo
 
 ### A. Blocks a positive result
 
+
+> **Audit correction 2026-10-19:** Early figures below are historical. Current paired 10,000-draw contrasts are ledger 2y; monotone/noise/shape results are 2ac/2ag/2ak/2af. Proposed final/forecast deliverables are not certified by this plan or rerun instructions.
+
 | # | Blocker | Type | What we do | Literature / data | Output | Done when |
 |---|---|---|---|---|---|---|
 | 1 | PDE does not beat persistence (GBM-only +0.0130, CI −0.0043 to +0.0302; 2w) | Finding | (a) Final run after all Part-A fixes (#14–19), 10,000 draws. (b) Report it as H-1. (c) Do **not** re-tune on MU. | — | `output/pde_manifest/results_final.json` | Final run done once; number in ledger, whatever it is |
@@ -97,6 +115,9 @@ Type key: **Fix** = bug or gap, can be repaired. **Finding** = true result, repo
 
 ### B. Data problems
 
+
+> **Audit correction 2026-10-19:** Cohort-specific 105/133 refers to GBM among analyzed MU patients, not every eligibility denominator. Counts and exclusions need exact cohort rules from cohort_tables.json/ledger 2p. No verified overlap or power artifact is linked for the proposed no-overlap/power claims.
+
 | # | Blocker | Type | What we do | Literature / data | Output | Done when |
 |---|---|---|---|---|---|---|
 | 8 | Small cohort (105 GBM) | Fix (partly) | Add cohorts, never double-count: MU 105 + RHUH 40 + LUMIERE 91 for H-1/H-3; PREDICT-GBM 253 for H-2. PREDICT-GBM includes 61 LUMIERE and 40 RHUH patients, so list overlaps by ID. Add a power simulation: minimum detectable Dice gain at our n. | PREDICT-GBM patient lists on GitHub [S] | `data/manifests/cohort_overlap.csv`, `output/power_sim.json` | Overlap table + MDE stated in paper |
@@ -107,6 +128,9 @@ Type key: **Fix** = bug or gap, can be repaired. **Finding** = true result, repo
 | 13 | No prospective data | Accept | Best substitutes: (a) frozen config + git tag before any external run; (b) temporal split on MU (train on earlier-dated patients, test on later); (c) three external cohorts. Wording: "retrospective, in silico". | — | `configs/development.yaml`, tag `v1.0-development-frozen` | Tag exists before external run |
 
 ### C. Method and numerical problems
+
+
+> **Audit correction 2026-10-19:** Later numerical records supersede pending-fix wording: 2ac core monotone checks V1–V6 pass, production-grid V7 still fails; 2ah speed correction and 2ak exact-solver forecast contrasts retain resolution limits. rho lower-bound hits are 124/154; D bound hits 147/154, not interchangeable. Cross-tool disagreement (2ab/2ag) is not scan-rescan error. Bootstrap current n_boot=10000 (2y); old values stay historical.
 
 | # | Blocker | Type | What we do | Literature / data | Output | Done when |
 |---|---|---|---|---|---|---|
@@ -119,6 +143,9 @@ Type key: **Fix** = bug or gap, can be repaired. **Finding** = true result, repo
 | 20 | No patient-specific fit; "digital twin" not supported | Fix (test) | Patient-calibrated model for the 56 patients with 3+ scans (2p): fit on scans 1–2 with a population prior, forecast scan 3. Compare with population cell and persistence. Name stays "patient-calibrated model". Use "digital twin" only if it beats both, pre-declared. | Hierarchical Bayesian calibration (GPHMC, HAL inria-01324849) [S]; reduced-order + neural nets for patient-specific growth (arXiv 2412.05330) [S] | `output/patient_calibrated.json` | Rolling-origin result on 56 patients |
 
 ### D. Treatment and RL (simulation only)
+
+
+> **Audit correction 2026-10-19:** These are historical action items, not fresh authorizations. Ledger 2ap finds the constant inflammation score was a default and the claimed measured Track A–B link was never tested; zone inputs are likely synthetic. Ledger 2ar/2at records later age/MGMT/response analyses. Therapy remains assumed-parameter simulation; Track A patient-fold/donor confounding remains (2o).
 
 | # | Blocker | Type | What we do | Literature / data | Output | Done when |
 |---|---|---|---|---|---|---|
@@ -134,6 +161,9 @@ Type key: **Fix** = bug or gap, can be repaired. **Finding** = true result, repo
 | 25 | "Healthy" = 3 non-GBM donors (W10) | Fix | Drop Healthy from all claims. Test Core vs Periphery within the 8 patients who have both. Add Ivy GAP anatomic regions (leading edge, infiltrating, cellular tumour) as a second region-labelled set. | Ivy GAP [VERIFY]; Ravi et al. 2022 Cancer Cell spatial programmes (PubMed 35700707, data on Dryad) [S] | `output/trackA_core_vs_periphery.json` | Within-patient test reported |
 | 26 | Cells-per-patient shortcut 64.6% vs model 63.8% (2o) | Fix | Equal cells per patient (balanced subsample). Pseudo-bulk per patient per zone. Re-run all baselines. | — | `output/trackA_balanced.json` | Model vs shortcut on balanced data |
 | 27 | Graph and cVAE leak (W12); MGMT underpowered (W18); zone files likely synthetic (W19) | Fix / Accept | Drop leaky models from claims (keep only `gat_pca_clean`-style). MGMT: report minimum detectable HR 1.74 (2j), context only. Zone files: never use; delete from any figure. | — | — | Removed from paper and board |
+
+
+> **Audit correction 2026-10-19:** Entire checklist and phases below are superseded as an active roadmap. H-2/H-3 outcomes were later recorded; former tests are spent. A checked plan, schedule or declaration is not proof a deliverable exists. Current next step is in ../../START_HERE.md; no rerun is authorized here.
 
 ### F. Not done yet
 
@@ -151,6 +181,9 @@ Type key: **Fix** = bug or gap, can be repaired. **Finding** = true result, repo
 ---
 
 ## 4. Phases and dates
+
+
+> **Audit correction 2026-10-19:** The event date below is unverified and withdrawn as scheduling guidance. Applicable 2027 dates/rules/forms require official confirmation; the historical October-to-January schedule is not current.
 
 ISEF 2027 is May 8–14, 2027 (`paper/masterplan_implementation_plan.md`). Regional fair date: [author to fill].
 
@@ -184,6 +217,9 @@ Success words: "broadly positive" only if the 95% CI is above 0. Otherwise "not 
 
 ## 6. Decision rules (what if it fails)
 
+
+> **Audit correction 2026-10-19:** Hypothetical decision rules only. H-2 primary did not meet success and data are spent. Conditional labels do not establish digital-twin validation, priority or publishability; novelty remains unverified.
+
 | Result | What we say |
 |---|---|
 | H-2 positive (CI above 0 vs margin and vs isotropic) | "On a public 3-centre benchmark, tract direction improved recurrence coverage at equal volume." Main headline. |
@@ -199,6 +235,9 @@ Success words: "broadly positive" only if the 95% CI is above 0. Otherwise "not 
 "digital twin", "revolutionary", "first" (only after a literature check, cited), "validated" (only for external frozen tests), "predicts survival", "personalised therapy". Treatment results are always "simulation".
 
 ---
+
+
+> **Audit correction 2026-10-19:** Every literature cohort/performance/license entry below needs its exact primary source, denominator and page/table before reuse. Search snippets and repeated table values are not independent verification; broad absence claims apply only to the undocumented search scope/date.
 
 ## 8. Literature found today (all [S]; check each before citing)
 
@@ -231,6 +270,9 @@ Not found in today's search: a published GBM study that compares a PDE forecast 
 Rule from the author: find a fix for every stated limit. Rule from CLAUDE.md: a limit that is not fixed stays in the paper.
 Each row: limit, fix, source, status. "Needs OK" = needs the author's permission (download or upload).
 
+
+> **Audit correction 2026-10-19:** Historical status superseded by ledger 2ac (numerical core checks pass, V7 production-grid limitation remains), 2ab/2ag (automated-tool disagreement, not scan-rescan), 2aj (boundary-metric rejection). “Running” and “done” below refer only to their dated snapshots.
+
 | # | Limit | Fix | Source | Status |
 |---|---|---|---|---|
 | L1 | Monotone solver not exact where a tensor is not a non-negative sum of 37 offsets (99.66% exact at r = 10) | Selling's decomposition: 6 non-negative weights, exact for every SPD tensor; long offsets blocked if they cross non-domain voxels | Selling 1874; Conway & Sloane 1992; Fehrenbach & Mirebeau 2014 (arXiv 1301.3925) | Done in code (`split="selling"`, 8 tests pass); script 97 rerun running |
@@ -255,6 +297,9 @@ Literature below was found by web search on 2026-10-09; each entry is [S] (searc
 
 ### 10.1 Where the field is (fresh literature)
 
+
+> **Audit correction 2026-10-19:** Benchmark/conformal statements remain unverified primary-source summaries. No comprehensive search record establishes absence of another shared benchmark or standard competitor. A literature count is not a local analysis cohort.
+
 | Finding | Source | What it means for us |
 |---|---|---|
 | Guideline margin is 15 mm around enhancing tumour / cavity (was 20 mm in 2016); no consensus on a T2/FLAIR margin (0-15 mm) | Niyazi et al. 2023, ESTRO-EANO, Radiother Oncol 184:109663 | M0 in H-2 = this plan; confirm PREDICT-GBM `create_standard_plan` uses the same rules |
@@ -267,6 +312,9 @@ Literature below was found by web search on 2026-10-09; each entry is [S] (searc
 | Conformal intervals for longitudinal lesion size; time-varying nonconformity score for irregular follow-up; exchangeability breaks under site shift (weighted conformal) | arXiv 2609.21197 (2026); Tassopoulou et al. (OpenReview 2025); arXiv 2407.19938 | H-3 method: split conformal on MU, time-varying score (our intervals are irregular), report coverage on LUMIERE as a shifted site |
 
 ### 10.2 What we are missing
+
+
+> **Audit correction 2026-10-19:** 2026-10-09 snapshot only: later TUM development and H-2/H-3 evaluation used the data (ledger 2al–2ax and 2bd). “Not downloaded/missing” below is not current status; both tests are now spent.
 
 #### H-2 (the possible strong positive)
 1. **PREDICT-GBM data not downloaded** (Hugging Face LZimmer/PREDICT-GBM, about 25.5 GB). Needs the author's OK. Amendment 6 is already committed, so the download is allowed by our own rules.
@@ -311,9 +359,12 @@ Literature below was found by web search on 2026-10-09; each entry is [S] (searc
 - Konukoglu et al. 2010 IEEE TMI: https://nmr.mgh.harvard.edu/node/4758
 
 
+
+> **Audit correction 2026-10-19:** Viewer behavior and equality of per-patient Dice are unverified: an exact artifact, input-array/key mapping and visual check log are missing. This is intended functionality, not a tested viewer result.
+
 ## 11. The final step: a 3D tumour forecast you can see (added 2026-10-09)
 
-What it is: an interactive 3D page (rotate, zoom, switch layers) for one patient, built from our real outputs:
+What it is: an interactive 3D page (rotate, zoom, switch layers) for one patient, intended to use source outputs (display correctness unverified):
 1. Brain outline (grey, see-through).
 2. Tumour today (input core mask).
 3. Model forecast for the next scan (PDE density as a colour cloud, plus the visible-tumour threshold surface).
@@ -327,6 +378,9 @@ Data rule: the page uses masks only (no MRI intensities); it stays private unles
 Honesty rule: the page shows the Dice for that patient and says "forecast", "atlas tensor", "retrospective".
 Done when: the page opens from one file, works for any patient id, and the shown Dice equals the ledger/cache value.
 Order: build it now on MU (we have forecasts and true next scans); add the radiation-plan layers after H-2 runs.
+
+
+> **Audit correction 2026-10-19:** Historical backlog only. These “main result” labels and clinically styled documents are proposals, not completed or clinically validated products. Nominal conformal coverage requires assumptions such as exchangeability; empirical dev-fold coverage is not an unconditional guarantee.
 
 ## 12. Full-depth backlog (added 2026-10-09; user: "everything possible, time is not a concern")
 
@@ -347,7 +401,7 @@ Order = dependency order. Every item: verify on disk, ledger entry, commit. Test
 
 ### C. H-3 (uncertainty)
 - C1. Conformal intervals for volume forecasts (MU), time-varying score.
-- C2. Conformal coverage maps on PREDICT-GBM (voxel risk sets with guaranteed coverage on dev folds).
+- C2. Conformal coverage maps on PREDICT-GBM (voxel risk sets with nominal/empirical coverage on dev folds under stated assumptions).
 - C3. Calibration plots; failure cases.
 
 ### D. Noise and data limits
@@ -369,6 +423,9 @@ Order = dependency order. Every item: verify on disk, ledger entry, commit. Test
 ## 13. Negative / null results and literature-based fixes (2026-10-10)
 
 Rule: a fix is legitimate only if (1) it comes from published literature, (2) it is declared here and in analysis_plan_v1.md BEFORE it is run, (3) it is chosen on development (TUM) only, (4) the test set is run once, after the freeze. Negative results stay in the paper unchanged; fixes are reported next to them, never instead of them.
+
+
+> **Audit correction 2026-10-19:** Historical X1–X4 declarations, not evidence each fix ran. Later outcomes are indexed by ledger 2ax/2bd and preceding development entries; 2ag 39–52% is a cross-tool proxy sensitivity, not measured longitudinal truth. No spent-set re-evaluation is authorized.
 
 | # | Negative / null result | Ledger | Literature fix | Can it be fixed? |
 |---|---|---|---|---|
@@ -396,6 +453,9 @@ Re-report 2ak contrasts only on pairs with SNR > 1 under the registered floor (2
 
 Same rule as section 13: declared before running, development data first, negatives stay reported.
 
+
+> **Audit correction 2026-10-19:** Historical Y proposals are partly superseded: Y1 fitted-minus-fixed +0.0006 and fitted-minus-persistence -0.0092 [-0.0533,+0.0346] (2at, exploratory); Y4 is default/synthetic and the claimed link was not tested (2ap). TMZ-subset MGMT/adjusted-age findings in 2ar remain inconclusive (age p=.11). Script 88 patient folds completed (2o); no fresh method tuning is authorized.
+
 | Old negative | Fix from literature | Verdict |
 |---|---|---|
 | Growth-only PDE loses to no-change on shrinking cores (-0.039, n 50) and on LUMIERE volumes | Fit a per-patient treatment response (kill rate) from the earlier scans instead of assumed alpha/beta (Hormuth et al. 2021 Sci Rep, PMC8055874: calibrated chemoradiation model, median enhancing-volume error -2.5% at 3 months, n 9). Also "sequential updating beats fixed fit" (open in the table). | **Y1: worth testing.** Strongest old lead. |
@@ -415,6 +475,9 @@ MU pairs with at least two prior scans: fit one kill multiplier k (scales the as
 - Y5. Age in CGGA: Cox model adjusted for grade, IDH status and treatment (radiotherapy, TMZ) where recorded, GBM only; one model, declared here. Report even if still weak.
 - Y6. RL vs rule: one stronger RL configuration fixed in advance (PPO, 10x training steps, domain-randomised simulated patients over the full prior ranges), run once with the same evaluation as script 68. Simulation only.
 
+
+> **Audit correction 2026-10-19:** Historical Z plan: later Z2 development is 2aw and H-2 final is 2ax. Split lists were later received under A9.5 for UCSF H-3 context; H-2 was not re-evaluated. Checkpoint dimensions/training-overlap and execution-count assertions below need primary manifests/logs; contact history is author-reported. H-2/H-3 sets are spent, not eligible for another locked test.
+
 ## 15. Old goal kept: beat the 15 mm plan with our own method (user decision 2026-10-11)
 
 Diagnosis of why our arms lost (2al-2as): small training set (~113 per fold), wrong objective (segmentation loss, but the endpoint is coverage at fixed volume = ranking), 2 mm vs 1 mm scoring. Paths, each declared here before it runs; dev (TUM) only; test set once at the end for the single final model chosen on dev:
@@ -433,3 +496,20 @@ The author emailed the PREDICT-GBM authors for the per-split held-out test lists
 
 ### Z2 details (declared 2026-10-11, before any Z2 run)
 Extra training samples: the 334 MU-Glioma-Post primary pairs (153 patients; input scan -> later scan), used ONLY in training folds; scoring stays out-of-fold on TUM. MU arrays are flipped in x and y into PREDICT-GBM order (2ak/script 112 note). Per MU pair at 2 mm: input core (labels 1, 3), edema (2), brain; target = later-scan labels 1-3 inside the brain (all) and label 3 (enhancing, for the ranking loss); k = 15 mm standard-plan volume of the input core. Tissue maps for MU: mean of the TUM dev wm / gm / csf maps (SRI24 population proxy; built from dev only). MRI channels: T1c and FLAIR scaled 0-1 by the 0.5-99.5 percentiles inside the brain. Domain gap stated: MU inputs are post-treatment scans, TUM inputs are pre-op. Arms: hybrid_rank_mu, hybrid_mri_rank_mu. Compute held equal to the TUM-only arms: same number of gradient steps (epochs = round(60 x n_TUM_train / n_total_train)).
+
+## Artifact status checked 2026-10-19
+
+The following proposed paths are absent; a declaration or plan is not a completed check:
+
+- `output/pde_manifest/results_final.json`
+- `output/forecastability_measured.json`
+- `output/volume_forecast/results.json`
+- `output/selective_forecast.json`
+- `data/manifests/cohort_overlap.csv`
+- `output/power_sim.json`
+- `configs/development.yaml`
+- `output/predictgbm/results.json`
+- `output/solver_verification_v2.json`
+- `output/identifiability.json`
+
+`output/shape_skill_matched.json` exists (ledger 2af); the audit list marking it absent was incorrect. Other current artifacts do not establish that each proposed final filename was ever produced. Exact original-run logs/configuration and source overlap/power records remain missing; no outputs were regenerated.
