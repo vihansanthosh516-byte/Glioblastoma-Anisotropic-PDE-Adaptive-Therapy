@@ -12,7 +12,7 @@
 
 ## Mental model (one sentence)
 
-Patient-specific **GBM computational oncology**: multi-omic risk (Track A) → **anisotropic PDE + stromal invasion** (Track B physics) → **adaptive / MPC dosing** (Track B therapy) → **3D DTI / inverse / CDSS** (Track C / Phase 3D).
+Historical model grouping: Track A expression work stands alone; no measured A-to-B link is established. Track B PDE simulation feeds Track C assumed-treatment/control experiments; this is not a validated patient-specific workflow.
 
 ```mermaid
 mindmap
@@ -37,7 +37,9 @@ mindmap
 
 ---
 
-## Repository layout
+## Historical repository layout
+
+2026-09-24 map, not a current operability audit. Recheck every path/entry point before reuse; current trust hierarchy and goal are in ../../START_HERE.md. Source existence is not successful execution. Bulk CLI is disabled.
 
 | Path | Role |
 |------|------|
@@ -57,7 +59,7 @@ mindmap
 
 **Entry points**
 - `python -m src.cli <n>` — run numbered script (`src/cli.py`)
-- `README.md` — abstract + key findings (note: still has merge markers in places)
+- `README.md` — current RANO guidance; the old merge-marker/map description is superseded
 - `run_all.sh` / `run_all.ps1` — batch runners
 
 ---
@@ -65,7 +67,7 @@ mindmap
 ## Three tracks
 
 ### Track A — Omics & biomarkers (Months 1–6)
-**Scripts:** `01`–`41` (mostly). Status: 27/28/29 verified with committed outputs; SPIB saddle proof 5/5 PASS; real TCGA-GBM validation (n=518). The 'unverifiable' note in the README is outdated.
+**Scripts:** `01`–`41` (mostly). Selected saved model outputs exist; SPIB flags are internal numerical checks, not biological proof. TCGA n=518 age association is observational, not external pipeline/treatment validation. Missing provenance and leakage caveats remain (ledger A1–A3/2o).
 
 | Band | Scripts | Theme |
 |------|---------|--------|
@@ -78,23 +80,23 @@ mindmap
 | Virtual KO / TI | 31–34 | Knockout screen, therapeutic index |
 | Clinical ingest | 35–41 | IvyGAP, survival, dose–response |
 
-**Verified physics anchors (from [[Project-State]])**
-- **27** ABA lattice — wave speed 26.6 µm/hr (old "front velocity ~0.118–0.120" not reproducible)
-- **28** FK-PDE — numerical 3.62 vs analytical 4.00 (~9.4% err)
-- **29** invasion — free-prop 26.6 vs analytical 28.3 µm/hr
+**Historical numerical model anchors (not measured biology)**
+- **27** ABA lattice — converted simulated speed26.6 um/hr from aba_analysis_results.json/invasion_summary.json, not a dimensioned lattice measurement (old "front velocity ~0.118–0.120" not reproducible)
+- **28** FK-PDE — numerical 3.62 vs analytical 4.00 (~9.4% error; output/fk_metrics.json:numerical_wave_speed/analytical_wave_speed/speed_error_percent)
+- **29** invasion — free-prop26.6 vs analytical28.3 um/hr (output/invasion_summary.json; relative error5.98%)
 
 ### Track B — Anisotropic PDE + adaptive therapy (focus)
-**Scripts:** `42`–`49`. This is the **current scientific spine**.
+**Scripts:** `42`–`49`. Historical Track B grouping, not the current scientific spine.
 
 | Script | File | One-liner | Vault note |
 |--------|------|-----------|------------|
 | 42 | `42_anisotropic_pde.py` | 2D anisotropic FK on tracts | — |
 | 43 | `43_stromal_feedback.py` | Stromal feedback, per-patient ρ | — |
-| 44 | `44_adaptive_therapy.py` | Adaptive vs MTD, **61** real pts | [[Script-44-Adaptive-Therapy]] |
+| 44 | `44_adaptive_therapy.py` | Adaptive vs MTD, 61 selected fitted-input simulations (42 of103 excluded) | [[Script-44-Adaptive-Therapy]] |
 | 45 | `45_validation_synthesis.py` | Cohort synthesis / poster metrics | — |
 | 46 | `46_sensitivity_analysis.py` | Sobol on real ρ / D ranges | — |
-| 47 | `47_optimal_control.py` | MPC dual-drug, **8** real pts | [[Script-47-Optimal-Control]] |
-| 48 | `48_3d_extension.py` | 50³ anisotropic 3D, **8** real pts | [[Script-48-3D-Extension]] |
+| 47 | `47_optimal_control.py` | MPC dual-drug, eight selected fitted-input simulations | [[Script-47-Optimal-Control]] |
+| 48 | `48_3d_extension.py` | 50³ anisotropic 3D, eight selected fitted-input simulations | [[Script-48-3D-Extension]] |
 | 49 | `49_interactive_3d_dashboard.py` | Plotly HTML from 48 artifacts | ⚠️ still expects PAT_ IDs unless updated |
 
 **Shared calibration (see [[Decisions]])**
@@ -292,7 +294,7 @@ flowchart TD
 
 ---
 
-## Quick command cheat sheet
+## Historical command examples (not verified current run instructions)
 
 ```bash
 # Activate venv, then:
@@ -309,4 +311,4 @@ python tools/vault_index.py
 
 #moc #repo #track-a #track-b #track-c #mu-glioma #adaptive-therapy #mpc #3d-extension #obsidian
 
-> **Correction (2026-10-04):** The chain above is not live. Track A does not feed Track B: the inflammation score in scripts 43-44 is 1.0 for all 61 patients (no ID overlap). Track A stands alone. Track B's PDE solver feeds Track C. See [[PAPER_FINDINGS_LEDGER]].
+> **Correction (2026-10-04):** No measured Track A-to-B chain exists; the corrected overview separates Track A. Track A does not feed Track B: the inflammation score in scripts 43-44 is 1.0 for all 61 patients (no ID overlap). Track A stands alone. Track B's PDE solver feeds Track C. See [[PAPER_FINDINGS_LEDGER]].

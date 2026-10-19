@@ -2,18 +2,17 @@
 
 # Script 44 — Adaptive Therapy Engine
 
-**Status:** Committed 17bfade. Threshold test running.
+**Status:** Committed 17bfade. Historical threshold status superseded by ledger 2bn; no rerun authorized.
 
 ## Purpose
-Simulate adaptive vs MTD dosing on real MU-Glioma patients with 
-per-patient rho and E_max.
+Simulate adaptive vs MTD dosing with fitted MU-Glioma growth inputs and assumed per-patient E_max=rho*1000. Outcomes are model simulations, not measured treatment responses.
 
 ## Cohort
 - 61 positive-rho patients (rho > 0 from fitted longitudinal data)
-- 42 negative-rho responders excluded (41% of cohort, matches TMZ response 
-  rate in MGMT-methylated GBM)
+- 42 negative-rho fits excluded from 103 records (40.8%). Calling them treatment responders is an assumption; no MGMT-response-prevalence comparison is established (`output/adaptive_cohort_summary.json:cohort_filter`).
 
 ## Key parameters
+Source: `src/44_adaptive_therapy.py`, ADAPTIVE_DT and THRESHOLD_OFF/ON defaults. Selected simulation constants, not measurements. Root summary keys e_max_ratio/horizon_days/horizon_steps match the stated ratio/horizon.
 - E_MAX_RATIO = 1000 (per-patient E_max = rho * 1000)
 - THRESHOLD_OFF = 0.80 (drug holiday when tumor < 80% of baseline)
 - THRESHOLD_ON = 1.0 (resume drug when tumor > 100%)
@@ -22,15 +21,15 @@ per-patient rho and E_max.
 ## Results (threshold=0.80)
 | Metric | MTD | Adaptive |
 |---|---|---|
-| Mean drug use | 100% | 32% |
-| Median resistant fraction | 99.2% | 30.6% |
-| Median VR ratio | — | 1.99 |
+| Mean drug use | 100% | 32.36% (`mean_drug_percent_of_mtd`) |
+| Median modeled resistant fraction, ratio1000 sweep | about 99% | about 31%; `output/emax_sweep_summary.json`, not the old vault-only exact 99.2/30.6 |
+| Mean final-mass ratio adaptive/MTD | — | 2.3913 (`adaptive_cohort_summary.json:mean_vr_ratio`); old median1.99 unverified |
 | Patients with adaptive earlier progression | — | 10/61 |
 
 ## Resistance selection
-- 54/61 patients: MTD selected more resistance
+- Source `output/emax_sweep_summary.json`, ratio1000: 54/61 modeled cases have more resistance under MTD; seven ties
 - 0/61 patients: adaptive selected more resistance
-- Pearson r (rho vs drug sparing) = −0.84
+- Historical rho/sparing r=-0.84 is unverified without an exact output key; no inferential claim retained.
 
 ## Files
 - src/44_adaptive_therapy.py
@@ -39,4 +38,4 @@ per-patient rho and E_max.
 - output/adaptive_therapy_comparison.png
 
 ## Threshold test
-THRESHOLD_OFF=0.50 test (resolved): drug use rises to 43% of MTD and holidays collapse to 5.8 mean (vs 32% drug, 48.9 holidays at 0.80). A looser setpoint does not rescue adaptive dosing, so 0.80 is retained. Source: output/adaptive_cohort_summary.json.
+The old .50 test attribution to baseline adaptive_cohort_summary.json is insufficient: its .80 copy repeats baseline values. Exact provenance for 5.8 holidays at .50 is unverified. Later declared eight-cell sweep is `vault/audit_2026-10-18/P4_threshold_sweep_results.csv` and report, ledger2bn: assumed-model drug use 27.4–43.3% across cells, progression pattern sensitive to ON/OFF. This is not clinical rescue or authority to retune.

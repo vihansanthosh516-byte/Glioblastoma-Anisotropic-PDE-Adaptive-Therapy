@@ -2,20 +2,19 @@
 
 # Script 46 — Sobol Sensitivity Analysis
 
-> **SUPERSEDED (2026-10-03):** the S1=0.998 result came from a reduced ODE, not the PDE. Real PDE Sobol: α_sens S1=0.43, ρ_s S1=0.20, D_w S1=0.000. See [[Script-60-66-Swanson-D]].
+> **SUPERSEDED (2026-10-03):** the S1=0.998 result came from a reduced ODE, not the PDE. Real PDE Sobol: α_sens S1=0.43, ρ_s S1=0.20, D_w S1≈0.0000062 (legacy; small nonzero). See [[Script-60-66-Swanson-D]].
 
 **Status:** Committed
 
 ## Method
 - 5-parameter reduced-ODE Sobol analysis
-- Real MU-Glioma parameter distributions (rho, D_white)
-- N=500 Saltelli samples → 6000 evaluations
+- Historical claim of MU-fitted sampling distributions needs an exact run/code manifest; these are not observed treatment effects.
+- Historical N=500 /6000-evaluation assertion needs exact sampling metadata; do not transfer it to the distinct PDE comparison.
 
 ## Key finding
-- Real PDE Sobol: α_sens S1 = 0.43, ρ_s S1 = 0.20, D_w S1 = 0.000
+- Real PDE Sobol: α_sens S1 = 0.43, ρ_s S1 = 0.20, D_w S1≈0.0000062 legacy, 0.0000749 alternate regime
   (95% CI: see [[Script-60-66-Swanson-D]])
-- Interpretation: drug sensitivity (α_sens) is the dominant driver of 
-  tumor volume at literature diffusivity
+- Interpretation: alpha_sens has a larger point-estimate S1 in this assumed model, with wide overlapping uncertainty (rough confidence half-widths alpha .14, rho .18). No stable causal/clinical ranking or matched literature calibration is established. Source `output/sobol_pde_swanson_vs_legacy.json:legacy.V_total`, `swanson.V_total`; original ODE .998390 remains superseded.
 
 ## Superseded (reduced-ODE, kept for history)
 - Original archived claim: rho_s dominated TTP variance with S1 = 0.998.
