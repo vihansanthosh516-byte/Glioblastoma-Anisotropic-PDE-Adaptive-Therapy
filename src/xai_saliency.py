@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# NOTE (2026-10-19 audit): historical legacy script; not part of the current RANO project. The CLI builds a fresh untrained PolicyNetwork() and a generic GbmTherapyEnv(training=False); no checkpoint is loaded, so saliency maps do not show what a trained agent sees. patient_id is a display label only (no patient data are loaded). Saliency is a local derivative through the scalar observation back to voxels for a synthetic state, not evidence of biological risk. No seed is set. The self-test only checks array shape and swallows exceptions. Defaults write cwd-relative output/ paths, so cwd is anchored at the project root.
 """
 Explainable AI (XAI) Saliency Maps for RL (Proposal 3)
 ======================================================
@@ -74,6 +75,9 @@ except ImportError:
 # module does not blow up when those deps are absent.
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
+
+import os as _os
+_os.chdir(_os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))))  # cwd-relative output/ paths below; anchor cwd at the project root
 
 def _load_module_by_path(name: str, path: Path):
     spec = importlib.util.spec_from_file_location(name, path)
