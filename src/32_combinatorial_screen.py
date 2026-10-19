@@ -1,3 +1,4 @@
+# NOTE (2026-10-19 audit): historical legacy Track A script; not part of the current RANO project. Needs torch (not in Requirements.txt). The import of script 33 is now rooted at the project root instead of the cwd.
 from __future__ import annotations
 
 import importlib.util
@@ -21,7 +22,7 @@ PROJECT_ROOT = _Path(__file__).resolve().parent.parent
 OUTPUT_DIR = PROJECT_ROOT / "output"
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
-spec = importlib.util.spec_from_file_location("therapeutic_index", "src/33_therapeutic_index.py")
+spec = importlib.util.spec_from_file_location("therapeutic_index", str(PROJECT_ROOT / "src" / "33_therapeutic_index.py"))
 therapeutic_index = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(therapeutic_index)
 compute_network_collapse_score = therapeutic_index.compute_network_collapse_score

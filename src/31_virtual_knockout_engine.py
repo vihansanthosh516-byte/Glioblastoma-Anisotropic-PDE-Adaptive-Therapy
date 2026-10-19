@@ -1,3 +1,4 @@
+# NOTE (2026-10-19 audit): historical legacy Track A script; not part of the current RANO project. Needs torch (not in Requirements.txt). single_knockout passes self.scores as both the perturbed and the baseline scores (transition scores are not recomputed after the knockout), so the reported transition-score shifts are zero by construction and the variance ratio is 1; only the collapse metric responds to the knockout. No seed is set.
 #!/usr/bin/env python3
 """
 Month 4, Week 1: Virtual Gene Knockout Engine
@@ -128,7 +129,7 @@ class VirtualKnockoutEngine:
         self.labels = labels  # (N,)
         self.gene_names = gene_names
         self.device = device
-        self.N, self.G = X.shape if (X := torch.load(str(OUTPUT_DIR / "nn_X.npy"), map_location="cpu")).shape else (15000, 2500)
+        self.N, self.G = X.shape if (X := np.load(str(OUTPUT_DIR / "nn_X.npy"), mmap_mode="r")).shape else (15000, 2500)  # was torch.load on a .npy file, which cannot read it
         
     def compute_network_collapse(
         self,

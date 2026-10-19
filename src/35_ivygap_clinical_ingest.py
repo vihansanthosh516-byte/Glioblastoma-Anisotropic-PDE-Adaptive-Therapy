@@ -1,3 +1,4 @@
+# NOTE (2026-10-19 audit): historical legacy Track A script; not part of the current RANO project. Despite the name, main loads data/tcga_gbm_clinical.csv when present and then SYNTHESISES gene expression with seeded normal draws (seed 42, rng.normal(5, 1.5)). Gene-expression survival results from this script are therefore mock, not measured TCGA/IvyGAP RNA-seq. It writes generic survival output names that script 36 also writes, so running either overwrites the other's files.
 #!/usr/bin/env python3
 """
 Month 5, Week 1: IvyGAP Clinical Cohort Ingestion & Mapping

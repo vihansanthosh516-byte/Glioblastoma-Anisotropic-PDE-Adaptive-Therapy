@@ -1,3 +1,4 @@
+# NOTE (2026-10-19 audit): historical legacy Track A script; not part of the current RANO project. Reads output/clinical_mapped_cohort.csv (518 rows). Script 38 builds a separate 150-patient expression-aligned cohort, so these 518-patient survival results do not validate the gene-expression or spatial target results from the smaller overlap.
 #!/usr/bin/env python3
 """
 Month 5, Week 2: Survival Analysis Suite (Real TCGA-GBM Clinical Data)

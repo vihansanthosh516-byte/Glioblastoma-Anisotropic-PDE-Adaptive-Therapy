@@ -1,3 +1,4 @@
+# NOTE (2026-10-19 audit): historical legacy Track A script; not part of the current RANO project. Needs numpy/matplotlib. The report text was made to follow the supplied data; the earlier hard-coded values (TMLHE C=0.0378, S100A8+S100A6 Bliss=-0.4258) did not match the saved outputs. output/drug_gating_report.md was absent when audited.
 #!/usr/bin/env python3
 """
 Month 4, Week 4: Drug Gating Report & Optimization Matrix

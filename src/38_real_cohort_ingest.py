@@ -1,3 +1,4 @@
+# NOTE (2026-10-19 audit): historical legacy Track A script; not part of the current RANO project. The manifest note '150-patient overlap between the 518 clinical and 172 expression cohorts' is hard-coded text; only the merged count (150) comes from the code. The subtype CSVs are proxy splits by gene expression, not spatial zones.
 #!/usr/bin/env python3
 """
 Month 5, Week 4: Real TCGA-GBM Cohort Ingestion

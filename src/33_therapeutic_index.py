@@ -1,3 +1,4 @@
+# NOTE (2026-10-19 audit): historical legacy Track A script; not part of the current RANO project. Needs torch. The collapse floor 0.001 and the 'clinical' label (TI > 1 and tumour collapse > 0.05) are code-chosen constants, not measured clinical thresholds.
 #!/usr/bin/env python3
 """
 Month 4, Week 3: Calibrated Therapeutic Index Calculation
