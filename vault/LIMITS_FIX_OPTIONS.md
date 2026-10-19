@@ -10,7 +10,7 @@ Cost key: **now** = existing data and code, hours. **download** = needs a public
 - **Fix 1 (now):** leave-one-patient-out or grouped k-fold on `obs["ID1"]` for LR, RF, NMF and scVI. Cheap.
 - **Fix 2 (now):** retrain C-GAT with test patients removed from the graph (inductive). The historical 41,499-parameter count lacks an exact model/config count record here and is unverified.
 - **Fix 3 (now):** 5 seeds plus bootstrap CIs for every row of the leaderboard.
-- **Fix 4 (compute):** use all 140,355 cells, not 15,000 (array inventory: `output/cvae_latent_full.npy`, shape 140355 by 32; a proposal, not an authorized run).
+- **Fix 4 (compute):** use all 140,355 cells, not 15,000 (array inventory: `output/cgat/cvae_latent_full.npy`, shape 140355 by 32; a proposal, not an authorized run).
 - **Fix 5 (now):** test for batch effects: batch-correction methods often leave residual batch signal that classifiers exploit [S](https://pmc.ncbi.nlm.nih.gov/articles/PMC10914288).
 - **If accuracy drops:** report the patient-level number as the headline and keep the old one as "cell-level, optimistic".
 
