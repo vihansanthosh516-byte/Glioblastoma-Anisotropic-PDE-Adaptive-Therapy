@@ -454,7 +454,7 @@ Re-report 2ak contrasts only on pairs with SNR > 1 under the registered floor (2
 Same rule as section 13: declared before running, development data first, negatives stay reported.
 
 
-> **Audit correction 2026-10-19:** Historical Y proposals are partly superseded: Y1 fitted-minus-fixed +0.0006 and fitted-minus-persistence -0.0092 [-0.0533,+0.0346] (2at, exploratory); Y4 is default/synthetic and the claimed link was not tested (2ap). TMZ-subset MGMT/adjusted-age findings in 2ar remain inconclusive (age p=.11). Script 88 patient folds completed (2o); no fresh method tuning is authorized.
+> **Audit correction 2026-10-19:** Historical Y proposals are partly superseded: Y1 fitted-minus-fixed +0.0006 and fitted-minus-persistence -0.0092 [-0.0533,+0.0346] (2at, exploratory); Y4 is default/synthetic and the claimed link was not tested (2ap). TMZ-subset MGMT adjusted association is inconclusive (p=.107; output/cgga_adjusted_age_mgmt.json:Y2_mgmt_tmz_adjusted.terms.mgmt_meth); the age model is a separate term/analysis. Script 88 patient folds completed (2o); no fresh method tuning is authorized.
 
 | Old negative | Fix from literature | Verdict |
 |---|---|---|
