@@ -115,6 +115,22 @@ split = pd.DataFrame({
 })
 split.to_csv(TSV_SPLIT, sep="\t", index=False)
 
+# ---- 4b. Patient-disjoint split (additive; the cell split above is unchanged) ----
+# Groups = patient (obs["ID1"]). StratifiedGroupKFold fold 0 as the test set: no patient is in both sets.
+# Healthy comes from few donors, so class balance in the test set is only approximate.
+if "ID1" in obs.columns:
+    from sklearn.model_selection import StratifiedGroupKFold
+    groups = obs["ID1"].astype(str).to_numpy()
+    sgkf = StratifiedGroupKFold(n_splits=5, shuffle=True, random_state=42)
+    p_train, p_test = next(sgkf.split(idx, y, groups))
+    assert not (set(groups[p_train]) & set(groups[p_test])), "patient overlap between train and test"
+    pd.DataFrame({"index": np.concatenate([p_train, p_test]),
+                  "split": ["train"] * len(p_train) + ["test"] * len(p_test)}).to_csv(
+        os.path.join(OUT_DIR, "nn_train_test_split_patient.tsv"), sep="\t", index=False)
+    log(f"patient-disjoint split: train={len(p_train)} test={len(p_test)} cells")
+else:
+    log("obs has no ID1 column: patient-disjoint split not written")
+
 log("DONE.")
 log(f"X shape = {X_dense.shape} ; y shape = {y.shape} ; train/test = "
     f"{len(idx_train)}/{len(idx_test)}")

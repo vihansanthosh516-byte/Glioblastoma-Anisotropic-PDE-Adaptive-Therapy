@@ -47,20 +47,25 @@ except ImportError:
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # project root (was "."; cwd-dependent)
 OUT_DIR = os.path.join(ROOT, "output")
+# GBM_SPLIT_MODE=patient: use the patient-disjoint split from script 04 and write all results under output/patient_split/
+# (the default "cell" mode is the original leaky random cell split and keeps the original output names).
+SPLIT_MODE = os.environ.get("GBM_SPLIT_MODE", "cell")
+RES_DIR = OUT_DIR if SPLIT_MODE == "cell" else os.path.join(OUT_DIR, "patient_split")
+os.makedirs(RES_DIR, exist_ok=True)
 NPY_X   = os.path.join(OUT_DIR, "nn_X.npy")
 NPY_Y   = os.path.join(OUT_DIR, "nn_y.npy")
 TSV_GENE_NM = os.path.join(OUT_DIR, "nn_gene_names.tsv")
 TSV_CLS_NM  = os.path.join(OUT_DIR, "nn_class_names.tsv")
-TSV_SPLIT   = os.path.join(OUT_DIR, "nn_train_test_split.tsv")
+TSV_SPLIT   = os.path.join(OUT_DIR, "nn_train_test_split.tsv" if SPLIT_MODE == "cell" else "nn_train_test_split_patient.tsv")
 
 # Load LR coefficients from Method 1
-TSV_LR_COEF = os.path.join(OUT_DIR, "method1_lr_coefficients.tsv")
+TSV_LR_COEF = os.path.join(RES_DIR, "method1_lr_coefficients.tsv")
 
-PT_MODEL     = os.path.join(OUT_DIR, "method3_hybrid.pt")
-TSV_METRICS  = os.path.join(OUT_DIR, "method3_metrics.json")
-TSV_PRED     = os.path.join(OUT_DIR, "method3_predictions.tsv")
-PNG_CM       = os.path.join(OUT_DIR, "method3_confusion.png")
-PNG_LOSS     = os.path.join(OUT_DIR, "method3_training_loss.png")
+PT_MODEL     = os.path.join(RES_DIR, "method3_hybrid.pt")
+TSV_METRICS  = os.path.join(RES_DIR, "method3_metrics.json")
+TSV_PRED     = os.path.join(RES_DIR, "method3_predictions.tsv")
+PNG_CM       = os.path.join(RES_DIR, "method3_confusion.png")
+PNG_LOSS     = os.path.join(RES_DIR, "method3_training_loss.png")
 
 # Hyperparameters - CPU friendly (match Method 2)
 N_GENES      = 100

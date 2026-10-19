@@ -28,17 +28,22 @@ import joblib
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # project root (was "."; cwd-dependent)
 OUT_DIR = os.path.join(ROOT, "output")
+# GBM_SPLIT_MODE=patient: use the patient-disjoint split from script 04 and write all results under output/patient_split/
+# (the default "cell" mode is the original leaky random cell split and keeps the original output names).
+SPLIT_MODE = os.environ.get("GBM_SPLIT_MODE", "cell")
+RES_DIR = OUT_DIR if SPLIT_MODE == "cell" else os.path.join(OUT_DIR, "patient_split")
+os.makedirs(RES_DIR, exist_ok=True)
 NPY_X   = os.path.join(OUT_DIR, "nn_X.npy")
 NPY_Y   = os.path.join(OUT_DIR, "nn_y.npy")
 TSV_GENE_NM = os.path.join(OUT_DIR, "nn_gene_names.tsv")
 TSV_CLS_NM  = os.path.join(OUT_DIR, "nn_class_names.tsv")
-TSV_SPLIT   = os.path.join(OUT_DIR, "nn_train_test_split.tsv")
+TSV_SPLIT   = os.path.join(OUT_DIR, "nn_train_test_split.tsv" if SPLIT_MODE == "cell" else "nn_train_test_split_patient.tsv")
 
-PNG_CM_LR = os.path.join(OUT_DIR, "method1_lr_confusion.png")
-PNG_CM_RF = os.path.join(OUT_DIR, "method1_rf_confusion.png")
-TSV_METRICS = os.path.join(OUT_DIR, "method1_metrics.json")
-TSV_IMP = os.path.join(OUT_DIR, "method1_lr_coefficients.tsv")
-TSV_IMP_RF = os.path.join(OUT_DIR, "method1_rf_importance.tsv")
+PNG_CM_LR = os.path.join(RES_DIR, "method1_lr_confusion.png")
+PNG_CM_RF = os.path.join(RES_DIR, "method1_rf_confusion.png")
+TSV_METRICS = os.path.join(RES_DIR, "method1_metrics.json")
+TSV_IMP = os.path.join(RES_DIR, "method1_lr_coefficients.tsv")
+TSV_IMP_RF = os.path.join(RES_DIR, "method1_rf_importance.tsv")
 
 def mem_mb(): return (resource.getrusage(resource.RUSAGE_SELF).ru_maxrss if resource else 0)/1024
 def log(m): print(f"[{time.strftime('%H:%M:%S')}] {m}  RSS={mem_mb():.0f}MB", flush=True)
@@ -156,6 +161,6 @@ with open(TSV_METRICS, "w") as f:
 log(f"Saved metrics -> {TSV_METRICS}")
 
 # ---- 8. Save models ---------------------------------------------------------
-joblib.dump(lr, os.path.join(OUT_DIR, "method1_lr.joblib"))
-joblib.dump(rf, os.path.join(OUT_DIR, "method1_rf.joblib"))
+joblib.dump(lr, os.path.join(RES_DIR, "method1_lr.joblib"))
+joblib.dump(rf, os.path.join(RES_DIR, "method1_rf.joblib"))
 log("Saved joblib models. DONE.")
