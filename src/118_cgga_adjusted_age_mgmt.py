@@ -51,7 +51,7 @@ def cox(d, cols):
 def main():
     d = cohort()
     res = {"script": "118_cgga_adjusted_age_mgmt", "declared": "GRAND_PLAN 14 Y5, Y2", "n_gbm_pooled": int(len(d)),
-           "tcga_reference_age_hr": 1.0307,
+           "tcga_reference_age_hr": 1.0307,  # hand-entered reference copied from the TCGA analysis (output/survival_stats_summary.json); NOT fitted here
            "Y5_age_adjusted": cox(d, ["age", "idh_wt", "radio", "tmz", "recurrent", "batch2"]),
            "Y5_age_univariate_same_rows": None}
     rows = d[["OS", "event", "age", "idh_wt", "radio", "tmz", "recurrent", "batch2"]].dropna()

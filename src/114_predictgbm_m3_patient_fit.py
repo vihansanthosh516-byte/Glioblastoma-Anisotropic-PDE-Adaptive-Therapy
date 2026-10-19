@@ -4,7 +4,9 @@
 Development (TUM) only; test recurrences stay locked (predictgbm_io). Same tissue model, atlas, grid and exact solver as
 script 112. Per patient: seed u = 1 in the 2 mm voxel at the centre of mass of the pre-op core; for each arm
 (iso, aniso r1, aniso r10) and lambda grow until the volume u >= 0.6 (T1Gd) reaches the core volume; fit score =
-Dice(u >= 0.6, core) + Dice(u >= 0.35, core + edema). The fit never reads the recurrence. Per arm family the best
+Dice(u >= 0.6, core) + Dice(u >= 0.35, core + edema). The fit never USES the recurrence (2026-10-19 audit: run_case does call pg.load_case(..., with_recurrence=True)
+before fitting, but the recurrence is used only for scoring; the per-patient best lambda is chosen on the pre-op fit
+score, a development-set selection, not independent validation). Per arm family the best
 lambda (and r) is chosen per patient (ties -> smaller lambda). Then growth continues until u >= 0.1 holds the
 standard-plan volume (as script 112) and the plan is top-k at that volume. Coverage is stored for every cell so the
 selection can be audited; only the fit-selected cell is the M3 result.

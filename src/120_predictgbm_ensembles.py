@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Script 120: GRAND_PLAN 15 Z1 (= 13 X3) ensembles, PREDICT-GBM development (TUM).
 
-Declared in GRAND_PLAN section 15 before this script ran. Per patient, each map is rank-normalised inside the brain
+Declared in GRAND_PLAN section 15 before this script ran. Ten arms are scored on the same development patients and
+best_at_equal_volume is chosen by the same-set mean, so it is optimistic (published maps may also have seen TUM). Per patient, each map is rank-normalised inside the brain
 (rank / n, ties averaged); an ensemble is the mean of its members' ranks. Plans = top-k inside the brain at
 k = fraction x standard-plan volume (fractions as script 117). Members: GliODIL, LOTI (sbtc) (released maps, clipped as
 the benchmark), U-Net raw (released prediction ranked by raw value), M1 (our isotropic tissue model at lambda 2 mm,

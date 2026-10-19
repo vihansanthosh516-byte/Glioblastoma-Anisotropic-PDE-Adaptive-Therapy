@@ -18,6 +18,8 @@ dependencies = [
     "scikit-learn",
     "joblib",
     "pydicom",
+    "lifelines",
+    "nibabel",
     "scikit-image",
 ]
 

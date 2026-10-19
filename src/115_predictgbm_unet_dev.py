@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Script 115: H-2 learned arm (GRAND_PLAN 12 B2) and hybrid arm (B3): small 3D U-Net on PREDICT-GBM development patients.
 
-Development (TUM) only, 5-fold cross-validation by patient (fixed seed): each patient is scored by a model that never
+Development (TUM) only (all arms are scored on the same patients, so picking the best arm is optimistic; the output
+oof_logits file name depends on the arm, e.g. oof_logits_{arm}.npz), 5-fold cross-validation by patient (fixed seed): each patient is scored by a model that never
 saw it, so the dev coverage is out-of-fold, not in-sample. Test patients are never loaded (dev_ids; loader lock).
 Inputs at 2 mm (block mean of 1 mm maps): core (labels 1, 3), edema (label 2), wm, gm, csf, brain, distance from the core
 (mm / 50). Hybrid arm adds a growth-model channel: isotropic tissue model M1 density at lambda 2 mm (the script 112

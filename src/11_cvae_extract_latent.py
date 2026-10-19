@@ -3,8 +3,17 @@
 ==========================
 Extract frozen cVAE latent embeddings for ALL 140k cells (not just the 15k subsample).
 Uses the trained cVAE encoder on the full dataset in memory-efficient batches.
+
+NOTE (2026-10-19 audit): historical Track A script. Paths now derive from __file__. Gene order is taken from
+nn_gene_names.tsv and assumed to match the model's input; the loaded config gene_names are not checked against it.
+Only cvae_latent_full.npy was found in output/cgat when audited; the labels/patient/region arrays were not.
+Needs torch and anndata (not in Requirements.txt); resource import is guarded for native Windows.
 """
-import os, time, gc, resource
+import os, time, gc
+try:
+    import resource
+except ImportError:  # native Windows Python has no resource module; RSS then reports 0
+    resource = None
 os.environ["OMP_NUM_THREADS"] = "2"
 os.environ["MKL_NUM_THREADS"] = "2"
 
@@ -15,7 +24,7 @@ import torch
 from torch.utils.data import DataLoader, TensorDataset
 from scipy.sparse import issparse
 
-ROOT = "."
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 FULL_H5AD = os.path.join(ROOT, "output", "01_filtered_three_class.h5ad")
 CVAE_MODEL = os.path.join(ROOT, "output", "cgat", "cvae_model.pt")
 OUT_DIR = os.path.join(ROOT, "output", "cgat")
@@ -28,7 +37,7 @@ REGION_FULL_PATH = os.path.join(OUT_DIR, "cvae_region_full.npy")
 BATCH_SIZE = 2048
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 
-def mem_mb(): return resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024
+def mem_mb(): return (resource.getrusage(resource.RUSAGE_SELF).ru_maxrss if resource else 0) / 1024
 def log(m): print(f"[{time.strftime('%H:%M:%S')}] {m}  RSS={mem_mb():.0f}MB", flush=True)
 
 # ---- 1. Load trained cVAE model ----
