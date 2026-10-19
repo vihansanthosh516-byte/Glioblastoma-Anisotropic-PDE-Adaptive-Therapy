@@ -76,6 +76,7 @@ def main():
         row = {"D": D, "rho": rho, "h_over_xi": H / math.sqrt(D / rho), "s_star": s, "D_eff": s * D,
                "speed_err_before": r7["V7b_rel_err_h2_vs_ref"], "speed_err_after": sp / target - 1,
                "radius_err_before_mm": v9[(D, rho)]["err_h2_mm"], "radius_err_after_mm": rad - r05}
+        row["target_bracketed"] = bool(lo > 0.05 * 1.0001 and hi < 2.0 / 1.0001)  # False: the target was not crossed inside [0.05, 2], s* is a bound
         row["pass_after"] = bool(abs(row["speed_err_after"]) < 0.10 and abs(row["radius_err_after_mm"]) < 1.0)
         rows.append(row)
         print(f"[{time.time() - t0:5.0f}s] D {D} rho {rho}: s* {s:.3f} speed {row['speed_err_before']:+.3f} -> "

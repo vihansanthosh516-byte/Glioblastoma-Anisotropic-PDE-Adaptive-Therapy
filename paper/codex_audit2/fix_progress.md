@@ -120,3 +120,6 @@ Graphify code index refreshed after source changes (AST-only, no LLM or scientif
 ## Deferred-fix batches (2026-10-19, after chunk pass)
 
 - Batch 1 (seeds): fixed seed 42 (random, numpy, torch) added to legacy scripts 05, 07, 08, 10, 13, 15_baseline_scvi, 16_cgat_train, 19, 21, 26, 27, 49, 55_dti_3d_ingestion, 56_multi_scale_framework, 58. Marked GLOBAL_SEED_2026_10_19. Earlier outputs came from unseeded runs and are NOT reproduced by the seeded code; no script was rerun. py_compile only.
+- Batch 2 (paths): scripts 02-08 ROOT now derived from __file__ (was "."); script 01 reads GBM_DATA_DIR (default the original machine path) and writes under the project root.
+- Batch 3 (small guards): 107 adds `target_bracketed` per row (new key appears only on a rerun; saved output unchanged); 125 prints a warning if the U-Net checkpoint count is not 15.
+- NOT done, by decision: patient-disjoint split and validation-set/final-epoch reporting in legacy Track A scripts 04-08, 10, 13, 15, 16 (scripts 86/88/95 already supply the patient-level replacement and rewriting the split would change every downstream saved array); 111 manifest inputs (needs the exact PREDICT-GBM input paths, unknown here); 142 A16 reproduction check; 73 sorted mask choice; erroring instead of falling back in run_patient_digital_twin; replacing os.chdir stopgaps with explicit joined paths.

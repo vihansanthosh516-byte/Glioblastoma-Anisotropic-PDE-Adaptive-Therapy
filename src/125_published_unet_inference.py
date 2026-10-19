@@ -37,6 +37,8 @@ from unet_published import PublishedUNet  # noqa: E402
 
 torch.set_num_threads(os.cpu_count() or 8)
 W = {p.stem: p for p in WDIR.rglob("ens_*_crv_*.tar")}
+if W and len(W) != 15:  # expected 3 members x 5 folds
+    print(f"WARNING: found {len(W)} ens_*_crv_*.tar checkpoints, expected 15", flush=True)
 _NETS = {}
 
 
