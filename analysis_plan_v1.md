@@ -561,3 +561,25 @@ Add an independent exponential death time, same in both arms, median 78 weeks (a
 
 ### A18.6 Reading rules and limits
 Everything is labelled "sensitivity analysis". No claim about a real trial. No threshold, grid or definition changes after seeing results. If PA1, PA2, PB1 or PD1 fail, the failure is reported unchanged.
+
+## Amendment 19 (2026-10-18): Anchoring the trial simulation to a published scan-rescan repeatability. SIMULATION. Written before the script exists or runs. Replaces nothing.
+
+### A19.1 The anchor (full text read: Abu Khalaf et al., AJNR 2021;42:1080-6, PMC8191681)
+Repeat scans of 20 patients with recurrent glioblastoma, one 1.5T scanner, mean 45.1 hours apart (range 23.2 to 54.6), segmented automatically with BraTumIA. Enhancing tumour: Bland-Altman repeatability coefficient in percent-change terms (RC%) = 46% (95% CI 33% to 67%) for BraTumIA 1.2 and 39% (28% to 57%) for BraTumIA 2.0; mean enhancing volumes about 23 to 26 mL; later-scan volumes were larger (24.2 vs 26.3 mL and 22.9 vs 24.9 mL, P < .05 and < .01), which the authors attribute possibly to incomplete gadolinium washout.
+Conversion (an ASSUMPTION; the paper gives no formula and does not say whether RC% was computed on raw or log data): change-SD s = RC% / 1.96, in ln-units as in A16. Anchors: central 0.235 (46%) and 0.199 (39%); lower end 0.143 (28%, version 2.0 lower CI); upper end 0.342 (67%, version 1.2 upper CI).
+
+### A19.2 Limits stated now
+One study, 20 patients, one scanner, one protocol; postoperative recurrent tumours with large enhancing volumes (about 24 mL), so the anchor does NOT cover small lesions, where noise is probably larger (the paper says repeatability may differ for smaller tumours); BraTumIA, not the tools used in A15 (LUMIERE used HD-GLIO-AUTO and DeepBraTumIA); the 2-day interval mixes tool noise with scan-to-scan acquisition and contrast-timing variability, and may include real change; the later-scan volume rise is a systematic scan-order effect not modelled; the conversion from RC% to s is assumed. The result is an anchored simulation, never evidence about a real trial.
+
+### A19.3 Simulation (script 143)
+Same model, seed, draw order, R=2000 and estimands E1, E2, E4, type I as A16 and A18 (common random numbers, so cells are paired with A16 and A18). Constant change-SD s in {0.143, 0.199, 0.235, 0.342}; N in {50, 100}; D in {8, 12}; rules single-scan and two-scan; theta in {1.0, 0.7}. Materiality as in A16 (E1 |mean| >= 4.345 weeks with CI excluding 0; E2 <= -0.05 with CI excluding 0).
+
+### A19.4 Predictions declared before the run (N=100, D=8)
+- PX1: single-scan E1 is material at all four anchors (E1 < 0).
+- PX2: single-scan power loss is material at all four anchors.
+- PX3: two-scan E1 is material at s = 0.199 and s = 0.235 (not asserted at 0.143).
+- PX4: type I error at theta=1 stays within [0.04, 0.06] at N=100 in all eight (anchor x rule) cells.
+Report any failure unchanged.
+
+### A19.5 Not declared
+No re-run with other anchors or conversions. If a reader prefers a different conversion (for example, RC% as a ratio of raw volumes), that is a new amendment. Results are labelled "simulation anchored to one published repeatability study; assumed conversion; large lesions only".
