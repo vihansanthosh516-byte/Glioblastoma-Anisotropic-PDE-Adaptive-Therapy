@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# NOTE (2026-10-19 audit): historical legacy script; not part of the current RANO project. Needs scanpy (not in Requirements.txt). It documents the leakage in the original Track A pipeline (all-cell kNN graph; cVAE trained on labelled random-split cells), so that pipeline cannot support independent test generalisation.
 """Script 95: Track A leakage and confounding audit (Phase 1.4; masterplan §29-30, §66, §128).
 
 Questions, answered on the same 15,000 cells and the same patient folds as script 88

@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# NOTE (2026-10-19 audit): historical legacy script; not part of the current RANO project. Writes the repository data manifests (data/manifests); do not rerun casually. Folds use the string seed 20261004; the manifest's chronology relative to each amendment and freeze is not proven by the code.
 """Script 94: canonical patient manifest, patient-level split, CONSORT counts (Phase 1.1, 1.2).
 
 One source of truth for who is eligible and in which fold (analysis_plan_v1.md A1.1-A1.3).

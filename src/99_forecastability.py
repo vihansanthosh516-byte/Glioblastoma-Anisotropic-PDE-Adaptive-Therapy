@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# NOTE (2026-10-19 audit): historical legacy script; not part of the current RANO project. The one-voxel erosion/dilation is a noise proxy, not measured segmentation uncertainty, so the forecastability ceiling is conditional on that proxy rather than an empirical ceiling.
 """Script 99: forecastability ceiling and signal-to-noise of observed change (Phase 2.5; masterplan §181-182).
 
 Question before any model: how much of the next scan can be predicted at all?

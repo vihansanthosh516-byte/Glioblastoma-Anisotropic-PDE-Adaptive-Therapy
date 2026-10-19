@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# NOTE (2026-10-19 audit): historical legacy script; not part of the current RANO project. The oracle-volume-matched arm is NOT a baseline (upper bound only). The existence of output files does not show the split manifest was frozen before outcomes were seen or later reused.
 """Script 98: baseline ladder on MU-Glioma-Post core masks (Phase 2.2; analysis_plan_v1.md A1.4).
 
 Forecast the next scan's core mask (labels 1 and 3, 2 mm grid, as script 81) with no PDE:

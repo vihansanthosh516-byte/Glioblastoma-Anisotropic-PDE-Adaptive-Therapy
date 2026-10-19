@@ -1,3 +1,4 @@
+# NOTE (2026-10-19 audit): historical legacy script; not part of the current RANO project. Kill rates stay assumed: patient-level rates are sampled from script-67 ranges (seeds 93+s). A sensitivity analysis, not evidence that these kill rates occur clinically.
 """Script 93: more real patients, and kill rates that are not one fixed table (limits L4, L14).
 
 Problem: `real_test` (script 67/75) is 21 MU-Glioma patients with REAL growth rates but the SAME assumed kill table
