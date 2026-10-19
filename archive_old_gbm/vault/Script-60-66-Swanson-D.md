@@ -2,13 +2,15 @@
 
 # Scripts 60/66 re-run at Swanson-type diffusivities: PRE-SPECIFICATION
 
-**Written 2026-10-03, before any re-run output was read.** Results are appended below the line `## RESULTS
+**Author-reported declaration date 2026-10-03; pre-inspection chronology is unverified without a dated review/run log.** Results appended below.
 All values read back from the output files (listed at the end). Runs: 2026-10-03.
 
 ### Headline
-1. **Volume endpoints stay flat; spatial endpoints are real.** At Swanson-range D (0.1-0.8 mm²/d) the day-90 total-volume ablation is still small (PPO: no-DTI +0.27% vs +0.007% before; at most 3.6% in any scenario), but the day-90 mask changes materially: Dice(no-DTI vs full) = 0.886 mean (was 0.994), min 0.08. The old null was a parameter artifact for spatial endpoints, not for volume (mass conservation).
-2. **The 0.998 does not survive a PDE.** In a real PDE Sobol, rho is not dominant for V_total, and D_w contributes nothing to volume at either D range.
+1. **Volume changes are small; spatial endpoints change in simulation.** At Swanson-range D (0.1-0.8 mm²/d) the day-90 total-volume ablation is still small (PPO: no-DTI +0.27% vs +0.007% before; at most 3.6% in any scenario), but the day-90 mask changes materially: Dice(no-DTI vs full) = 0.886 mean (was 0.994), min 0.08. The old null was a parameter artifact for spatial endpoints, not for volume (mass conservation).
+2. **The 0.998 does not survive a PDE.** In a real PDE Sobol, rho is not dominant for V_total, and D_w has small nonzero volume sensitivity in both selected regimes.
 3. **Script 66's study is essentially unchanged**: win rates and mean log-ratios at equal budget barely move.
+
+Source check 2026-10-19: all five named aggregate/spatial/Sobol root JSONs exist, contrary to the audit missing-file assertions. The following are assumed-parameter simulations, including fitted-growth real_test cases with assumed kill rates; no clinical result.
 
 ### Script 60 (primary endpoint: day-90 mean final volume, mm³; 30 LHS scenarios, equal budget)
 | Arm | legacy D, full | Swanson D, full | legacy no-DTI | Swanson no-DTI |
@@ -36,6 +38,8 @@ All values read back from the output files (listed at the end). Runs: 2026-10-03
 | oracle beats Stupp on V_vis(0.01 K) | 43% | **20%** |
 The diffusion length is now several voxels (2 mm), so the sub-voxel explanation from script 77 no longer applies.
 
+Exact source schema: `output/rl_equal_budget{,_swanson}/evaluate.json:sets.lhs30.<arm>`, fields `win_rate_final_pct`, `mean_log_ratio_final_vs_stupp`. Arms heuristic59, oracle_final, ppo_final_s0 and bc_dagger_final match the four rows. real_test is a separate set, not the same LHS analysis.
+
 ### Script 66 (primary: equal-budget win rate and mean log(final/Stupp final); evaluate stage, full PDE)
 | LHS-30 | win % old -> new | log ratio old -> new |
 |---|---|---|
@@ -47,6 +51,8 @@ Real-test (21 patients): all numbers identical to 3 decimals except trivial chan
 - Max effect of diffusion on Stupp's final volume (validate stage): 0.029% -> **0.83%**.
 - Reused unchanged from the legacy directory: `oracle.json`, `train.json`, PPO/BC weights (D-independent, reaction-only stages).
 - Conclusion of script 66 holds: pacing/late-block structure at equal budget is not a D artifact.
+
+Source: `output/sobol_pde_legacy.json` / `_swanson.json`, n_base=128, n_runs=640; `sobol_pde_swanson_vs_legacy.json:legacy|swanson.V_total` identifies S1/ST and uncertainty. Values printed as0.000 are rounded, not exact zero (D_w S1≈6.21e-6 legacy,7.49e-5 alternate regime).
 
 ### Sobol (script 80, PDE, N = 128 base, 640 runs per regime, Stupp schedule, day 90)
 | Output | Parameter | legacy S1 | legacy ST | Swanson S1 | Swanson ST |
@@ -60,11 +66,11 @@ Real-test (21 patients): all numbers identical to 3 decimals except trivial chan
 | V_vis(0.04) | all | CIs 0.05-2.1 (many zeros): not interpretable at N = 128 | | | |
 
 - **Does rho_s still dominate?** No. In the PDE with treatment, alpha_sens (kill scale) has the largest S1 for V_total (0.43), rho second (0.20), and ST sums above 1 (interactions). The archived script-46 value (rho_s S1 = 0.998) comes from a toy ODE with k_diff = 15 and D_white held within ±20% of 0.013, so rho dominates by construction. **The Track B headline "rho_s S1 = 0.998" should not be cited as a property of the PDE model.**
-- D_w is irrelevant to volume at both ranges (mass conservation). At Swanson D it enters extent only weakly (ST = 0.020 ± 0.012).
+- D_w volume sensitivity is very small in these selected runs; finite uncertainty does not establish irrelevance. At Swanson D it enters extent only weakly (ST = 0.020 ± 0.012).
 - Sobol differences from the earlier "ablation" result: Sobol varies D within 0.1-0.8 on a treated tumour (small by day 90, mean extent ~2 mm), whereas script 78 grew an untreated tumour; so the Sobol D-sensitivity is small while the mask Dice in the ablation is not.
 
 ### Verdict
-- The ablation null is a parameter artifact for spatial endpoints (Dice 0.99 -> 0.89 with the diffusivity fixed) and still a true null for total volume. The scripts 60/66 conclusions about RL vs Stupp at equal budget hold.
+- The ablation null is a parameter artifact for spatial endpoints (Dice 0.99 -> 0.89 with the diffusivity fixed) and still a true null for total volume. These particular model comparisons change little under this selected diffusivity intervention; all remain simulations with assumed kill rates, not clinical evidence. Sobol alpha/rho uncertainty overlaps widely, so point ranking is not a stable empirical attribution.
 - Caveats: N = 128 Sobol has wide CIs; the unit-corrected range (0.1-0.8) was chosen by converting the script's declared cm²/day, not fitted to data; real-test D estimates were not audited; 30 scenarios, one seed.
 
 ### Files

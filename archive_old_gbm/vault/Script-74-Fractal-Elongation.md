@@ -2,7 +2,7 @@
 
 # Script 74 — Matched-isotropic paired test (D_f and elongation)
 
-**Source:** `output/fractal_aniso_vs_iso.json` (script `src/74_fractal_aniso_vs_iso.py`). n = 103 patients (MU-Glioma-Post masks). Design: paired, same patient, rho, seed, dt and steps. Only the tensor differs. Iso tensor = trace(D)/2 * I. Values below were read from the JSON on 2026-10-04.
+**Source:** `output/fractal_aniso_vs_iso.json` (script `src/74_fractal_aniso_vs_iso.py`). n=103 paired simulations using MU-Glioma-Post masks; this is simulation-vs-simulation, not measured longitudinal tumor growth. Design: paired, same patient, rho, seed, dt and steps. Only the tensor differs. Iso tensor = trace(D)/2 * I. Values below were read from the JSON on 2026-10-04.
 
 | Endpoint (150 d) | Aniso | Iso | Diff | Aniso > iso | Cohen dz | Wilcoxon p |
 |---|---|---|---|---|---|---|
@@ -14,11 +14,11 @@
 - **Elongation is the clean positive result.** Anisotropy stretches the tumour shape in 98 of 103 patients.
 - **D_f is not a valid anisotropy metric here.** It goes the wrong way. Tumours are about 120-140 px, so box counting measures size. Drop D_f.
 - **Tract alignment goes the wrong way too** (0.45 vs 0.50, 1/103 higher). This was not in the vault before. Do not claim that anisotropic growth "aligns better with tracts" without explaining this. Likely cause: not checked. State it as an open question.
-- At 600 d, elongation is 1.56 vs 1.13 (from `NEGATIVES_REVISITED.md`; the 600 d JSON block was not re-read).
+- At 600 d, elongation is 1.56 vs 1.13 (checked2026-10-19 in output/fractal_aniso_vs_iso.json:secondary.elongation_600d, mean1.5592 vs1.1284,99/103 higher; paired simulation).
 - Elongation here is on the **patient-tensor model**. Script 78 shows elongation changes sign across horizons in a different setup. Keep the two separate.
 
 ## README claim that is retracted
 README says "D_f = 1.20-1.55 vs isotropic ~0.0, Cohen's d = 10.43". Script 74 replaces it. Do not cite the README value.
 
 ## Script 42 note
-Script 42's D_f median is 0.909 and 0/103 patients exceed 1.2.
+Historical script42 median0.909/0-of103-above1.2 claim is unverified here; exact source output and keys are missing. It does not affect the supported script74 retraction above.

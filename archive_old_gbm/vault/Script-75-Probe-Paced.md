@@ -4,6 +4,8 @@
 
 **Source:** `output/probe_paced_policies/evaluate.json` (script `src/75_probe_and_paced_policies.py`). Budget 35.0, horizon 365 d, progression factor 1.4. Values read from the JSON on 2026-10-04.
 
+All policy gains below are assumed-kill simulations, including real_test fitted-growth cases, not observed treatment benefits.
+
 ## Paced heuristic (arm `paced_heuristic59`), equal drug budget
 | Set | n | Day-90 win | TTP minus Stupp, days (95% CI) | longer / equal / shorter | Wilcoxon p |
 |---|---|---|---|---|---|
@@ -25,10 +27,10 @@
 | `probe_dagger_ttp` (TTP-trained) | 70% (TTP +58.9 d) | 60 / 40 / 55 (TTP +46 to +53 d) |
 | blind `ppo66` | 25% | 25% |
 
-- Noise-free is 100%. Under realistic noise it falls to about 62%.
-- Kill rates are identifiable from daily noise-free volumes, not from clinical volumetry (about 5-10% CV, from `NEGATIVES_REVISITED.md`).
+- Noise-free is 100%. Under assumed multiplicative sigma=.10 noise in cohort64 it falls to about62%; this is not a clinically calibrated noise level.
+- Model-internal kill estimation works under stated noise-free simulated observations. Clinical identifiability and the old5–10% CV range are not established without a measurement/calibration source.
 - On lhs60 and real_test the win rate under noise falls to 11-46% (from `NEGATIVES_REVISITED.md`; not re-derived here).
-- Frame as an identifiability result, not a deployable policy.
+- Frame as a model-internal noise/estimation sensitivity, not a clinical identifiability result or deployable policy.
 
 ## Label correction (2026-10-04)
-`real_test` uses real fitted growth rates but the same assumed kill rates [0, 0.05, 0.08, 0.13] for all 21 patients. Figures now label it "real growth, assumed kill". Median kill/rho is 77.7 there vs 2.7-12.5 in the synthetic sets (script 87), which explains the small +2.1 d gain.
+`real_test` uses real fitted growth rates but the same assumed kill rates [0, 0.05, 0.08, 0.13] for all 21 patients. Figures now label it "real growth, assumed kill". Median kill/rho is 77.7 there vs 2.7-12.5 in the synthetic sets (`output/limit_checks.json:L14_real_vs_synthetic.<set>.kill_over_rho_median`, real_test77.6603, cohort642.74386,lhs606.59535,synth_test12.49275). This model-input contrast is consistent with the small gain, not a demonstrated causal explanation.

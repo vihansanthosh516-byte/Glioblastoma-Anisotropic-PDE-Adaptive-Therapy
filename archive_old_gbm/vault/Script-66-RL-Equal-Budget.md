@@ -4,7 +4,9 @@
 
 **Status:** Committed (95a73a1, a5cbb6a, 697c470)
 
-## Key Results
+## Original legacy-run results (not the Swanson rerun)
+
+Source `output/rl_equal_budget/evaluate.json:sets.lhs30`: stupp,heuristic59,ppo_final_s0/s1/s2,bc_dagger_final; fields mean_final_mm3,win_rate_final_pct,mean_auc. This assumed-treatment LHS30 simulation is distinct from cohort64 and the later Swanson rerun (separate directory).
 
 | Arm | Win % | Mean final volume | Drug AUC |
 |---|---|---|---|
@@ -14,14 +16,14 @@
 | DAgger from oracle | 100% | 11.43 mm³ | 35.0 |
 | Legacy-reward PPO | 0% | 14.89 mm³ | 34.9 |
 
-Held-out real patients (n=21): PPO wins 95%, DAgger wins 100%.
+Simulated evaluation of21 fitted-growth real_test cases with assumed kill rates: PPO about95.2% on day-90 volume, DAgger100%. No measured drug efficacy or TTP advantage follows.
 
 ## Four Findings
 
-1. **RL beats Stupp at equal budget** — 100% win rate
+1. **Original LHS30 simulation** — listed final-volume PPO arm wins100%; blind cohort64 only25% in the separate conditioned-policy evaluation
 2. **Winning policies are fixed schedules, not adaptive** — PPO converges to "combo from day 1", DAgger to "combo days 1-35"
 3. **The model has no adaptive advantage** — single homogeneous population, no clonal competition
-4. **Day-90 volume is a poor metric** — the "optimal" schedule leaves tumor untreated for 55 days
+4. **Endpoint tradeoff in this simulation** — the historical55-day untreated interpretation requires exact schedule/action output; final-volume optimization does not establish TTP benefit.
 
 ## Model issues found
 
@@ -31,7 +33,7 @@ Held-out real patients (n=21): PPO wins 95%, DAgger wins 100%.
 ## Literature
 
 Adaptive therapy requires clonal competition (Gatenby 2009, Leder 2014). 
-Our model lacks this structure, so adaptive control has nothing to exploit.
+This selected model lacks that competition structure; it does not establish that all adaptive policies lack benefit in other models or patients.
 
 ## Files
 
