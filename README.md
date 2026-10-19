@@ -14,8 +14,11 @@ RANO 2.0 calls progression at a tumour volume rise of 40% or more and partial re
 | A19: simulation anchored to a published repeat-scan study (change-SD 0.14 to 0.34) | Earlier PFS by 7.6 to 20.4 weeks and power loss 0.20 to 0.82 (N=100, 8-week scans, single-scan rule); two-scan rule roughly halves the bias | One study, 20 patients, large tumours, BraTumIA not our tools; assumed RC%-to-SD conversion | `output/anchored_sim/anchored_sim_summary.json`, ledger 2bu |
 | A16: trial simulation | Noise makes PFS earlier and cuts power a lot (N=100, D=8: power 0.97 with no noise, 0.29 at s=0.25, 0.05 at s=1.0). Two of four declared predictions NOT supported (H-S3, H-S4) | Effect sizes depend on the assumed noise model. Simulation, assumed parameters | `output/trial_sim/trial_sim_summary.json`, ledger 2bs |
 
+## Tool
+`python src/rano_calc.py V0_mm3 V1_mm3 [s]` gives the probability that the true change is progression, response or stable, and the minimal detectable change (`src/rano_calc.py`, tests `tests/test_rano_calc.py`, ledger 2bv). Model-based; not for clinical use. Pass the nadir volume as V0 for progression.
+
 ## Not done
-Calculator, patient timeline viewer, paper, poster. Novelty is unverified (about 15 snippet-level searches). Nothing here is a clinical claim.
+Patient timeline viewer, paper, poster. Novelty is unverified (about 15 snippet-level searches). Nothing here is a clinical claim.
 
 ## Files
 `START_HERE.md` (state and rules), `analysis_plan_v1.md` (declarations), `vault/PAPER_FINDINGS_LEDGER.md` (results), `paper/` (plans), `src/140_*`, `src/141_*` (current scripts), `archive_old_gbm/` (old GBM documents), `CLAUDE.md` (run commands).
