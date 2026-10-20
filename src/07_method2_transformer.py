@@ -100,8 +100,15 @@ y_train_t = torch.from_numpy(y_train).long()
 X_test_t  = torch.from_numpy(X_test).float()
 y_test_t  = torch.from_numpy(y_test).long()
 # Validation split carved from TRAIN (10%, stratified, seed 42): the epoch is chosen on validation; the test set is scored once.
-from sklearn.model_selection import train_test_split as _tts
-_tr_i, _va_i = _tts(np.arange(len(y_train_t)), test_size=0.10, random_state=42, stratify=y_train_t.numpy())
+from sklearn.model_selection import train_test_split as _tts, StratifiedGroupKFold as _sgkf
+if SPLIT_MODE == "patient":
+    # Patient mode: validation is grouped by patient, so no donor is in both train and validation.
+    _pid = np.load(os.path.join(OUT_DIR, "nn_patient_ids.npy"), allow_pickle=True)[train_mask]
+    _tr_i, _va_i = next(_sgkf(n_splits=10, shuffle=True, random_state=42).split(np.zeros(len(y_train_t)), y_train_t.numpy(), _pid))
+    assert not (set(_pid[_tr_i]) & set(_pid[_va_i])), "patient overlap between train and validation"
+    print(f"patient-grouped validation: {len(set(_pid[_va_i]))} patients, {len(_va_i)} cells", flush=True)
+else:
+    _tr_i, _va_i = _tts(np.arange(len(y_train_t)), test_size=0.10, random_state=42, stratify=y_train_t.numpy())
 X_val_t, y_val_t = X_train_t[_va_i], y_train_t[_va_i]
 X_train_t, y_train_t = X_train_t[_tr_i], y_train_t[_tr_i]
 

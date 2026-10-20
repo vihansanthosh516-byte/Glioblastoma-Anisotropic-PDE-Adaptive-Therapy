@@ -99,8 +99,16 @@ split_map = dict(zip(split_df["index"], split_df["split"]))
 train_mask = np.array([split_map.get(i, "train") == "train" for i in range(len(y))])
 test_mask = ~train_mask
 # Validation cells carved from TRAIN (10%, stratified, seed 42); epoch chosen on validation, test scored once.
-from sklearn.model_selection import train_test_split as _tts
-_tr_i, _va_i = _tts(np.where(train_mask)[0], test_size=0.10, random_state=42, stratify=y[train_mask])
+from sklearn.model_selection import train_test_split as _tts, StratifiedGroupKFold as _sgkf
+if SPLIT_MODE == "patient":
+    # Patient mode: validation grouped by patient, so no donor is in both train and validation.
+    _tri = np.where(train_mask)[0]
+    _pid = np.load(os.path.join(ROOT, "output", "nn_patient_ids.npy"), allow_pickle=True)[_tri]
+    _a, _b = next(_sgkf(n_splits=10, shuffle=True, random_state=42).split(np.zeros(len(_tri)), y[_tri], _pid))
+    assert not (set(_pid[_a]) & set(_pid[_b])), "patient overlap between train and validation"
+    _tr_i, _va_i = _tri[_a], _tri[_b]
+else:
+    _tr_i, _va_i = _tts(np.where(train_mask)[0], test_size=0.10, random_state=42, stratify=y[train_mask])
 val_mask = np.zeros_like(train_mask); val_mask[_va_i] = True
 train_mask = np.zeros_like(train_mask); train_mask[_tr_i] = True
 

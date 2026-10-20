@@ -94,13 +94,21 @@ if SPLIT_MODE == "cell":
 else:
     from sklearn.model_selection import StratifiedGroupKFold
     _pf = os.path.join(RES_DIR, "cvae_patient_full.npy")
+    if not os.path.exists(_pf):  # script 11 never ran at 140k; use the same 15k-cell patient IDs as scripts 05/07/08/13
+        _pf = os.path.join(OUT_DIR, "nn_patient_ids.npy")
     if not os.path.exists(_pf):
         raise SystemExit(f"patient split needs {_pf} (written by script 11); not found")
     groups = np.load(_pf, allow_pickle=True).astype(str)
     train_idx, test_idx = next(StratifiedGroupKFold(n_splits=5, shuffle=True, random_state=42).split(np.arange(n_cells), y, groups))
     assert not (set(groups[train_idx]) & set(groups[test_idx])), "patient overlap between train and test"
 # Validation cells carved from TRAIN (10%, stratified, seed 42); epoch chosen on validation, test scored once.
-train_idx, val_idx = train_test_split(train_idx, test_size=0.10, random_state=42, stratify=y[train_idx])
+if SPLIT_MODE == "patient":
+    # Patient mode: validation grouped by patient, so no donor is in both train and validation.
+    _a, _b = next(StratifiedGroupKFold(n_splits=10, shuffle=True, random_state=42).split(np.zeros(len(train_idx)), y[train_idx], groups[train_idx]))
+    assert not (set(groups[train_idx[_a]]) & set(groups[train_idx[_b]])), "patient overlap between train and validation"
+    train_idx, val_idx = train_idx[_a], train_idx[_b]
+else:
+    train_idx, val_idx = train_test_split(train_idx, test_size=0.10, random_state=42, stratify=y[train_idx])
 train_mask = torch.zeros(n_cells, dtype=torch.bool)
 train_mask[train_idx] = True
 val_mask = torch.zeros(n_cells, dtype=torch.bool)
