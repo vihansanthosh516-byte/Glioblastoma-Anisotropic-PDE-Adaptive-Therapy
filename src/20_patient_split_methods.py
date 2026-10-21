@@ -92,6 +92,7 @@ def run_method(name, grid, fn):
     per_seed = []
     for s in SEEDS:
         pred = fn(Xtr, ytr, Xte, best, s)
+        np.savez(os.path.join(RES, f"pred_seed{s}_{name}.npz"), y_true=yte, y_pred=pred, test_index=test_rows)
         per_seed.append({"seed": s, "accuracy": accuracy_score(yte, pred),
                          "macro_f1": macro_f1(yte, pred),
                          "balanced_accuracy": balanced_accuracy_score(yte, pred)})

@@ -35,16 +35,17 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import seaborn as sns
 # GLOBAL_SEED_2026_10_19: fixed seed added by the audit corrections (legacy script was unseeded); outputs from earlier runs came from unseeded runs.
+_SEED = int(os.environ.get("GBM_SEED", "42"))  # seed sweep; default 42
 import random as _random_seed
-_random_seed.seed(42)
+_random_seed.seed(_SEED)
 try:
     import numpy as _np_seed
-    _np_seed.random.seed(42)
+    _np_seed.random.seed(_SEED)
 except ImportError:
     pass
 try:
     import torch as _torch_seed
-    _torch_seed.manual_seed(42)
+    _torch_seed.manual_seed(_SEED)
 except ImportError:
     pass
 
@@ -233,6 +234,7 @@ with torch.no_grad():
 
 # Metrics
 acc = accuracy_score(true, pred)
+np.savez(os.path.join(RES_DIR, f"test_predictions_gat13_seed{_SEED}.npz"), y_true=true, y_pred=pred, test_index=np.where(test_mask)[0])
 macro_f1 = f1_score(true, pred, average="macro")
 weighted_f1 = f1_score(true, pred, average="weighted")
 prec, rec, _, _ = precision_recall_fscore_support(true, pred, average="macro")
