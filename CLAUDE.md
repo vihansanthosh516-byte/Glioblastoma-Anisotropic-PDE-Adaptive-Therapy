@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**Read `START_HERE.md` first.** CURRENT PROJECT (2026-10-18): "probabilistic RANO" (measurement noise of RANO 2.0 volume lines and its effect on PFS and trial power; see `START_HERE.md`, `analysis_plan_v1.md` Amendments 14-21, `paper/phd_level_plan_probabilistic_rano.md`). The four tracks below are the OLDER GBM platform: background, not the goal. Old files that say "first", "novel" or "revolutionary" are not supported.
+**Read `START_HERE.md` first.** Current scope (2026-10-20): personal computational-biology research, not currently an ISEF/GARSEF submission. Current project is "probabilistic RANO" (measurement noise of RANO 2.0 volume lines and its effect on PFS and trial power; see `START_HERE.md`, `analysis_plan_v1.md` Amendments 14-21, `paper/phd_level_plan_probabilistic_rano.md`). Latest decision is to narrow: the basic false-progression-by-visit calculation is routine, and the project has no scan-rescan noise estimate from its own pipeline. A QIN-GBM feasibility gate may precede any Amendment 22; no access request or Amendment 22 exists yet. The four tracks below are the OLDER GBM platform: background, not the goal. Old files that say "first", "novel" or "revolutionary" are not supported.
 
 Older platform: four tracks, 159 numbered top-level source files (maximum prefix 145, with collisions), 208 top-level and 217 recursive source `.py` files, counted 2026-10-19; file counts do not establish safe runnable pipelines:
 
@@ -162,5 +162,5 @@ The author gives Claude's overviews, numbers and claims to ChatGPT for an indepe
 ## Past work is not automatically good (user rule, 2026-10-18)
 - Do not assume something is good, correct or worth keeping because it was already built, committed, or reported in the ledger. Judge it on evidence and on whether it serves the current goal.
 - Discarding the existing work and starting over is acceptable to the user. Say so plainly when it is the better choice. Do not defend sunk cost.
-- Current goal (set 2026-10-18): a completely new, strong project in computational biology with substantial mathematics, for the Greater Austin Regional Science and Engineering Fair (GARSEF), with a February 2027 deadline. Chosen project: probabilistic RANO (see `START_HERE.md`). Findings must be backed by solid science. Claims of novelty must say how they were checked and what is unverified.
+- Current scope (updated 2026-10-20): personal computational-biology research, not currently an ISEF/GARSEF submission. The user may switch or clear chats; `START_HERE.md` is the durable project handoff and must be updated when the research decision or next step changes. The project is probabilistic RANO. Findings must be backed by solid science. Claims of novelty must say how they were checked and what is unverified.
 - Presentation rule from the user: show best real results, do not advertise failures, never fabricate. Answer questions on limits fully when asked.
