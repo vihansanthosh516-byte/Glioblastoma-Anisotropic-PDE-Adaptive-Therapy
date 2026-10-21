@@ -11,10 +11,11 @@ Operational details fixed here, before the first run (they only make A15.2-A15.4
     flip = classes differ. Patient-cluster bootstrap, 10,000 draws, seed 20261018. Reading: lower CI >= 0.20 material;
     upper CI <= 0.10 robust; else inconclusive.
   * Test 2 (A15.4): d = dlnV(HD) - dlnV(DBT). Size band = tertile (edges from eligible pairs) of the smaller of the two scans'
-    tool-geometric-mean volumes. Upper noise bound s_up = 1.4826 MAD(d) / sqrt(2). Lower noise bound from UPenn expert correction
-    (region enhancing, rows without skip): median |ln(V_ai/V_rad)| per band (band by geometric mean of V_ai and V_rad, same
-    edges) / 0.6745 = per-scan SD, times sqrt(2) = change SD. MDC95 = 1.96 s. Line = ln(1.40) = 0.3365.
-    Reading: bracket = [min, max] of the two MDC95; max < line -> above the noise; min > line -> inside the noise; else undetermined.
+    tool-geometric-mean volumes. Cross-tool proxy s_cross = 1.4826 MAD(d) / sqrt(2), under independent tool errors; correlation
+    can make it lower than either marginal error, and changing label definitions can add disagreement. Expert-correction proxy
+    from UPenn (region enhancing, rows without skip): median |ln(V_ai/V_rad)| per band (band by geometric mean of V_ai and
+    V_rad, same edges) / 0.6745 = per-scan SD, times sqrt(2) = change SD. This is not guaranteed to be a lower bound on
+    scan-rescan noise. MDC95 = 1.96 s. Compare both proxy estimates with line = ln(1.40) = 0.3365; do not call them bounds.
 Run once. No re-run with other thresholds, floors or definitions.
 Output: output/rano_noise/rano_tool_dependence.json, rano_pairs.csv
 """
@@ -147,9 +148,12 @@ def main():
         s_low = float(np.sqrt(2) * (u.median() / 0.6745)) if len(u) else float("nan")
         mdc_up, mdc_low = 1.96 * s_up, 1.96 * s_low
         lo_b, hi_b = min(mdc_up, mdc_low), max(mdc_up, mdc_low)
-        reading = ("above the noise" if hi_b < LINE_LN else "inside the noise" if lo_b > LINE_LN else "undetermined")
+        reading = ("above both proxy MDC estimates" if hi_b < LINE_LN
+                   else "below both proxy MDC estimates" if lo_b > LINE_LN
+                   else "proxy estimates straddle the line")
         t2["bands"][str(b)] = {"n_pairs": int(len(d)), "n_patients": int(df.loc[df["band"] == b, "Patient"].nunique()),
                                "median_vsize_mm3": float(df.loc[df["band"] == b, "vsize"].median()),
+                               # Legacy names retained for the saved A15 schema; values are proxy estimates, not bounds.
                                "s_change_upper_bound": float(s_up), "mdc95_upper_bound_ln": float(mdc_up),
                                "mdc95_upper_bound_pct": float(np.expm1(mdc_up) * 100),
                                "upenn_n_scans": int(len(u)), "s_change_lower_bound": s_low, "mdc95_lower_bound_ln": float(mdc_low),
@@ -157,8 +161,8 @@ def main():
                                "bracket_ln": [float(lo_b), float(hi_b)], "reading": reading}
     res["TEST2_mdc_vs_progression_line"] = t2
     res["weakest_points"] = [
-        "Two automated tools with different label definitions are not a scan-rescan pair; the upper bound includes definition differences that change over time.",
-        "UPenn expert correction anchors on the AI mask, so the lower bound understates independent noise.",
+        "Two automated tools with different label definitions are not a scan-rescan pair; cross-tool disagreement can include definition differences and can underestimate marginal error when tool errors correlate.",
+        "UPenn expert correction anchors on the AI mask and does not establish a lower bound on scan-rescan noise.",
         "LUMIERE is one centre; expert ratings are 2D RANO at selected follow-ups and are relative to baseline or nadir, not to the previous scan.",
         "Exploratory on public data; aggregate noise summaries (script 104) were seen before the declaration."]
     OUT.mkdir(parents=True, exist_ok=True)

@@ -11,11 +11,11 @@ select{background:var(--card);color:var(--fg);border:1px solid var(--bd);border-
 #a,#b{margin:0 8px}footer{padding:14px 18px;color:var(--mut);font-size:12.5px;border-top:1px solid var(--bd)}
 </style></head><body>
 <header><h1>Probabilistic RANO: volume timeline with uncertainty bands</h1>
-<div class="warn">Display of model-based quantities only. model-based, noise bracket from one centre (LUMIERE, 2 tools); not a diagnosis; not for clinical use.</div></header>
+<div class="warn">Display of model-based quantities only. model-based proxy sensitivity scenarios from one centre (LUMIERE, 2 tools), not formal noise bounds; not a diagnosis; not for clinical use.</div></header>
 <div class="bar"><label>Patient <select id="pat"></select></label><label>Tool <select id="tool"></select></label><span id="cnt" class="warn"></span></div>
 <div class="cards" id="cards"></div>
 <div id="a" style="height:430px"></div><div id="b" style="height:250px"></div>
-<footer>Bands: inner = low end, outer = high end of the noise bracket from LUMIERE (HD-GLIO-AUTO versus DeepBraTumIA disagreement is the high end; expert correction of an AI mask is the low end, near zero for larger tumours, so the inner band may collapse). Probabilities: chance that the true change from the nadir (smallest earlier volume of the same tool, at least 500 mm3) is +40% or more, flat prior, normal error. The 500 mm3 floor is our own operational rule, not a RANO 2.0 rule. Expert ratings are LUMIERE 2D RANO ratings. Display of model-based quantities only. model-based, noise bracket from one centre (LUMIERE, 2 tools); not a diagnosis; not for clinical use.</footer>
+<footer>Bands show low and high ends of two proxy sensitivity scenarios from LUMIERE: cross-tool disagreement and AI-anchored expert correction. Neither is a formal bound on scan-rescan noise; the expert-correction proxy is near zero for larger tumours, so the inner band may collapse. Probabilities: chance that the true change from the nadir (smallest earlier volume of the same tool, at least 500 mm3) is +40% or more, flat prior, normal error. The 500 mm3 floor is our own operational rule, not a RANO 2.0 rule. Expert ratings are LUMIERE 2D RANO ratings. Display of model-based quantities only. model-based proxy sensitivity scenarios from one centre (LUMIERE, 2 tools), not formal noise bounds; not a diagnosis; not for clinical use.</footer>
 <script>/**
 * plotly.js v4.0.0
 * Copyright 2012-2026, Plotly, Inc.
@@ -3640,8 +3640,8 @@ function render(){
   tr.push({x:S.filter(r=>r.eligible).map(r=>r.wk),y:S.filter(r=>r.eligible).map(r=>{const e=S.filter(q=>q.eligible&&q.wk<=r.wk).map(q=>q.vol);return Math.min(...e)}),mode:'lines',line:{color:c,dash:'dot',width:1.5,shape:'hv'},name:TOOLS[t]+' nadir',hoverinfo:'skip'});
   tr.push({x:S.filter(r=>r.eligible).map(r=>r.wk),y:S.filter(r=>r.eligible).map(r=>{const e=S.filter(q=>q.eligible&&q.wk<=r.wk).map(q=>q.vol);return 1.4*Math.min(...e)}),mode:'lines',line:{color:c,dash:'dash',width:1,shape:'hv'},name:TOOLS[t]+' +40% line',hoverinfo:'skip'});
   S.filter(r=>r.rating&&r.vol!=null).forEach(r=>{tr.push({x:[r.wk],y:[r.vol],mode:'text',text:[r.rating],textposition:'top center',showlegend:false,hoverinfo:'skip',textfont:{size:11,color:'#888'}})});
-  bars.push({x:nx.map(r=>r.wk),y:nx.map(r=>r.p_pd_hi),type:'bar',name:TOOLS[t]+' P(PD) high noise',marker:{color:c+'66'},text:nx.map(r=>'det. class '+r.det+'<br>P(PD) low '+r.p_pd_lo.toFixed(2)+' / high '+r.p_pd_hi.toFixed(2)+'<br>P(PR) low '+r.p_pr_lo.toFixed(2)+' / high '+r.p_pr_hi.toFixed(2)+'<br>change-SD bracket '+r.s_lo.toFixed(2)+' to '+r.s_hi.toFixed(2)),hoverinfo:'text'});
-  bars.push({x:nx.map(r=>r.wk),y:nx.map(r=>r.p_pd_lo),type:'bar',name:TOOLS[t]+' P(PD) low noise',marker:{color:c},hoverinfo:'skip'});
+  bars.push({x:nx.map(r=>r.wk),y:nx.map(r=>r.p_pd_hi),type:'bar',name:TOOLS[t]+' P(PD) higher proxy SD',marker:{color:c+'66'},text:nx.map(r=>'det. class '+r.det+'<br>P(PD) low '+r.p_pd_lo.toFixed(2)+' / high '+r.p_pd_hi.toFixed(2)+'<br>P(PR) low '+r.p_pr_lo.toFixed(2)+' / high '+r.p_pr_hi.toFixed(2)+'<br>change-SD proxy span '+r.s_lo.toFixed(2)+' to '+r.s_hi.toFixed(2)),hoverinfo:'text'});
+  bars.push({x:nx.map(r=>r.wk),y:nx.map(r=>r.p_pd_lo),type:'bar',name:TOOLS[t]+' P(PD) lower proxy SD',marker:{color:c},hoverinfo:'skip'});
   const pd=nx.filter(r=>r.det==='PD').length, unsure=nx.filter(r=>r.p_pd_hi>0.05&&r.p_pd_hi<0.95).length;
   cards+='<div class="card"><b>'+TOOLS[t]+'</b>: '+el.length+' measurable scans, '+nx.length+' with a nadir; deterministic PD '+pd+'; calls uncertain at the high end (P between 0.05 and 0.95): '+unsure+'</div>';
  });

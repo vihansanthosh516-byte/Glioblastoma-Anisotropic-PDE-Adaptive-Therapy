@@ -9,11 +9,11 @@ Architecture:
 - Trained on 15k balanced cells (5k per class)
 - 80/20 train/test split (same as other methods for fair comparison)
 
-NOTE (2026-10-19 audit): historical Track A script. The split is per cell, not patient-held-out, and test accuracy is
-evaluated every epoch with the checkpoint saved when test accuracy improves, so the reported accuracy is selected on
-the test set (optimistic). No random seed is set. Needs torch, torch_geometric and anndata (not in Requirements.txt).
-The edge attributes come from script 12 and encode tissue-label information (see its note). Paths now derive from __file__.
-The (15000, 32) latent shape is an assumption, not checked.
+NOTE (2026-10-20 audit): historical Track A script. Current code selects epochs on validation data and scores test once.
+Default cell split is not patient-held-out and permits patient overlap; optional patient mode exists but saved root metrics
+are historical. Seed defaults to 42 (GBM_SEED can vary it). Edge attributes from script 12 encode tissue-label
+information, so this graph remains label-leaky for classification. Needs torch, torch_geometric and anndata.
+Paths derive from __file__. The (15000, 32) latent shape is assumed, not checked.
 """
 import os, time, gc, json
 try:

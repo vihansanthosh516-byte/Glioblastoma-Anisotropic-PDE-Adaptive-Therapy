@@ -16,8 +16,9 @@ Summary: median, IQR, patient-bootstrap CI of the median (10,000 draws), overall
 Pairing: the AI and corrected SEG of a study must reference the same source series and have the same geometry
 (orientation, pixel spacing, rows, columns); frames are matched by their ImagePositionPatient. Others are counted
 and excluded.
-Weakest points (stated before the run): expert correction of an AI mask is anchored on that mask, so it understates
-independent rater disagreement; same scan, so scanner/registration noise between visits is not included; the AI
+Weakest points (stated before the run): expert correction is anchored on an AI mask and does not estimate independent-rater
+agreement or scan-rescan variability; the direction of its difference from either quantity is not established; same scan,
+so scanner/registration noise between visits is not included; the AI
 tool (AIMI/BAMF) differs from the MU and LUMIERE pipelines; 55 patients, 2 raters, no rater overlap.
 Input : data/external/upenn_gbm/seg/ (DICOM-SEG from IDC), data/external/upenn_gbm/seg_series.csv
 Output: output/upenn_rater_noise.json, output/upenn_rater_noise_scans.csv (+ manifest)
@@ -159,7 +160,7 @@ def main():
                 blk["volume_floor_ln_A6.5_analogue"] = blk["abs_ln_ratio"]["median"] / 2
             res["summary"].setdefault(reg, {})[sub] = blk
     res["weakest_points"] = [
-        "Correction of an AI mask is anchored on that mask: understates independent rater disagreement.",
+        "Correction is anchored on an AI mask; independent-rater agreement and scan-rescan variability are not estimated.",
         "Same scan: no between-visit scanner or registration noise.",
         "AIMI/BAMF tool differs from MU and LUMIERE pipelines; 55 patients, 2 radiologists, no overlap between them."]
     (OUT / "upenn_rater_noise.json").write_text(json.dumps(res, indent=1, default=float))

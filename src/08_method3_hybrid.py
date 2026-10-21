@@ -13,6 +13,11 @@ Architecture:
     as a static bias to the attention logits before softmax
   - This injects the "statistical knowledge" from Method 1 into Method 2
   - Final classification head same as before
+
+Audit scope: current code selects epochs on validation data and scores the test
+set once. Default cell split allows patient overlap; patient split is optional
+and exploratory with five held-out patients. Root output metrics are historical.
+The first 100 source-ordered genes are not necessarily the top HVGs.
 """
 import os, time, json, gc
 try:

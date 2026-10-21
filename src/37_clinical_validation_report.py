@@ -2,9 +2,9 @@
 """
 Month 5, Week 3: Observational Association Report Generation
 
-Synthesizes the real TCGA-GBM survival analysis (scripts 35-36) and the
-spatial therapeutic indices (scripts 33-34) into a historical observational
-clinical validation report.
+Summarizes real TCGA-GBM clinical covariates and spatial therapeutic indices.
+Gene-expression values from script 35 are synthetic, so gene-survival
+associations are not observed TCGA expression results. This is not validation.
 """
 
 from __future__ import annotations
@@ -115,25 +115,25 @@ def generate_report(survival_data: Dict, univariate: List[Dict], dual_ko: List[D
     with open(output_path, "w", encoding="utf-8") as f:
         f.write("# Observational Association Report — Track A\n\n")
         f.write(f"**Generated:** {time.strftime('%Y-%m-%d %H:%M:%S')}\n")
-        f.write("**Cohort:** Real TCGA-GBM (cBioPortal clinical data)\n\n")
+        f.write("**Cohort:** TCGA-GBM clinical covariates (cBioPortal); gene-expression values are synthetic and gene-survival associations are not observed TCGA results. This report is not clinical validation.\n\n")
         f.write("---\n\n")
 
         # Executive Summary
         f.write("## Executive Summary\n\n")
         f.write(
-            f"Clinical survival analysis on **{n_patients} real TCGA-GBM patients** "
-            f"({n_events} events, median OS {median_os:.0f} days). "
+            f"Survival summary on **{n_patients} TCGA-GBM patients** "
+            f"({n_events} events, median OS {median_os:.0f} days). Any gene-expression association uses synthetic expression, not observed TCGA RNA-seq. "
         )
         if sig_covs:
             cov_names = ", ".join(r.get("covariate", r.get("gene", "?")) for r in sig_covs)
-            f.write(f"Significant univariate predictors (p < 0.05): **{cov_names}**.\n\n")
+            f.write(f"Nominal univariate associations in this mixed synthetic/clinical analysis (p < 0.05; not validation): **{cov_names}**.\n\n")
         else:
             f.write("No univariate predictor reached p < 0.05.\n\n")
 
         if top_cov:
             top_name = top_cov.get("covariate", top_cov.get("gene"))
             f.write(
-                f"**Strongest signal:** {top_name} — "
+                f"**Smallest univariate p-value (exploratory):** {top_name} — "
                 f"HR = {top_cov['cox_hr']:.3f} "
                 f"(95% CI {top_cov['cox_ci_lower']:.3f}-{top_cov['cox_ci_upper']:.3f}), "
                 f"p = {top_cov['cox_p']:.2e}.\n\n"
@@ -169,13 +169,13 @@ def generate_report(survival_data: Dict, univariate: List[Dict], dual_ko: List[D
             f"({100*n_events/max(n_patients,1):.0f}% event rate)\n"
         )
         f.write(
-            f"- **Significant univariate predictors (p < 0.05):** "
+            f"- **Nominal associations in this mixed synthetic/clinical analysis (p < 0.05):** "
             f"{len(sig_covs)} / {len(univariate)}\n"
         )
         if top_cov:
             top_name = top_cov.get("covariate", top_cov.get("gene"))
             f.write(
-                f"- **Top predictor:** {top_name} "
+                f"- **Top exploratory association:** {top_name} "
                 f"(HR = {top_cov['cox_hr']:.3f}, p = {top_cov['cox_p']:.2e})\n"
             )
         f.write("\n### Interpretation\n\n")
@@ -204,7 +204,7 @@ def generate_report(survival_data: Dict, univariate: List[Dict], dual_ko: List[D
 
 def main():
     print("=" * 60)
-    print("CLINICAL VALIDATION REPORT")
+    print("HISTORICAL OBSERVATIONAL SUMMARY (NOT VALIDATION)")
     print("=" * 60)
 
     survival_data = load_survival_summary()

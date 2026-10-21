@@ -15,7 +15,7 @@ Question: are the RANO 2.0 volume lines (progression at +40%, partial response a
 | Item | State | Source |
 |---|---|---|
 | A15 test 1: consecutive-scan ratio class differs between the two tools | DONE. 54.5% of 121 eligible pairs (CI 45.6% to 63.8%), "material" | `output/rano_noise/rano_tool_dependence.json`, ledger 2br |
-| A15 test 2: minimal detectable change vs the +40% line | DONE. Smallest size band: inside the noise. Two larger bands: undetermined (noise lower bound is degenerate) | same |
+| A15 test 2: minimal detectable change vs the +40% line | DONE. Both proxy MDC95 estimates exceed line in smallest size band; estimates straddle line in two larger bands. These are sensitivity scenarios, not formal noise bounds. | same |
 | A16 trial simulation (Aim 3) | DONE (simulation, assumed parameters). Noise makes PFS earlier and cuts power a lot (H-S1, H-S2 supported; H-S3, H-S4 NOT supported as declared) | `output/trial_sim/trial_sim_summary.json`, ledger 2bs |
 | Calculator (`src/rano_calc.py`) and patient timeline viewer (`output/viewer_rano/viewer_rano.html`) | DONE (display and arithmetic only) | ledger 2bv, 2bw |
 | Paper, poster | Author-reported not started as of 2026-10-18 | plan; no draft-status audit |

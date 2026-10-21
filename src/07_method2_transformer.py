@@ -4,8 +4,10 @@
 Method 2: Efficient Transformer Encoder baseline for CPU training.
 Uses the first N_GENES = 100 columns (code: X[:, :N_GENES]; an earlier note said
 500). Script 04 keeps source feature order, not HVG-rank order, so these are not
-necessarily the top HVGs. Test accuracy is read every epoch and the best epoch
-is reported (random cell split), so it is optimistic.
+necessarily the top HVGs. Current code selects the epoch on validation data and
+scores test once. Default cell split allows patient overlap; optional patient
+split is exploratory and has only five held-out patients. Saved root metrics
+are historical.
 """
 import os, time, json, gc
 try:

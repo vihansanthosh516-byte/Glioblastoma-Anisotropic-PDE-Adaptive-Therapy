@@ -19,8 +19,10 @@ Intent (original author notes; NOT demonstrated by this script, 2026-10-19 audit
     predictions (no ablation or comparison code).
   - No comparison against a 10,000-gene model is run here.
   - No test of agreement with DE markers beyond listing top weights.
-  - Test accuracy is read every epoch and the best epoch is reported, on a
-    random cell-level split (not patient-held-out), so it is optimistic.
+  - Current code selects the epoch on validation data and scores the test set
+    once. Default cell split still allows patient overlap and cannot establish
+    generalization to unseen patients. Optional patient split is exploratory
+    and has only five held-out patients. Saved root metrics are historical.
 
 Size: output/nn_metrics.json reports n_params = 488899 (the earlier "~3.2M"
 was wrong). No torch.save is called, so nn_model.pt is not produced here.

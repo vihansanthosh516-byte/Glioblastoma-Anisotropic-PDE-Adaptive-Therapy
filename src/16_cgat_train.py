@@ -4,7 +4,7 @@
 Train Edge-Aware GAT on FULL 140k-cell graph using full-batch training.
 No neighbor sampling needed - full graph fits in memory.
 
-NOTE (2026-10-19 audit): historical legacy Track A script. Test accuracy is evaluated every epoch and used for checkpoint selection ((UPDATED 2026-10-19: the epoch is now chosen on a validation split carved from train and test is scored once; the text in this sentence describes the older behaviour: the test set was part of model selection)); no torch seed is set; the split is per cell. Needs torch and torch_geometric (not in Requirements.txt). The root was a hard-coded WSL path and now derives from __file__.
+NOTE (2026-10-20 audit): historical legacy Track A script. Current code chooses the epoch on a validation split and scores test once; seed defaults to 42 (GBM_SEED can vary it). Default split is per cell; patient-grouped mode is available, but the old saved root outputs remain historical. Edge inputs from script 12 include tissue-label-derived features, so resulting GAT metrics are not valid as label-independent prediction evidence. Needs torch and torch_geometric. Project root derives from __file__.
 """
 import os, time, resource, gc, json
 import numpy as np

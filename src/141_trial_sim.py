@@ -1,6 +1,6 @@
 """Script 141: trial simulation, Amendment 16 (analysis_plan_v1.md).
 
-SIMULATION ONLY. All parameters are assumed or taken from the A15 noise bracket.
+SIMULATION ONLY. All parameters are assumed or taken from A15 proxy sensitivity scenarios.
 Implements A16.2 to A16.5 exactly. Run once; no re-runs with other settings (A16.6).
 Writes output/trial_sim/trial_sim_cells.csv and trial_sim_summary.json.
 """
@@ -27,7 +27,7 @@ THETAS = [1.0, 0.7]
 NS = [50, 100]
 DS = [8, 12]
 VOL_EDGES = (2503.39, 5118.34)       # mm3, A15 size bands
-VOL_SD = (1.286, 1.133, 0.718)       # A15 upper-bound change SD per band
+VOL_SD = (1.286, 1.133, 0.718)       # A15 cross-tool-derived change-SD proxy per band; not a noise upper bound
 CHI2_CRIT = 3.8415
 
 

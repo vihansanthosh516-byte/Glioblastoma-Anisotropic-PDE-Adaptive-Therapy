@@ -1,7 +1,7 @@
-# NOTE (2026-10-19 audit): historical legacy script; not part of the current RANO project. Model-based one-centre/two-tool noise bracket; not validated and not for clinical use. The 500 mm3 floor is a project operational choice, and backward mode assumes a flat prior with normal error.
+# NOTE (2026-10-19/20 audit): current RANO display/calculator; model-based proxy sensitivity span from one centre and two tools, not formal noise bounds; not validated and not for clinical use. The 500 mm3 floor is a project operational choice, and backward mode assumes a flat prior with normal error.
 """Probabilistic RANO calculator (Amendment 17, analysis_plan_v1.md).
 
-Model-based, noise bracket from one centre (LUMIERE, 2 tools); NOT for clinical use. Not validated on patients.
+Model-based proxy sensitivity span from one centre (LUMIERE, 2 tools); NOT for clinical use. Not validated on patients.
 Volumes in mm3. s = SD of the log-ratio (change) error, ln units, as in A15/A16.
 Thresholds: progression ratio >= 1.40, partial response ratio <= 0.35 (RANO 2.0). The 500 mm3 floor is an operational
 choice of this project, not a RANO 2.0 rule.
@@ -19,7 +19,7 @@ A15_JSON = PROJECT_ROOT / "output" / "rano_noise" / "rano_tool_dependence.json"
 PD_RATIO, PR_RATIO = 1.40, 0.35
 LN_PD, LN_PR = math.log(PD_RATIO), math.log(PR_RATIO)
 FLOOR_MM3 = 500.0
-LABEL = "model-based, noise bracket from one centre (LUMIERE, 2 tools); not for clinical use"
+LABEL = "model-based proxy sensitivity scenarios from one centre (LUMIERE, 2 tools); not formal noise bounds; not for clinical use"
 
 
 def _phi(x: float) -> float:
@@ -44,7 +44,7 @@ def size_band(v0: float, v1: float) -> int:
 
 
 def bracket(band: int) -> tuple[float, float]:
-    """(min, max) of the A15 upper- and lower-bound change SD for a band; read from the A15 file."""
+    """Legacy API: (min, max) of two A15 change-SD proxy estimates, not formal bounds."""
     b = _a15()["bands"][str(band)]
     lo, hi = sorted((b["s_change_upper_bound"], b["s_change_lower_bound"]))
     return float(lo), float(hi)
