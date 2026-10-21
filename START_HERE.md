@@ -3,7 +3,7 @@
 Read this file first. If another file disagrees with it, this file and `vault/PAPER_FINDINGS_LEDGER.md` win. This is an intentional repository instruction, not an empirical finding.
 
 ## 1. Current goal
-Personal computational-biology research, not currently an ISEF/GARSEF submission. The user may clear or switch chats; keep this file current so the project can resume without chat history. User has 20 hours/week, mentors, and a 16-core/34-GB desktop without a GPU. Do not promise a prize or certainty of success.
+Personal computational-biology research, not currently an ISEF/GARSEF submission. The user may clear or switch chats; keep this file current so the project can resume without chat history. User has 20 hours/week, mentors, a 16-core/34-GB desktop without a GPU, and Kaggle access for GPU runs. Check Kaggle quota, session limits, and dataset transfer needs before relying on a GPU; availability is not unlimited. Do not promise a prize or certainty of success.
 
 ## 2. Current project: "probabilistic RANO" (decision narrowed 2026-10-20)
 Question: are the RANO 2.0 volume lines (progression at +40%, partial response at -65%; progression is judged against the NADIR, response against baseline). The 0.5 cm3 volume floor used in our analysis is OUR operational choice. It is NOT in the RANO 2.0 text (checked 2026-10-18 in PMC11630866) above the measurement noise of automated segmentation in glioblastoma, and what does the noise do to trial endpoints (progression-free survival, PFS)?
