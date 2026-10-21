@@ -61,7 +61,7 @@ OUT_DIR = os.path.join(ROOT, "output")
 # GBM_SPLIT_MODE=patient: use the patient-disjoint split from script 04 and write all results under output/patient_split/
 # (the default "cell" mode is the original leaky random cell split and keeps the original output names).
 SPLIT_MODE = os.environ.get("GBM_SPLIT_MODE", "cell")
-RES_DIR = OUT_DIR if SPLIT_MODE == "cell" else os.path.join(OUT_DIR, "patient_split")
+RES_DIR = OUT_DIR if SPLIT_MODE == "cell" else os.path.join(OUT_DIR, "patient_split_seeds", f"seed{_SEED}")  # one folder per seed: no overwrite
 os.makedirs(RES_DIR, exist_ok=True)
 NPY_X   = os.path.join(OUT_DIR, "nn_X.npy")
 NPY_Y   = os.path.join(OUT_DIR, "nn_y.npy")
@@ -286,6 +286,9 @@ metrics = {
     "dropout":             DROPOUT,
     "lr":                  LR,
     "device":              DEVICE,
+    "seed":                _SEED,
+    "test_accuracy":       float((true == preds).mean()),
+    "test_n":              int(len(true)),
 }
 with open(TSV_METRICS, "w") as f:
     json.dump(metrics, f, indent=2)

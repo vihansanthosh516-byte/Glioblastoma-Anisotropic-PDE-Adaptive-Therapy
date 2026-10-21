@@ -40,13 +40,15 @@ ROOT = __import__("os").path.dirname(__import__("os").path.dirname(__import__("o
 OUT_DIR = os.path.join(ROOT, "output", "cgat")
 # GBM_SPLIT_MODE=patient: patient-disjoint split, results under output/cgat/patient_split/ (default "cell" keeps the original behaviour and names).
 SPLIT_MODE = os.environ.get("GBM_SPLIT_MODE", "cell")
-RES_DIR = OUT_DIR if SPLIT_MODE == "cell" else os.path.join(OUT_DIR, "patient_split")
+RES_DIR = OUT_DIR if SPLIT_MODE == "cell" else os.path.join(OUT_DIR, "patient_split_seeds", f"seed{_SEED}")  # one folder per seed: no overwrite
 os.makedirs(RES_DIR, exist_ok=True)
 
-EDGE_INDEX_PATH = os.path.join(RES_DIR, "gat_edge_index_full.npy")
-EDGE_ATTR_PATH = os.path.join(RES_DIR, "gat_edge_attr_full.npy")
-LATENT_PATH = os.path.join(RES_DIR, "cvae_latent_full.npy")
-LABELS_PATH = os.path.join(RES_DIR, "cvae_labels_full.npy")
+# upstream inputs (scripts 10-15) stay in the shared folder; only outputs are per-seed
+INPUT_DIR = OUT_DIR if SPLIT_MODE == "cell" else os.path.join(OUT_DIR, "patient_split")
+EDGE_INDEX_PATH = os.path.join(INPUT_DIR, "gat_edge_index_full.npy")
+EDGE_ATTR_PATH = os.path.join(INPUT_DIR, "gat_edge_attr_full.npy")
+LATENT_PATH = os.path.join(INPUT_DIR, "cvae_latent_full.npy")
+LABELS_PATH = os.path.join(INPUT_DIR, "cvae_labels_full.npy")
 
 MODEL_PATH = os.path.join(RES_DIR, "gat_full_model.pt")
 METRICS_PATH = os.path.join(RES_DIR, "gat_full_metrics.json")
@@ -94,7 +96,7 @@ if SPLIT_MODE == "cell":
     train_idx, test_idx = train_test_split(np.arange(n_cells), test_size=0.2, random_state=42, stratify=y)
 else:
     from sklearn.model_selection import StratifiedGroupKFold
-    _pf = os.path.join(RES_DIR, "cvae_patient_full.npy")
+    _pf = os.path.join(INPUT_DIR, "cvae_patient_full.npy")
     if not os.path.exists(_pf):  # script 11 never ran at 140k; use the same 15k-cell patient IDs as scripts 05/07/08/13
         _pf = os.path.join(OUT_DIR, "nn_patient_ids.npy")
     if not os.path.exists(_pf):

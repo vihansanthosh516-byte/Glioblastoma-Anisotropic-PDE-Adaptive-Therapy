@@ -53,12 +53,14 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 OUT_DIR = os.path.join(ROOT, "output", "cgat")
 # GBM_SPLIT_MODE=patient: patient-disjoint split, results under output/cgat/patient_split/ (default "cell" keeps the original behaviour and names).
 SPLIT_MODE = os.environ.get("GBM_SPLIT_MODE", "cell")
-RES_DIR = OUT_DIR if SPLIT_MODE == "cell" else os.path.join(OUT_DIR, "patient_split")
+RES_DIR = OUT_DIR if SPLIT_MODE == "cell" else os.path.join(OUT_DIR, "patient_split_seeds", f"seed{_SEED}")  # one folder per seed: no overwrite
 os.makedirs(RES_DIR, exist_ok=True)
 
-EDGE_INDEX_PATH = os.path.join(RES_DIR, "gat_edge_index.npy")
-EDGE_ATTR_PATH = os.path.join(RES_DIR, "gat_edge_attr.npy")
-LATENT_PATH = os.path.join(RES_DIR, "cvae_latent.npy")
+# upstream inputs (scripts 10-12) stay in the shared folder; only outputs are per-seed
+INPUT_DIR = OUT_DIR if SPLIT_MODE == "cell" else os.path.join(OUT_DIR, "patient_split")
+EDGE_INDEX_PATH = os.path.join(INPUT_DIR, "gat_edge_index.npy")
+EDGE_ATTR_PATH = os.path.join(INPUT_DIR, "gat_edge_attr.npy")
+LATENT_PATH = os.path.join(INPUT_DIR, "cvae_latent.npy")
 ADATA_SUB_PATH = os.path.join(ROOT, "output", "02_adata_subsampled.h5ad")
 SPLIT_PATH = os.path.join(ROOT, "output", "nn_train_test_split.tsv" if SPLIT_MODE == "cell" else "nn_train_test_split_patient.tsv")
 
