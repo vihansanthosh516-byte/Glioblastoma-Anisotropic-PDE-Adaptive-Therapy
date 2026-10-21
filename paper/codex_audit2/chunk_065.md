@@ -1,0 +1,25 @@
+# Chunk 065 — scripts 93–99
+
+Static audit only. `python -m py_compile` passed for all eight files; none was executed. Cache directed inside `paper/codex_audit2/.pycache`.
+
+| Script | Check | Finding | Evidence | Severity |
+|---|---|---|---|---|
+| `src/93_real_rho_kill_sensitivity.py` | compile/paths/artifact | PASS. Uses project-rooted output; JSON exists. | Compile exit 0; lines 33–35, 107; `output/real_rho_kill_sensitivity.json`. | low |
+| `src/93_real_rho_kill_sensitivity.py` | assumed treatment | Explicitly says kill rates stay assumed; random patient-level rates sampled from script 67 ranges with seeds 93+s. Use is sensitivity analysis only, not evidence these kill rates occur clinically. | Header lines 3–20; code lines 73–87. | medium |
+| `src/94_patient_manifest.py` | compile/outputs | PASS. Project-rooted outputs in `data/manifests` exist. It writes repository data manifests (do not execute under this read-only audit). | Compile exit 0; header lines 3–13; paths 28–35; writes 177–215; files present. | low |
+| `src/94_patient_manifest.py` | freeze/split | Header says canonical eligibility and folds; split seed is string `20261004`. The manifest’s chronology relative to each amendment/freeze is not proven by code. Treat those generated files as the source only where their checksums/versions are recorded. | Lines 3–13, 28–35. | medium |
+| `src/95_trackA_audit.py` | compile/deps/artifacts | PASS. Uses scanpy and sklearn; scanpy is not in root Requirements.txt/pyproject (docker note excludes Track A). JSON and manifest exist. | Compile exit 0; imports 27–35; output lines 18–19, 226–227; artifacts present. | medium |
+| `src/95_trackA_audit.py` | leakage finding | Header and code explicitly acknowledge original all-cell kNN graph and cVAE trained on labelled random-split cells; leakage means it cannot support independent test generalization. Report appropriately limits conclusions to `gat_pca_clean` for leakage-free comparison. | Header lines 5–16; lines 219–222. | high |
+| `src/96_cohort_tables.py` | compile/outputs | PASS. Root-derived JSON/CSV outputs exist; descriptive SMD only, no p-values/tuning per header. | Compile exit 0; lines 3–10, 20–24, 81, 115; outputs present. | low |
+| `src/96_cohort_tables.py` | comparability limitation | Correctly excludes tumour-volume comparison due to different measurement definitions. Keep this limitation with any cohort-shift claims. | Header lines 7–10. | low |
+| `src/97_solver_verification.py` | compile/outputs | PASS. Root-derived verification JSON exists. Seed 20261004. | Compile exit 0; lines 47–54, 288–293; `output/solver_verification.json`. | low |
+| `src/97_solver_verification.py` | amendment chronology | Header marks V1–V7 criteria pre-declared but explicitly says V7b was added after first run and before reading results; V6 criterion was found invalid on first run. Preserve amendment disclosures; do not present all criteria as fixed before any run. | Header lines 10–23; code lines 220–222. | medium |
+| `src/97_solver_verification.py` | scope | Correctly distinguishes numerical equation-solver verification from whether equations describe tumors. Tests are synthetic solver checks and cannot validate biological accuracy. | Header lines 3–9; run manifest dataset `synthetic`, lines 288–292. | low |
+| `src/98_baseline_ladder.py` | compile/outputs | PASS. Root-derived JSON/CSV/manifest outputs exist. | Compile exit 0; lines 32–35, 184, 247–249; artifacts present. | low |
+| `src/98_baseline_ladder.py` | interpretation | Header explicitly labels oracle-volume-matched arm “NOT a baseline” and upper bound; preserve that. Geometric rate uses training-fold patients and labels; this is correctly disclosed. | Header lines 3–14. | low |
+| `src/98_baseline_ladder.py` | test timing | Uses manifest patient folds and predicts next scan; code/header alone do not confirm split manifest was frozen before outcomes or later reuse. Do not claim fresh independent validation from existence of outputs alone. | Lines 3–14, 32–35, 235–249. | medium |
+| `src/99_forecastability.py` | compile/outputs | PASS. Root-derived JSON and pair CSV exist; manifest records seed and noise assumption. | Compile exit 0; lines 27–30, 66, 90–92; outputs present. | low |
+| `src/99_forecastability.py` | assumed noise proxy | Header explicitly calls one-voxel erosion/dilation noise a proxy, not measured segmentation uncertainty. Forecastability ceiling is conditional on that proxy, not an empirical ceiling. | Header lines 3–11; output key `assumption` written line 75. | medium |
+| `src/__init__.py` | compile | PASS; package marker only, no executable claims or outputs. | Compile exit 0; lines 1–4. | low |
+
+The outputs were checked for presence only, not recomputed. No current RANO validation or new locked-set evaluation is established by these legacy scripts. `95_trackA_audit.py` explicitly finds test-to-train graph leakage in the original Track A pipeline; preserve that caveat wherever its reported metrics are cited.

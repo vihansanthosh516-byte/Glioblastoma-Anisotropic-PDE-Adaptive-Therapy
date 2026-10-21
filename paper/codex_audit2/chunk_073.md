@@ -1,0 +1,17 @@
+# Chunk 073 — `src/xai_saliency.py`
+
+Static audit only. `python -m py_compile src/xai_saliency.py` passed with bytecode cache redirected under `paper/codex_audit2/.pycache-check`. No script was executed. No XAI/saliency output files were found under `output/`.
+
+| script | check | finding | evidence | severity |
+|---|---|---|---|---|
+| `src/xai_saliency.py` | syntax | Compile passed. | `python -m py_compile src/xai_saliency.py` exit 0. | low |
+| `src/xai_saliency.py` | dependencies | Numpy is in pyproject only. Torch, scipy, matplotlib are optional imports; Plotly is imported lazily. None appears in `Requirements.txt` or pyproject dependencies except numpy/scipy/matplotlib. | Imports lines 47–69, lazy Plotly lines 267–269; manifests. | medium |
+| `src/xai_saliency.py` | output paths | Defaults/CLI write to relative `output/...` paths, contrary to `CLAUDE.md` requirement that paths derive from `__file__`. No HTML, PNG, or XAI report artifacts currently exist in output. | Defaults lines 330, 353; CLI line 422; writes lines 271–318, 360–381; artifact search empty. | medium |
+| `src/xai_saliency.py` | learned policy claim | Header says maps show where the RL agent sees risky growth, but CLI builds a fresh `PolicyNetwork()` and does not load a trained checkpoint; `_self_test` also uses fresh random weights. Therefore the visualization is saliency for an untrained random policy unless caller supplies a separately trained policy object. | Header lines 3–6; CLI lines 428–435; self-test lines 395–408. | high |
+| `src/xai_saliency.py` | patient-specific claim | API/report labels a `patient_id`, but no patient data or ID is loaded/selected; CLI creates a generic `GbmTherapyEnv(training=False)` and uses its initialized simulation. The ID is a display label only. | `saliency_to_html` args lines 325–344; report label lines 347–388; CLI lines 431–435. | high |
+| `src/xai_saliency.py` | self-test | Optional self-test only asserts saliency array shape equals tumor field shape; it does not check gradient nonzero, correctness, policy provenance, or output rendering. Exceptions are printed and swallowed, so failure does not produce a failing exit status. | Lines 395–413; CLI exits 0 after invoking it at 425–427. | medium |
+| `src/xai_saliency.py` | seed | No random seed is set for newly initialized policy or environment. | Policy/env construction lines 404–407 and 431–433; no seed setup in file. | medium |
+| `src/xai_saliency.py` | frozen/test data | No locked/test data access appears in this file; no analysis-plan freeze reference. It only consumes a passed environment/policy or constructs the generic legacy simulation. | Module imports/functions and CLI lines 416–435. | low |
+| `src/xai_saliency.py` | saliency interpretation | Differentiation is only through the scalar observation `[norm_vol,u_max,day,toxicities]`, then back to voxel values. This is a local derivative for the current synthetic state/action probability, not evidence of causal “risky growth” or clinician-validated explanation. Thresholds and normalization/smoothing are fixed visualization choices. | Header formula lines 10–20; observation construction lines 100–118; gradient lines 159–176; visualization thresholds lines 287–294. | high |
+
+No script execution, test run, or output modification occurred. No hand-coded result metrics were found; the concern is that the described visualization can be generated from an untrained random policy and synthetic environment.
