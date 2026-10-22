@@ -10,6 +10,18 @@ The current project asks how disagreement between tumor-segmentation tools and a
 
 The A15-A21 analyses, calculator, and viewer already exist. The technical note is an audited draft, not a finished paper or clinical result. Recent source checks corrected its ranges, citations, reference-scan wording, and limits on execution-history claims. Some primary tables and supplements remain unread. No new analysis is currently authorized by the existing plan.
 
+The user reports that their mentor thinks the current work is good. The mentor's detailed comments and clinical or imaging qualifications are not recorded here.
+
+### Dataset feasibility screen, 2026-10-21
+
+The closest scientific fit found so far is QIN-GBM Treatment Response: its TCIA page describes double-baseline scans typically 2–5 days apart, 54 patients, multiple structural and advanced MRI sequences, and 33.5 GB of DICOM images. A published test-retest analysis used 11 newly diagnosed GBM patients with scans 2–6 days apart. The 11-patient analysis does not establish that all 54 patients have usable scan pairs for this project's segmentation question.
+
+QIN is not cleared for use. Its collection page says users must sign a TCIA Restricted License Agreement. TCIA's newer policy says it stopped hosting controlled-access datasets on July 8, 2025 and moved access and hosting to dbGaP and the NCI Cancer Research Data Commons. The QIN page still shows the older TCIA route, so current request eligibility and hosting route are unresolved. The restricted-license language also limits disclosure to third parties unless permitted; Kaggle use is not confirmed.
+
+The desk-only screen found open longitudinal datasets such as LUMIERE and UCSD-PTGBM, but their follow-up scans do not provide a clean short-interval scan-rescan estimate. No fully open tumor scan-rescan dataset that meets the current measurement objective has been verified in this screen. This is a preliminary search, not an exhaustive review.
+
+Sources checked: [QIN collection page](https://wiki.cancerimagingarchive.net/display/Public/QIN%2BGBM%2BTreatment%2BResponse); [QIN test-retest study](https://pmc.ncbi.nlm.nih.gov/articles/PMC9207284/); [TCIA controlled-data policy](https://www.cancerimagingarchive.net/nih-controlled-data-access-policy/); [TCIA restricted-license text](https://www.cancerimagingarchive.net/wp-content/uploads/TCIA-Restricted-License-20220519.pdf); [LUMIERE dataset paper](https://pmc.ncbi.nlm.nih.gov/articles/PMC9755255/); [UCSD-PTGBM dataset paper](https://pmc.ncbi.nlm.nih.gov/articles/PMC12886825/).
+
 ## What happens next
 
 ### Phase 1 — Close the current note review
@@ -24,7 +36,7 @@ The A15-A21 analyses, calculator, and viewer already exist. The technical note i
 
 Run a desk-only search for an alternative to QIN and RIDER. Do not download images or run segmentation during this phase. A candidate must have documented lawful access for this project, repeat tumor MRI suitable for estimating measurement variation, enough sequence information for a defensible segmentation method, and a usable license or written access route. Check data counts and series on primary collection pages; do not rely on search snippets alone.
 
-**Gate:** Proceed only if one dataset meets all access, repeat-scan, and measurement-method requirements. RIDER currently fails the open-access requirement; its current image row is controlled access. QIN remains stopped. A mentor-supervised access path would need to be confirmed before any use.
+**Gate:** Proceed only if one dataset meets all access, repeat-scan, and measurement-method requirements. RIDER and QIN currently require restricted access. QIN remains the strongest technical fit, but its current access route and permitted compute environment must be confirmed in writing. No qualifying open alternative has been verified yet.
 
 If no dataset passes, stop the new-code path. Keep the existing work as a limited exploratory and simulation-based technical note, or choose a separately justified research question with its own evidence and plan. Do not invent a dataset or force a new analysis just to keep coding.
 
