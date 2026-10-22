@@ -38,3 +38,10 @@ Identifiability proof, paper, poster, clinician review. (Calculator `src/rano_ca
 
 ## Please rate
 1. Is the question real and important? 2. Is the evidence enough for a regional fair? For ISEF? 3. What is the biggest flaw? 4. What would a judge ask that I cannot answer? 5. What one thing should I do next?
+
+## Audit corrections after this dated snapshot (2026-10-21)
+
+- RANO 2.0 progression reference is context-dependent. Depending on setting and scan history, comparison may be to baseline or nadir; the project's running-minimum rule is a simplification. See https://pmc.ncbi.nlm.nih.gov/articles/PMC10860967/ and https://pmc.ncbi.nlm.nih.gov/articles/PMC11493521/ .
+- Keep A21 simulation ranges separate: seven A21 grid values give E1 shifts of -2.6 to -15.7 weeks; all 11 simulated A19+A21 values include -20.4 weeks at A19 s=0.342. The -5.8 to -15.0-week range refers to point-estimate conversion readings only, with upper endpoints from A19.
+- Conversion sensitivity ratios are 2.05 within BraTumIA 1.2, 2.43 within BraTumIA 2.0, and 2.60 across compared endpoint readings. These describe modeled effect estimates, not the seven-value A21 grid. Source: `output/conversion_audit/conversion_audit_summary.json` and ledger 2bx.
+- The 34.8-week simulation median remains assumed. The cited support in A16.2 is not supported by the reviewed text of PMC11241823. See the append-only erratum in `analysis_plan_v1.md`.
