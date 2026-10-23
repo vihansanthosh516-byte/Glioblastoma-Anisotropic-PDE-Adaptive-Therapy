@@ -32,7 +32,7 @@ The engineering goal is to build and compare reproducible methods across all thr
 
 1. Download UCSC multiomic-gbm files. Record release and donor IDs. Define Core versus Periphery; exclude NormalBrain and unresolved donors.
 2. Split by donor. Fit preprocessing and tuning on training donors only. Compare attention, inductive expression-graph, PCA/logistic, and source-panel models. Build graph edges from expression, not IDs or test labels.
-3. Test panels on held-out spatial specimens with measured labels. Report donor/specimen metrics, uncertainty, exclusions, failures. Flag reused donors as exploratory.
+3. Test panels on held-out spatial specimens with measured labels. Report donor/specimen metrics, uncertainty, failures. Mark reused donors exploratory.
 
 ### Track B — MRI growth, volume, and recurrence
 
