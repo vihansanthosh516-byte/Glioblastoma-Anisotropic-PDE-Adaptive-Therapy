@@ -49,7 +49,11 @@ def test_no_duplicate_scans(scans):
 
 
 def test_one_fold_per_patient(split):
-    lc.assert_one_fold_per_patient(split)
+    lc.assert_one_fold_per_patient(split, ms.N_FOLDS)
+
+
+def test_every_split_row_matches_hash_rule(split):
+    lc.assert_split_matches_rule(split, ms.fold_of)
 
 
 def test_pairs_follow_split(pairs, split):

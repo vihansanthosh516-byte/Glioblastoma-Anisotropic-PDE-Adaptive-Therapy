@@ -56,6 +56,7 @@ The old GBM source code, data, outputs, and archived documents remain in their e
 ## 7. Coding status and next work
 
 - **Started:** Track A donor-split runner now has import-safe behavior and validates saved arrays, indices, labels, IDs, and patient disjointness before creating output. Synthetic tests pass. No real data were scored.
+- **Shared split/provenance (2026-10-22):** `src/leakage_checks.py` now rejects blank, non-integer, negative, out-of-range and empty folds, splits that differ from the script-94 hash rule, and patients with no fold. Track B `src/100_pde_manifest.py` validates `split_mu.csv` on every load and reuses a cached forecast only when a SHA-256 signature of pair, fold, interval, treatment, grid or selected cell, solver and atlas matches; older unsigned caches are recomputed. Synthetic tests in `tests/test_split_provenance.py`; scratch-clone suite 142 passed. Script 100 was not run on patient data.
 - **Spent evaluation:** Do not rerun `src/20_patient_split_methods.py` on the saved five-patient test split and call it fresh confirmation. It is historical/exploratory only.
 - **Next shared step:** inspect and stabilize data manifests, source-file identities, split hashes, run configuration, and output provenance before new model runs.
 - **Track A:** resolve donor/sample aliases and dataset terms; implement nested donor-grouped selection, donor-level evaluation, panel mapping, and held-out spatial transfer without label or identity leakage.

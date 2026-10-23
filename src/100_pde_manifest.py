@@ -21,6 +21,8 @@ means of the pair Dice); applied to the test fold. All reported Dice are out-of-
 from __future__ import annotations
 
 import argparse
+import hashlib
+import importlib.util
 import json
 import os
 import sys
@@ -37,6 +39,7 @@ MAN = PROJECT_ROOT / "data" / "manifests"
 sys.path.insert(0, str(PROJECT_ROOT))
 
 import run_improved_aniso as ria  # noqa: E402
+from src import leakage_checks as lc  # noqa: E402
 from src import patient_stats as ps  # noqa: E402
 from src.run_manifest import write_run_manifest  # noqa: E402
 
@@ -49,6 +52,39 @@ PILOT_RHOS = [0.03, 0.1, 0.2]
 PILOT_DS = [0.01, 0.03, 0.1]
 PILOT_ARMS = [("aniso", 1.0), ("iso_homog", 1.0)]
 PILOT_PER_STRATUM = 3   # 3 x 3 strata -> at most 27 first pairs, all folds (Amendment 4.4)
+N_FOLDS = 5
+
+
+def _split_rule():
+    spec = importlib.util.spec_from_file_location("manifest_94", PROJECT_ROOT / "src" / "94_patient_manifest.py")
+    m = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(m)
+    assert m.N_FOLDS == N_FOLDS, f"script 94 uses {m.N_FOLDS} folds, script 100 expects {N_FOLDS}"
+    return m.fold_of
+
+
+def load_split(path=None) -> pd.Series:
+    """Validated patient -> fold map. Refuses blank or out-of-range folds, empty folds, and any fold that differs
+    from the script-94 hash rule (a stale or hand-edited split)."""
+    split = pd.read_csv(path or MAN / "split_mu.csv")
+    folds = lc.fold_map(split, N_FOLDS)
+    lc.assert_split_matches_rule(split, _split_rule())
+    return folds
+
+
+def cache_signature(pair, h, grid, solver, atlas_sha) -> str:
+    """SHA-256 of everything that determines a cached forecast record. A cache file is reused only when this matches,
+    so a changed grid, selected cell, fold, solver, atlas, interval or treatment schedule forces a recompute."""
+    if grid.get("selected") is not None:
+        g = {"selected": grid["selected"][str(int(pair["fold"]))]}
+    else:
+        g = {"arms": [[a, float(r)] for a, r in grid["arms"]], "ds": [float(x) for x in grid["ds"]],
+             "rhos": [float(x) for x in grid["rhos"]]}
+    key = {"pair": [str(pair["patient_id"]), int(pair["tp_in"]), int(pair["tp_out"])],
+           "fold": None if pair.get("fold") is None else int(pair["fold"]),
+           "day_in": float(pair["day_in"]), "dt_days": float(pair["dt_days"]), "treatment": pair.get("treatment"),
+           "h": float(h), "grid": g, "solver": solver, "atlas_sha": atlas_sha}
+    return hashlib.sha256(json.dumps(key, sort_keys=True, default=str).encode()).hexdigest()
 
 
 def arms_full():
@@ -183,14 +219,17 @@ def _init(h, grid, cache):
 def worker(pair):
     key = f"{pair['patient_id']}_{pair['tp_in']}_{pair['tp_out']}"
     f = _CACHE / f"{key}.json"
+    sig = cache_signature(pair, _H, _GRID, ria.TensorFK.__name__, ria._ATLAS_SHA)
     if f.exists():
         rec = json.loads(f.read_text())
-        if rec.get("atlas_sha") == ria._ATLAS_SHA and rec.get("dt_days") == pair["dt_days"]:
+        if rec.get("cache_sig") == sig:   # records without a signature (older runs) are recomputed
             return rec
     t0 = time.time()
     rec = forecast_pair(pair, ria._ATLAS, _H, _GRID)
     rec["seconds"] = round(time.time() - t0, 1)
     rec["atlas_sha"] = ria._ATLAS_SHA
+    rec["cache_sig"] = sig
+    rec["fold"] = None if pair.get("fold") is None else int(pair["fold"])
     rec["solver"] = ria.TensorFK.__name__
     rec["device"] = str(__import__("torch").get_default_device())
     tmp = f.with_suffix(".tmp")
@@ -205,7 +244,8 @@ def get_pairs(h, limit=None, stage="forecast"):
     pairs = pairs[pairs["in_primary"]].copy()
     cohort = {p["patient_id"]: p.get("treatment_schedule")
               for p in json.loads((PROJECT_ROOT / "output" / "mu_glioma_cohort.json").read_text())}
-    split = pd.read_csv(MAN / "split_mu.csv").set_index("patient_id")["fold"]
+    split = load_split()
+    lc.assert_all_have_fold(pairs["patient_id"], split, "primary pairs")
     pairs["fold"] = pairs["patient_id"].map(split)
     pairs = pairs[pairs["has_prior_scan"]] if stage == "selected" else pairs[~pairs["has_prior_scan"]]
     if h == 1.0:   # pilot (Amendment 4.4): stratified subset of first pairs, all folds. Strata = input-core-volume tertile x
@@ -268,15 +308,19 @@ def select_cells():
     """Per fold and arm family: the (r, d, rho) cell with the best mean Dice over TRAINING patients, using first pairs.
     Patient means of the pair Dice; ties go to the first cell in sorted order."""
     recs = load_records("cache_h2")
-    split = pd.read_csv(MAN / "split_mu.csv").set_index("patient_id")["fold"]
+    split = load_split()
+    lc.assert_all_have_fold([r["patient_id"] for r in recs], split, "cached forecasts")
     all_cells = sorted(next(iter(recs))["dice"]["grid"].keys())
+    odd = [r["patient_id"] for r in recs if sorted(r["dice"]["grid"]) != all_cells]
+    assert not odd, f"cached forecasts with a different grid: {odd[:5]}"
     df = pd.DataFrame([{"patient_id": r["patient_id"], **r["dice"]["grid"]} for r in recs])
     pm = df.groupby("patient_id")[all_cells].mean()
     pm["fold"] = pm.index.map(split)
     fam_cells = {}
     for c in all_cells:
         fam_cells.setdefault(family_of(c), []).append(c)
-    sel = {str(f): {fam: pm[pm["fold"] != f][cl].mean().idxmax() for fam, cl in fam_cells.items()} for f in range(5)}
+    sel = {str(f): {fam: pm[pm["fold"] != f][cl].mean().idxmax() for fam, cl in fam_cells.items()}
+           for f in range(N_FOLDS)}
     (OUT / "selected_cells.json").write_text(json.dumps(sel, indent=1))
     print(json.dumps(sel, indent=1))
     return sel
@@ -285,7 +329,8 @@ def select_cells():
 def analyze():
     recs = load_records("cache_h2")
     recs_sel = load_records("cache_sel") if (OUT / "cache_sel").exists() else []
-    split = pd.read_csv(MAN / "split_mu.csv").set_index("patient_id")["fold"]
+    split = load_split()
+    lc.assert_all_have_fold([r["patient_id"] for r in recs + recs_sel], split, "cached forecasts")
     pats = pd.read_csv(MAN / "patient_manifest.csv", low_memory=False)
     gbm = pats[pats["dataset"] == "MU"].set_index("patient_id")["is_gbm"]
     sel = json.loads((OUT / "selected_cells.json").read_text()) if (OUT / "selected_cells.json").exists() else select_cells()
@@ -308,7 +353,7 @@ def analyze():
     df2.to_csv(OUT / "oof_pairs.csv", index=False)
 
     edge = {fam: [] for fam in fams}
-    for f in range(5):
+    for f in range(N_FOLDS):
         for fam in fams:
             kv = dict(x.split("=") for x in sel[str(f)][fam].split("|")[1:])
             rho, d = float(kv["rho"]), float(kv["d"])
@@ -360,7 +405,9 @@ def analyze():
     (OUT / "results.json").write_text(json.dumps(res, indent=1, default=float))
     write_run_manifest("pde_manifest_100", OUT / "results.manifest.json", script="src/100_pde_manifest.py", seed=ps.DEFAULT_SEED,
                        config={"grid": res["grid"], "families": fams},
-                       inputs=[MAN / "forecast_pairs_mu.csv", MAN / "split_mu.csv", ria.ATLAS_NPZ],
+                       inputs=[MAN / "forecast_pairs_mu.csv", MAN / "split_mu.csv", ria.ATLAS_NPZ,
+                               OUT / "selected_cells.json", PROJECT_ROOT / "output" / "mu_glioma_cohort.json",
+                               PROJECT_ROOT / "output" / "baseline_ladder_pairs.csv"],
                        dataset="MU-Glioma-Post core", patient_split="data/manifests/split_mu.csv",
                        primary_endpoint="PDE Dice delta vs persistence (per patient)")
     print(json.dumps(res["grid_edge_summary"], indent=1))
