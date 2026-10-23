@@ -4,7 +4,7 @@ Updated 2026-10-22. Read this file before continuing work. The main project is n
 
 ## 1. Current goal
 
-Reorganize and improve the old GBM project into a defensible science-fair research plan. The future plan must account for Tracks A, B, and C, use openly downloadable data, and clearly separate measured data from assumptions and simulations.
+Begin coding the GBM Tracks A, B, and C project. Keep all three tracks equally important and separate. The research-plan form remains a working document and can be finished later. Do not treat the tracks as one fused patient-level model.
 
 The current forward plan is `paper/research_plan_complete_project_form.md`, with details in `paper/research_plan_complete_project_appendix.md`. Tracks A, B, and C are equally important. The plan contains questions and procedures, not project outcomes. Each analysis remains conditional on its data, rights, and protocol gates.
 
@@ -53,6 +53,14 @@ The probabilistic RANO project is no longer the main project. Its plans, declara
 
 The old GBM source code, data, outputs, and archived documents remain in their existing locations. The current plan documents intended future analyses; it does not change historical results or authorize use of files whose terms remain unresolved.
 
-## 7. Next step
+## 7. Coding status and next work
 
-Review the current form and appendix for factual accuracy and venue field limits. Close the protocol-manifest gates before each affected analysis. Keep all three tracks core and separate. Do not describe historical test sets as fresh confirmation or claim a patient-level fused model. Do not start new analysis or code until the plan and applicable review are recorded.
+- **Started:** Track A donor-split runner now has import-safe behavior and validates saved arrays, indices, labels, IDs, and patient disjointness before creating output. Synthetic tests pass. No real data were scored.
+- **Spent evaluation:** Do not rerun `src/20_patient_split_methods.py` on the saved five-patient test split and call it fresh confirmation. It is historical/exploratory only.
+- **Next shared step:** inspect and stabilize data manifests, source-file identities, split hashes, run configuration, and output provenance before new model runs.
+- **Track A:** resolve donor/sample aliases and dataset terms; implement nested donor-grouped selection, donor-level evaluation, panel mapping, and held-out spatial transfer without label or identity leakage.
+- **Track B:** reconcile patient/visit manifests; add solver and physical-unit tests; compare PDE, volume, and recurrence models with fixed baselines; test parameter recovery and forecastability before patient fitting.
+- **Track C:** freeze simulator equations, seeds, budgets, and endpoints; validate two-population dynamics; compare adaptive, fixed, and learned policies on common simulated cases; report sensitivity and failures. Keep MGMT association observational and separate.
+- **Validation:** use synthetic/unit tests first. Run full experiments only after input rights, provenance, inclusion, split, and failure rules are recorded. Preserve old outputs; never reuse spent test sets as confirmatory.
+
+The research-plan form and appendix are not coding specifications. Do not change them unless the user asks. Do not claim clinical benefit, validated patient-specific predictions, or a fused digital twin.
