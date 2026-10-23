@@ -1,6 +1,6 @@
 # GBM computational oncology project: status README
 
-**This file covers the OLDER GBM platform. The current project (probabilistic RANO, from 2026-10-18) is described in `START_HERE.md`.** Written 2026-10-17. Corrected the same day after a number audit against the ledger and `output/`. All numbers come from `vault/PAPER_FINDINGS_LEDGER.md` (entries cited as "ledger 2xx") or files in `output/`. I did not re-run any script for this file. Interim numbers are marked interim. `README.md` now describes probabilistic RANO. This file preserves older platform results and plans; audit corrections dated 2026-10-19 do not reactivate those plans. Historical run-once/freeze compliance needs the named execution records.
+**This file records earlier GBM Tracks A/B/C results. GBM is now the main science-fair project; current goals are in START_HERE.md and science_fair_gbm/README.md.** Written 2026-10-17. Corrected the same day after a number audit against the ledger and `output/`. All numbers come from `vault/PAPER_FINDINGS_LEDGER.md` (entries cited as "ledger 2xx") or files in `output/`. I did not re-run any script for this file. Interim numbers are marked interim. README.md now gives the GBM project overview. This file preserves older platform results and plans; audit corrections dated 2026-10-19 do not reactivate those plans. Historical run-once/freeze compliance needs the named execution records.
 
 ## 1. What this project is
 
