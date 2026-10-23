@@ -1,6 +1,6 @@
 # GBM Tracks A, B, and C: research plan
 
-This plan treats Tracks A, B, and C as equally important core parts of one GBM research project, while keeping their datasets and endpoints separate. Exploratory analyses and model development have already occurred; disclose that history without presenting earlier test sets as fresh confirmation. This plan states no project result values and makes no directional outcome prediction.
+Tracks A, B, and C are equally important parts of this GBM project. Each track uses its own data and endpoint. Earlier exploratory work is disclosed, and previously used test groups are not presented as fresh confirmation. This plan states no results.
 
 ## Rationale
 
@@ -8,35 +8,48 @@ GBM varies across patients and within tumors. Molecular expression and spatial a
 
 ## Research Question/Hypothesis(es)/Engineering Goal(s)
 
-**Track A:** How do attention and bounded graph models compare with simple classifiers and an exact source-identified gene panel for donor-held-out GBM Core/Periphery labels? Where matched source-labeled spatial data and reuse terms permit, how do those panels transfer to held-out spatial specimens?
+**Track A hypothesis:** Core/Periphery models tested on held-out donors will have lower performance and greater donor-to-donor variation than random-cell splits suggest.
 
-**Track B:** How do reaction-diffusion forecasts compare with persistence and geometric-growth baselines for later MRI masks, and how do measurement-aware models compare with fixed baselines for next-scan core volume? Separately, on rights-cleared source data, how does a model-based recurrence-location map compare with an equal-volume 15 mm geometric expansion?
+**Track B hypothesis:** On held-out patients, reaction-diffusion forecasts will predict later tumor masks more accurately than persistence and geometric-growth baselines.
 
-**Track C:** Under specified model assumptions, how do sensitive/resistant adaptive schedules and optimal-control/RL policies compare with fixed and simple-rule schedules? Separately, what observational association exists between verified MGMT status and progression-time measures in the eligible clinical cohort?
+**Track C hypothesis:** At equal modeled treatment budget, adaptive schedules will delay simulated progression relative to fixed schedules across prespecified growth and drug-effect settings.
 
-No directional hypothesis is made. The engineering goal is an auditable comparison across three core tracks, with measured, fitted, assumed, simulated, and observational quantities distinguished.
+The engineering goal is to build and compare reproducible methods across all three tracks while keeping measured, fitted, assumed, simulated, and observational quantities distinct.
 
 ## Materials
 
-Use the UCSC multiomic-gbm atlas only after recording source release, files, donor mapping, and file-level terms. MU-Glioma-Post v1 has listed CC BY 4.0 terms for images, segmentations, and clinical files and will be used locally with citation. LUMIERE item records list CC0 while its paper limits use to noncommercial purposes; resolve exact file terms and use only within clearly permitted noncommercial scope. RHUH terms differ by file type: use only documented brain-extracted NIfTI derivatives if verified; raw DICOM is restricted. Exclude PREDICT-GBM and ALPTDG-derived packs unless exact upstream provenance and permission are documented; ALPTDG also requires its DUA. No patient contact or lab work is planned.
+- UCSC multiomic-gbm atlas: GBM single-cell and spatial transcriptomic data.
+- MU-Glioma-Post v1: longitudinal postoperative glioma MRI, segmentations, and clinical data.
+- LUMIERE: longitudinal glioblastoma MRI and expert RANO evaluations; noncommercial-use scope.
+- RHUH-GBM: preoperative, early postoperative, and recurrence MRI; use brain-extracted NIfTI derivatives, not restricted raw DICOM.
+- Desktop computer: 16 CPU cores, 34 GB RAM, no local GPU.
+- Python and the project’s existing analysis environment and scripts.
+- No laboratory chemicals, biological agents, patient contact, or new human-subject data collection.
 
 ## Procedures
 
-1. **Track A — Molecular and spatial analyses**
-   1. Resolve atlas release, files, labels, aliases, and terms. Compare attention-gated, label-safe inductive graph, PCA/logistic, and an exact source-identified panel on donor-held-out Core/Periphery labels; fit preprocessing within training folds.
-   2. If exact source panels, matched specimens, spatial labels, and terms permit, evaluate panels on patient-held-out spatial specimens. Report donor/specimen-level metrics and limits; otherwise stop that component.
+### Track A — Molecular and spatial prediction
 
-2. **Track B — MRI growth and recurrence endpoints**
-   1. For MU mask/core-volume forecasts, validate visits, dates, labels, and voxel sizes; compare the documented PDE solver with persistence and training-fold geometric growth, and compare a measurement-aware volume model with persistence, median slope, and a time-gap variance baseline.
-   2. Separately compare recurrence coverage from source-built MRI risk maps with an equal-volume 15 mm geometric expansion. Use only rights-cleared files; exclude unverified PREDICT/ALPTDG derivatives. The expansion is a geometric comparator, not a clinical treatment plan.
+1. Download UCSC multiomic-gbm files. Record release and donor IDs. Define Core versus Periphery; exclude NormalBrain and unresolved donors.
+2. Split by donor. Fit preprocessing and tuning on training donors only. Compare attention, inductive expression-graph, PCA/logistic, and source-panel models. Build graph edges from expression, not IDs or test labels.
+3. Test panels on held-out spatial specimens with measured labels. Report donor/specimen metrics, uncertainty, exclusions, failures. Flag reused donors as exploratory.
 
-3. **Track C — Policy simulation and clinical association**
-   1. Compare the two-population adaptive schedule with the source-defined 5-days-on/23-days-off schedule across the documented effect/growth sweep. In the separate equal-budget RL model compare Stupp-like, heuristic, PPO, and oracle-reference policies under the documented budget and horizon. Keep all effects simulated.
-   2. Separately estimate an observational MGMT/progression association only after verifying field coding, time origin, event/censor definitions, and missingness. Do not map MGMT to simulated resistance or infer treatment benefit.
+### Track B — MRI growth, volume, and recurrence
+
+1. Build a MU patient/visit table. Verify diagnosis, dates, voxel spacing, masks, and volume definitions; convert voxels to physical volume.
+2. Keep each patient in one fold. Fit reaction-diffusion models on earlier scans; forecast later masks and compare with persistence and geometric growth.
+3. Fit the measurement-aware volume model on training patients. Compare with persistence, median-slope, and time-gap variance baselines. Check calibration, intervals, fit failures, and identifiability after simulation recovery checks.
+4. Register LUMIERE/RHUH MRI and recurrence masks. Compare model-risk regions with equal-volume 15 mm expansions. Score held-out enhancing-tumor and all-recurrence coverage; record exclusions and registration quality.
+
+### Track C — Treatment policies and MGMT association
+
+1. Freeze simulator, assumptions, thresholds, parameter grid, seeds, horizon, and budget. Resolve code-setting conflicts first.
+2. Pair initial tumor/clone states in adaptive and fixed five-days-on/23-days-off simulations. Separately compare Stupp-like, heuristic, PPO, and oracle-reference policies on held-out RL cases with equal budget.
+3. Record burden, modeled progression, resistant fraction, and exposure. Separately estimate MU MGMT/progression association after verifying codebook, time origin, event, censoring, and missingness. Report uncertainty; make no causal claim.
 
 ## Risk Assessment
 
-Use de-identified records and comply with exact file terms and agreements. Keep data local unless the source explicitly permits the intended hosting. The repository records prior cloud packaging that includes ALPTDG-derived labels; its DUA and transfer permission have not been established here. Do not re-identify participants or infer patient links across datasets. Simulations and observational associations do not guide clinical care.
+Use de-identified data under each source’s terms. Keep files local; do not upload controlled or unclear-license data. Do not identify participants or join patients across cohorts. Simulations and observational results are not medical advice.
 
 ## Data Analysis
 
