@@ -78,8 +78,7 @@ from scipy import stats
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_ROOT / "src"))
-OUTPUT_DIR = PROJECT_ROOT / "output" / "resistance_adaptive"
-OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+OUTPUT_DIR = PROJECT_ROOT / "output" / "resistance_adaptive"   # created by compute(), not on import
 
 _spec = spec_from_file_location("s68", PROJECT_ROOT / "src" / "68_time_to_progression_equal_budget.py")
 s68 = module_from_spec(_spec)
@@ -278,7 +277,7 @@ def run_cell(idx: int, cfg: Dict, sets: Dict, fixed_cache: Dict) -> Dict:
 def compute(shard: int, nshards: int, reverse: bool = False, only=None):
     err = validate()
     assert err == 0.0, f"TwoPopSim(f_r0=0) TTP differs from KillReactionSim by {err} days"
-    (OUTPUT_DIR / "cells").mkdir(exist_ok=True)
+    (OUTPUT_DIR / "cells").mkdir(parents=True, exist_ok=True)
     sets = s68.reaction_sets()
     fixed_cache = {}
     t_all = time.time()
