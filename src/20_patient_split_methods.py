@@ -16,9 +16,10 @@ Protocol (fixed in the plan):
   - Patient-level bootstrap (2000 resamples over the 5 test patients) of test macro-F1.
 
 Output: output/patient_split_v2_methods/ (one JSON per method, plus summary.json).
-Run: python src/20_patient_split_methods.py
+Run historical split only with explicit opt-in: python src/20_patient_split_methods.py --exploratory
 This historical test split is spent; reruns are exploratory, not fresh confirmation.
 """
+import argparse
 import json
 import numpy as np
 import pandas as pd
@@ -182,7 +183,17 @@ def panel(Xa, ya, Xb, hp, seed):
     return fit_predict_panel(Xa, ya, Xb, k, C, seed)
 
 
-def main():
+def main(argv=None):
+    parser = argparse.ArgumentParser(description="Exploratory donor-split method comparison")
+    parser.add_argument(
+        "--exploratory",
+        action="store_true",
+        help="allow reuse of the historical, already-evaluated patient test split",
+    )
+    args = parser.parse_args(argv)
+    if not args.exploratory:
+        parser.error("the saved patient test split is spent; pass --exploratory to rerun it")
+
     X, y, pid, train_rows, test_rows = load_split_inputs(OUT)
     Xtr, ytr, ptr = np.asarray(X[train_rows]), y[train_rows], pid[train_rows]
     Xte, yte, pte = np.asarray(X[test_rows]), y[test_rows], pid[test_rows]

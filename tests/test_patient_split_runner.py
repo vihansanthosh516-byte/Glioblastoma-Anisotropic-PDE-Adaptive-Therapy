@@ -115,3 +115,14 @@ def test_import_does_not_load_project_data_or_create_output(tmp_path: Path, monk
 
     assert calls == []
     assert not (tmp_path / "output").exists()
+
+
+def test_main_requires_explicit_opt_in_before_loading_spent_split(monkeypatch) -> None:
+    def forbidden_load(_output_dir):
+        raise AssertionError("spent split must be blocked before loading data")
+
+    monkeypatch.setattr(runner, "load_split_inputs", forbidden_load)
+    with pytest.raises(SystemExit) as error:
+        runner.main([])
+
+    assert error.value.code == 2
