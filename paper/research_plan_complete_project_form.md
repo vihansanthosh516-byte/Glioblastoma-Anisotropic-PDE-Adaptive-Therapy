@@ -6,15 +6,15 @@ Tracks A, B, and C are equally important parts of this GBM project. Each track u
 
 GBM varies across patients and within tumors. Molecular expression and spatial assays, longitudinal MRI, and treatment simulations describe different aspects of the disease. The repository establishes no patient-level link between the atlas and MRI cohorts, so results will not be fused into a patient-specific model. The project studies (A) donor-held-out cell-label prediction and matched spatial transfer where data permit, (B) MRI growth/volume forecasts and a separate recurrence-location comparison, and (C) adaptive and optimal-control/RL policy simulations plus a separate observational MGMT association. Simulated effects will not be described as clinical treatment effects.
 
-## Research Question/Hypothesis(es)/Engineering Goal(s)
+## Research Question and Hypotheses
 
-**Track A hypothesis:** Core/Periphery models tested on held-out donors will have lower performance and greater donor-to-donor variation than random-cell splits suggest.
+**Research question:** In separate GBM datasets and simulations, do donor-held-out molecular models, longitudinal MRI forecasts, and equal-budget treatment policies improve their prespecified evaluation measures over appropriate baselines?
 
-**Track B hypothesis:** On held-out patients, reaction-diffusion forecasts will predict later tumor masks more accurately than persistence and geometric-growth baselines.
+**Track A hypothesis:** I hypothesize that random-cell splits overstate generalization: Core/Periphery models tested on held-out donors will have lower performance and greater donor-to-donor variation.
 
-**Track C hypothesis:** At equal modeled treatment budget, adaptive schedules will delay simulated progression relative to fixed schedules across prespecified growth and drug-effect settings.
+**Track B hypothesis:** I hypothesize that reaction-diffusion models will achieve higher patient-level Dice scores for later MRI tumor masks than persistence and geometric-growth baselines.
 
-The engineering goal is to build and compare reproducible methods across all three tracks while keeping measured, fitted, assumed, simulated, and observational quantities distinct.
+**Track C hypothesis:** I hypothesize that adaptive dosing and reinforcement-learning policies will lengthen simulated time to progression compared with fixed schedules under equal modeled budgets and prespecified settings.
 
 ## Materials
 
@@ -30,22 +30,25 @@ The engineering goal is to build and compare reproducible methods across all thr
 
 ### Track A — Molecular and spatial prediction
 
-1. Download UCSC multiomic-gbm files. Record release and donor IDs. Define Core versus Periphery; exclude NormalBrain and unresolved donors.
-2. Split by donor. Fit preprocessing and tuning on training donors only. Compare attention, inductive expression-graph, PCA/logistic, and source-panel models. Build graph edges from expression, not IDs or test labels.
-3. Test panels on held-out spatial specimens with measured labels. Report donor/specimen metrics, uncertainty, failures. Mark reused donors exploratory.
+1. Obtain UCSC multiomic-gbm single-cell and spatial files. Make a data inventory with release, assay, labels, donor/sample IDs, gene identifiers, and file terms. Resolve donor aliases from source records; do not count unresolved cell IDs as people.
+2. Set the primary cell target to GBM Core versus GBM Periphery. Exclude NormalBrain and cells without a source-supported donor or target label. Summarize eligible donors and class counts before modeling.
+3. Make donor-grouped training, validation, and test partitions. Keep all cells from each donor in one partition. Fit normalization, feature selection, dimensionality reduction, and model tuning using training donors only. Run a random-cell split only as a leakage diagnostic, not as the main performance estimate.
+4. Compare the attention model, inductive expression-graph model, PCA/logistic-regression baseline, and fixed 40-gene anatomical and 348-gene Xenium panels on identical held-out donors. Map each panel to measured assay genes. Build graph edges from expression features only; exclude donor IDs, test labels, anatomical labels, and test-to-test edges.
+5. Evaluate spatial transfer as a separate analysis. Apply the fixed panel to spatial specimens with measured Core/Periphery labels, hold out each specimen from fitting, and use only genes measured by that assay. Report donor/specimen metrics, uncertainty, class support, exclusions, and fit failures. Keep previously evaluated donors labeled exploratory.
 
 ### Track B — MRI growth, volume, and recurrence
 
-1. Build a MU patient/visit table. Verify diagnosis, dates, voxel spacing, masks, and volume definitions; convert voxels to physical volume.
-2. Keep each patient in one fold. Fit reaction-diffusion models on earlier scans; forecast later masks and compare with persistence and geometric growth.
-3. Fit the measurement-aware volume model on training patients. Compare with persistence, median-slope, and time-gap variance baselines. Check calibration, intervals, fit failures, and identifiability after simulation recovery checks.
-4. Register LUMIERE/RHUH MRI and recurrence masks. Compare model-risk regions with equal-volume 15 mm expansions. Score held-out enhancing-tumor and all-recurrence coverage; record exclusions and registration quality.
+1. Build a MU-Glioma-Post table with patient, diagnosis, visit date, scan interval, image spacing, mask source, and tumor-region labels. Check duplicates, missing visits, scan order, and GBM diagnosis. Convert voxel counts to cubic millimeters using image spacing and apply one written volume definition.
+2. Keep each patient in one evaluation fold. For each eligible forecast, use earlier scans for fitting and reserve a later scan for scoring. Fit the reaction-diffusion model and make a later-mask forecast without using the reserved mask. Compare the same patient and time gap with persistence and geometric-growth forecasts.
+3. Fit the measurement-aware log-volume model using training patients. Compare next-visit predictions with persistence, median-slope, and time-gap variance baselines. Before patient fitting, test parameter recovery on simulated data using the observed visit spacing. Record parameter bounds, failed fits, predictive intervals, calibration, and identifiability; stop inferential claims if recovery fails.
+4. For recurrence location, use LUMIERE and RHUH-GBM MRI and recurrence masks as separate cohorts. Align image and mask coordinates in physical space, define the starting core and brain mask, make a 15 mm expansion, and threshold the model-risk map to the same volume. Score held-out coverage for enhancing recurrence and all recurrence separately. Record registration quality, exclusions, patient overlap, and cohort terms.
 
 ### Track C — Treatment policies and MGMT association
 
-1. Freeze simulator, assumptions, thresholds, parameter grid, seeds, horizon, and budget. Resolve code-setting conflicts first.
-2. Pair initial tumor/clone states in adaptive and fixed five-days-on/23-days-off simulations. Separately compare Stupp-like, heuristic, PPO, and oracle-reference policies on held-out RL cases with equal budget.
-3. Record burden, modeled progression, resistant fraction, and exposure. Separately estimate MU MGMT/progression association after verifying codebook, time origin, event, censoring, and missingness. Report uncertainty; make no causal claim.
+1. Keep the two-population simulator and optimal-control/RL simulator as separate experiments. Before either run, record the simulator version, equations, assumptions, parameter grid, thresholds, random seeds, treatment budget, and time horizon. Resolve differences between source comments and executable settings before generating comparisons.
+2. In the two-population model, initialize paired runs with the same tumor and sensitive/resistant clone state. Compare adaptive dosing with the fixed five-days-on/23-days-off schedule across the prespecified growth and drug-effect settings. Save modeled burden over time, progression time, resistant fraction, and cumulative modeled dose for each run.
+3. In the separate RL model, use the same held-out virtual cases and equal modeled budget to compare the Stupp-like schedule, heuristic policy, PPO policy, and oracle-reference policy. Keep training cases separate from evaluation cases. Treat the oracle as a reference bound, not as a usable treatment policy.
+4. Analyze MGMT and progression in MU clinical data as a separate observational analysis. Verify MGMT code meanings, diagnosis, time origin, progression event, censoring, and missingness. Define the association and survival method before estimation; report eligible counts, exclusions, and uncertainty. Do not infer causal treatment benefit or use MGMT to set simulated resistance.
 
 ## Risk Assessment
 
