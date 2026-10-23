@@ -4,7 +4,7 @@ Updated 2026-10-22. Read this file before continuing work. The main project is n
 
 ## 1. Current goal
 
-Begin coding the GBM Tracks A, B, and C project. Keep all three tracks equally important and separate. The research-plan form remains a working document and can be finished later. Do not treat the tracks as one fused patient-level model.
+Begin coding the GBM Tracks A, B, and C project from the final proposed plan. Keep all three tracks equally important and separate. Do not treat the tracks as one fused patient-level model.
 
 The current forward plan is `paper/research_plan_complete_project_form.md`, with details in `paper/research_plan_complete_project_appendix.md`. Tracks A, B, and C are equally important. The plan contains questions and procedures, not project outcomes. Each analysis remains conditional on its data, rights, and protocol gates.
 
@@ -68,4 +68,4 @@ The old GBM source code, data, outputs, and archived documents remain in their e
 - **Track C:** freeze simulator equations, seeds, budgets, and endpoints; validate two-population dynamics; compare adaptive, fixed, and learned policies on common simulated cases; report sensitivity and failures. Keep MGMT association observational and separate.
 - **Validation:** use synthetic/unit tests first. Run full experiments only after input rights, provenance, inclusion, split, and failure rules are recorded. Preserve old outputs; never reuse spent test sets as confirmatory.
 
-The research-plan form and appendix are not coding specifications. Do not change them unless the user asks. Do not claim clinical benefit, validated patient-specific predictions, or a fused digital twin.
+The research-plan form and appendix specify intended methods, data gates, primary measures, baselines, and failure rules. Keep later code aligned with them; revise the plan before changing the research design. Do not claim clinical benefit, validated patient-specific predictions, or a fused digital twin.
