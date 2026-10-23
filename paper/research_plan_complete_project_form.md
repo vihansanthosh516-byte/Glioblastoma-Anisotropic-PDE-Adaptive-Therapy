@@ -1,51 +1,46 @@
 # GBM Tracks A, B, and C: research plan
 
-This document states the selected methods and planned measurements. It contains no project findings and assumes no direction or size of any effect. If any analysis was completed before this plan was submitted, disclose that work as the fair requires.
+This plan treats Tracks A, B, and C as equally important core parts of one GBM research project, while keeping their datasets and endpoints separate. Exploratory analyses and model development have already occurred; disclose that history without presenting earlier test sets as fresh confirmation. This plan states no project result values and makes no directional outcome prediction.
 
 ## Rationale
 
-Glioblastoma (GBM) varies between patients and within a tumor. Molecular data, MRI, and treatment models describe different parts of this disease (Hormuth et al., 2021). The available datasets do not share verified patient identifiers, so we cannot combine them into one patient-level model. We need to study them in three related but separate tracks. The mathematical focus is a state-space model that represents latent postoperative volume change and MRI measurement error separately. Better measurement models may help research teams interpret longitudinal imaging; this retrospective study will not guide patient care.
+GBM varies across patients and within tumors. Molecular expression and spatial assays, longitudinal MRI, and treatment simulations describe different aspects of the disease. The repository establishes no patient-level link between the atlas and MRI cohorts, so results will not be fused into a patient-specific model. The project studies (A) donor-held-out cell-label prediction and matched spatial transfer where data permit, (B) MRI growth/volume forecasts and a separate recurrence-location comparison, and (C) adaptive and optimal-control/RL policy simulations plus a separate observational MGMT association. Simulated effects will not be described as clinical treatment effects.
 
 ## Research Question/Hypothesis(es)/Engineering Goal(s)
 
-**Primary question:** How does a hierarchical state-space model of latent postoperative log-volume and MRI measurement error perform for next-scan prediction on held-out patients, compared with population-median log-volume slope and persistence baselines?
+**Track A:** How do attention and bounded graph models compare with simple classifiers and an exact source-identified gene panel for donor-held-out GBM Core/Periphery labels? Where matched source-labeled spatial data and reuse terms permit, how do those panels transfer to held-out spatial specimens?
 
-**Supporting questions:** How well do molecular features predict tumor-zone labels for donors excluded from training? How do selected reaction-diffusion and recurrence-risk methods compare with prespecified MRI baselines? How do adaptive and standard treatment schedules compare in simulations with assumed drug effects?
+**Track B:** How do reaction-diffusion forecasts compare with persistence and geometric-growth baselines for later MRI masks, and how do measurement-aware models compare with fixed baselines for next-scan core volume? Separately, on rights-cleared source data, how does a model-based recurrence-location map compare with an equal-volume 15 mm geometric expansion?
 
-**Hypothesis:** We make no directional prediction. We will estimate differences and uncertainty using prespecified two-sided comparisons.
+**Track C:** Under specified model assumptions, how do sensitive/resistant adaptive schedules and optimal-control/RL policies compare with fixed and simple-rule schedules? Separately, what observational association exists between verified MGMT status and progression-time measures in the eligible clinical cohort?
 
-**Engineering goal:** Build an auditable method for longitudinal GBM analysis that reports assumptions, uncertainty, and conditions where the method fails. The tracks remain separate because their patient cohorts cannot be linked.
+No directional hypothesis is made. The engineering goal is an auditable comparison across three core tracks, with measured, fitted, assumed, simulated, and observational quantities distinguished.
 
 ## Materials
 
-We need a computer with 16 CPU cores and 34 GB RAM, Python, the project’s scientific-computing packages, and the listed public data. Sources are the UCSC multiomic-gbm atlas; MU-Glioma-Post v1; UCSF-PDGM; RHUH-GBM brain-extracted NIfTI files; and LUMIERE. Dataset sizes, citations, URLs, and use terms appear in the appendix. LUMIERE use terms conflict between its article and file record, and file-level reuse terms for atlas exports need checking. We must verify the exact files and permitted use before analysis or transfer. PREDICT-GBM and the Abu Khalaf repeatability study are literature references, not project data. No chemicals, organisms, laboratory equipment, or human contact are involved.
+Use the UCSC multiomic-gbm atlas only after recording source release, files, donor mapping, and file-level terms. MU-Glioma-Post v1 has listed CC BY 4.0 terms for images, segmentations, and clinical files and will be used locally with citation. LUMIERE item records list CC0 while its paper limits use to noncommercial purposes; resolve exact file terms and use only within clearly permitted noncommercial scope. RHUH terms differ by file type: use only documented brain-extracted NIfTI derivatives if verified; raw DICOM is restricted. Exclude PREDICT-GBM and ALPTDG-derived packs unless exact upstream provenance and permission are documented; ALPTDG also requires its DUA. No patient contact or lab work is planned.
 
 ## Procedures
 
-1. **Track A — Molecular tumor-zone prediction**
-   1. Manifest the UCSC multiomic-gbm atlas; resolve donors from source metadata and exclude unresolved identities.
-   2. Split by donor, keeping each donor's cells in one group. Fit the attention-gated classifier on training and validation donors.
-   3. Compare with fixed PCA/logistic-regression and 200-gene logistic-regression baselines. Measure test-donor macro-F1 and donor-level uncertainty.
+1. **Track A — Molecular and spatial analyses**
+   1. Resolve atlas release, files, labels, aliases, and terms. Compare attention-gated, label-safe inductive graph, PCA/logistic, and an exact source-identified panel on donor-held-out Core/Periphery labels; fit preprocessing within training folds.
+   2. If exact source panels, matched specimens, spatial labels, and terms permit, evaluate panels on patient-held-out spatial specimens. Report donor/specimen-level metrics and limits; otherwise stop that component.
 
-2. **Track B — MRI growth, recurrence, and measurement-aware modeling**
-   1. Manifest eligible MRI visits, scan day, mask source, voxel size, labels, exclusions, and file terms. Do not link patients across cohorts.
-   2. Compare patient-fold reaction-diffusion forecasts with persistence and geometric-growth forecasts. Compare selected preoperative recurrence-risk maps with an equal-volume 15 mm expansion; score enhancing recurrence first and all recurrence second.
-   3. Fit the hierarchical state-space model to positive postoperative log-volumes, separating latent net trend, process noise, and scan error. Check parameter recovery on simulated visit schedules; compare rolling next-scan predictive scores with population-median-slope and persistence baselines.
-   4. Report estimates, two-sided intervals, calibration, exclusions, sensitivity analyses, and prespecified fit failures.
+2. **Track B — MRI growth and recurrence endpoints**
+   1. For MU mask/core-volume forecasts, validate visits, dates, labels, and voxel sizes; compare the documented PDE solver with persistence and training-fold geometric growth, and compare a measurement-aware volume model with persistence, median slope, and a time-gap variance baseline.
+   2. Separately compare recurrence coverage from source-built MRI risk maps with an equal-volume 15 mm geometric expansion. Use only rights-cleared files; exclude unverified PREDICT/ALPTDG derivatives. The expansion is a geometric comparator, not a clinical treatment plan.
 
-3. **Track C — Treatment-policy simulation**
-   1. Run the sensitive/resistant-cell simulator with MRI-derived growth inputs and assumed drug-kill rates. Compare adaptive and maximum-tolerated-dose schedules across the fixed ratio grid.
-   2. Record modeled progression time, burden, resistance, dose, and censoring. Analyze MGMT-associated patient outcomes separately as observational data, not treatment effects.
+3. **Track C — Policy simulation and clinical association**
+   1. Compare the two-population adaptive schedule with the source-defined 5-days-on/23-days-off schedule across the documented effect/growth sweep. In the separate equal-budget RL model compare Stupp-like, heuristic, PPO, and oracle-reference policies under the documented budget and horizon. Keep all effects simulated.
+   2. Separately estimate an observational MGMT/progression association only after verifying field coding, time origin, event/censor definitions, and missingness. Do not map MGMT to simulated resistance or infer treatment benefit.
 
 ## Risk Assessment
 
-We use de-identified records and follow the terms for each file. We must avoid re-identification, guessed patient links, unauthorized redistribution, and transfer to a cloud GPU unless the exact data terms allow it. Public derivatives and raw DICOM can have different access rules. No participant is contacted and no new human or animal data are collected; we need to ask the fair review committee whether secondary analysis needs prior review.
-
-The main ethical risk is readers treating computational results as medical advice. State that the work is retrospective, uses public data, and does not estimate patient-specific treatment benefit or guide care.
+Use de-identified records and comply with exact file terms and agreements. Keep data local unless the source explicitly permits the intended hosting. The repository records prior cloud packaging that includes ALPTDG-derived labels; its DUA and transfer permission have not been established here. Do not re-identify participants or infer patient links across datasets. Simulations and observational associations do not guide clinical care.
 
 ## Data Analysis
 
-Use donor-level units for Track A and patient-level units for Tracks B and C. Report macro-F1 and donor-level uncertainty; paired Dice and equal-volume recurrence coverage with patient-level uncertainty; simulation summaries for every assumed drug-effect setting; and observational MGMT associations separately. For the state-space model, report parameter-recovery coverage, profile-likelihood diagnostics, predictive calibration, and paired patient-level log-score differences against both baselines. Use two-sided intervals and report estimates regardless of direction. Do not infer clinical benefit, causal treatment effects, or a linked molecular-to-MRI model. Report failed fits and eligibility shortfalls without relaxing rules after examining results.
+Track A uses donor-held-out folds, donor-wise macro-F1/class metrics, and donor-level uncertainty. Track B reports patient-paired Dice for mask forecasting; volume forecasts use patient-level predictive log scores, calibration, intervals, and fit/identifiability diagnostics. The recurrence endpoint reports enhancing-tumor and all-recurrence coverage separately against the equal-volume 15 mm comparator. Track C reports every simulation setting and policy comparison; MGMT associations remain separate observational estimates. Use common evaluation units within comparisons, report failures and exclusions, and do not present reused cohorts as fresh confirmation. Keep all three tracks distinct.
 
 ## Bibliography
 

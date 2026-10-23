@@ -6,7 +6,7 @@ Updated 2026-10-22. Read this file before continuing work. The main project is n
 
 Reorganize and improve the old GBM project into a defensible science-fair research plan. The future plan must account for Tracks A, B, and C, use openly downloadable data, and clearly separate measured data from assumptions and simulations.
 
-This update only organizes files and records known improvement needs. It does not choose a final research question, approve an analysis, run code, download data, or change results.
+The current forward plan is `paper/research_plan_complete_project_form.md`, with details in `paper/research_plan_complete_project_appendix.md`. Tracks A, B, and C are equally important. The plan contains questions and procedures, not project outcomes. Each analysis remains conditional on its data, rights, and protocol gates.
 
 ## 2. Project shape
 
@@ -35,7 +35,7 @@ Use [README_STATUS.md](README_STATUS.md) for detailed numbers and the [findings 
 - [Findings ledger](vault/PAPER_FINDINGS_LEDGER.md)
 - [Archived GBM documents](archive_old_gbm/README.md)
 
-Prior drafts exist. The forward plan in paper/research_plan_full_story_2026-10-22.md centers a MU/LUMIERE growth-forecast study and does not set roles for all three tracks, so it is not adopted as the current plan. The RANO-derived form and appendix remain unchanged. Use the improvement backlog when preparing the new GBM plan.
+Prior drafts exist. `paper/research_plan_full_story_2026-10-22.md` centers an MU/LUMIERE growth-forecast study and is not the current plan. The RANO-derived form and appendix remain unchanged.
 
 ## 5. Evidence and workflow rules
 
@@ -44,15 +44,15 @@ Prior drafts exist. The forward plan in paper/research_plan_full_story_2026-10-2
 3. Keep negative results and state the weakest point beside each result.
 4. Do not reuse the H-2 or H-3 evaluation sets as fresh confirmatory tests; those sets are spent.
 5. Do not claim patient-specific treatment benefit, clinical validity, or a validated digital twin from the current simulations.
-6. Before any new analysis, write a separate GBM plan that fixes the question, open dataset and license, inclusion rules, model, baselines, held-out evaluation, and failure rule.
+6. Before each new analysis, close the applicable source, provenance, inclusion, model, evaluation, and failure-rule gates in the current plan and its protocol manifest.
 7. Keep patient data de-identified and follow each dataset's access and use terms.
 
 ## 6. Separate preserved work
 
 The probabilistic RANO project is no longer the main project. Its plans, declarations, results, technical note, code, and outputs remain in place as a separate historical record. In particular, analysis_plan_v1.md and the RANO-derived research-plan drafts remain unchanged and do not define the new GBM project.
 
-The old GBM source code, data, outputs, and archived documents also remain in their existing locations. This organization pass changes navigation and project status only.
+The old GBM source code, data, outputs, and archived documents remain in their existing locations. The current plan documents intended future analyses; it does not change historical results or authorize use of files whose terms remain unresolved.
 
 ## 7. Next step
 
-Use the improvement backlog to build the GBM science-fair research plan. Decide which track supplies the primary question and outcome, and define the roles of the other tracks. Do not start new analysis or code until that plan is reviewed and recorded.
+Review the current form and appendix for factual accuracy and venue field limits. Close the protocol-manifest gates before each affected analysis. Keep all three tracks core and separate. Do not describe historical test sets as fresh confirmation or claim a patient-level fused model. Do not start new analysis or code until the plan and applicable review are recorded.
