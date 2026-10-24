@@ -86,7 +86,7 @@ def test_heldout_truth_does_not_change_fitted_forecast(monkeypatch):
 
     def fake_fit(masks, fit_days, h, domain=None):
         observed_fit_inputs.append((len(masks), tuple(fit_days), [int(m.sum()) for m in masks]))
-        return {"rho": 0.04, "D": 0.05, "sse_log_volume": 0.0}
+        return {"rho": 0.04, "D": 0.05, "sse_log_volume": 0.0, "dice": [1.0, 1.0]}
 
     monkeypatch.setattr(fi, "fit_fk_masks", fake_fit)
     truth_a = ball(shape=shape, radius=4.0)
