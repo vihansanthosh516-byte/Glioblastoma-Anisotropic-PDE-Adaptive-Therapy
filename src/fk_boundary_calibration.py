@@ -6,7 +6,62 @@ record which patients trained its forecast; the held-out patient must be absent 
 from __future__ import annotations
 
 import numpy as np
+from scipy import ndimage
 from scipy.optimize import nnls
+
+from src.fk_spatial_uncertainty import deterministic_surface_anchors
+
+
+def make_cross_fitted_boundary_residual_case(*, patient_id, origin_id, training_patient_ids,
+                                             target_mask, pre_boundary_probability,
+                                             spacing_mm=1.0, n_anchors: int = 256) -> dict:
+    """Create one calibration residual vector after forecasting a held-out patient from history only.
+
+    The target mask is used only to define target-surface anchors and residual values. The caller must provide
+    the patient IDs used to fit every forecast nuisance parameter; this function rejects self-inclusion.
+    """
+    if patient_id is None or origin_id is None:
+        raise ValueError("patient_id and origin_id must be present")
+    patient_id = str(patient_id).strip()
+    origin_id = str(origin_id).strip()
+    if not patient_id or not origin_id:
+        raise ValueError("patient_id and origin_id must be nonempty")
+    if isinstance(training_patient_ids, (str, bytes)):
+        raise ValueError("training_patient_ids must be a collection of patient identifiers")
+    training_ids = [str(value).strip() for value in training_patient_ids]
+    if not training_ids or any(not value for value in training_ids):
+        raise ValueError("training_patient_ids must contain nonempty identifiers")
+    if patient_id in set(training_ids):
+        raise ValueError("held-out patient must not appear in forecast training IDs")
+
+    target = np.asarray(target_mask, dtype=bool)
+    probability = np.asarray(pre_boundary_probability, dtype=float)
+    spacing = np.broadcast_to(np.asarray(spacing_mm, dtype=float), (3,)).copy()
+    if (target.ndim != 3 or probability.shape != target.shape or not target.any() or target.all()
+            or not np.isfinite(probability).all() or np.any((probability < 0) | (probability > 1))):
+        raise ValueError("target and forecast probability must be valid matching 3D arrays")
+    if not np.isfinite(spacing).all() or np.any(spacing <= 0):
+        raise ValueError("spacing_mm must contain three positive finite values")
+    forecast_mask = probability >= 0.5
+    if not forecast_mask.any() or forecast_mask.all():
+        raise ValueError("median pre-boundary forecast must be nonempty and not fill the domain")
+
+    anchors = deterministic_surface_anchors(target, spacing_mm=spacing, n_anchors=n_anchors)
+    anchor_indices = (anchors / spacing).T
+    target_distance = (ndimage.distance_transform_edt(target, sampling=spacing)
+                       - ndimage.distance_transform_edt(~target, sampling=spacing))
+    forecast_distance = (ndimage.distance_transform_edt(forecast_mask, sampling=spacing)
+                         - ndimage.distance_transform_edt(~forecast_mask, sampling=spacing))
+    observed = ndimage.map_coordinates(target_distance, anchor_indices, order=1, mode="nearest")
+    predicted = ndimage.map_coordinates(forecast_distance, anchor_indices, order=1, mode="nearest")
+    return {
+        "patient_id": patient_id,
+        "origin_id": origin_id,
+        "training_patient_ids": training_ids,
+        "residuals_mm": np.asarray(predicted - observed, dtype=float),
+        "anchor_points_mm": anchors,
+        "target_used_for": "held-out residual measurement only",
+    }
 
 
 def fit_cross_fitted_boundary_covariance(calibration_cases, *, ell_candidates_mm=(5.0, 10.0, 20.0)) -> dict:

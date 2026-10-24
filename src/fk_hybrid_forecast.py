@@ -129,6 +129,7 @@ def hybrid_posterior_predictive_forecast(masks, days, target_day, *, prior: dict
     seed_sequences = boundary_seed.spawn(n_draws)
     parameter_draws = posterior["parameter_draws_log"]
     masks_out = []
+    pre_boundary_probability = np.zeros(masks[0].shape, dtype=np.float32)
     for draw_index, (log_rho, log_D) in enumerate(parameter_draws):
         rho, diffusion = float(np.exp(log_rho)), float(np.exp(log_D))
         concentration = fi.forward_concentrations(
@@ -139,6 +140,7 @@ def hybrid_posterior_predictive_forecast(masks, days, target_day, *, prior: dict
         )
         if sized_mask.all() or not sized_mask.any():
             raise ValueError("volume-matched forecast has no usable boundary")
+        pre_boundary_probability += sized_mask.astype(np.float32) / n_draws
         boundary_draw = correlated_boundary_perturbation(
             sized_mask,
             sigma_b_mm=boundary_covariance["sigma_b_mm"],
@@ -161,6 +163,7 @@ def hybrid_posterior_predictive_forecast(masks, days, target_day, *, prior: dict
     )
     return {
         "mask_draws": mask_draws,
+        "pre_boundary_probability": pre_boundary_probability,
         "no_pde_ranker_mask_draws": no_pde_ranker_draws,
         "parameter_draws_log": parameter_draws,
         "requested_volume_draws_voxels": requested_voxels,
