@@ -53,24 +53,98 @@ def test_training_nuisance_records_only_fit_cohort_and_uses_training_series():
 
 def test_outer_gate_scores_each_synthetic_patient_once_and_withholds_target_mask(monkeypatch):
     observed = []
+    mismatched_covariance = {"sigma_b_mm": 0.2, "tau_b_mm": 0.05, "ell_mm": 2.0}
 
     def cheap_forecast(masks, days, target_day, **kwargs):
         last = np.asarray(masks[-1], dtype=bool)
-        observed.append((len(masks), float(target_day), kwargs["population_log_volume_slope_per_day"]))
+        observed.append((len(masks), float(target_day), kwargs["population_log_volume_slope_per_day"],
+                         kwargs["boundary_covariance"]))
         draws = np.stack([last, last], axis=0)
         return {"mask_draws": draws, "no_pde_ranker_mask_draws": draws.copy(),
                 "requested_volume_draws_voxels": np.asarray([last.sum(), last.sum()])}
 
     result = gate.run_synthetic_gate(
         replicates_per_condition=2, n_folds=2, seed=37, forecast_function=cheap_forecast,
+        forecast_nuisance_overrides={"boundary_covariance": mismatched_covariance},
+        boundary_calibration_mode="oracle",
     )
 
     assert len(result["rows"]) == 8
     assert len({row["patient_id"] for row in result["rows"]}) == 8
     assert len(observed) == 8
-    assert all(history_count == 3 and target_day > 0 for history_count, target_day, _ in observed)
+    assert all(history_count == 3 and target_day > 0 and covariance == mismatched_covariance
+               for history_count, target_day, _, covariance in observed)
+    assert result["metadata"]["boundary_covariance_truth"] != \
+        result["metadata"]["boundary_covariance_model_input"]
+    assert not result["metadata"]["boundary_covariance_is_oracle_input"]
+    assert result["metadata"]["boundary_covariance_calibration_status"] == "not_run_oracle"
     assert result["summary"]["n_patients"] == 8
     assert set(result["summary"]["by_condition"]) == {
         "isotropic|growth", "isotropic|shrinkage",
         "anisotropic|growth", "anisotropic|shrinkage",
     }
+
+
+def test_outer_gate_can_estimate_boundary_covariance_from_inner_heldout_patients(monkeypatch):
+    observed_covariances = []
+
+    def cheap_series(row):
+        coordinates = np.indices((16, 16, 16), dtype=float)
+        volume_sign = 1.0 if row["volume_trend"] == "growth" else -0.5
+        masks = []
+        for scan_index in range(4):
+            center_x = 7.0 + 0.2 * scan_index
+            radius = 3.8 + volume_sign * 0.15 * scan_index
+            mask = ((coordinates[0] - center_x) ** 2
+                    + (coordinates[1] - 7.0) ** 2
+                    + (coordinates[2] - 8.0) ** 2) <= radius ** 2
+            masks.append(mask)
+        truth = {"diffusion_truth": row["diffusion_truth"], "volume_trend": row["volume_trend"]}
+        return gate.PatientSeries(row["case_id"], np.asarray([0.0, 15.0, 35.0, 60.0]), tuple(masks)), truth
+
+    monkeypatch.setattr(gate, "generate_synthetic_series", cheap_series)
+
+    def cheap_forecast(masks, days, target_day, **kwargs):
+        last = np.asarray(masks[-1], dtype=bool)
+        observed_covariances.append(dict(kwargs["boundary_covariance"]))
+        draws = np.stack([last, last], axis=0)
+        return {"mask_draws": draws, "no_pde_ranker_mask_draws": draws.copy(),
+                "requested_volume_draws_voxels": np.asarray([last.sum(), last.sum()]),
+                "pre_boundary_probability": last.astype(float)}
+
+    result = gate.run_synthetic_gate(
+        replicates_per_condition=3, n_folds=3, seed=47, forecast_function=cheap_forecast,
+        forecast_config={"n_anchors": 8}, boundary_calibration_mode="cross_fitted", inner_n_folds=2,
+    )
+
+    metadata = result["metadata"]
+    assert len(result["rows"]) == 12
+    assert len(observed_covariances) == 36  # 24 inner calibration plus 12 outer forecasts.
+    assert metadata["boundary_calibration_mode"] == "cross_fitted"
+    assert metadata["boundary_covariance_model_input"] is None
+    assert not metadata["boundary_covariance_is_oracle_input"]
+    assert metadata["boundary_covariance_crossfit_start_input"] == gate.BOUNDARY_CALIBRATION_START
+    calibration_calls = (observed_covariances[0:8] + observed_covariances[12:20]
+                          + observed_covariances[24:32])
+    assert calibration_calls == [gate.BOUNDARY_CALIBRATION_START] * 24
+    fits = metadata["boundary_covariance_estimates_by_outer_fold"]
+    assert len(fits) == 3
+    boundary_folds = sum(fit["selection_boundary"] for fit in fits)
+    assert metadata["boundary_covariance_search_boundary_fold_count"] == boundary_folds
+    assert metadata["boundary_covariance_calibration_status"] == (
+        "inconclusive_search_boundary" if boundary_folds else "all_folds_interior"
+    )
+    assert "diagnostic only" in metadata["boundary_covariance_status_rule"]
+    assert all(fit["n_outer_training_patients"] == 8 for fit in fits)
+    assert all(fit["n_calibration_patients"] == 8 for fit in fits)
+    assert all(set(fit["estimate"]) == {"sigma_b_mm", "tau_b_mm", "ell_mm"} for fit in fits)
+    assert all(np.isfinite(list(fit["estimate"].values())).all() for fit in fits)
+    assert all(value >= 0 for fit in fits for value in fit["estimate"].values())
+
+
+def test_cross_fitted_mode_rejects_a_fixed_boundary_covariance_override():
+    with np.testing.assert_raises_regex(ValueError, "estimates it from training patients"):
+        gate.run_synthetic_gate(
+            forecast_nuisance_overrides={"boundary_covariance": gate.BOUNDARY_TRUTH},
+            boundary_calibration_mode="cross_fitted",
+        )

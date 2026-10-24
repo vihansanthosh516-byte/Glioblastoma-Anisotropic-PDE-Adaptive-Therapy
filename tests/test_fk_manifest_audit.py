@@ -106,6 +106,26 @@ def test_patient_pair_counts_must_match_pair_manifest():
     assert codes["patient_primary_pair_count_mismatches"] == 1
 
 
+def test_audit_reports_aggregate_count_of_eligible_four_visit_patients():
+    scans, patients, pairs, splits = valid_rows()
+    scans.extend([
+        {"patient_id": "MU-1", "dataset": "MU", "scan_number": "3", "day": "60", "mask_exists": "True"},
+        {"patient_id": "MU-1", "dataset": "MU", "scan_number": "4", "day": "90", "mask_exists": "True"},
+    ])
+    patients[0].update({"n_scans": "4", "n_forecast_pairs": "3", "n_primary_pairs": "3"})
+    pairs.extend([
+        {"patient_id": "MU-1", "tp_in": "2", "tp_out": "3", "day_in": "30",
+         "day_out": "60", "dt_days": "30", "input_core_nonempty": "True", "in_primary": "True"},
+        {"patient_id": "MU-1", "tp_in": "3", "tp_out": "4", "day_in": "60",
+         "day_out": "90", "dt_days": "30", "input_core_nonempty": "True", "in_primary": "True"},
+    ])
+
+    report = audit_mu_manifests(scans, patients, pairs, splits)
+
+    assert report["summary"]["eligible_mu_patients_with_4plus_manifest_flagged_scans"] == 1
+    assert "MU-1" not in json.dumps(report)
+
+
 def test_missing_days_and_unmatched_split_rows_are_reported():
     scans, patients, pairs, splits = valid_rows()
     scans[1]["day"] = ""

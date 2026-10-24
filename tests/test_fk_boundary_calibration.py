@@ -10,9 +10,12 @@ REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO))
 
 from src.fk_boundary_calibration import (  # noqa: E402
+    assign_patient_folds,
     fit_cross_fitted_boundary_covariance,
     make_cross_fitted_boundary_residual_case,
+    run_cross_fitted_boundary_calibration,
 )
+from src.fk_patient_cv import PatientSeries  # noqa: E402
 from src.fk_spatial_uncertainty import exponential_covariance_matrix  # noqa: E402
 
 
@@ -85,4 +88,57 @@ def test_residual_case_rejects_target_patient_in_training_ids():
         make_cross_fitted_boundary_residual_case(
             patient_id="p1", origin_id="o1", training_patient_ids=["p1", "p2"],
             target_mask=target, pre_boundary_probability=target.astype(float), n_anchors=10,
+        )
+
+
+def _series(patient_id):
+    shape = (16, 16, 16)
+    base = np.zeros(shape, dtype=bool)
+    base[5:11, 5:11, 5:11] = True
+    masks = [base.copy(), base.copy(), base.copy(), np.roll(base, 1, axis=0)]
+    return PatientSeries(patient_id, np.asarray([0.0, 20.0, 40.0, 60.0]), tuple(masks))
+
+
+def test_inner_patient_folds_are_balanced_deterministic_and_cover_each_id_once():
+    patient_ids = [f"p{i}" for i in range(12)]
+    first = assign_patient_folds(patient_ids, n_folds=4, seed=101)
+    second = assign_patient_folds(patient_ids, n_folds=4, seed=101)
+
+    assert first == second
+    assert set(first) == set(patient_ids)
+    assert {fold: list(first.values()).count(fold) for fold in range(4)} == {0: 3, 1: 3, 2: 3, 3: 3}
+
+
+def test_cross_fitted_boundary_calibration_excludes_each_patient_from_its_forecast_fit():
+    records = [_series(f"p{i}") for i in range(6)]
+    forecasted = []
+
+    def fit_nuisance(training_records):
+        return {"training_ids": {record.patient_id for record in training_records}}
+
+    def forecast(history, nuisance):
+        assert not hasattr(history, "target")
+        assert history.patient_id not in nuisance["training_ids"]
+        forecasted.append(history.patient_id)
+        return {"pre_boundary_probability": history.masks[-1].astype(float)}
+
+    result = run_cross_fitted_boundary_calibration(
+        records, fit_nuisance, forecast, n_folds=3, seed=33, n_anchors=24,
+        ell_candidates_mm=(2.0, 5.0, 10.0),
+    )
+
+    assert len(forecasted) == len(set(forecasted)) == 6
+    assert result["covariance_fit"]["n_calibration_patients"] == 6
+    assert len(result["residual_cases"]) == 6
+    assert all(case["patient_id"] not in case["training_patient_ids"]
+               for case in result["residual_cases"])
+    assert all(fold["n_test_patients"] == 2 for fold in result["fold_audit"])
+
+
+def test_cross_fitted_boundary_calibration_requires_pre_boundary_probability():
+    records = [_series(f"p{i}") for i in range(4)]
+    with pytest.raises(ValueError, match="pre_boundary_probability"):
+        run_cross_fitted_boundary_calibration(
+            records, lambda training: {}, lambda history, nuisance: {},
+            n_folds=2, seed=5, n_anchors=12, ell_candidates_mm=(2.0, 5.0),
         )

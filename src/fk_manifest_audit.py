@@ -95,6 +95,7 @@ def audit_mu_manifests(scan_rows, patient_rows, pair_rows, split_rows, *,
     issues: Counter[str] = Counter()
     scan_map = {}
     scan_patient_ids = set()
+    patient_usable_scan_counts = Counter()
     scan_days_missing = 0
     duplicate_scan_keys = 0
     for row in scans:
@@ -108,6 +109,9 @@ def audit_mu_manifests(scan_rows, patient_rows, pair_rows, split_rows, *,
             duplicate_scan_keys += 1
         else:
             scan_map[key] = row
+            if (_number(row.get("day")) is not None
+                    and _boolean(row.get("mask_exists")) is True):
+                patient_usable_scan_counts[patient_id] += 1
         scan_patient_ids.add(patient_id)
         if _number(row.get("day")) is None:
             scan_days_missing += 1
@@ -291,6 +295,17 @@ def audit_mu_manifests(scan_rows, patient_rows, pair_rows, split_rows, *,
         "mu_scan_rows": len(scans),
         "mu_unique_scan_keys": len(scan_map),
         "mu_unique_scan_patients": len(scan_patient_ids),
+        "mu_patients_with_4plus_day_and_mask_flag_scans": sum(
+            count >= 4 for count in patient_usable_scan_counts.values()
+        ),
+        "eligible_mu_patients_with_4plus_manifest_flagged_scans": sum(
+            _boolean(row.get("eligible")) is True and patient_usable_scan_counts[patient_id] >= 4
+            for patient_id, row in patient_map.items()
+        ),
+        "eligible_mu_patients_with_5plus_manifest_flagged_scans": sum(
+            _boolean(row.get("eligible")) is True and patient_usable_scan_counts[patient_id] >= 5
+            for patient_id, row in patient_map.items()
+        ),
         "scan_records_missing_day": scan_days_missing,
         "mu_patient_rows": len(patients),
         "mu_eligible_patients": sum(_boolean(row.get("eligible")) is True for row in patients),

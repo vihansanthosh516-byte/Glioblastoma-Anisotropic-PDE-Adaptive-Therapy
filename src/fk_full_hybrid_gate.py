@@ -15,6 +15,7 @@ import time
 import numpy as np
 
 from src import fk_mask_inverse as fi
+from src.fk_boundary_calibration import run_cross_fitted_boundary_calibration
 from src.fk_grid_likelihood import volume_match_concentration
 from src.fk_hybrid_forecast import estimate_log_volume_slope
 from src.fk_patient_cv import PatientSeries, run_outer_patient_cv
@@ -37,6 +38,9 @@ TRAINING_DAYS = (0.0, 15.0, 35.0)
 DIFFUSION_TRUTHS = ("isotropic", "anisotropic")
 VOLUME_TRENDS = ("growth", "shrinkage")
 BOUNDARY_TRUTH = {"sigma_b_mm": 0.6, "tau_b_mm": 0.2, "ell_mm": 4.0}
+# Fixed working value used only to construct cross-fitted forecasts before residual covariance is estimated.
+# It is deliberately distinct from the synthetic generator's covariance and is not a claimed scanner-noise value.
+BOUNDARY_CALIBRATION_START = {"sigma_b_mm": 0.8, "tau_b_mm": 0.3, "ell_mm": 6.0}
 
 
 def build_synthetic_manifest(replicates_per_condition: int = 25, n_folds: int = 5,
@@ -299,12 +303,115 @@ def _summarize(rows: list[dict]) -> dict:
 
 def run_synthetic_gate(*, replicates_per_condition: int = 25, n_folds: int = 5,
                        seed: int = 20261024, forecast_function=None,
-                       forecast_config: dict | None = None) -> dict:
-    """Run the full hybrid on synthetic, patient-held-out histories and score matched-size ablations."""
+                       forecast_config: dict | None = None,
+                       forecast_nuisance_overrides: dict | None = None,
+                       boundary_calibration_mode: str = "cross_fitted",
+                       inner_n_folds: int = 2) -> dict:
+    """Run the hybrid on synthetic, patient-held-out histories and score matched-size ablations.
+
+    By default, each outer fold estimates boundary covariance from inner patient-held-out residuals drawn
+    only from that fold's training patients. ``oracle`` mode is retained only to reproduce the favorable
+    historical simulation; it supplies the generator's known covariance.
+    """
     from src import fk_hybrid_forecast as hybrid
     forecast_function = forecast_function or hybrid.hybrid_posterior_predictive_forecast
     forecast_config = {"n_coarse": 5, "n_refine": 3, "n_draws": 16, "n_anchors": 24,
                        **(forecast_config or {})}
+    if boundary_calibration_mode not in {"cross_fitted", "oracle"}:
+        raise ValueError("boundary_calibration_mode must be 'cross_fitted' or 'oracle'")
+    if (isinstance(inner_n_folds, (bool, np.bool_)) or int(inner_n_folds) != inner_n_folds
+            or inner_n_folds < 2):
+        raise ValueError("inner_n_folds must be an integer of at least two")
+    inner_n_folds = int(inner_n_folds)
+    overrides = {} if forecast_nuisance_overrides is None else dict(forecast_nuisance_overrides)
+    allowed_overrides = {"boundary_covariance", "prior"}
+    if set(overrides) - allowed_overrides:
+        raise ValueError(f"unsupported forecast nuisance overrides: {sorted(set(overrides) - allowed_overrides)}")
+    if boundary_calibration_mode == "cross_fitted" and "boundary_covariance" in overrides:
+        raise ValueError("boundary covariance overrides require oracle mode; cross-fitted mode estimates it from training patients")
+    model_covariance = dict(overrides.get("boundary_covariance", BOUNDARY_TRUTH))
+    required_covariance = {"sigma_b_mm", "tau_b_mm", "ell_mm"}
+    if set(model_covariance) != required_covariance:
+        raise ValueError("boundary covariance override must specify sigma_b_mm, tau_b_mm, and ell_mm")
+    try:
+        model_covariance = {key: float(value) for key, value in model_covariance.items()}
+    except (TypeError, ValueError, OverflowError) as exc:
+        raise ValueError("boundary covariance override values must be numeric") from exc
+    if (not all(np.isfinite(value) for value in model_covariance.values())
+            or model_covariance["sigma_b_mm"] < 0 or model_covariance["tau_b_mm"] < 0
+            or model_covariance["ell_mm"] <= 0):
+        raise ValueError("boundary covariance override parameters are outside their valid ranges")
+    model_prior = overrides.get("prior", {"mean": np.log([0.04, 0.05]), "covariance": np.eye(2) * 0.25})
+    if not isinstance(model_prior, dict):
+        raise ValueError("parameter prior override must be a mapping")
+    prior_mean = np.asarray(model_prior.get("mean"), dtype=float)
+    prior_covariance = np.asarray(model_prior.get("covariance"), dtype=float)
+    if (prior_mean.shape != (2,) or prior_covariance.shape != (2, 2)
+            or not np.isfinite(prior_mean).all() or not np.isfinite(prior_covariance).all()
+            or not np.allclose(prior_covariance, prior_covariance.T)
+            or np.linalg.eigvalsh(prior_covariance).min() <= 0):
+        raise ValueError("parameter prior override must have a finite 2-vector mean and positive-definite covariance")
+    model_prior = {"mean": prior_mean, "covariance": prior_covariance}
+
+    boundary_calibration_fits = []
+
+    def fit_outer_training_nuisance(train_records):
+        fitted = fit_training_nuisance(train_records)
+        fitted["prior"] = model_prior
+        if boundary_calibration_mode == "oracle":
+            fitted["boundary_covariance"] = dict(model_covariance)
+            fitted["boundary_covariance_source"] = (
+                "prespecified sensitivity override" if overrides
+                else "known simulation generator (oracle)"
+            )
+            return fitted
+
+        if len(train_records) - int(np.ceil(len(train_records) / inner_n_folds)) < 3:
+            raise ValueError("each inner calibration training split must contain at least three patients")
+
+        def fit_inner_nuisance(inner_training_records):
+            inner = fit_training_nuisance(inner_training_records)
+            inner["prior"] = model_prior
+            # The covariance enters the PDE shape likelihood, so it must remain positive definite. This
+            # prespecified working value is not the generator truth and is replaced by cross-fit residuals.
+            inner["boundary_covariance"] = dict(BOUNDARY_CALIBRATION_START)
+            return inner
+
+        def forecast_for_calibration(history, inner_nuisance):
+            prediction = _forecast_callback(
+                history, inner_nuisance, forecast_function=forecast_function, forecast_config=forecast_config,
+            )
+            forecast = prediction["forecast"]
+            if "pre_boundary_probability" not in forecast:
+                raise ValueError("cross-fitted boundary calibration requires pre_boundary_probability")
+            return {"pre_boundary_probability": forecast["pre_boundary_probability"]}
+
+        training_ids = sorted(record.patient_id for record in train_records)
+        calibration_seed = int.from_bytes(
+            hashlib.sha256("\0".join(training_ids).encode("utf-8")).digest()[:4], "little"
+        )
+        calibration = run_cross_fitted_boundary_calibration(
+            train_records, fit_inner_nuisance, forecast_for_calibration,
+            n_folds=inner_n_folds, seed=calibration_seed,
+            minimum_history=3, spacing_mm=SPACING_MM, n_anchors=forecast_config["n_anchors"],
+        )
+        covariance_fit = calibration["covariance_fit"]
+        estimated_covariance = {
+            key: float(covariance_fit[key]) for key in ("sigma_b_mm", "tau_b_mm", "ell_mm")
+        }
+        fitted["boundary_covariance"] = estimated_covariance
+        fitted["boundary_covariance_source"] = "inner patient-held-out residuals from outer-training patients"
+        boundary_calibration_fits.append({
+            "n_outer_training_patients": len(train_records),
+            "n_calibration_patients": int(covariance_fit["n_calibration_patients"]),
+            "n_calibration_origins": int(covariance_fit["n_calibration_origins"]),
+            "estimate": estimated_covariance,
+            "selection_boundary": bool(covariance_fit["selection_boundary"]),
+            "weighted_rmse_mm2": float(covariance_fit["candidate_fits"][covariance_fit["ell_mm"]]["weighted_rmse_mm2"]),
+            "fit_scope": covariance_fit["scope"],
+        })
+        return fitted
+
     manifest = build_synthetic_manifest(replicates_per_condition, n_folds, seed)
     generated = [generate_synthetic_series(row) for row in manifest]
     records = [record for record, _ in generated]
@@ -312,7 +419,7 @@ def run_synthetic_gate(*, replicates_per_condition: int = 25, n_folds: int = 5,
     folds = {row["case_id"]: int(row["fold"]) for row in manifest}
     started = time.perf_counter()
     result = run_outer_patient_cv(
-        records, folds, fit_training_nuisance,
+        records, folds, fit_outer_training_nuisance,
         lambda history, nuisance: _forecast_callback(
             history, nuisance, forecast_function=forecast_function, forecast_config=forecast_config,
         ),
@@ -325,6 +432,15 @@ def run_synthetic_gate(*, replicates_per_condition: int = 25, n_folds: int = 5,
             "diffusion_truth": truth["diffusion_truth"],
             "volume_trend": truth["volume_trend"],
         })
+    boundary_search_boundary_folds = sum(
+        fit["selection_boundary"] for fit in boundary_calibration_fits
+    )
+    if boundary_calibration_mode == "oracle":
+        boundary_calibration_status = "not_run_oracle"
+    elif boundary_search_boundary_folds:
+        boundary_calibration_status = "inconclusive_search_boundary"
+    else:
+        boundary_calibration_status = "all_folds_interior"
     return {
         "manifest": manifest,
         "rows": result["rows"],
@@ -336,9 +452,22 @@ def run_synthetic_gate(*, replicates_per_condition: int = 25, n_folds: int = 5,
             "conditions": [f"{d}|{v}" for d in DIFFUSION_TRUTHS for v in VOLUME_TRENDS],
             "solver_spacing_mm": SPACING_MM,
             "shape_grid": SHAPE,
-            "boundary_covariance_truth_and_model_input": dict(BOUNDARY_TRUTH),
-            "boundary_covariance_is_oracle_input": True,
-            "parameter_prior_is_fixed": True,
+            "boundary_covariance_truth": dict(BOUNDARY_TRUTH),
+            "boundary_calibration_mode": boundary_calibration_mode,
+            "boundary_covariance_model_input": dict(model_covariance) if boundary_calibration_mode == "oracle" else None,
+            "boundary_covariance_is_oracle_input": boundary_calibration_mode == "oracle" and model_covariance == BOUNDARY_TRUTH,
+            "boundary_covariance_crossfit_start_input": (dict(BOUNDARY_CALIBRATION_START)
+                                                           if boundary_calibration_mode == "cross_fitted" else None),
+            "boundary_covariance_search_boundary_fold_count": int(boundary_search_boundary_folds),
+            "boundary_covariance_calibration_status": boundary_calibration_status,
+            "boundary_covariance_status_rule": (
+                "inconclusive_search_boundary if any outer-fold length-scale estimate is at either candidate-grid edge; "
+                "all_folds_interior is diagnostic only and does not establish calibration"
+            ),
+            "boundary_covariance_estimates_by_outer_fold": boundary_calibration_fits,
+            "parameter_prior_model_input": {"mean": prior_mean.tolist(), "covariance": prior_covariance.tolist()},
+            "parameter_prior_is_fixed_across_cases": True,
+            "sensitivity_override_keys": sorted(overrides),
             "volume_population_slope_tau_and_variance_fit_scope": "outer-training patients only; tau via leave-one-patient-out rolling origins",
             "primary_comparison": "paired spatial energy score, hybrid PDE shape vs no-PDE signed-distance ranker, same sampled volumes",
             "secondary_measures": ["Dice", "spatial variogram score", "marginal Brier", "volume CRPS"],
@@ -355,11 +484,16 @@ def main(argv=None) -> int:
     parser.add_argument("--replicates-per-condition", type=int, default=25)
     parser.add_argument("--n-folds", type=int, default=5)
     parser.add_argument("--seed", type=int, default=20261024)
-    parser.add_argument("--output", type=Path, default=PROJECT_ROOT / "output" / "track_b_full_hybrid_gate_20261024.json")
+    parser.add_argument("--boundary-calibration-mode", choices=("cross_fitted", "oracle"), default="cross_fitted")
+    parser.add_argument("--inner-n-folds", type=int, default=2)
+    parser.add_argument("--output", type=Path,
+                        default=PROJECT_ROOT / "output" / "track_b_full_hybrid_gate_crossfit_20261024.json")
     args = parser.parse_args(argv)
     result = run_synthetic_gate(
         replicates_per_condition=args.replicates_per_condition,
         n_folds=args.n_folds, seed=args.seed,
+        boundary_calibration_mode=args.boundary_calibration_mode,
+        inner_n_folds=args.inner_n_folds,
     )
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(result, indent=2, allow_nan=False), encoding="utf-8")
