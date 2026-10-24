@@ -27,6 +27,7 @@ class PatientSeries:
 class PatientHistory:
     patient_id: str
     target_index: int
+    forecast_day: float
     days: np.ndarray
     masks: tuple[np.ndarray, ...]
 
@@ -116,7 +117,8 @@ def run_outer_patient_cv(records: Sequence[PatientSeries], fold_by_patient: Mapp
     """Run rolling-origin forecasts with patient-level outer folds and target-isolated callbacks.
 
     ``fit_nuisance`` is called once per fold with training patients only. ``forecast`` receives one patient's
-    history and the fitted nuisance object, never its target. ``score`` receives the forecast and that target.
+    history, the scheduled forecast day, and the fitted nuisance object, never its target mask. ``score`` receives
+    the forecast and that target.
     If ``forecast`` raises :class:`ForecastFailure`, the required fallback is run on the same history only.
     Inner selection and cross-fitting used by ``fit_nuisance`` remain the caller's responsibility.
     """
@@ -149,6 +151,7 @@ def run_outer_patient_cv(records: Sequence[PatientSeries], fold_by_patient: Mapp
                 history = PatientHistory(
                     patient_id=record.patient_id,
                     target_index=target_index,
+                    forecast_day=float(record.days[target_index]),
                     days=_readonly_array(record.days[:target_index], dtype=float, name="history days"),
                     masks=tuple(record.masks[:target_index]),
                 )

@@ -45,7 +45,8 @@ def test_outer_patient_folds_keep_all_scans_of_test_patient_out_of_nuisance_fit(
         return {"training_ids": ids}
 
     def forecast(history, nuisance):
-        forecast_calls.append((history.patient_id, tuple(history.days), len(history.masks), nuisance["training_ids"]))
+        forecast_calls.append((history.patient_id, tuple(history.days), len(history.masks),
+                               history.forecast_day, nuisance["training_ids"]))
         return {"history_days": tuple(history.days), "history_scans": len(history.masks)}
 
     def score(prediction, target):
@@ -64,8 +65,9 @@ def test_outer_patient_folds_keep_all_scans_of_test_patient_out_of_nuisance_fit(
         assert row["scores"]["history_scans"] == row["target_index"]
         assert row["forecast_status"] == "ok"
         assert row["patient_id"] not in fit_calls[row["fold"]]
-    for patient_id, history_days, history_scans, nuisance_ids in forecast_calls:
+    for patient_id, history_days, history_scans, forecast_day, nuisance_ids in forecast_calls:
         assert len(history_days) == history_scans
+        assert forecast_day > history_days[-1]
         assert patient_id not in nuisance_ids
 
 
