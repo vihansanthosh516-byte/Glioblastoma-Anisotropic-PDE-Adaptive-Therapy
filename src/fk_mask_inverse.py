@@ -30,9 +30,14 @@ STARTS = ((0.01, 0.03), (0.1, 0.3))
 
 def forward_masks(mask0: np.ndarray, domain: np.ndarray, rho: float, D: float, days, h: float) -> list:
     """Binary masks at days[1:], integrating continuously from days[0]."""
+    return [field > ria.U_VISIBLE for field in forward_concentrations(mask0, domain, rho, D, days, h)]
+
+
+def forward_concentrations(mask0: np.ndarray, domain: np.ndarray, rho: float, D: float, days, h: float) -> list:
+    """Continuous concentration fields at days[1:], integrating from the day-0 initial mask."""
     d6 = np.zeros(np.asarray(mask0).shape + (6,), np.float32)
     d6[..., :3] = float(D)
-    return forward_masks_tensor(mask0, domain, rho, d6, days, h)
+    return forward_concentrations_tensor(mask0, domain, rho, d6, days, h)
 
 
 def forward_masks_tensor(mask0: np.ndarray, domain: np.ndarray, rho: float, diffusion_tensor: np.ndarray,
@@ -43,6 +48,14 @@ def forward_masks_tensor(mask0: np.ndarray, domain: np.ndarray, rho: float, diff
     those references with ``fit_fk_masks`` is a deliberate model-mismatch stress test, not patient evidence.
     Tensor component order is xx, yy, zz, xy, xz, yz, as required by ``run_improved_aniso.TensorFK``.
     """
+    return [field > ria.U_VISIBLE for field in forward_concentrations_tensor(
+        mask0, domain, rho, diffusion_tensor, days, h
+    )]
+
+
+def forward_concentrations_tensor(mask0: np.ndarray, domain: np.ndarray, rho: float,
+                                  diffusion_tensor: np.ndarray, days, h: float) -> list:
+    """Continuous concentration fields at days[1:] under a six-component diffusion tensor field."""
     mask0 = np.asarray(mask0, dtype=bool)
     domain = np.asarray(domain, dtype=bool)
     diffusion_tensor = np.asarray(diffusion_tensor, dtype=np.float32)
@@ -62,7 +75,7 @@ def forward_masks_tensor(mask0: np.ndarray, domain: np.ndarray, rho: float, diff
     for t in days[1:]:
         u = s.run(u, [rho], float(t - prev))[0][0]
         prev = t
-        out.append(u > ria.U_VISIBLE)
+        out.append(np.asarray(u, dtype=np.float32))
     return out
 
 

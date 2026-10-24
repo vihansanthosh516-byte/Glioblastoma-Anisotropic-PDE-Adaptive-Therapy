@@ -71,9 +71,9 @@ def test_local_refinement_increases_resolution_around_high_mass_region():
     log_density = -0.5 * np.sum((coarse["points"] - center) ** 2 / 0.05, axis=1)
     refined = refine_log_parameter_grid(coarse, log_density, mass_fraction=0.9, n_refine=11)
 
-    assert len(refined["rho_log_grid"]) > len(coarse["rho_log_grid"])
-    assert len(refined["D_log_grid"]) > len(coarse["D_log_grid"])
-    assert refined["points"].shape[0] == len(refined["rho_log_grid"]) * len(refined["D_log_grid"])
+    assert refined["points"].shape == (len(refined["quadrature_weights"]), 2)
+    assert len(refined["points"]) < len(coarse["points"]) + 11**2
     assert np.all(refined["quadrature_weights"] > 0)
-    assert np.isclose(np.exp(refined["rho_log_grid"]).min(), 1e-4)
-    assert np.isclose(np.exp(refined["D_log_grid"]).max(), 1.0)
+    assert np.isclose(refined["quadrature_weights"].sum(), np.log(1e-2 / 1e-4) * np.log(1.0 / 1e-3))
+    assert np.any(refined["coarse_source_indices"] < 0)
+    assert np.any(refined["coarse_source_indices"] >= 0)

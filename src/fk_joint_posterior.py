@@ -112,7 +112,11 @@ def normalize_grid_posterior(log_likelihood, log_prior, quadrature_weights) -> d
 
 def refine_log_parameter_grid(coarse_grid: dict, coarse_log_posterior, *,
                               mass_fraction: float = 0.9, n_refine: int = 11) -> dict:
-    """Add local log-grid resolution over the smallest high-posterior-mass region available on the coarse grid."""
+    """Refine only high-mass rectangle; retain coarse quadrature outside it.
+
+    Remove coarse cell area inside refined rectangle before adding local fine-grid weights. Retained coarse
+    points keep their likelihood evaluations, so refinement needs evaluations only at new fine-grid points.
+    """
     log_posterior = np.asarray(coarse_log_posterior, dtype=float)
     points = np.asarray(coarse_grid["points"], dtype=float)
     if log_posterior.ndim != 1 or log_posterior.shape != (len(points),) or np.isnan(log_posterior).any():
@@ -145,15 +149,40 @@ def refine_log_parameter_grid(coarse_grid: dict, coarse_log_posterior, *,
     upper = np.minimum(upper, [rho_axis[-1], D_axis[-1]])
     fine_rho = np.linspace(lower[0], upper[0], int(n_refine))
     fine_D = np.linspace(lower[1], upper[1], int(n_refine))
-    refined = _grid_from_axes(np.unique(np.concatenate((rho_axis, fine_rho))),
-                              np.unique(np.concatenate((D_axis, fine_D))))
-    refined["rho_bounds"] = coarse_grid["rho_bounds"]
-    refined["D_bounds"] = coarse_grid["D_bounds"]
-    refined["grid_type"] = "coarse plus local high-mass refinement"
-    refined["refinement_mass_fraction"] = float(mass_fraction)
-    refined["refinement_region_log"] = {"rho": (float(lower[0]), float(upper[0])),
-                                        "D": (float(lower[1]), float(upper[1]))}
-    return refined
+    fine = _grid_from_axes(fine_rho, fine_D)
+
+    def cell_edges(axis):
+        return np.concatenate(([axis[0]], (axis[:-1] + axis[1:]) / 2.0, [axis[-1]]))
+
+    rho_edges, D_edges = cell_edges(rho_axis), cell_edges(D_axis)
+    rho_widths, D_widths = np.diff(rho_edges), np.diff(D_edges)
+    rho_overlap = np.maximum(0.0, np.minimum(rho_edges[1:], upper[0])
+                             - np.maximum(rho_edges[:-1], lower[0]))
+    D_overlap = np.maximum(0.0, np.minimum(D_edges[1:], upper[1])
+                           - np.maximum(D_edges[:-1], lower[1]))
+    coarse_cell_area = np.outer(rho_widths, D_widths).ravel()
+    inside_cell_area = np.outer(rho_overlap, D_overlap).ravel()
+    outside_weights = np.maximum(0.0, coarse_cell_area - inside_cell_area)
+
+    all_points = np.vstack((points, fine["points"]))
+    all_weights = np.concatenate((outside_weights, fine["quadrature_weights"]))
+    positive = all_weights > 0
+    unique_points, inverse = np.unique(all_points[positive], axis=0, return_inverse=True)
+    weights = np.bincount(inverse, weights=all_weights[positive], minlength=len(unique_points))
+    coarse_lookup = {tuple(point): index for index, point in enumerate(points)}
+    source_indices = np.asarray([coarse_lookup.get(tuple(point), -1) for point in unique_points], dtype=int)
+    return {
+        "points": unique_points,
+        "quadrature_weights": weights,
+        "coarse_source_indices": source_indices,
+        "rho_bounds": coarse_grid["rho_bounds"],
+        "D_bounds": coarse_grid["D_bounds"],
+        "grid_type": "coarse outside high-mass rectangle plus local fine grid",
+        "refinement_mass_fraction": float(mass_fraction),
+        "coarse_mass_in_refined_rectangle": float(posterior[selected].sum()),
+        "refinement_region_log": {"rho": (float(lower[0]), float(upper[0])),
+                                  "D": (float(lower[1]), float(upper[1]))},
+    }
 
 
 def sample_joint_log_parameters(points, posterior_probabilities, *, n_draws: int = 1, seed: int = 0) -> np.ndarray:

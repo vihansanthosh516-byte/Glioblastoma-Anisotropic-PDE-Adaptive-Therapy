@@ -197,12 +197,22 @@ class TensorFK:
     def run(self, u0: np.ndarray, rhos, t_end: float, max_dt: float = 0.5,
             kill_schedule: TreatmentSchedule | None = None, t_start: float = 0.0,
             alpha: float = ALPHA_TMZ, beta: float = BETA_RT):
-        """Integrate a batch (one member per rho) to t_end; returns (B, X, Y, Z) numpy.
+        """Integrate one initial field or matching batch to t_end; returns (B, X, Y, Z) numpy.
 
         kill_schedule adds a spatially uniform -( alpha*C(t) + beta*R(t) )*u sink, C and R the
-        TMZ concentration and radiation dose rate at simulation day t_start + elapsed time."""
-        rho = torch.as_tensor(np.asarray(rhos, dtype=np.float32))[:, None, None, None]
-        u = torch.as_tensor(u0.astype(np.float32))[None].repeat(len(rhos), 1, 1, 1) * self.m
+        TMZ concentration and radiation dose rate at simulation day t_start + elapsed time. For a 3D
+        initial field, each rho gets a copy. For a 4D initial batch, each member pairs with one rho."""
+        rhos = np.asarray(rhos, dtype=np.float32)
+        u0 = np.asarray(u0, dtype=np.float32)
+        if rhos.ndim != 1 or len(rhos) < 1 or not np.isfinite(rhos).all() or np.any(rhos < 0):
+            raise ValueError("rhos must be a nonempty finite nonnegative 1D array")
+        if u0.ndim == 3:
+            u = torch.as_tensor(u0)[None].repeat(len(rhos), 1, 1, 1) * self.m
+        elif u0.ndim == 4 and u0.shape[0] == len(rhos) and u0.shape[1:] == tuple(self.m.shape):
+            u = torch.as_tensor(u0) * self.m
+        else:
+            raise ValueError("u0 must be 3D or a 4D batch aligned to rhos and solver grid")
+        rho = torch.as_tensor(rhos)[:, None, None, None]
         kmax = 0.0
         if kill_schedule is not None:
             rt_max = kill_schedule.radiation.corrected_dose_per_fraction if kill_schedule.radiation else 0.0
