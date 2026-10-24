@@ -113,20 +113,21 @@ def _normalize_folds(fold_by_patient: Mapping, patient_ids: set[str], n_folds: i
 def run_outer_patient_cv(records: Sequence[PatientSeries], fold_by_patient: Mapping,
                          fit_nuisance: Callable, forecast: Callable, score: Callable, *,
                          fallback_forecast: Callable | None = None, n_folds: int = 5,
-                         minimum_history: int = 3) -> dict:
+                         minimum_history: int = 2) -> dict:
     """Run rolling-origin forecasts with patient-level outer folds and target-isolated callbacks.
 
     ``fit_nuisance`` is called once per fold with training patients only. ``forecast`` receives one patient's
     history, the scheduled forecast day, and the fitted nuisance object, never its target mask. ``score`` receives
     the forecast and that target.
-    If ``forecast`` raises :class:`ForecastFailure`, the required fallback is run on the same history only.
+    ``minimum_history`` counts observed masks before each target; two masks allow the planned first-two-to-third
+    forecast. If ``forecast`` raises :class:`ForecastFailure`, the required fallback uses same history only.
     Inner selection and cross-fitting used by ``fit_nuisance`` remain the caller's responsibility.
     """
     if isinstance(n_folds, (bool, np.bool_)) or int(n_folds) != n_folds or n_folds < 2:
         raise ValueError("n_folds must be an integer of at least two")
     if (isinstance(minimum_history, (bool, np.bool_)) or int(minimum_history) != minimum_history
-            or minimum_history < 3):
-        raise ValueError("minimum_history must be an integer of at least three scans")
+            or minimum_history < 2):
+        raise ValueError("minimum_history must be an integer of at least two scans")
     n_folds, minimum_history = int(n_folds), int(minimum_history)
     series = _normalize_series(records, minimum_history=minimum_history)
     folds = _normalize_folds(fold_by_patient, {record.patient_id for record in series}, n_folds)

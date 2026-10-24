@@ -119,7 +119,7 @@ def test_cross_fitted_boundary_calibration_excludes_each_patient_from_its_foreca
     def forecast(history, nuisance):
         assert not hasattr(history, "target")
         assert history.patient_id not in nuisance["training_ids"]
-        forecasted.append(history.patient_id)
+        forecasted.append((history.patient_id, history.target_index, len(history.masks)))
         return {"pre_boundary_probability": history.masks[-1].astype(float)}
 
     result = run_cross_fitted_boundary_calibration(
@@ -127,12 +127,15 @@ def test_cross_fitted_boundary_calibration_excludes_each_patient_from_its_foreca
         ell_candidates_mm=(2.0, 5.0, 10.0),
     )
 
-    assert len(forecasted) == len(set(forecasted)) == 6
+    assert len(forecasted) == 12
+    assert {patient_id for patient_id, _, _ in forecasted} == {record.patient_id for record in records}
+    assert {(target_index, history_count) for _, target_index, history_count in forecasted} == {(2, 2), (3, 3)}
     assert result["covariance_fit"]["n_calibration_patients"] == 6
-    assert len(result["residual_cases"]) == 6
+    assert len(result["residual_cases"]) == 12
     assert all(case["patient_id"] not in case["training_patient_ids"]
                for case in result["residual_cases"])
-    assert all(fold["n_test_patients"] == 2 for fold in result["fold_audit"])
+    assert all(fold["n_test_patients"] == 2 and fold["n_forecasts"] == 4
+               for fold in result["fold_audit"])
 
 
 def test_cross_fitted_boundary_calibration_requires_pre_boundary_probability():

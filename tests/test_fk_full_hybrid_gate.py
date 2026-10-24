@@ -51,7 +51,36 @@ def test_training_nuisance_records_only_fit_cohort_and_uses_training_series():
     assert nuisance["volume_variance_fit"]["slope_per_day"] >= 0
 
 
-def test_outer_gate_scores_each_synthetic_patient_once_and_withholds_target_mask(monkeypatch):
+def test_summary_weights_patients_equally_when_visit_counts_differ():
+    score_template = {
+        "energy_score_difference_hybrid_minus_no_pde": 0.0,
+        "hybrid_consensus_dice": 0.8,
+        "no_pde_consensus_dice": 0.7,
+        "hybrid_variogram_score": 1.0,
+        "no_pde_variogram_score": 1.2,
+        "hybrid_volume_crps_voxels": 2.0,
+        "no_pde_volume_crps_voxels": 3.0,
+        "diffusion_truth": "isotropic",
+        "volume_trend": "growth",
+    }
+    rows = []
+    for patient_id, differences in (("p1", (0.0, 0.0)), ("p2", (-3.0,))):
+        for difference in differences:
+            scores = dict(score_template)
+            scores["energy_score_difference_hybrid_minus_no_pde"] = difference
+            rows.append({"patient_id": patient_id, "scores": scores})
+
+    summary = gate._summarize(rows)
+
+    assert summary["n_patients"] == 2
+    assert summary["n_forecasts"] == 3
+    assert summary["overall"]["n_patients"] == 2
+    assert summary["overall"]["n_forecasts"] == 3
+    assert summary["overall"]["mean_energy_score_difference_hybrid_minus_no_pde"] == -1.5
+    assert summary["overall"]["hybrid_lower_energy_count"] == 1
+
+
+def test_outer_gate_scores_planned_origins_and_withholds_target_mask(monkeypatch):
     observed = []
     mismatched_covariance = {"sigma_b_mm": 0.2, "tau_b_mm": 0.05, "ell_mm": 2.0}
 
@@ -69,16 +98,19 @@ def test_outer_gate_scores_each_synthetic_patient_once_and_withholds_target_mask
         boundary_calibration_mode="oracle",
     )
 
-    assert len(result["rows"]) == 8
+    assert len(result["rows"]) == 16
     assert len({row["patient_id"] for row in result["rows"]}) == 8
-    assert len(observed) == 8
-    assert all(history_count == 3 and target_day > 0 and covariance == mismatched_covariance
+    assert len(observed) == 16
+    assert all(history_count in (2, 3) and target_day > 0 and covariance == mismatched_covariance
                for history_count, target_day, _, covariance in observed)
     assert result["metadata"]["boundary_covariance_truth"] != \
         result["metadata"]["boundary_covariance_model_input"]
     assert not result["metadata"]["boundary_covariance_is_oracle_input"]
     assert result["metadata"]["boundary_covariance_calibration_status"] == "not_run_oracle"
     assert result["summary"]["n_patients"] == 8
+    assert result["summary"]["n_forecasts"] == 16
+    assert result["summary"]["overall"]["n_patients"] == 8
+    assert result["summary"]["overall"]["n_forecasts"] == 16
     assert set(result["summary"]["by_condition"]) == {
         "isotropic|growth", "isotropic|shrinkage",
         "anisotropic|growth", "anisotropic|shrinkage",
@@ -118,15 +150,15 @@ def test_outer_gate_can_estimate_boundary_covariance_from_inner_heldout_patients
     )
 
     metadata = result["metadata"]
-    assert len(result["rows"]) == 12
-    assert len(observed_covariances) == 36  # 24 inner calibration plus 12 outer forecasts.
+    assert len(result["rows"]) == 24
+    assert len(observed_covariances) == 72  # 48 inner calibration plus 24 outer forecasts.
     assert metadata["boundary_calibration_mode"] == "cross_fitted"
     assert metadata["boundary_covariance_model_input"] is None
     assert not metadata["boundary_covariance_is_oracle_input"]
     assert metadata["boundary_covariance_crossfit_start_input"] == gate.BOUNDARY_CALIBRATION_START
-    calibration_calls = (observed_covariances[0:8] + observed_covariances[12:20]
-                          + observed_covariances[24:32])
-    assert calibration_calls == [gate.BOUNDARY_CALIBRATION_START] * 24
+    calibration_calls = (observed_covariances[0:16] + observed_covariances[24:40]
+                          + observed_covariances[48:64])
+    assert calibration_calls == [gate.BOUNDARY_CALIBRATION_START] * 48
     fits = metadata["boundary_covariance_estimates_by_outer_fold"]
     assert len(fits) == 3
     boundary_folds = sum(fit["selection_boundary"] for fit in fits)
@@ -137,6 +169,7 @@ def test_outer_gate_can_estimate_boundary_covariance_from_inner_heldout_patients
     assert "diagnostic only" in metadata["boundary_covariance_status_rule"]
     assert all(fit["n_outer_training_patients"] == 8 for fit in fits)
     assert all(fit["n_calibration_patients"] == 8 for fit in fits)
+    assert all(fit["n_calibration_origins"] == 16 for fit in fits)
     assert all(set(fit["estimate"]) == {"sigma_b_mm", "tau_b_mm", "ell_mm"} for fit in fits)
     assert all(np.isfinite(list(fit["estimate"].values())).all() for fit in fits)
     assert all(value >= 0 for fit in fits for value in fit["estimate"].values())

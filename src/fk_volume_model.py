@@ -6,6 +6,7 @@ any future target unless that target is explicitly supplied as a training-only v
 from __future__ import annotations
 
 import math
+from collections import Counter
 
 import numpy as np
 from scipy.optimize import nnls
@@ -39,8 +40,8 @@ def select_shrinkage_time_constant(validation_cases, *, candidates_days=(30, 90,
     """Select tau by log-volume MSE on caller-supplied outer-training validation forecasts.
 
     Each case must contain patient_slope, population_slope, observation_gap_days, horizon_days, last_volume,
-    and target_volume. The caller is responsible for cross-fitting the population slope and keeping all cases
-    inside the outer-training partition.
+    and target_volume. Optional patient_id makes origins within a patient share one total weight. Cases without
+    patient_id are treated as independent patients. The caller must keep all cases inside outer training.
     """
     cases = list(validation_cases)
     candidates = tuple(float(value) for value in candidates_days)
@@ -54,33 +55,42 @@ def select_shrinkage_time_constant(validation_cases, *, candidates_days=(30, 90,
     required = ("patient_slope", "population_slope", "observation_gap_days", "horizon_days",
                 "last_volume", "target_volume")
     normalized = []
-    for case in cases:
+    for index, case in enumerate(cases):
         values = {key: _finite_scalar(case[key], key) for key in required}
         if values["observation_gap_days"] <= 0 or values["horizon_days"] <= 0:
             raise ValueError("validation observation gaps and horizons must be positive")
         if values["last_volume"] <= 0 or values["target_volume"] <= 0:
             raise ValueError("validation volumes must be positive")
+        patient_id = str(case.get("patient_id", f"case-{index}")).strip()
+        if not patient_id:
+            raise ValueError("validation patient IDs must be nonempty")
+        values["patient_id"] = patient_id
         normalized.append(values)
 
     errors_by_candidate = {}
     for tau in candidates:
-        squared_errors = []
+        squared_errors_by_patient = {}
         for case in normalized:
             slope = shrink_log_growth_slope(
                 case["patient_slope"], case["population_slope"],
                 observation_gap_days=case["observation_gap_days"], time_constant_days=tau,
             )
             predicted_log_volume = math.log(case["last_volume"]) + slope * case["horizon_days"]
-            squared_errors.append((predicted_log_volume - math.log(case["target_volume"])) ** 2)
-        errors_by_candidate[tau] = float(np.mean(squared_errors))
+            squared_errors_by_patient.setdefault(case["patient_id"], []).append(
+                (predicted_log_volume - math.log(case["target_volume"])) ** 2
+            )
+        patient_mean_errors = [float(np.mean(values)) for values in squared_errors_by_patient.values()]
+        errors_by_candidate[tau] = float(np.mean(patient_mean_errors))
     selected = min(candidates, key=lambda tau: (errors_by_candidate[tau], tau))
     return {"time_constant_days": float(selected), "candidate_mse_log_volume": errors_by_candidate,
             "n_validation_forecasts": len(normalized),
+            "n_validation_patients": len({case["patient_id"] for case in normalized}),
+            "selection_weighting": "equal patient weight; forecast origins averaged within patient",
             "selection_scope": "caller-supplied outer-training validation cases"}
 
 
-def fit_log_volume_variance(horizons_days, residuals_log_volume) -> dict:
-    """Fit nonnegative linear predictive variance a+b*h to training log-volume residuals."""
+def fit_log_volume_variance(horizons_days, residuals_log_volume, *, patient_ids=None) -> dict:
+    """Fit nonnegative linear predictive variance a+b*h with equal total weight per training patient."""
     horizons = np.asarray(horizons_days, dtype=float)
     residuals = np.asarray(residuals_log_volume, dtype=float)
     if (horizons.ndim != 1 or residuals.ndim != 1 or len(horizons) != len(residuals)
@@ -88,10 +98,22 @@ def fit_log_volume_variance(horizons_days, residuals_log_volume) -> dict:
         raise ValueError("horizons and residuals must be matching finite 1D arrays with at least two rows")
     if np.any(horizons < 0) or len(np.unique(horizons)) < 2:
         raise ValueError("variance fitting needs at least two distinct nonnegative horizons")
+    if patient_ids is None:
+        ids = [f"case-{index}" for index in range(len(horizons))]
+    else:
+        if isinstance(patient_ids, (str, bytes)) or len(patient_ids) != len(horizons):
+            raise ValueError("patient_ids must match the number of training residuals")
+        ids = [str(value).strip() for value in patient_ids]
+        if any(not value for value in ids):
+            raise ValueError("patient IDs must be nonempty")
+    counts = Counter(ids)
+    weights = np.asarray([1.0 / math.sqrt(counts[patient_id]) for patient_id in ids])
     design = np.column_stack((np.ones(len(horizons)), horizons))
-    coefficients, residual_norm = nnls(design, residuals**2)
+    coefficients, residual_norm = nnls(design * weights[:, None], residuals**2 * weights)
     return {"intercept": float(coefficients[0]), "slope_per_day": float(coefficients[1]),
-            "training_sse_variance": float(residual_norm**2), "n_training_residuals": int(len(horizons))}
+            "training_sse_variance": float(residual_norm**2), "n_training_residuals": int(len(horizons)),
+            "n_training_patients": len(counts),
+            "variance_weighting": "equal patient weight; forecast origins averaged within patient"}
 
 
 def sample_positive_volumes(last_volume: float, *, horizon_days: float, log_growth_slope: float,

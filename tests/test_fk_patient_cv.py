@@ -71,6 +71,25 @@ def test_outer_patient_folds_keep_all_scans_of_test_patient_out_of_nuisance_fit(
         assert patient_id not in nuisance_ids
 
 
+def test_two_history_masks_forecast_third_visit_as_planned():
+    records = [make_series(f"patient-{index}", n_scans=3) for index in range(6)]
+    folds = {record.patient_id: index % 3 for index, record in enumerate(records)}
+    forecast_history_counts = []
+
+    def forecast(history, nuisance):
+        forecast_history_counts.append((history.target_index, len(history.masks)))
+        return {"history_scans": len(history.masks)}
+
+    result = run_outer_patient_cv(
+        records, folds, lambda train: {}, forecast,
+        lambda prediction, target: {"history_scans": prediction["history_scans"]},
+        n_folds=3,
+    )
+
+    assert len(result["rows"]) == 6
+    assert forecast_history_counts == [(2, 2)] * 6
+
+
 def test_empty_heldout_target_is_scored_but_not_passed_to_forecast():
     records, folds = make_cohort()
     records[0] = make_series(records[0].patient_id, empty_target=True)
@@ -173,7 +192,7 @@ def test_runner_rejects_bad_records_masks_and_parameters():
         run_outer_patient_cv(records, folds, lambda train: {}, lambda h, n: {}, lambda p, t: {}, n_folds=1)
     with pytest.raises(ValueError, match="minimum_history"):
         run_outer_patient_cv(records, folds, lambda train: {}, lambda h, n: {}, lambda p, t: {},
-                             n_folds=3, minimum_history=2)
+                             n_folds=3, minimum_history=1)
 
 
 def test_fold_map_rejects_noninteger_boolean_out_of_range_and_normalized_duplicates():

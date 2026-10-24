@@ -172,6 +172,7 @@ def fit_training_nuisance(training_records) -> dict:
             history_days = np.asarray(record.days[:target_index], dtype=float)
             history_volumes = volumes[:target_index]
             validation_cases.append({
+                "patient_id": record.patient_id,
                 "patient_slope": estimate_log_volume_slope(history_volumes, history_days),
                 "population_slope": leave_one_out_population,
                 "observation_gap_days": float(history_days[-1] - history_days[0]),
@@ -191,7 +192,10 @@ def fit_training_nuisance(training_records) -> dict:
         prediction = np.log(case["last_volume"]) + shrunk * case["horizon_days"]
         validation_horizons.append(case["horizon_days"])
         validation_residuals.append(np.log(case["target_volume"]) - prediction)
-    variance_fit = fit_log_volume_variance(validation_horizons, validation_residuals)
+    variance_fit = fit_log_volume_variance(
+        validation_horizons, validation_residuals,
+        patient_ids=[case["patient_id"] for case in validation_cases],
+    )
     return {
         "training_patient_ids": tuple(sorted(ids)),
         "population_log_volume_slope_per_day": float(np.mean(list(patient_slopes.values()))),
@@ -274,20 +278,38 @@ def _score_callback(prediction, target) -> dict:
 
 def _summarize(rows: list[dict]) -> dict:
     def summary(subset):
+        by_patient = {}
+        for row in subset:
+            by_patient.setdefault(row["patient_id"], []).append(row["scores"])
+        patient_scores = {
+            patient_id: {
+                key: float(np.mean([scores[key] for scores in forecasts]))
+                for key in (
+                    "energy_score_difference_hybrid_minus_no_pde",
+                    "hybrid_consensus_dice", "no_pde_consensus_dice",
+                    "hybrid_variogram_score", "no_pde_variogram_score",
+                    "hybrid_volume_crps_voxels", "no_pde_volume_crps_voxels",
+                )
+            }
+            for patient_id, forecasts in by_patient.items()
+        }
+        patient_values = list(patient_scores.values())
         differences = np.asarray(
-            [row["scores"]["energy_score_difference_hybrid_minus_no_pde"] for row in subset], dtype=float
+            [scores["energy_score_difference_hybrid_minus_no_pde"]
+             for scores in patient_values], dtype=float
         )
         return {
-            "n_patients": int(len(subset)),
+            "n_patients": len(patient_scores),
+            "n_forecasts": len(subset),
             "mean_energy_score_difference_hybrid_minus_no_pde": float(differences.mean()),
             "median_energy_score_difference_hybrid_minus_no_pde": float(np.median(differences)),
             "hybrid_lower_energy_count": int(np.sum(differences < 0)),
-            "mean_hybrid_consensus_dice": float(np.mean([r["scores"]["hybrid_consensus_dice"] for r in subset])),
-            "mean_no_pde_consensus_dice": float(np.mean([r["scores"]["no_pde_consensus_dice"] for r in subset])),
-            "mean_hybrid_variogram_score": float(np.mean([r["scores"]["hybrid_variogram_score"] for r in subset])),
-            "mean_no_pde_variogram_score": float(np.mean([r["scores"]["no_pde_variogram_score"] for r in subset])),
-            "mean_hybrid_volume_crps_voxels": float(np.mean([r["scores"]["hybrid_volume_crps_voxels"] for r in subset])),
-            "mean_no_pde_volume_crps_voxels": float(np.mean([r["scores"]["no_pde_volume_crps_voxels"] for r in subset])),
+            "mean_hybrid_consensus_dice": float(np.mean([s["hybrid_consensus_dice"] for s in patient_values])),
+            "mean_no_pde_consensus_dice": float(np.mean([s["no_pde_consensus_dice"] for s in patient_values])),
+            "mean_hybrid_variogram_score": float(np.mean([s["hybrid_variogram_score"] for s in patient_values])),
+            "mean_no_pde_variogram_score": float(np.mean([s["no_pde_variogram_score"] for s in patient_values])),
+            "mean_hybrid_volume_crps_voxels": float(np.mean([s["hybrid_volume_crps_voxels"] for s in patient_values])),
+            "mean_no_pde_volume_crps_voxels": float(np.mean([s["no_pde_volume_crps_voxels"] for s in patient_values])),
         }
 
     by_condition = {}
@@ -295,7 +317,8 @@ def _summarize(rows: list[dict]) -> dict:
         key = f"{row['scores']['diffusion_truth']}|{row['scores']['volume_trend']}"
         by_condition.setdefault(key, []).append(row)
     return {
-        "n_patients": len(rows),
+        "n_patients": len({row["patient_id"] for row in rows}),
+        "n_forecasts": len(rows),
         "overall": summary(rows),
         "by_condition": {key: summary(value) for key, value in sorted(by_condition.items())},
     }
@@ -393,7 +416,7 @@ def run_synthetic_gate(*, replicates_per_condition: int = 25, n_folds: int = 5,
         calibration = run_cross_fitted_boundary_calibration(
             train_records, fit_inner_nuisance, forecast_for_calibration,
             n_folds=inner_n_folds, seed=calibration_seed,
-            minimum_history=3, spacing_mm=SPACING_MM, n_anchors=forecast_config["n_anchors"],
+            minimum_history=2, spacing_mm=SPACING_MM, n_anchors=forecast_config["n_anchors"],
         )
         covariance_fit = calibration["covariance_fit"]
         estimated_covariance = {
@@ -423,7 +446,7 @@ def run_synthetic_gate(*, replicates_per_condition: int = 25, n_folds: int = 5,
         lambda history, nuisance: _forecast_callback(
             history, nuisance, forecast_function=forecast_function, forecast_config=forecast_config,
         ),
-        _score_callback, n_folds=n_folds, minimum_history=3,
+        _score_callback, n_folds=n_folds, minimum_history=2,
     )
     elapsed = time.perf_counter() - started
     for row in result["rows"]:

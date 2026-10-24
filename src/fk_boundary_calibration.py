@@ -180,7 +180,7 @@ def assign_patient_folds(patient_ids, *, n_folds: int = 5, seed: int = 0) -> dic
 
 def run_cross_fitted_boundary_calibration(records: Sequence, fit_nuisance, forecast, *,
                                           n_folds: int = 5, seed: int = 0,
-                                          minimum_history: int = 3, spacing_mm=1.0,
+                                          minimum_history: int = 2, spacing_mm=1.0,
                                           n_anchors: int = 256,
                                           ell_candidates_mm=(5.0, 10.0, 20.0)) -> dict:
     """Generate inner patient-held-out boundary residuals and fit their effective covariance.

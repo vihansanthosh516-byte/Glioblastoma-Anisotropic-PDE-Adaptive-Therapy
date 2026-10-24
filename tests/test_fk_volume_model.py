@@ -42,6 +42,25 @@ def test_time_constant_selection_uses_only_supplied_training_validation_cases():
     assert changed["candidate_mse_log_volume"] != selected["candidate_mse_log_volume"]
 
 
+def test_time_constant_selection_gives_equal_total_weight_to_each_patient():
+    cases = [
+        {"patient_id": "p1", "patient_slope": 0.03, "population_slope": 0.0,
+         "observation_gap_days": 10, "horizon_days": 60, "last_volume": 100, "target_volume": 1000},
+        {"patient_id": "p2", "patient_slope": -0.01, "population_slope": 0.0,
+         "observation_gap_days": 25, "horizon_days": 60, "last_volume": 100, "target_volume": 100},
+        {"patient_id": "p3", "patient_slope": 0.01, "population_slope": 0.0,
+         "observation_gap_days": 40, "horizon_days": 60, "last_volume": 100, "target_volume": 150},
+    ]
+    original = select_shrinkage_time_constant(cases)
+    replicated = select_shrinkage_time_constant(cases[:1] * 6 + cases[1:])
+
+    assert all(np.isclose(original["candidate_mse_log_volume"][tau],
+                          replicated["candidate_mse_log_volume"][tau])
+               for tau in original["candidate_mse_log_volume"])
+    assert original["n_validation_patients"] == replicated["n_validation_patients"] == 3
+    assert "equal patient weight" in original["selection_weighting"]
+
+
 def test_log_volume_variance_fit_is_nonnegative_and_predictive_draws_are_positive_reproducible():
     fit = fit_log_volume_variance([30, 60, 90, 120], [0.10, -0.15, 0.20, -0.25])
     first = sample_positive_volumes(
@@ -64,3 +83,18 @@ def test_zero_residual_variance_produces_deterministic_positive_volume():
     )
     assert fit["intercept"] == 0.0 and fit["slope_per_day"] == 0.0
     assert np.allclose(draws, 80.0 * np.exp(-0.45))
+
+
+def test_log_volume_variance_is_invariant_to_replicating_one_patient_origins():
+    horizons = [10, 20, 30]
+    residuals = [0.4, -0.2, 0.1]
+    patient_ids = ["p1", "p2", "p3"]
+    original = fit_log_volume_variance(horizons, residuals, patient_ids=patient_ids)
+    replicated = fit_log_volume_variance(
+        [10] * 6 + horizons[1:], [0.4] * 6 + residuals[1:],
+        patient_ids=["p1"] * 6 + patient_ids[1:],
+    )
+
+    assert np.isclose(original["intercept"], replicated["intercept"])
+    assert np.isclose(original["slope_per_day"], replicated["slope_per_day"])
+    assert original["n_training_patients"] == replicated["n_training_patients"] == 3
