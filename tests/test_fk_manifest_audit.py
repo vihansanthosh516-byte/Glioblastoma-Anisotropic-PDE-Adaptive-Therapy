@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from src.fk_manifest_audit import audit_mu_manifests
+from src.fk_manifest_audit import audit_manifest_files, audit_mu_local_image_tree, audit_mu_manifests
 
 
 def valid_rows():
@@ -175,6 +175,67 @@ def test_pair_for_unlisted_patient_is_not_silent():
 
     assert codes["pair_patients_missing_patient_manifest"] == 1
     assert codes["missing_pair_scan_references"] == 1
+
+
+def _make_timepoint(image_root, patient_id, number, *, include_segmentation=True):
+    folder = image_root / patient_id / f"Timepoint_{number}"
+    folder.mkdir(parents=True)
+    names = ["t1n.nii.gz", "t1c.nii.gz", "t2w.nii.gz", "t2f.nii.gz"]
+    if include_segmentation:
+        names.append("segmentation.nii.gz")
+    for name in names:
+        (folder / name).touch()
+
+
+def _write_manifest_files(manifest_dir, rows):
+    manifest_dir.mkdir()
+    scans, patients, pairs, splits = rows
+    for name, values in (
+        ("scan_manifest.csv", scans), ("patient_manifest.csv", patients),
+        ("forecast_pairs_mu.csv", pairs), ("split_mu.csv", splits),
+    ):
+        with (manifest_dir / name).open("w", newline="", encoding="utf-8") as handle:
+            writer = csv.DictWriter(handle, fieldnames=list(values[0]))
+            writer.writeheader()
+            writer.writerows(values)
+
+
+def test_local_release_metadata_resolves_two_unsegmented_timepoints(tmp_path):
+    rows = valid_rows()
+    image_root = tmp_path / "images"
+    _make_timepoint(image_root, "MU-1", 1)
+    _make_timepoint(image_root, "MU-1", 2)
+    _make_timepoint(image_root, "MU-1", 3, include_segmentation=False)
+    manifest_dir = tmp_path / "manifests"
+    _write_manifest_files(manifest_dir, rows)
+
+    report = audit_manifest_files(
+        manifest_dir, source_reported_scan_count=3, source_reported_image_count=14,
+        local_image_dir=image_root,
+    )
+
+    assert report["status"] == "ready"
+    assert report["issues"] == []
+    assert report["summary"]["mu_scan_rows"] == 2
+    assert report["summary"]["source_unsegmented_timepoint_count"] == 1
+    assert report["local_release_audit"]["status"] == "consistent_by_file_metadata"
+    assert report["local_release_audit"]["summary"]["manifest_rows_with_all_four_mri_plus_seg"] == 2
+    assert "MU-1" not in json.dumps(report)
+
+
+def test_local_release_metadata_audit_blocks_manifest_mask_without_segmentation(tmp_path):
+    scans, _, _, _ = valid_rows()
+    image_root = tmp_path / "images"
+    _make_timepoint(image_root, "MU-1", 1, include_segmentation=False)
+
+    report = audit_mu_local_image_tree(
+        scans, image_root, source_reported_timepoint_count=1, source_reported_image_count=4,
+    )
+    codes = {item["code"]: item["count"] for item in report["issues"]}
+
+    assert report["status"] == "blocked"
+    assert codes["manifest_flagged_segmentation_missing"] == 1
+    assert "MU-1" not in json.dumps(report)
 
 
 def test_missing_required_columns_and_invalid_fold_count_raise():
