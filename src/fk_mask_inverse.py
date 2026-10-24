@@ -30,7 +30,33 @@ STARTS = ((0.01, 0.03), (0.1, 0.3))
 
 def forward_masks(mask0: np.ndarray, domain: np.ndarray, rho: float, D: float, days, h: float) -> list:
     """Binary masks at days[1:], integrating continuously from days[0]."""
-    s = ria.TensorFK(np.tile(np.array([D, D, D, 0, 0, 0], np.float32), domain.shape + (1,)), domain, h=h)
+    d6 = np.zeros(np.asarray(mask0).shape + (6,), np.float32)
+    d6[..., :3] = float(D)
+    return forward_masks_tensor(mask0, domain, rho, d6, days, h)
+
+
+def forward_masks_tensor(mask0: np.ndarray, domain: np.ndarray, rho: float, diffusion_tensor: np.ndarray,
+                         days, h: float) -> list:
+    """Binary masks at days[1:] under a supplied six-component diffusion tensor field.
+
+    This is used to generate synthetic anisotropic references. The fitter remains isotropic, so comparing
+    those references with ``fit_fk_masks`` is a deliberate model-mismatch stress test, not patient evidence.
+    Tensor component order is xx, yy, zz, xy, xz, yz, as required by ``run_improved_aniso.TensorFK``.
+    """
+    mask0 = np.asarray(mask0, dtype=bool)
+    domain = np.asarray(domain, dtype=bool)
+    diffusion_tensor = np.asarray(diffusion_tensor, dtype=np.float32)
+    days = np.asarray(days, dtype=float)
+    if mask0.ndim != 3 or domain.shape != mask0.shape:
+        raise ValueError("mask0 and domain must have the same 3D shape")
+    if diffusion_tensor.shape != mask0.shape + (6,) or not np.isfinite(diffusion_tensor).all():
+        raise ValueError("diffusion_tensor must be finite with shape mask0.shape + (6,)")
+    if days.ndim != 1 or len(days) < 2 or not np.isfinite(days).all() or np.any(np.diff(days) <= 0):
+        raise ValueError("days must contain at least two finite, strictly increasing values")
+    if not np.isfinite(rho) or rho < 0 or not np.isfinite(h) or h <= 0:
+        raise ValueError("rho must be nonnegative and h must be positive")
+
+    s = ria.TensorFK(diffusion_tensor, domain, h=h)
     u = mask0.astype(np.float32)
     out, prev = [], days[0]
     for t in days[1:]:
