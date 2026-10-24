@@ -207,9 +207,10 @@ def conformal_error_upper_bounds(calibration_scores, calibration_errors, predict
 
 
 def compare_next_scan(training_masks, training_days, target_day: float, target_mask, *, h: float, domain=None) -> dict:
-    """Fit using training scans only, then compare PDE, persistence, and volume-trend forecasts.
+    """Fit using training scans only, then compare PDE, persistence, and hybrid forecasts.
 
     Requires at least two follow-up scans for a two-parameter fit. The target scan is used only for scoring.
+    The hybrid takes the PDE forecast as its spatial template and the volume-trend forecast as its size.
     Returned masks are included to support transparent review of each forecast.
     """
     masks = [np.asarray(mask, dtype=bool) for mask in training_masks]
@@ -236,13 +237,18 @@ def compare_next_scan(training_masks, training_days, target_day: float, target_m
     trend_volume = int(np.rint(last_volume * np.exp(growth_per_day * horizon)))
     trend_volume = int(np.clip(trend_volume, 0, int(domain.sum())))
     volume_trend = project_mask_volume(masks[-1], trend_volume, domain=domain, spacing_mm=h)
+    hybrid_template = pde if pde.any() else masks[-1]
+    pde_shape_volume_trend = project_mask_volume(
+        hybrid_template, trend_volume, domain=domain, spacing_mm=h
+    )
 
     training_spatial_residual = float(np.mean(1.0 - np.asarray(fit["dice"], dtype=float)))
     volume_sse = float(fit["sse_log_volume"])
     if not np.isfinite(volume_sse) or volume_sse < 0:
         raise ValueError("fit sse_log_volume must be finite and nonnegative")
     training_volume_residual_score = volume_sse / (1.0 + volume_sse)
-    predictions = {"pde": pde, "persistence": persistence, "volume_trend": volume_trend}
+    predictions = {"pde": pde, "persistence": persistence, "volume_trend": volume_trend,
+                   "pde_shape_volume_trend": pde_shape_volume_trend}
     metrics = {name: all_metrics(pred, target, spacing=h) for name, pred in predictions.items()}
     return {"fit": fit, "target_day": float(target_day), "target_volume_trend_voxels": trend_volume,
             "training_spatial_residual": training_spatial_residual,

@@ -97,7 +97,7 @@ def test_heldout_truth_does_not_change_fitted_forecast(monkeypatch):
 
     assert observed_fit_inputs[0] == observed_fit_inputs[1]
     assert observed_fit_inputs[0][0:2] == (3, tuple(days))
-    for arm in ("pde", "persistence", "volume_trend"):
+    for arm in ("pde", "persistence", "volume_trend", "pde_shape_volume_trend"):
         assert np.array_equal(result_a["predictions"][arm], result_b["predictions"][arm])
         assert set(result_a["metrics"][arm]) >= {"dice", "hd95_mm", "spe_pct"}
     assert result_a["metrics"]["pde"] != result_b["metrics"]["pde"]
@@ -114,6 +114,7 @@ def test_next_scan_comparison_integrates_with_the_parameter_fitter():
     result = fv.compare_next_scan(training_masks, days[:3], days[3], reference[2], h=2.0, domain=domain)
 
     assert result["fit"]["rho"] > 0 and result["fit"]["D"] > 0
-    assert set(result["predictions"]) == {"pde", "persistence", "volume_trend"}
+    assert set(result["predictions"]) == {"pde", "persistence", "volume_trend", "pde_shape_volume_trend"}
+    assert int(result["predictions"]["pde_shape_volume_trend"].sum()) == result["target_volume_trend_voxels"]
     assert all(mask.shape == shape for mask in result["predictions"].values())
     assert all(set(metrics) >= {"dice", "hd95_mm", "spe_pct"} for metrics in result["metrics"].values())
