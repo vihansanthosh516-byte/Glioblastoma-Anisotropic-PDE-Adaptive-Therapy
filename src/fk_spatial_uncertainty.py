@@ -142,15 +142,19 @@ def correlated_boundary_perturbation(mask, *, sigma_b_mm: float, tau_b_mm: float
     return deformed > 0
 
 
-def fixed_boundary_score_pairs(reference_mask, *, spacing_mm=1.0, n_voxels: int = 256,
+def fixed_boundary_score_pairs(history_mask, *, spacing_mm=1.0, n_voxels: int = 256,
                                band_mm: float = 10.0, max_pair_distance_mm: float = 10.0) -> dict:
-    """Select fixed target-independent voxels and all pairs within the declared distance strata."""
-    mask = np.asarray(reference_mask, dtype=bool)
+    """Select a target-independent score design from the last observed history mask.
+
+    Reuse this design for every forecast arm and held-out target in the corresponding case. Do not build it
+    from the target mask: choosing scored locations after observing the outcome changes the scoring rule.
+    """
+    mask = np.asarray(history_mask, dtype=bool)
     spacing = _spacing3(spacing_mm)
     band_mm = float(band_mm)
     max_pair_distance_mm = float(max_pair_distance_mm)
     if mask.ndim != 3 or not mask.any() or mask.all():
-        raise ValueError("reference_mask must be a nonempty, non-full 3D binary array")
+        raise ValueError("history_mask must be a nonempty, non-full 3D binary array")
     if isinstance(n_voxels, (bool, np.bool_)) or int(n_voxels) != n_voxels or n_voxels < 2:
         raise ValueError("n_voxels must be an integer of at least two")
     if not np.isfinite(band_mm) or band_mm <= 0 or not np.isfinite(max_pair_distance_mm) or max_pair_distance_mm <= 0:
