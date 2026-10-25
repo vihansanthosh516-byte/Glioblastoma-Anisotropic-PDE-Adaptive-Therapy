@@ -321,7 +321,17 @@ def simulate(scen, policy, seed, track_fr=False):
     Returns capped TTP (days), courses used, and optional filter coverage records."""
     rng = np.random.default_rng(seed)
     N = len(scen["r"])
-    noise = rng.standard_normal((N, N_CYCLES)) * scen["sigma"][:, None]
+    # wrong-model suites (script 155) may set: sigma_true (actual noise sd; policies still get
+    # "sigma"), noise_df (Student-t readings scaled to the same sd), bias (log offset);
+    # all are per-scenario arrays so subset() keeps working
+    sd = scen.get("sigma_true", scen["sigma"])[:, None]
+    if "noise_df" in scen:
+        df = float(scen["noise_df"][0])
+        noise = rng.standard_t(df, (N, N_CYCLES)) * np.sqrt((df - 2) / df) * sd
+    else:
+        noise = rng.standard_normal((N, N_CYCLES)) * sd
+    if "bias" in scen:
+        noise = noise + scen["bias"][:, None]
     S = (1 - scen["f0"]) * scen["B0"]
     R = scen["f0"] * scen["B0"]
     level = PROG_FACTOR * scen["B0"]

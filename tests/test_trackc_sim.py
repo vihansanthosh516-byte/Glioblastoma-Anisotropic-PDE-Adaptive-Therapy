@@ -131,6 +131,29 @@ def test_risk_containment_waits_then_treats():
     assert (eager["courses"] == np.minimum(tc.BUDGET, eager["courses"].max())).any()
 
 
+class Record(NoTreat):
+    def act(self, j, y):
+        self.y = getattr(self, "y", []) + [y.copy()]
+        return np.zeros(y.shape, bool)
+
+
+def test_wrong_model_reading_options():
+    scen = tc.draw_scenarios(200, seed=15, sigmas=(0.05,))
+    base = tc.simulate(scen, Record(), seed=16)["ttp"]
+    for extra in ({}, {"bias": np.full(200, 0.1)}, {"sigma_true": scen["sigma"] * 2},
+                  {"noise_df": np.full(200, 3.0)}):
+        pol = Record()
+        out = tc.simulate(dict(scen, **extra), pol, seed=16)
+        assert np.array_equal(out["ttp"], base)          # readings never change the untreated truth
+        y0 = pol.y[0] - np.log(scen["B0"])
+        if "bias" in extra:
+            assert abs(y0.mean() - 0.1) < 0.02
+        elif "sigma_true" in extra:
+            assert 0.08 < y0.std() < 0.12
+        else:
+            assert 0.04 < y0.std() < 0.06
+
+
 def test_cvar_lower():
     assert tc.cvar_lower(np.arange(1, 11), 0.1) == pytest.approx(1.0)
     x = np.arange(15.0)
