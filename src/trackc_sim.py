@@ -287,6 +287,34 @@ class FilteredThreshold:
         self.pf.propagate(j, treat)
 
 
+class RiskContainment:
+    """Belief containment: treat when the filter's probability of reaching the
+    progression level within `horizon` untreated cycles is >= p_star. Each particle uses
+    its own 1.2 x B0 level (B0 is a filtered parameter). Motivated by the known-parameter
+    oracle, which mostly doses near 1.1-1.19 x B0 (script 153 follow-up; training seeds)."""
+    uses_filter = True
+
+    def __init__(self, p_star, horizon=1, n_particles=500, ranges=RANGES):
+        self.p_star, self.horizon, self.n_particles, self.ranges = p_star, horizon, n_particles, ranges
+
+    def reset(self, scen, rng):
+        self.pf = ParticleFilter(scen["sigma"], self.n_particles, rng, ranges=self.ranges)
+
+    def act(self, j, y):
+        pf = self.pf
+        pf.update(j, y)
+        level = PROG_FACTOR * pf.theta["B0"]
+        ttp = np.full(pf.S.shape, np.nan)
+        S, R = pf.S, pf.R
+        for h in range(self.horizon):
+            S, R = run_cycle(S, R, pf.theta, 0.0, 0.0, pf.dt, prog_level=level, ttp=ttp)
+        risk = (pf.w * ~np.isnan(ttp)).sum(1)
+        return risk >= self.p_star
+
+    def advance(self, j, treat):
+        self.pf.propagate(j, treat)
+
+
 # ---------------------------------------------------------------- episode
 def simulate(scen, policy, seed, track_fr=False):
     """Run one noise replicate of every scenario under `policy` (shared course budget).
@@ -361,6 +389,8 @@ def make_policy(spec):
         return RawThreshold(*spec[1:])
     if kind == "filt":
         return FilteredThreshold(*spec[1:])
+    if kind == "risk":
+        return RiskContainment(*spec[1:])
     raise ValueError(kind)
 
 

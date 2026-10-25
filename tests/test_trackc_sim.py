@@ -120,6 +120,17 @@ def test_filter_posterior_concentrates_on_truth():
     assert errs[-1] < 0.05
 
 
+def test_risk_containment_waits_then_treats():
+    scen = tc.draw_scenarios(20, seed=13, sigmas=(0.05,))
+    out = tc.simulate(scen, tc.make_policy(("risk", 0.1, 1)), seed=14)
+    assert out["courses"].max() <= tc.BUDGET
+    # p_star = 1.0 can never trigger before the first progression is certain: fewer courses
+    lazy = tc.simulate(scen, tc.make_policy(("risk", 1.0, 1)), seed=14)
+    assert lazy["courses"].sum() < out["courses"].sum()
+    eager = tc.simulate(scen, tc.make_policy(("risk", 0.0, 1)), seed=14)
+    assert (eager["courses"] == np.minimum(tc.BUDGET, eager["courses"].max())).any()
+
+
 def test_cvar_lower():
     assert tc.cvar_lower(np.arange(1, 11), 0.1) == pytest.approx(1.0)
     x = np.arange(15.0)
