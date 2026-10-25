@@ -110,11 +110,22 @@ def main():
     ap.add_argument("--max-per-group", type=int, default=3000)
     ap.add_argument("--n-genes", type=int, default=2000)
     ap.add_argument("--seed", type=int, default=20261025)
+    ap.add_argument("--exclude-technical", action="store_true")
     args = ap.parse_args()
-    OUT_DIR.mkdir(parents=True, exist_ok=True)
+    out_dir = OUT_DIR / ("exclude_technical" if args.exclude_technical else "")
+    out_dir.mkdir(parents=True, exist_ok=True)
     t0 = time.time()
     X, y, donor, ctype, genes = load(args.max_per_group, args.seed)
     t_load = time.time() - t0
+    n_excluded = 0
+    if args.exclude_technical:
+        # drop genes that often reflect handling or contamination, not cell state: immediate-early
+        # stress, ribosomal, mitochondrial, hemoglobin, nuclear lncRNAs (sensitivity analysis)
+        tech = np.array([g in STRESS or g.startswith(("RPL", "RPS", "MT-", "MTRNR", "HBA", "HBB", "HBD"))
+                         or g in {"MALAT1", "NEAT1"} for g in genes])
+        X = X[:, ~tech]
+        genes = genes[~tech]
+        n_excluded = int(tech.sum())
     mg = ctype == "microglia"
     mg_genes = top_genes(X[mg], y[mg], genes, args.n_genes)
 
@@ -155,7 +166,8 @@ def main():
         "git_commit_at_run": commit, "input": str(H5AD.relative_to(PROJECT_ROOT)),
         "settings": {"max_per_group": args.max_per_group, "n_genes": args.n_genes, "seed": args.seed,
                      "model": "L2 logistic regression, C = 0.1, standardized features",
-                     "within_min_cells_per_side": 50},
+                     "within_min_cells_per_side": 50,
+                     "exclude_technical": args.exclude_technical, "n_genes_excluded": n_excluded},
         "cells_used": counts,
         "auc": s,
         "share_of_gene_auc_from_composition": (c - 0.5) / (g - 0.5) if g and g > 0.5 else None,
@@ -166,7 +178,7 @@ def main():
         "microglia_top_genes_all_donors_descriptive": mg_genes,
         "runtime_s": {"load": t_load, "total": time.time() - t0},
     }
-    (OUT_DIR / "audit_results.json").write_text(json.dumps(result, indent=2, default=float))
+    (out_dir / "audit_results.json").write_text(json.dumps(result, indent=2, default=float))
     print(json.dumps({k: result[k] for k in ("share_of_gene_auc_from_composition", "tests",
                                              "random_cell_split_auc_genes")}, indent=1, default=float))
     print({k: v["mean"] for k, v in s.items()})
