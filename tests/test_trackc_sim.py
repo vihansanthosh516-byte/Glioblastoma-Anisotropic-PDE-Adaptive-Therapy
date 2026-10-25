@@ -131,6 +131,19 @@ def test_risk_containment_waits_then_treats():
     assert (eager["courses"] == np.minimum(tc.BUDGET, eager["courses"].max())).any()
 
 
+def test_weak_drug_guard_front_loads_weak_drugs():
+    weak = tc.draw_scenarios(30, seed=17, ranges=dict(tc.RANGES, m=(3.0, 4.0, "log")), sigmas=(0.05,))
+    narrow = tc.simulate(weak, tc.make_policy(("risk", 0.05, 2, 0.0, False)), seed=18)
+    wide = tc.simulate(weak, tc.make_policy(("risk", 0.05, 2, 0.0, True)), seed=18)
+    guard = tc.simulate(weak, tc.make_policy(("risk", 0.05, 2, 6.0, True)), seed=18)
+    # the wide prior alone lets the filter see a weak drug and dose early (found 2026-10-25)
+    assert wide["ttp"].mean() > narrow["ttp"].mean() + 28
+    assert wide["courses"].mean() > narrow["courses"].mean()
+    assert guard["ttp"].mean() >= wide["ttp"].mean() - 7
+    assert tc.RiskContainment(0.05, wide=True).ranges["m"][0] == 3.0
+    assert tc.RiskContainment(0.05).ranges["m"][0] == 6.0
+
+
 class Record(NoTreat):
     def act(self, j, y):
         self.y = getattr(self, "y", []) + [y.copy()]

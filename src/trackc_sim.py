@@ -42,6 +42,7 @@ PARAMS = ("r", "m", "f0", "c", "eps", "B0")      # kill rate k = m * r
 RANGES = {"r": (0.001, 0.05, "log"), "m": (6.0, 20.0, "log"), "f0": (0.001, 0.1, "log"),
           "c": (0.0, 0.25, "lin"), "eps": (0.0, 0.2, "lin"), "B0": (0.05, 0.5, "lin")}
 SIGMAS = (0.05, 0.10, 0.20)
+RANGES_WIDE_M = dict(RANGES, m=(3.0, 20.0, "log"))     # filter prior that can hold a weak drug
 
 
 # ---------------------------------------------------------------- scenarios
@@ -294,8 +295,13 @@ class RiskContainment:
     oracle, which mostly doses near 1.1-1.19 x B0 (script 153 follow-up; training seeds)."""
     uses_filter = True
 
-    def __init__(self, p_star, horizon=1, n_particles=500, ranges=RANGES):
-        self.p_star, self.horizon, self.n_particles, self.ranges = p_star, horizon, n_particles, ranges
+    def __init__(self, p_star, horizon=1, guard=0.0, wide=False, n_particles=500, ranges=None):
+        """guard > 0: weak-drug guard (script 156). Treat every cycle while the filter gives
+        P(m < guard) >= 0.5, since waiting near the line fails when one course cannot push
+        burden back (script 155, M3). wide=True widens the filter prior on m to [3, 20] so
+        the filter can represent a weak drug."""
+        self.p_star, self.horizon, self.guard, self.n_particles = p_star, horizon, guard, n_particles
+        self.ranges = ranges or (RANGES_WIDE_M if wide else RANGES)
 
     def reset(self, scen, rng):
         self.pf = ParticleFilter(scen["sigma"], self.n_particles, rng, ranges=self.ranges)
@@ -309,7 +315,10 @@ class RiskContainment:
         for h in range(self.horizon):
             S, R = run_cycle(S, R, pf.theta, 0.0, 0.0, pf.dt, prog_level=level, ttp=ttp)
         risk = (pf.w * ~np.isnan(ttp)).sum(1)
-        return risk >= self.p_star
+        treat = risk >= self.p_star
+        if self.guard > 0:
+            treat |= (pf.w * (pf.theta["m"] < self.guard)).sum(1) >= 0.5
+        return treat
 
     def advance(self, j, treat):
         self.pf.propagate(j, treat)
