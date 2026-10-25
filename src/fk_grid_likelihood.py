@@ -150,13 +150,15 @@ def evaluate_parameter_grid_log_likelihood(masks, days, log_parameter_points, *,
     """Evaluate a joint log(rho)-log(D) grid using training-series shape residuals only.
 
     The first mask seeds the PDE. Each later concentration is volume-matched to its corresponding supplied
-    training mask before the spatial likelihood is evaluated. Use only outer-training masks here.
+    training mask before the spatial likelihood is evaluated. With only two masks, the single follow-up can leave
+    a rho-D ridge; the joint posterior must retain that uncertainty and must not be presented as separate
+    patient-specific parameter identification. Use only outer-training masks here.
     """
     masks = [np.asarray(mask, dtype=bool) for mask in masks]
     days = np.asarray(days, dtype=float)
     points = np.asarray(log_parameter_points, dtype=float)
-    if len(masks) < 3 or days.shape != (len(masks),) or np.any(np.diff(days) <= 0) or not np.isfinite(days).all():
-        raise ValueError("need at least three ordered masks and one finite day per mask")
+    if len(masks) < 2 or days.shape != (len(masks),) or np.any(np.diff(days) <= 0) or not np.isfinite(days).all():
+        raise ValueError("need at least two ordered masks and one finite day per mask")
     if any(mask.ndim != 3 or mask.shape != masks[0].shape or not mask.any() for mask in masks):
         raise ValueError("all training masks must be nonempty 3D arrays with one shape")
     if points.ndim != 2 or points.shape[1] != 2 or not np.isfinite(points).all():

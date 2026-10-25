@@ -1,8 +1,8 @@
 """Outer-patient evaluation of the Track B hybrid on a controlled synthetic cohort.
 
-All inputs are generated here. The evaluator uses no patient data. The simulated segmentation-error
-covariance is deliberately supplied at its known generating value, so this is a favorable method check and
-does not validate noise estimation or performance on MRI cohorts.
+All inputs are generated here. The evaluator uses no patient data. Cross-fitted boundary calibration is the
+default; oracle covariance is available only to reproduce a favorable simulation condition. Neither mode
+validates performance on MRI cohorts.
 """
 from __future__ import annotations
 
@@ -18,7 +18,7 @@ from src import fk_mask_inverse as fi
 from src.fk_boundary_calibration import run_cross_fitted_boundary_calibration
 from src.fk_grid_likelihood import volume_match_concentration
 from src.fk_hybrid_forecast import estimate_log_volume_slope
-from src.fk_patient_cv import PatientSeries, run_outer_patient_cv
+from src.fk_patient_cv import ForecastFailure, PatientSeries, run_outer_patient_cv
 from src.fk_spatial_uncertainty import (
     correlated_boundary_perturbation,
     energy_score_mask,
@@ -214,20 +214,68 @@ def _seed_for_patient(patient_id: str) -> int:
 
 def _forecast_callback(history, nuisance, *, forecast_function, forecast_config):
     shape = history.masks[-1].shape
-    result = forecast_function(
-        history.masks, history.days, history.forecast_day,
-        prior=nuisance["prior"], h=SPACING_MM,
-        boundary_covariance=nuisance["boundary_covariance"],
-        population_log_volume_slope_per_day=nuisance["population_log_volume_slope_per_day"],
-        shrinkage_time_constant_days=nuisance["shrinkage_time_constant_days"],
-        volume_variance_fit=nuisance["volume_variance_fit"],
-        domain=np.ones(shape, dtype=bool),
-        rho_bounds=(0.01, 0.1), D_bounds=(0.01, 0.1),
-        n_coarse=forecast_config["n_coarse"], n_refine=forecast_config["n_refine"],
-        n_draws=forecast_config["n_draws"], n_anchors=forecast_config["n_anchors"],
-        seed=_seed_for_patient(history.patient_id),
-    )
+    try:
+        result = forecast_function(
+            history.masks, history.days, history.forecast_day,
+            prior=nuisance["prior"], h=SPACING_MM,
+            boundary_covariance=nuisance["boundary_covariance"],
+            population_log_volume_slope_per_day=nuisance["population_log_volume_slope_per_day"],
+            shrinkage_time_constant_days=nuisance["shrinkage_time_constant_days"],
+            volume_variance_fit=nuisance["volume_variance_fit"],
+            domain=np.ones(shape, dtype=bool),
+            rho_bounds=(0.01, 0.1), D_bounds=(0.01, 0.1),
+            n_coarse=forecast_config["n_coarse"], n_refine=forecast_config["n_refine"],
+            n_draws=forecast_config["n_draws"], n_anchors=forecast_config["n_anchors"],
+            seed=_seed_for_patient(history.patient_id),
+        )
+    except np.linalg.LinAlgError as exc:
+        raise ForecastFailure(f"linear algebra failure in forecast: {exc}") from exc
+    except ValueError as exc:
+        expected_failures = (
+            "forecast volume reaches computational-domain capacity",
+            "boundary covariance must be positive definite",
+            "boundary covariance is not positive definite",
+            "volume-matched forecast has no usable boundary",
+        )
+        if str(exc).startswith(expected_failures):
+            raise ForecastFailure(str(exc)) from exc
+        raise
     return {"forecast": result, "history_mask": history.masks[-1]}
+
+
+def _persistence_error_fallback(history, nuisance, *, forecast_config):
+    """Use last-mask persistence with the same boundary wrapper; retain persistence if that wrapper fails."""
+    from src.fk_hybrid_forecast import signed_distance_volume_baseline_draws
+
+    last_mask = np.asarray(history.masks[-1], dtype=bool)
+    n_draws = int(forecast_config["n_draws"])
+    targets = np.full(n_draws, int(last_mask.sum()), dtype=np.int64)
+    domain = np.ones(last_mask.shape, dtype=bool)
+    try:
+        draws, draw_fallbacks = signed_distance_volume_baseline_draws(
+            last_mask,
+            targets,
+            domain=domain,
+            spacing_mm=SPACING_MM,
+            boundary_covariance=nuisance["boundary_covariance"],
+            seed=_seed_for_patient(history.patient_id),
+            n_anchors=forecast_config["n_anchors"],
+            return_fallback_count=True,
+        )
+    except (ValueError, np.linalg.LinAlgError):
+        draws = np.repeat(last_mask[None, ...], n_draws, axis=0)
+        draw_fallbacks = n_draws
+    forecast = {
+        "mask_draws": draws,
+        "no_pde_ranker_mask_draws": draws.copy(),
+        "pre_boundary_probability": last_mask.astype(np.float32),
+        "hybrid_boundary_draw_fallback_count": int(draw_fallbacks),
+        "no_pde_boundary_draw_fallback_count": int(draw_fallbacks),
+        "requested_volume_draws_voxels": targets,
+        "final_volume_draws_voxels": draws.reshape(n_draws, -1).sum(axis=1),
+        "forecast_status": "persistence_with_correlated_error_fallback",
+    }
+    return {"forecast": forecast, "history_mask": last_mask}
 
 
 def _score_callback(prediction, target) -> dict:
@@ -271,8 +319,58 @@ def _score_callback(prediction, target) -> dict:
         "hybrid_minus_no_pde_dice": float(hybrid_dice - baseline_dice),
         "hybrid_lower_energy": bool(hybrid_energy < baseline_energy),
         "hybrid_boundary_disagreement": float(ensemble_boundary_disagreement(hybrid_draws)),
+        "hybrid_boundary_draw_fallback_count": int(forecast.get("hybrid_boundary_draw_fallback_count", 0)),
+        "no_pde_boundary_draw_fallback_count": int(forecast.get("no_pde_boundary_draw_fallback_count", 0)),
         "target_volume_voxels": int(truth.sum()),
         "forecast_day": float(target.day),
+    }
+
+
+def _summarize_calibration_residuals(residual_cases: list[dict]) -> dict:
+    """Summarize cross-fitted residuals without exposing patient IDs or anchor-level rows."""
+    bins = ((0.0, 2.0, "0-2"), (2.0, 5.0, "2-5"), (5.0, 10.0, "5-10"),
+            (10.0, 20.0, "10-20"), (20.0, 40.0, "20-40"), (40.0, float("inf"), "40+"))
+    by_patient: dict[str, list[dict]] = {}
+    for case in residual_cases:
+        residuals = np.asarray(case["residuals_mm"], dtype=float)
+        points = np.asarray(case["anchor_points_mm"], dtype=float)
+        pair_i, pair_j = np.triu_indices(len(residuals), k=1)
+        distances = np.linalg.norm(points[pair_i] - points[pair_j], axis=1)
+        semivariogram = 0.5 * (residuals[pair_i] - residuals[pair_j]) ** 2
+        per_bin = {}
+        for lower, upper, name in bins:
+            selected = (distances >= lower) & (distances < upper)
+            if selected.any():
+                per_bin[name] = float(semivariogram[selected].mean())
+        by_patient.setdefault(str(case["patient_id"]), []).append({
+            "mean_residual_mm": float(residuals.mean()),
+            "centered_sd_mm": float(residuals.std()),
+            "semivariogram_by_bin_mm2": per_bin,
+        })
+
+    patient_means = []
+    patient_centered_sds = []
+    patient_bins: dict[str, list[float]] = {name: [] for _, _, name in bins}
+    for origins in by_patient.values():
+        patient_means.append(float(np.mean([row["mean_residual_mm"] for row in origins])))
+        patient_centered_sds.append(float(np.mean([row["centered_sd_mm"] for row in origins])))
+        for _, _, name in bins:
+            origin_values = [row["semivariogram_by_bin_mm2"][name]
+                             for row in origins if name in row["semivariogram_by_bin_mm2"]]
+            if origin_values:
+                patient_bins[name].append(float(np.mean(origin_values)))
+    return {
+        "n_calibration_patients": len(by_patient),
+        "n_calibration_origins": len(residual_cases),
+        "patient_balanced_mean_residual_mm": float(np.mean(patient_means)),
+        "patient_balanced_centered_residual_sd_mm": float(np.mean(patient_centered_sds)),
+        "semivariogram_by_distance_bin_mm2": {
+            name: {
+                "patient_balanced_mean": float(np.mean(values)),
+                "patients_with_pairs": len(values),
+            }
+            for _, _, name in bins if (values := patient_bins[name])
+        },
     }
 
 
@@ -301,6 +399,7 @@ def _summarize(rows: list[dict]) -> dict:
         return {
             "n_patients": len(patient_scores),
             "n_forecasts": len(subset),
+            "forecast_fallback_count": int(sum(row.get("forecast_status") == "fallback" for row in subset)),
             "mean_energy_score_difference_hybrid_minus_no_pde": float(differences.mean()),
             "median_energy_score_difference_hybrid_minus_no_pde": float(np.median(differences)),
             "hybrid_lower_energy_count": int(np.sum(differences < 0)),
@@ -310,6 +409,12 @@ def _summarize(rows: list[dict]) -> dict:
             "mean_no_pde_variogram_score": float(np.mean([s["no_pde_variogram_score"] for s in patient_values])),
             "mean_hybrid_volume_crps_voxels": float(np.mean([s["hybrid_volume_crps_voxels"] for s in patient_values])),
             "mean_no_pde_volume_crps_voxels": float(np.mean([s["no_pde_volume_crps_voxels"] for s in patient_values])),
+            "hybrid_boundary_draw_fallback_count": int(sum(
+                row["scores"].get("hybrid_boundary_draw_fallback_count", 0) for row in subset
+            )),
+            "no_pde_boundary_draw_fallback_count": int(sum(
+                row["scores"].get("no_pde_boundary_draw_fallback_count", 0) for row in subset
+            )),
         }
 
     by_condition = {}
@@ -329,7 +434,8 @@ def run_synthetic_gate(*, replicates_per_condition: int = 25, n_folds: int = 5,
                        forecast_config: dict | None = None,
                        forecast_nuisance_overrides: dict | None = None,
                        boundary_calibration_mode: str = "cross_fitted",
-                       inner_n_folds: int = 2) -> dict:
+                       inner_n_folds: int = 2,
+                       ell_candidates_mm=(5.0, 10.0, 20.0)) -> dict:
     """Run the hybrid on synthetic, patient-held-out histories and score matched-size ablations.
 
     By default, each outer fold estimates boundary covariance from inner patient-held-out residuals drawn
@@ -346,6 +452,10 @@ def run_synthetic_gate(*, replicates_per_condition: int = 25, n_folds: int = 5,
             or inner_n_folds < 2):
         raise ValueError("inner_n_folds must be an integer of at least two")
     inner_n_folds = int(inner_n_folds)
+    ell_candidates_mm = tuple(float(value) for value in ell_candidates_mm)
+    if (len(ell_candidates_mm) < 2 or len(set(ell_candidates_mm)) != len(ell_candidates_mm)
+            or any(not np.isfinite(value) or value <= 0 for value in ell_candidates_mm)):
+        raise ValueError("ell_candidates_mm must contain at least two unique positive finite values")
     overrides = {} if forecast_nuisance_overrides is None else dict(forecast_nuisance_overrides)
     allowed_overrides = {"boundary_covariance", "prior"}
     if set(overrides) - allowed_overrides:
@@ -377,8 +487,10 @@ def run_synthetic_gate(*, replicates_per_condition: int = 25, n_folds: int = 5,
     model_prior = {"mean": prior_mean, "covariance": prior_covariance}
 
     boundary_calibration_fits = []
+    boundary_calibration_fallback_total = 0
 
     def fit_outer_training_nuisance(train_records):
+        nonlocal boundary_calibration_fallback_total
         fitted = fit_training_nuisance(train_records)
         fitted["prior"] = model_prior
         if boundary_calibration_mode == "oracle":
@@ -401,9 +513,17 @@ def run_synthetic_gate(*, replicates_per_condition: int = 25, n_folds: int = 5,
             return inner
 
         def forecast_for_calibration(history, inner_nuisance):
-            prediction = _forecast_callback(
-                history, inner_nuisance, forecast_function=forecast_function, forecast_config=forecast_config,
-            )
+            nonlocal boundary_calibration_fallback_total
+            try:
+                prediction = _forecast_callback(
+                    history, inner_nuisance, forecast_function=forecast_function,
+                    forecast_config=forecast_config,
+                )
+            except ForecastFailure:
+                boundary_calibration_fallback_total += 1
+                prediction = _persistence_error_fallback(
+                    history, inner_nuisance, forecast_config=forecast_config,
+                )
             forecast = prediction["forecast"]
             if "pre_boundary_probability" not in forecast:
                 raise ValueError("cross-fitted boundary calibration requires pre_boundary_probability")
@@ -413,10 +533,12 @@ def run_synthetic_gate(*, replicates_per_condition: int = 25, n_folds: int = 5,
         calibration_seed = int.from_bytes(
             hashlib.sha256("\0".join(training_ids).encode("utf-8")).digest()[:4], "little"
         )
+        calibration_fallbacks_before = boundary_calibration_fallback_total
         calibration = run_cross_fitted_boundary_calibration(
             train_records, fit_inner_nuisance, forecast_for_calibration,
             n_folds=inner_n_folds, seed=calibration_seed,
             minimum_history=2, spacing_mm=SPACING_MM, n_anchors=forecast_config["n_anchors"],
+            ell_candidates_mm=ell_candidates_mm,
         )
         covariance_fit = calibration["covariance_fit"]
         estimated_covariance = {
@@ -430,7 +552,13 @@ def run_synthetic_gate(*, replicates_per_condition: int = 25, n_folds: int = 5,
             "n_calibration_origins": int(covariance_fit["n_calibration_origins"]),
             "estimate": estimated_covariance,
             "selection_boundary": bool(covariance_fit["selection_boundary"]),
+            "n_persistence_error_fallbacks": int(
+                boundary_calibration_fallback_total - calibration_fallbacks_before
+            ),
             "weighted_rmse_mm2": float(covariance_fit["candidate_fits"][covariance_fit["ell_mm"]]["weighted_rmse_mm2"]),
+            "candidate_fits": {str(key): dict(value)
+                               for key, value in covariance_fit["candidate_fits"].items()},
+            "residual_diagnostics": _summarize_calibration_residuals(calibration["residual_cases"]),
             "fit_scope": covariance_fit["scope"],
         })
         return fitted
@@ -446,7 +574,11 @@ def run_synthetic_gate(*, replicates_per_condition: int = 25, n_folds: int = 5,
         lambda history, nuisance: _forecast_callback(
             history, nuisance, forecast_function=forecast_function, forecast_config=forecast_config,
         ),
-        _score_callback, n_folds=n_folds, minimum_history=2,
+        _score_callback,
+        fallback_forecast=lambda history, nuisance: _persistence_error_fallback(
+            history, nuisance, forecast_config=forecast_config,
+        ),
+        n_folds=n_folds, minimum_history=2,
     )
     elapsed = time.perf_counter() - started
     for row in result["rows"]:
@@ -476,12 +608,15 @@ def run_synthetic_gate(*, replicates_per_condition: int = 25, n_folds: int = 5,
             "solver_spacing_mm": SPACING_MM,
             "shape_grid": SHAPE,
             "boundary_covariance_truth": dict(BOUNDARY_TRUTH),
+            "forecast_config": dict(forecast_config),
             "boundary_calibration_mode": boundary_calibration_mode,
             "boundary_covariance_model_input": dict(model_covariance) if boundary_calibration_mode == "oracle" else None,
             "boundary_covariance_is_oracle_input": boundary_calibration_mode == "oracle" and model_covariance == BOUNDARY_TRUTH,
             "boundary_covariance_crossfit_start_input": (dict(BOUNDARY_CALIBRATION_START)
                                                            if boundary_calibration_mode == "cross_fitted" else None),
+            "boundary_covariance_ell_candidates_mm": list(ell_candidates_mm),
             "boundary_covariance_search_boundary_fold_count": int(boundary_search_boundary_folds),
+            "boundary_calibration_persistence_fallback_count": int(boundary_calibration_fallback_total),
             "boundary_covariance_calibration_status": boundary_calibration_status,
             "boundary_covariance_status_rule": (
                 "inconclusive_search_boundary if any outer-fold length-scale estimate is at either candidate-grid edge; "
@@ -509,6 +644,11 @@ def main(argv=None) -> int:
     parser.add_argument("--seed", type=int, default=20261024)
     parser.add_argument("--boundary-calibration-mode", choices=("cross_fitted", "oracle"), default="cross_fitted")
     parser.add_argument("--inner-n-folds", type=int, default=2)
+    parser.add_argument("--ell-candidates-mm", type=float, nargs="+", default=(5.0, 10.0, 20.0))
+    parser.add_argument("--n-anchors", type=int, default=24)
+    parser.add_argument("--n-draws", type=int, default=16)
+    parser.add_argument("--n-coarse", type=int, default=5)
+    parser.add_argument("--n-refine", type=int, default=3)
     parser.add_argument("--output", type=Path,
                         default=PROJECT_ROOT / "output" / "track_b_full_hybrid_gate_crossfit_20261024.json")
     args = parser.parse_args(argv)
@@ -517,6 +657,13 @@ def main(argv=None) -> int:
         n_folds=args.n_folds, seed=args.seed,
         boundary_calibration_mode=args.boundary_calibration_mode,
         inner_n_folds=args.inner_n_folds,
+        ell_candidates_mm=args.ell_candidates_mm,
+        forecast_config={
+            "n_anchors": args.n_anchors,
+            "n_draws": args.n_draws,
+            "n_coarse": args.n_coarse,
+            "n_refine": args.n_refine,
+        },
     )
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(result, indent=2, allow_nan=False), encoding="utf-8")

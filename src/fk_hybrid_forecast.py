@@ -30,9 +30,27 @@ def estimate_log_volume_slope(volumes, days) -> float:
     return float(centered_days @ (log_volumes - log_volumes.mean()) / denominator)
 
 
+def _perturb_boundary_or_keep(mask, *, boundary_covariance, spacing_mm, seed, n_anchors):
+    """Keep the valid pre-draw mask if boundary rasterization collapses a draw."""
+    mask = np.asarray(mask, dtype=bool)
+    perturbed = correlated_boundary_perturbation(
+        mask,
+        sigma_b_mm=boundary_covariance["sigma_b_mm"],
+        tau_b_mm=boundary_covariance["tau_b_mm"],
+        ell_mm=boundary_covariance["ell_mm"],
+        spacing_mm=spacing_mm,
+        seed=seed,
+        n_anchors=n_anchors,
+    )
+    if not perturbed.any() or perturbed.all():
+        return mask.copy(), True
+    return perturbed, False
+
+
 def signed_distance_volume_baseline_draws(last_mask, target_voxels, *, domain=None, spacing_mm=1.0,
                                           boundary_covariance: dict, seed: int = 0,
-                                          n_anchors: int = 256) -> np.ndarray:
+                                          n_anchors: int = 256,
+                                          return_fallback_count: bool = False):
     """Draw matched-volume no-PDE forecasts by ranking voxels with last-mask signed distance."""
     last_mask = np.asarray(last_mask, dtype=bool)
     if last_mask.ndim != 3 or not last_mask.any() or last_mask.all():
@@ -51,21 +69,21 @@ def signed_distance_volume_baseline_draws(last_mask, target_voxels, *, domain=No
                        - ndimage.distance_transform_edt(~last_mask, sampling=spacing))
     seeds = np.random.SeedSequence(seed).spawn(len(targets))
     draws = []
+    fallback_count = 0
     for target, child_seed in zip(targets, seeds):
         ranked = volume_match_concentration(signed_distance, domain, target_voxels=int(target))
-        draw = correlated_boundary_perturbation(
+        draw, collapsed = _perturb_boundary_or_keep(
             ranked,
-            sigma_b_mm=boundary_covariance["sigma_b_mm"],
-            tau_b_mm=boundary_covariance["tau_b_mm"],
-            ell_mm=boundary_covariance["ell_mm"],
+            boundary_covariance=boundary_covariance,
             spacing_mm=spacing,
             seed=int(child_seed.generate_state(1)[0]),
             n_anchors=n_anchors,
-        ) & domain
-        if not draw.any() or draw.all():
-            raise ValueError("no-PDE baseline produced an empty or full-domain mask")
+        )
+        fallback_count += int(collapsed)
+        draw &= domain
         draws.append(draw)
-    return np.stack(draws, axis=0)
+    result = np.stack(draws, axis=0)
+    return (result, fallback_count) if return_fallback_count else result
 
 
 def hybrid_posterior_predictive_forecast(masks, days, target_day, *, prior: dict, h: float,
@@ -80,14 +98,16 @@ def hybrid_posterior_predictive_forecast(masks, days, target_day, *, prior: dict
     """Draw joint PDE-shape, log-volume, and correlated-boundary forecasts from history only.
 
     The prior and nuisance estimates must come from outer-training patients. The target mask is deliberately
-    not an argument. A forecast that reaches the computational-domain edge fails instead of being clipped.
+    not an argument. Two masks support the planned first-two-to-third forecast, but one spatial follow-up can
+    leave a joint rho-D ridge, so integrate posterior uncertainty and do not interpret the two parameters
+    separately. A forecast that reaches the computational-domain edge fails instead of being clipped.
     """
     masks = [np.asarray(mask, dtype=bool) for mask in masks]
     days = np.asarray(days, dtype=float)
     target_day = float(target_day)
     h = float(h)
-    if len(masks) < 3 or days.shape != (len(masks),) or not np.isfinite(days).all():
-        raise ValueError("need at least three finite history masks and one day per mask")
+    if len(masks) < 2 or days.shape != (len(masks),) or not np.isfinite(days).all():
+        raise ValueError("need at least two finite history masks and one day per mask")
     if any(mask.ndim != 3 or mask.shape != masks[0].shape or not mask.any() for mask in masks):
         raise ValueError("history masks must be nonempty 3D arrays with one common shape")
     if np.any(np.diff(days) <= 0) or not np.isfinite(target_day) or target_day <= days[-1]:
@@ -129,6 +149,7 @@ def hybrid_posterior_predictive_forecast(masks, days, target_day, *, prior: dict
     seed_sequences = boundary_seed.spawn(n_draws)
     parameter_draws = posterior["parameter_draws_log"]
     masks_out = []
+    hybrid_boundary_fallback_count = 0
     pre_boundary_probability = np.zeros(masks[0].shape, dtype=np.float32)
     for draw_index, (log_rho, log_D) in enumerate(parameter_draws):
         rho, diffusion = float(np.exp(log_rho)), float(np.exp(log_D))
@@ -141,30 +162,31 @@ def hybrid_posterior_predictive_forecast(masks, days, target_day, *, prior: dict
         if sized_mask.all() or not sized_mask.any():
             raise ValueError("volume-matched forecast has no usable boundary")
         pre_boundary_probability += sized_mask.astype(np.float32) / n_draws
-        boundary_draw = correlated_boundary_perturbation(
+        boundary_draw, collapsed = _perturb_boundary_or_keep(
             sized_mask,
-            sigma_b_mm=boundary_covariance["sigma_b_mm"],
-            tau_b_mm=boundary_covariance["tau_b_mm"],
-            ell_mm=boundary_covariance["ell_mm"],
+            boundary_covariance=boundary_covariance,
             spacing_mm=h,
             seed=int(seed_sequences[draw_index].generate_state(1)[0]),
             n_anchors=n_anchors,
-        ) & domain
-        if not boundary_draw.any() or boundary_draw.all():
-            raise ValueError("boundary perturbation produced an empty or full-domain forecast")
+        )
+        hybrid_boundary_fallback_count += int(collapsed)
+        boundary_draw &= domain
         masks_out.append(boundary_draw)
 
     mask_draws = np.stack(masks_out, axis=0)
     final_volumes = mask_draws.reshape(n_draws, -1).sum(axis=1)
-    no_pde_ranker_draws = signed_distance_volume_baseline_draws(
+    no_pde_ranker_draws, baseline_boundary_fallback_count = signed_distance_volume_baseline_draws(
         masks[-1], requested_voxels, domain=domain, spacing_mm=h,
         boundary_covariance=boundary_covariance,
         seed=int(boundary_seed.generate_state(1)[0]), n_anchors=n_anchors,
+        return_fallback_count=True,
     )
     return {
         "mask_draws": mask_draws,
         "pre_boundary_probability": pre_boundary_probability,
         "no_pde_ranker_mask_draws": no_pde_ranker_draws,
+        "hybrid_boundary_draw_fallback_count": int(hybrid_boundary_fallback_count),
+        "no_pde_boundary_draw_fallback_count": int(baseline_boundary_fallback_count),
         "parameter_draws_log": parameter_draws,
         "requested_volume_draws_voxels": requested_voxels,
         "final_volume_draws_voxels": final_volumes,
