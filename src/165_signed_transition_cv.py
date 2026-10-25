@@ -405,6 +405,30 @@ def _rank_probabilities(
     )
 
 
+def _equal_weight_probability_mixture(
+    hybrid_probability: np.ndarray,
+    prior_probability: np.ndarray,
+) -> np.ndarray:
+    """Return a fixed equal-weight linear pool of two spatial marginals.
+
+    Both component maps use the same count law, so their mixture preserves the
+    expected event count while hedging between learned and prior-only location
+    forecasts. The 1/2 weight is fixed, not fitted on the evaluation patients.
+    """
+    hybrid = np.asarray(hybrid_probability, dtype=np.float64)
+    prior = np.asarray(prior_probability, dtype=np.float64)
+    if hybrid.shape != prior.shape or hybrid.ndim != 1:
+        raise ValueError("mixture inputs must be one-dimensional maps with matching shape")
+    if (
+        not np.all(np.isfinite(hybrid))
+        or not np.all(np.isfinite(prior))
+        or np.any((hybrid < 0) | (hybrid > 1))
+        or np.any((prior < 0) | (prior > 1))
+    ):
+        raise ValueError("mixture inputs must contain finite probabilities in [0, 1]")
+    return 0.5 * hybrid + 0.5 * prior
+
+
 def _metric_row(target: np.ndarray, score: np.ndarray, probability: np.ndarray) -> dict[str, float]:
     y = np.asarray(target, dtype=np.uint8)
     if y.size == 0 or y.min() == y.max():
@@ -576,16 +600,30 @@ def evaluate(
                 "removal_future_rate_multiplier": count_calibration["removal"]["rate_multiplier"],
                 "boundary_counts": row.boundary_counts,
             }
+            probability_arms: dict[str, tuple[np.ndarray, np.ndarray]] = {}
             for arm, (add_score, remove_score) in score_arms.items():
                 add_probability, remove_probability = _rank_probabilities(
                     add_score, remove_score, count_forecast
                 )
+                probability_arms[arm] = (add_probability, remove_probability)
                 for outcome, target, score, probability in (
                     ("addition", row.addition_target, add_score, add_probability),
                     ("removal", row.removal_target, remove_score, remove_probability),
                 ):
                     for metric, value in _metric_row(target, score, probability).items():
                         record[f"{arm}_{outcome}_{metric}"] = value
+            mixture_add = _equal_weight_probability_mixture(
+                probability_arms["hybrid"][0], probability_arms["prior_only"][0]
+            )
+            mixture_remove = _equal_weight_probability_mixture(
+                probability_arms["hybrid"][1], probability_arms["prior_only"][1]
+            )
+            for outcome, target, probability in (
+                ("addition", row.addition_target, mixture_add),
+                ("removal", row.removal_target, mixture_remove),
+            ):
+                for metric, value in _metric_row(target, probability, probability).items():
+                    record[f"prior_anchored_mixture_{outcome}_{metric}"] = value
             records.append(record)
         fold_summaries.append(
             {
@@ -618,6 +656,21 @@ def evaluate(
                 else:
                     contrast = {**contrast, "direction": "positive favors hybrid"}
                 contrasts[f"hybrid_minus_{comparator}_{outcome}_{metric}"] = contrast
+            mixture_values = _aggregate_by_patient(
+                records, "prior_anchored_mixture", outcome, metric
+            )
+            for comparator in ("hybrid", "prior_only", "mri_only"):
+                comparator_values = _aggregate_by_patient(records, comparator, outcome, metric)
+                contrast = _bootstrap_difference(
+                    mixture_values,
+                    comparator_values,
+                    seed=seed + len(contrasts),
+                )
+                direction = "negative favors mixture" if metric == "brier" else "positive favors mixture"
+                contrasts[f"prior_anchored_mixture_minus_{comparator}_{outcome}_{metric}"] = {
+                    **contrast,
+                    "direction": direction,
+                }
         for metric in ("count_absolute_error",):
             calibrated_values = _aggregate_by_patient(records, "calibrated", outcome, metric)
             uncalibrated_values = _aggregate_by_patient(records, "uncalibrated", outcome, metric)
@@ -643,7 +696,7 @@ def evaluate(
     return {
         "status": "exploratory; MU-Glioma-Post has prior project use",
         "endpoint": "future annotated label-1/3 additions and removals inside forecast-origin risk sets",
-        "method": "direction-specific spatial-prior residual heads plus bounded shared-frailty binomial counts and rank-constrained probabilities",
+        "method": "direction-specific spatial-prior residual heads plus bounded shared-frailty binomial counts, rank-constrained probabilities, and a fixed equal-weight hybrid/prior probability mixture",
         "n_patients": int(unique_patients.size),
         "n_intervals": len(intervals),
         "n_splits": n_splits,
@@ -653,6 +706,7 @@ def evaluate(
             "max_voxels_per_class_per_interval": 2000,
             "correlated_score_field_used_for_primary_scores": False,
             "count_rate_calibration": "direction-specific moment matching using inner patient-grouped out-of-fold forecasts",
+            "prior_anchored_mixture_weight": 0.5,
         },
         "folds": fold_summaries,
         "patient_bootstrap_contrasts": contrasts,
@@ -663,6 +717,7 @@ def evaluate(
             "MU results are exploratory because the cohort has prior project use.",
             "Spatial heads use fixed hyperparameters; no inner-fold tuning was performed.",
             "Count rate correction matches aggregate inner-fold expected counts and does not guarantee calibration for individual patients or intervals.",
+            "The equal-weight hybrid/prior probability mixture is a fixed model-averaging sensitivity arm, not a calibrated or learned weight.",
             "The calibration layer was added after exploratory results on this same cohort; nested calibration limits within-run leakage but does not create an independent confirmation set.",
             "One shared frailty induces count dependence; residual local dependence is represented only in separate sensitivity draws.",
         ],
