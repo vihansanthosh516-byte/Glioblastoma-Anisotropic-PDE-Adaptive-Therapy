@@ -46,13 +46,14 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_ROOT / "src"))
 import trackc_sim as tc  # noqa: E402
 
-OUT_DIR = PROJECT_ROOT / "output" / "trackc_pilot"
+OUT_DIR = PROJECT_ROOT / "output" / "trackc_pilot2"
 
 # PILOT seeds only. The frozen evaluation must use different, newly recorded seeds.
-SEED_TRAIN, SEED_EVAL, SEED_POS = 20261023, 20261024, 20261025
-NOISE_TRAIN = [1_023_001]
-NOISE_EVAL = [1_024_001, 1_024_002]
-NOISE_POS = [1_025_001]
+# Pilot 2 (2026-10-24): new seeds after the kill-ratio and h fixes.
+SEED_TRAIN, SEED_EVAL, SEED_POS = 20261031, 20261032, 20261033
+NOISE_TRAIN = [1_031_001]
+NOISE_EVAL = [1_032_001, 1_032_002]
+NOISE_POS = [1_033_001]
 
 ONOFF = [(0.6, 0.3), (0.6, 0.5), (0.8, 0.3), (0.8, 0.5), (0.8, 0.7), (1.0, 0.3), (1.0, 0.5), (1.0, 0.7)]
 A_R = [0.6, 0.8, 1.0, 1.1]

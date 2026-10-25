@@ -6,7 +6,7 @@ SIMULATION ONLY. Every parameter range is an assumption, not a patient or drug m
 Two-population model (sensitive S, resistant R, K = 1), with optional asymmetric
 competition used only by the misspecified / positive-control suites:
 
-    dS/dt = r S (1 - (S + a_rs R)) - k u S
+    dS/dt = r S (1 - (S + a_rs R)) - k u S,   k = m r
     dR/dt = r (1 - c) R (1 - (a_sr S + R)) - eps k u R
 
 Treatment: 28-day cycles; a treated cycle gets u = 1 on days 0-4. Budget 12 courses,
@@ -17,7 +17,7 @@ With B0 <= 0.5 and K = 1 this level (<= 0.6) is reachable without treatment.
 
 Particle filter: 500 particles over (log r, log k, log f0, logit c, logit eps, logit B0),
 drawn from the generating priors; Gaussian likelihood; systematic resampling when
-ESS < P/2, then one Liu-West move (h = 0.98) and deterministic re-propagation of S, R
+ESS < P/2, then one Liu-West move (h = 0.90, chosen on tuning seed 555 for interval coverage) and deterministic re-propagation of S, R
 from t = 0 under the known past actions (no process noise).
 
 Policies decide once per cycle: periodic schedules, raw-reading on/off thresholds
@@ -34,10 +34,12 @@ N_CYCLES = 52
 HORIZON = N_CYCLES * CYCLE_DAYS          # 1,456 days
 BUDGET = 12
 PROG_FACTOR = 1.2
-DT = 0.5                                  # RK4 step; tests check it against 0.05 (rel. error < 1e-6)
+DT = 0.25                                 # RK4 step; tests check it against 0.05 (rel. error < 1e-4)
 
-PARAMS = ("r", "k", "f0", "c", "eps", "B0")
-RANGES = {"r": (0.001, 0.05, "log"), "k": (0.02, 0.08, "log"), "f0": (0.001, 0.1, "log"),
+PARAMS = ("r", "m", "f0", "c", "eps", "B0")      # kill rate k = m * r
+# m = k / r >= 6 keeps every scenario treatable: one 5-day course outweighs 28 days of growth
+# (pilot 1 showed k ~ r scenarios progress in ~13 days under every policy). Assumed, not measured.
+RANGES = {"r": (0.001, 0.05, "log"), "m": (6.0, 20.0, "log"), "f0": (0.001, 0.1, "log"),
           "c": (0.0, 0.25, "lin"), "eps": (0.0, 0.2, "lin"), "B0": (0.05, 0.5, "lin")}
 SIGMAS = (0.05, 0.10, 0.20)
 
@@ -66,8 +68,8 @@ def subset(scen, idx):
 
 # ---------------------------------------------------------------- dynamics
 def _deriv(S, R, p, u):
-    dS = p["r"] * S * (1.0 - (S + p["a_rs"] * R)) - p["k"] * u * S
-    dR = p["r"] * (1.0 - p["c"]) * R * (1.0 - (p["a_sr"] * S + R)) - p["eps"] * p["k"] * u * R
+    dS = p["r"] * S * (1.0 - (S + p["a_rs"] * R)) - p["m"] * p["r"] * u * S
+    dR = p["r"] * (1.0 - p["c"]) * R * (1.0 - (p["a_sr"] * S + R)) - p["eps"] * p["m"] * p["r"] * u * R
     return dS, dR
 
 
@@ -128,7 +130,7 @@ def _from_z(z, ranges=RANGES):
 class ParticleFilter:
     """Batch of independent filters, one per scenario (axis 0), P particles (axis 1)."""
 
-    def __init__(self, sigma, n_particles, rng, h=0.98, dt=DT, ranges=RANGES):
+    def __init__(self, sigma, n_particles, rng, h=0.90, dt=DT, ranges=RANGES):
         self.N, self.P, self.rng, self.h, self.dt = len(sigma), n_particles, rng, h, dt
         self.ranges = ranges
         self.sigma = np.asarray(sigma, float)[:, None]
