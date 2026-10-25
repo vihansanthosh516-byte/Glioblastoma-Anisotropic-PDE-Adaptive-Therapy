@@ -206,3 +206,34 @@ The conditional-Bernoulli formula above does not solve the spatial-dependence pr
 3. If the fixed-count allocation adds no joint-score/calibration value, drop it. If the remaining architecture is only a known PDE/learned-residual combination, stop claiming a new method and narrow the project to an exploratory comparative result. If it passes, freeze the method and evaluate only with patient-grouped CV on the already examined MU data, labeled exploratory; external confirmation needs an untouched compatible cohort.
 
 **Weakest point of this recommendation:** even a successful synthetic gate may show only that a standard count-location factorization behaves as designed. The available MU cohort cannot establish independent confirmation, and the target remains a scan-label transition rather than biological growth.
+
+## Synthetic gate execution record (2026-10-25)
+
+### Scope and checks
+
+The standalone implementation in `src/growth_zone_joint_law.py` was run on generated arrays only. It did not load, inspect, or score patient data or MRI images. The 8×8×8 generator used three fixed seeds, 120 synthetic training cases and 50 test cases per seed for each of 16 settings: two negative-binomial dispersion values, two spatial-clustering levels, zero or one-voxel predictor shift, and matched or misspecified anisotropy. Total: 2,400 synthetic test cases. The spatial generator is an analytic anisotropic reach proxy, not a numerical PDE.
+
+Six focused tests passed in `tests/test_growth_zone_joint_law.py`. They check the elementary-symmetric normalizer against brute force, exact sampled cardinality, mass-intercept count matching and score order, negative-binomial probabilities against SciPy, constant-mean regression behavior, and aggregation when a metric is undefined. A first aggregation implementation let any undefined average-precision value contaminate the full condition mean. It was corrected to average finite values and report the evaluable-case count; the simulation was rerun after that fix.
+
+### Observed synthetic results
+
+Means below are unweighted means across the 16 settings; each setting has 150 test cases. They describe this generator and these seeds only.
+
+| Metric | History-conditioned count model | Global count model |
+|---|---:|---:|
+| Count MAE | 6.668 voxels | 7.191 voxels |
+| Count negative log likelihood | 3.254 | 3.349 |
+| Empirical 90% count-interval coverage | 92.7% | 93.8% |
+| Joint count/location negative log likelihood | 44.773 | 44.867 |
+
+The history model had lower count negative log likelihood in all 16 settings. Its joint score was lower than the global-count joint score in all 16 settings, but the location law was identical for those two arms; this difference therefore comes only from the count distribution. The history joint law also scored lower than the independent expected-mass mask model in all 16 settings (mean difference −2.361 nats per mask). This comparison is specific to the simulated data-generating law and is not a general performance guarantee.
+
+The conditional location score improved mean log score by 6.121 nats per mask over a uniform fixed-count allocation. Mean average precision was 0.127 over settings. AP was defined for 2,280 of 2,400 test cases; 120 all-zero targets had undefined AP and were excluded from that metric only. Applying the scalar mass intercept changed AP by a mean absolute 0.0006 and a maximum 0.0014 due to finite-precision clipping and ties. In exact arithmetic, the scalar logistic intercept preserves score order, so this is a numerical diagnostic, not evidence that the count intercept improves spatial ranking.
+
+### Interpretation and decision
+
+The synthetic gate supports implementation feasibility: the count-history model improves count prediction under this generator, and the joint count-location score distinguishes a coherent fixed-count law from independent expected-mass probabilities. It does **not** establish a new method, MRI performance, biological growth prediction, superiority to published forecasters, or patient readiness. The generated location law and fitted location law share the same broad score structure; the optional smooth latent field is limited, and the conditional-Bernoulli law has no attractive neighbor interaction. The small grid and chosen perturbations do not represent clinical registration or segmentation error.
+
+Decision: retain this as a tested mathematical prototype, not as a novelty or patient-analysis gate that has been passed. Before any patient scoring, compare the exact predictive distribution and target against released prior methods, validate the candidate-region normalizer at real region sizes, and preregister patient-level estimands, splits, calibration measures, and stop rules. Any eventual MU analysis remains exploratory because this cohort was previously examined.
+
+**Weakest point:** the favorable result may be mostly a consequence of generating data from a model family close to the fitted one. A less matched spatial process or real annotation transitions may erase the apparent benefit.
