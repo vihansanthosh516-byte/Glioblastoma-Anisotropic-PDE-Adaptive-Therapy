@@ -46,8 +46,8 @@ SINGLE = [0.8, 0.9, 1.0, 1.05, 1.1, 1.15]
 P_STAR, HORIZONS, GUARDS = [0.02, 0.05, 0.1], [1, 2], [5.0, 6.0, 7.0]
 
 
-def suite(k, n):
-    seed = 20261080 + k
+def suite(k, n, base_seed=20261080):
+    seed = base_seed + k
     if k == 0:
         return "M0_nominal", tc.draw_scenarios(n, seed)
     if k == 1:
