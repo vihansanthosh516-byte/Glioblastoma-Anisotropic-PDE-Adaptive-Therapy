@@ -48,19 +48,34 @@ ARMS = {
 }
 
 
-def _iid_mixture_manifest(*, seed: int, n_patients: int = 60) -> list[dict]:
-    """Sample patients independently from the four-condition mixture used by the Track B generator."""
+def _iid_mixture_manifest(*, seed: int, n_patients: int = 60,
+                          factor_design: str = "independent") -> list[dict]:
+    """Sample conditions, scan-gap order, and anisotropy axis from an explicit design."""
+    if factor_design not in {"independent", "legacy_coupled"}:
+        raise ValueError("factor_design must be 'independent' or 'legacy_coupled'")
     rng = np.random.default_rng(seed)
     rows = []
     for index in range(n_patients):
         diffusion = str(rng.choice(gate.DIFFUSION_TRUTHS))
         volume_trend = str(rng.choice(gate.VOLUME_TRENDS))
+        replicate = int(rng.integers(0, 15))
+        if factor_design == "independent":
+            factor_rng = np.random.default_rng(
+                np.random.SeedSequence([int(seed), index, 791])
+            )
+            gap_pattern_index = int(factor_rng.integers(0, 3))
+            anisotropy_axis_index = int(factor_rng.integers(0, 3))
+        else:
+            gap_pattern_index = replicate % 3
+            anisotropy_axis_index = replicate % 3
         case_seed = int(np.random.SeedSequence([int(seed), index, 91]).generate_state(1)[0])
         rows.append({
             "case_id": f"mix-{seed}-{index:03d}",
             "diffusion_truth": diffusion,
             "volume_trend": volume_trend,
-            "replicate": int(rng.integers(0, 15)),
+            "replicate": replicate,
+            "gap_pattern_index": gap_pattern_index,
+            "anisotropy_axis_index": anisotropy_axis_index,
             "seed": case_seed,
         })
     return rows
@@ -149,8 +164,8 @@ def _estimate_training_centroid_correction(training_records, *, covariance, impo
     }
 
 
-def _run_cohort(*, seed: int, alphas=(0.1, 0.05)) -> dict:
-    manifest = _iid_mixture_manifest(seed=seed)
+def _run_cohort(*, seed: int, alphas=(0.1, 0.05), factor_design="independent") -> dict:
+    manifest = _iid_mixture_manifest(seed=seed, factor_design=factor_design)
     split = _random_split(manifest, seed=seed + 3)
     generated = {record.patient_id: (_first_third_visit(record), truth)
                  for row in manifest for record, truth in [gate.generate_synthetic_series(row)]}
@@ -165,8 +180,20 @@ def _run_cohort(*, seed: int, alphas=(0.1, 0.05)) -> dict:
             condition = f"{row['diffusion_truth']}|{row['volume_trend']}"
             counts[condition] = counts.get(condition, 0) + 1
         condition_counts[split_name] = counts
-    result = {"seed": int(seed), "partition_sizes": {key: len(value) for key, value in split.items()},
-              "condition_counts_by_split": condition_counts, "arms": {}}
+    factor_counts = {}
+    for split_name, patient_ids in split.items():
+        rows = [rows_by_id[patient_id] for patient_id in patient_ids]
+        factor_counts[split_name] = {
+            f"gap{gap}_axis{axis}": sum(
+                row["gap_pattern_index"] == gap and row["anisotropy_axis_index"] == axis
+                for row in rows
+            )
+            for gap in range(3) for axis in range(3)
+        }
+    result = {"seed": int(seed), "factor_design": factor_design,
+              "partition_sizes": {key: len(value) for key, value in split.items()},
+              "condition_counts_by_split": condition_counts,
+              "gap_axis_counts_by_split": factor_counts, "arms": {}}
 
     for arm_name, arm in ARMS.items():
         nuisance = dict(nuisance_base)
@@ -248,12 +275,15 @@ def _run_cohort(*, seed: int, alphas=(0.1, 0.05)) -> dict:
     return result
 
 
-def run_conformal_synthetic_gate(*, replicates: int = 5, seed: int = 20261030) -> dict:
+def run_conformal_synthetic_gate(*, replicates: int = 5, seed: int = 20261030,
+                                 factor_design: str = "independent") -> dict:
     if isinstance(replicates, bool) or int(replicates) != replicates or replicates < 1:
         raise ValueError("replicates must be a positive integer")
+    if factor_design not in {"independent", "legacy_coupled"}:
+        raise ValueError("factor_design must be 'independent' or 'legacy_coupled'")
     cohorts = []
     for index in range(int(replicates)):
-        cohorts.append(_run_cohort(seed=int(seed) + index))
+        cohorts.append(_run_cohort(seed=int(seed) + index, factor_design=factor_design))
         print(f"completed cohort {index + 1}/{int(replicates)}", flush=True)
     aggregate = {}
     for arm_name in ARMS:
@@ -283,9 +313,11 @@ def run_conformal_synthetic_gate(*, replicates: int = 5, seed: int = 20261030) -
         "status": "synthetic_split_conformal_development_pilot",
         "seed": int(seed),
         "cohort_replicates": int(replicates),
+        "factor_design": factor_design,
         "patient_conditions": (
-            "independent uniform draws from four synthetic conditions; scan-gap cycle and anisotropic axis are "
-            "randomized independently per patient; patients split at random"
+            "independent uniform draws from four synthetic conditions; scan-gap order and anisotropic axis are "
+            + ("sampled independently per patient; patients split at random" if factor_design == "independent"
+               else "both derived from replicate modulo three as in the historical synthetic runs")
         ),
         "split_per_cohort": {"training_patients": 20, "calibration_patients": 20, "test_patients": 20},
         "forecast_origin": "first two masks predict third mask; one target per patient",
@@ -313,14 +345,21 @@ def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--replicates", type=int, default=5)
     parser.add_argument("--seed", type=int, default=20261030)
-    parser.add_argument("--output", type=Path,
-                        default=PROJECT_ROOT / "output" / "track_b_conformal_synthetic_gate_iid_20261030.json")
+    parser.add_argument("--factor-design", choices=("independent", "legacy_coupled"), default="independent")
+    parser.add_argument("--output", type=Path, default=None)
     args = parser.parse_args(argv)
-    report = run_conformal_synthetic_gate(replicates=args.replicates, seed=args.seed)
-    args.output.parent.mkdir(parents=True, exist_ok=True)
-    args.output.write_text(json.dumps(report, indent=2, allow_nan=False) + "\n", encoding="utf-8")
+    report = run_conformal_synthetic_gate(
+        replicates=args.replicates, seed=args.seed, factor_design=args.factor_design
+    )
+    output = args.output or PROJECT_ROOT / "output" / (
+        f"track_b_conformal_synthetic_gate_{args.factor_design}_{args.replicates}rep_seed{args.seed}.json"
+    )
+    if args.output is None and output.exists():
+        raise FileExistsError(f"refusing to overwrite existing default output: {output}")
+    output.parent.mkdir(parents=True, exist_ok=True)
+    output.write_text(json.dumps(report, indent=2, allow_nan=False) + "\n", encoding="utf-8")
     print(json.dumps(report["aggregate"], indent=2, allow_nan=False))
-    print(f"saved {args.output}")
+    print(f"saved {output}")
     return 0
 
 

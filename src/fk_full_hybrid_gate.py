@@ -44,8 +44,9 @@ BOUNDARY_CALIBRATION_START = {"sigma_b_mm": 0.8, "tau_b_mm": 0.3, "ell_mm": 6.0}
 
 
 def build_synthetic_manifest(replicates_per_condition: int = 25, n_folds: int = 5,
-                             seed: int = 20261024) -> list[dict]:
-    """Build a balanced four-condition manifest with patient-level outer folds."""
+                             seed: int = 20261024,
+                             factor_design: str = "orthogonal_crossed") -> list[dict]:
+    """Build a balanced condition manifest with patient folds and decoupled nuisance factors."""
     if (isinstance(replicates_per_condition, (bool, np.bool_))
             or int(replicates_per_condition) != replicates_per_condition
             or replicates_per_condition < 2):
@@ -56,11 +57,24 @@ def build_synthetic_manifest(replicates_per_condition: int = 25, n_folds: int = 
         raise ValueError("replicates_per_condition must be divisible by n_folds for balanced splits")
     if isinstance(seed, (bool, np.bool_)) or int(seed) != seed:
         raise ValueError("seed must be an integer")
+    if factor_design not in {"orthogonal_crossed", "legacy_coupled"}:
+        raise ValueError("factor_design must be 'orthogonal_crossed' or 'legacy_coupled'")
     replicates_per_condition, n_folds = int(replicates_per_condition), int(n_folds)
     rows = []
     condition_index = 0
     for diffusion_truth in DIFFUSION_TRUTHS:
         for volume_trend in VOLUME_TRENDS:
+            if factor_design == "orthogonal_crossed":
+                factor_pairs = [(gap, axis) for gap in range(3) for axis in range(3)]
+                factor_schedule = [factor_pairs[index % len(factor_pairs)]
+                                   for index in range(replicates_per_condition)]
+                factor_rng = np.random.default_rng(
+                    np.random.SeedSequence([int(seed), condition_index, 771])
+                )
+                factor_rng.shuffle(factor_schedule)
+            else:
+                factor_schedule = [(replicate % 3, replicate % 3)
+                                   for replicate in range(replicates_per_condition)]
             for replicate in range(replicates_per_condition):
                 case_seed = int(np.random.SeedSequence(
                     [int(seed), condition_index, replicate]
@@ -71,6 +85,9 @@ def build_synthetic_manifest(replicates_per_condition: int = 25, n_folds: int = 
                     "volume_trend": volume_trend,
                     "replicate": replicate,
                     "fold": replicate % n_folds,
+                    "gap_pattern_index": int(factor_schedule[replicate][0]),
+                    "anisotropy_axis_index": int(factor_schedule[replicate][1]),
+                    "factor_design": factor_design,
                     "seed": case_seed,
                 })
             condition_index += 1
@@ -95,8 +112,15 @@ def generate_synthetic_series(manifest_row: dict) -> tuple[PatientSeries, dict]:
     rng = np.random.default_rng(int(seed))
     replicate = int(manifest_row["replicate"])
     interval_cycle = (15.0, 20.0, 25.0)
-    gaps = (interval_cycle[replicate % 3], interval_cycle[(replicate + 1) % 3],
-            interval_cycle[(replicate + 2) % 3])
+    gap_pattern_index = manifest_row.get("gap_pattern_index", replicate % 3)
+    anisotropy_axis_index = manifest_row.get("anisotropy_axis_index", replicate % 3)
+    for name, value in (("gap_pattern_index", gap_pattern_index),
+                        ("anisotropy_axis_index", anisotropy_axis_index)):
+        if isinstance(value, (bool, np.bool_)) or int(value) != value or not 0 <= int(value) < 3:
+            raise ValueError(f"{name} must be an integer in {{0, 1, 2}}")
+    gap_pattern_index = int(gap_pattern_index)
+    anisotropy_axis_index = int(anisotropy_axis_index)
+    gaps = tuple(interval_cycle[(gap_pattern_index + offset) % 3] for offset in range(3))
     days = np.asarray([0.0, gaps[0], gaps[0] + gaps[1], sum(gaps)], dtype=float)
     domain = np.ones(SHAPE, dtype=bool)
     initial = _ball(float(rng.choice((3.0, 3.5, 4.0))))
@@ -104,7 +128,7 @@ def generate_synthetic_series(manifest_row: dict) -> tuple[PatientSeries, dict]:
     if diffusion_truth == "isotropic":
         tensor[..., :3] = 0.05
     else:
-        high_axis = replicate % 3
+        high_axis = anisotropy_axis_index
         diagonal = np.asarray((0.08, 0.035, 0.02), dtype=np.float32)
         diagonal = np.roll(diagonal, high_axis)
         tensor[..., :3] = diagonal
@@ -139,6 +163,8 @@ def generate_synthetic_series(manifest_row: dict) -> tuple[PatientSeries, dict]:
         "true_log_volume_slope_per_day": slope,
         "true_tensor_diagonal_mm2_per_day": tuple(float(value) for value in tensor[0, 0, 0, :3]),
         "boundary_covariance_truth": dict(BOUNDARY_TRUTH),
+        "gap_pattern_index": gap_pattern_index,
+        "anisotropy_axis_index": anisotropy_axis_index,
     }
     return record, truth
 
@@ -430,7 +456,8 @@ def _summarize(rows: list[dict]) -> dict:
 
 
 def run_synthetic_gate(*, replicates_per_condition: int = 25, n_folds: int = 5,
-                       seed: int = 20261024, forecast_function=None,
+                       seed: int = 20261024, factor_design: str = "orthogonal_crossed",
+                       forecast_function=None,
                        forecast_config: dict | None = None,
                        forecast_nuisance_overrides: dict | None = None,
                        boundary_calibration_mode: str = "cross_fitted",
@@ -563,7 +590,9 @@ def run_synthetic_gate(*, replicates_per_condition: int = 25, n_folds: int = 5,
         })
         return fitted
 
-    manifest = build_synthetic_manifest(replicates_per_condition, n_folds, seed)
+    manifest = build_synthetic_manifest(
+        replicates_per_condition, n_folds, seed, factor_design=factor_design
+    )
     generated = [generate_synthetic_series(row) for row in manifest]
     records = [record for record, _ in generated]
     truth_by_patient = {record.patient_id: truth for record, truth in generated}
@@ -604,6 +633,7 @@ def run_synthetic_gate(*, replicates_per_condition: int = 25, n_folds: int = 5,
         "metadata": {
             "scope": "synthetic-only outer-patient rolling-origin simulation",
             "n_patients": len(records),
+            "factor_design": factor_design,
             "conditions": [f"{d}|{v}" for d in DIFFUSION_TRUTHS for v in VOLUME_TRENDS],
             "solver_spacing_mm": SPACING_MM,
             "shape_grid": SHAPE,
@@ -642,6 +672,8 @@ def main(argv=None) -> int:
     parser.add_argument("--replicates-per-condition", type=int, default=25)
     parser.add_argument("--n-folds", type=int, default=5)
     parser.add_argument("--seed", type=int, default=20261024)
+    parser.add_argument("--factor-design", choices=("orthogonal_crossed", "legacy_coupled"),
+                        default="orthogonal_crossed")
     parser.add_argument("--boundary-calibration-mode", choices=("cross_fitted", "oracle"), default="cross_fitted")
     parser.add_argument("--inner-n-folds", type=int, default=2)
     parser.add_argument("--ell-candidates-mm", type=float, nargs="+", default=(5.0, 10.0, 20.0))
@@ -649,12 +681,11 @@ def main(argv=None) -> int:
     parser.add_argument("--n-draws", type=int, default=16)
     parser.add_argument("--n-coarse", type=int, default=5)
     parser.add_argument("--n-refine", type=int, default=3)
-    parser.add_argument("--output", type=Path,
-                        default=PROJECT_ROOT / "output" / "track_b_full_hybrid_gate_crossfit_20261024.json")
+    parser.add_argument("--output", type=Path, default=None)
     args = parser.parse_args(argv)
     result = run_synthetic_gate(
         replicates_per_condition=args.replicates_per_condition,
-        n_folds=args.n_folds, seed=args.seed,
+        n_folds=args.n_folds, seed=args.seed, factor_design=args.factor_design,
         boundary_calibration_mode=args.boundary_calibration_mode,
         inner_n_folds=args.inner_n_folds,
         ell_candidates_mm=args.ell_candidates_mm,
@@ -665,9 +696,14 @@ def main(argv=None) -> int:
             "n_refine": args.n_refine,
         },
     )
-    args.output.parent.mkdir(parents=True, exist_ok=True)
-    args.output.write_text(json.dumps(result, indent=2, allow_nan=False), encoding="utf-8")
-    print(f"saved {args.output}")
+    output = args.output or PROJECT_ROOT / "output" / (
+        f"track_b_full_hybrid_gate_{args.factor_design}_seed{args.seed}.json"
+    )
+    if args.output is None and output.exists():
+        raise FileExistsError(f"refusing to overwrite existing default output: {output}")
+    output.parent.mkdir(parents=True, exist_ok=True)
+    output.write_text(json.dumps(result, indent=2, allow_nan=False), encoding="utf-8")
+    print(f"saved {output}")
     print(json.dumps(result["summary"], indent=2))
     print(json.dumps(result["metadata"], indent=2))
     return 0
