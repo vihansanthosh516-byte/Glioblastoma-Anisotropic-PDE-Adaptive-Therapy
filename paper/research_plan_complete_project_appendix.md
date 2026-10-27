@@ -27,7 +27,8 @@ A track supports a within-study advantage only if all eligibility and validation
 | Source | Planned role | Public access and scale | Terms and use gate |
 |---|---|---|---|
 | UCSC Cell Browser, multiomic-gbm | Track A primary molecular/spatial data | Public Cell Browser page and bulk download | The page supports downloads but does not display an explicit license for each export. Record exact files and terms; keep local, do not upload to Kaggle or redistribute until terms are established. |
-| MU-Glioma-Post v1, TCIA | Track B primary MRI and masks | Official TCIA page lists 203 subjects and about 11 GB of public NIfTI/clinical files; the dataset paper reports 594 postoperative MRIs | TCIA lists CC BY 4.0 for its public NIfTI, segmentation-volume, and clinical packages. Reconcile the local visit manifest with the published count before freezing eligibility. |
+| MU-Glioma-Post v1, TCIA | Track B development only | Official TCIA page lists 203 subjects and public NIfTI/clinical files | TCIA lists CC BY 4.0 for public packages. The source has been examined in earlier project work; all Track B results on MU are exploratory. |
+| UCSD-PTGBM v3, TCIA | Track B single external patient-level test | Official TCIA page lists 178 subjects and 243 timepoints; standard NIfTI images and segmentations total about 44.98 GB across two packages | Current TCIA page lists CC BY 4.0, data citation DOI 10.7937/fwv2-dt74. Download locally via Aspera; do not transfer patient files to Kaggle or commit them. |
 | Track C virtual simulator | Track C only | Generated locally or in Kaggle; no patient data | Synthetic inputs are project assumptions. Kaggle is permitted for Track C simulations because no patient files are transferred. |
 
 The UCSC source is publicly downloadable, but public access alone does not establish a reuse license. The current public repository already contains derived per-cell UCSC files according to the project audit. Do not add or publish additional source-derived files until their terms are clear; repository history or visibility is outside this protocol.
@@ -85,72 +86,69 @@ Check whether performance is driven by cell type, library, or batch. If source m
 
 The main risks are too few independent donors, unresolved aliases, donor/class confounding, and weak gains over logistic regression. If the eligibility gate fails, no resampling method can manufacture donor-level evidence. If the model only works in one library or cell type, report that dependence rather than a general donor-robust method. The result remains exploratory because the source donors have already been examined in the project.
 
-## 3. Track B: uncertainty-aware reaction-diffusion forecasting
+## 3. Track B: next-visit tumor-core annotation-change ranking
 
-### 3.1 Cohort, prior exposure, and endpoint
+### 3.1 Question, sources, and eligibility
 
-Use the public MU-Glioma-Post v1 NIfTI, segmentation, and clinical files. TCIA lists the public packages under CC BY 4.0; the dataset paper describes 203 patients and 594 postoperative MRI time points. Record the exact local file manifest and reconcile its visit count with the source records before freezing eligibility.
+The question is whether a screened graph-diffusion prior combined with an MRI residual attenuated by fixed boundary-perturbation sensitivity improves patient-level ranking of new standard tumor-core annotations at the next available visit. The endpoint is change in released labels. It is not tumor-cell growth, recurrence, progression, response, or a fixed-horizon clinical forecast.
 
-Build an ordered patient-by-visit manifest with diagnosis, scan date and day origin, image-mask alignment, physical voxel spacing, source-label meanings, treatment context, and duplicate or missing visits. The primary tumor mask is the union of source labels 1 and 3 only after confirming their codebook meanings. Require at least three eligible, ordered, nonempty masks. Keep all visits from a patient together in five outer patient folds. Score the first two masks against the third and then use rolling-origin forecasts, always fitting from visits available before the target.
+Use MU-Glioma-Post v1 only for method fitting and development-only comparator selection. The project previously examined this source, so all MU metrics remain exploratory. The external source is UCSD-PTGBM v3 from [TCIA](https://www.cancerimagingarchive.net/collection/ucsd-ptgbm/), which lists the image packages and clinical workbook as CC BY 4.0 and requires citation of dataset DOI [10.7937/fwv2-dt74](https://doi.org/10.7937/fwv2-dt74). TCIA lists 178 subjects and 243 visits in v3, split across an Images and Segmentations package and a BraTS-GLI 2024 Test package, totaling approximately 44.98 GB. The current clinical workbook is pinned locally by SHA-256 `bbf40bbdd289266924869052806de4d7e8fc9ee73286cdc0cc066672ef5bb51d`; older workbook versions are not accepted. NIfTI bulk downloads use IBM Aspera. Keep all raw files under the Git-ignored `data/external/UCSD-PTGBM-v3/`; do not move them to Kaggle or commit patient-level files.
 
-The cohort and its fixed splits have already been examined in this project. Every MU result is exploratory, even if a new model or score is used. Do not call it independent confirmation.
+Use exact primary diagnosis `Glioblastoma`. Reject duplicate patient/timepoint rows. Group by TCIA subject and sort by numeric visit suffix. If both metadata acquisition-to-anchor values are present, require that the later visit suffix is chronologically later; stop on any contradiction. For each subject, choose at most the first adjacent pair with exactly one standard BraTS segmentation and exactly one each of T1-native, T1-contrast, T2, and FLAIR at each visit. Require internal modality-to-segmentation alignment, millimetre spatial units, the same shape and affine across visits within 0.001 mm, and orthogonal 1.000 ± 0.001 mm spacing on each axis. Resolve files by complete TCIA/BraTS ID tokens; do not permit visit suffix substring collisions. Pair selection may use only diagnosis, source chronology, modality/file completeness, and image-header geometry. It must not depend on target label counts or visual target quality. Use the earlier scan as origin and the next available scan as target; report actual interval in prespecified groups ≤90, 91–180, and >180 days, plus unknown. The interval is not a model input.
 
-A close prior-art study is Jung and Shin (2026), an arXiv preprint that cites the MU dataset and reports the same source scale: 203 patients and 594 postoperative MRIs. It forms no-new-treatment triplets and tests a learned tumor-state proxy forecast against persistence and dilation on 15 patient-held-out triplets. Its results were comparable to persistence at one proxy threshold and numerically higher at another, with uncertainty that did not establish a difference from persistence. The study predicts a continuous label-derived proxy from MRI inputs; those published scores are not directly comparable with this plan’s binary mask target and spatial score. Reproduce or adapt its public OASA/SegMamba method only if the target, folds, and available inputs can be aligned fairly. Otherwise retain it as the closest same-dataset work and make no claim that the proposed method beats it.
+### 3.2 Target and risk set
 
-### 3.2 Shape and size components
+Use only standard compartment labels. At visit t, let C_t(v)=1 for NETC or ET (source codes 1 or 3); SNFH (2) is a current-scan predictor and the resection cavity (4) is excluded. Operational brain support B_0 is the union of nonzero voxels in the four origin MRI modalities and any nonzero origin label. Let Q_0 be the origin cavity. The at-risk voxels are
 
-Model the latent concentration c(x,t) by
 \[
-\frac{\partial c}{\partial t}=\nabla\cdot(D\nabla c)+\rho c(1-c/K).
+R_0 = B_0 \setminus (C_0 \cup Q_0), \qquad
+Y(v)=\mathbf 1\{v\in C_1\setminus C_0\},\;v\in R_0.
 \]
-Use K=1, initial concentration 1 inside the input mask and 0 outside, isotropic D in the primary fit, a 2 mm grid, a 30 mm padded domain clipped to the image field, no-flux crop boundaries, and visible contour c=0.5. Use nearest-neighbor mask resampling and sub-voxel trilinear interpolation for the contour. Use forward Euler with
+
+This is the full operational brain support, without a hand-picked 20 mm crop. Report additions outside R_0, including additions in current cavity and outside current support. Do not use the dataset's cellular-tumor segmentations because their definitions use prior/subsequent longitudinal information. TCIA describes the standard segmentation as software-initialized and manually corrected by trained radiologists; this does not make a single released mask error-free truth.
+
+### 3.3 Hybrid method
+
+Robust-normalize each origin MRI modality over B_0. On graph nodes B_0\Q_0, solve
+
 \[
-\Delta t\leq \min(0.5,\;0.9\Delta x^2/(6D))\ \mathrm{days},
+(L_A + \ell^{-2}I)u=\mathbf 1_{C_0}, \qquad \ell=10\,\mathrm{mm},
 \]
-with D≤10 mm²/day. Do not expand parameter bounds after fitting. Mark any boundary-limited fit.
 
-Estimate a joint empirical-Bayes prior over (log rho, log D) from outer-training patients only. Use a 21-by-21 logarithmic grid over rho in [10^-5, 10^-1] day^-1 and D in [10^-5, 10] mm²/day, with a local 11-by-11 refinement around high posterior mass and grid-cell quadrature weights. Retain correlated parameter pairs rather than substituting independent point estimates. Fit the shape component between two available masks by matching the simulated iso-surface to the second mask’s volume and evaluating signed-distance residuals at 256 fixed surface anchors.
+with a six-neighbor graph and edge conductance
 
-For each rolling-origin forecast, estimate a separate log-volume trend from the last two available masks. Shrink the patient slope toward the outer-training population slope using a time constant chosen from {30, 90, 180, 365} days on training patients only. Model predictive log-volume variance as a linear function of forecast horizon, fitted from outer-training forecast residuals. This component can represent shrinking as well as growing volume.
-
-For each predictive draw, sample a joint (rho,D) pair, use the PDE concentration to rank voxels, sample a positive future volume from the size model, and select the highest-ranked voxels until that sampled volume is reached. This separates the PDE’s spatial ranking from the independently forecast size.
-
-### 3.3 Boundary uncertainty and synthetic gates
-
-Represent effective boundary discrepancy at anchor points p_k by a zero-mean spatial Gaussian field with
 \[
-\Sigma_{kl}=\sigma_b^2\exp(-\|p_k-p_l\|/\ell)+\tau_b^2\mathbf{1}_{k=l}.
+A_{vw}=h_{vw}^{-2}\exp\!\left[-0.5\,\frac14\sum_m(z_m(v)-z_m(w))^2\right]
+\exp\!\left[\frac{\log 2}{2}\{\mathbf1_{SNFH}(v)+\mathbf1_{SNFH}(w)\}\right].
 \]
-Estimate sigma_b, tau_b, and correlation length ell in {5, 10, 20} mm using cross-fitted rolling-origin residuals from outer-training patients only. For each calibration patient, leave that patient out while estimating the growth prior, forecast a later mask from earlier masks, and exclude that target from all fitting. This is combined mask, registration, treatment, and model discrepancy; it is not a direct scanner-noise estimate.
 
-For each draw, generate correlated displacement on 256 anchors, interpolate it to nearby surface vertices using the three nearest anchors with normalized weights proportional to (distance + 0.1 mm)^-2, move the contour along local normals, and rasterize the mask. Use 200 draws per forecast after a runtime pilot confirms feasibility. Apply the same training-derived error procedure to every probabilistic comparator.
+Here h_vw is physical neighbor spacing and z_m is the robust-normalized modality m. The graph field is normalized to its maximum over R_0 and used as a spatial ranking prior. It is not a cell-density field or reaction-diffusion estimate.
 
-Before patient scoring, generate at least 100 synthetic longitudinal series at observed visit gaps. Use boundary displacement SDs of 0, 2, and 4 mm and correlation lengths of 5, 10, and 20 mm. Include anisotropic growth and shrinking-volume cases. Test numerical stability, parameter recovery, predictive interval coverage, calibration, failure rate, runtime, and peak memory. For separate rho and D interpretation, require at least two fitting intervals, median absolute relative error at most 25% for each parameter, 80–97% coverage of nominal 90% intervals, and at most 10% of complete fits hitting any computational parameter bound. For forecast uncertainty, require 80–97% coverage of nominal 90% predictive intervals. These are project gates, not clinical standards. Failure blocks the affected parameter interpretation but does not remove a patient from forecast scoring.
+The ridge-logistic residual uses seven origin-only voxel features: distance to current core, distance to current cavity, four normalized MRI intensities, and current SNFH indicator. No transition history, personalized PDE parameter, interval, or future-derived quantity enters a prediction. Recompute the graph prior after fixed one-voxel erosion and dilation of the current core. Let I(v) be the median absolute change in log-prior across those two perturbations, let s be the median across MU patients of the within-patient 90th percentile of I over R_0, and set g(v)=exp(-I(v)/s). This deterministic gate shrinks the learned residual in spatially sensitive regions; it is not calibrated uncertainty.
 
-Profile five synthetic and five training-patient fits on the 8-core desktop. If projected full-run wall time exceeds 48 hours, use the prespecified 3 mm grid, repeat all synthetic gates, and freeze the setting before opening outer-fold scores. Stop and report infeasibility if the 3 mm run still exceeds the limit.
+For voxel feature vector x(v), the full ranking score is
 
-### 3.4 Scores and matched baselines
-
-The primary outcome is a spatial variogram score. Before opening a forecast target, select 256 voxels by a fixed deterministic rule within a 10 mm band around the last observed mask boundary. Form a fixed set of voxel pairs, stratified by physical separation into 0–2, 2–5, and 5–10 mm groups. For binary predictive draws X and held-out labels Y, score each pair by
 \[
-\left(\mathbb{E}[(X_i-X_j)^2]-(Y_i-Y_j)^2\right)^2.
+S(v)=\beta\log u(v)+g(v)[\theta_0+x(v)^T\theta],\qquad\beta\ge0.
 \]
-Give each nonempty distance stratum equal total weight; report empty strata and renormalize over the others. Average within forecast, then equally across forecast origins and patients. Lower is better. The held-out target supplies labels for scoring only; it cannot define model inputs or the scored band. Report energy score, marginal Brier score, volume CRPS, Dice, surface distance, volume error, predictive interval coverage, target voxels outside the band, and performance by observed shrinkage as secondary outcomes.
 
-Use these matched baselines and ablations on identical patient folds and score locations:
-1. A no-PDE ranker based on signed distance from the last mask, with the same sampled volume and boundary-error wrapper.
-2. The PDE with its own iso-surface volume instead of the separate size forecast.
-3. The PDE with independent boundary errors at the same marginal variance.
-4. Persistence and volume-trend-only forecasts, each with the same volume and uncertainty treatment where applicable.
-5. A 3D U-Net ranker trained on the same mask history and visit interval as the proposed method, followed by the same volume and boundary-error wrapper, if a one-fold compute pilot confirms feasibility.
+Fit the ridge-logistic head on MU training patients only, with equal patient/class weights, ridge penalty 1, prior penalty 10^-3, at most 4,000 sampled positive and negative voxels per patient, and base seed 20261026. Development-fold fits use the base seed plus the one-based fold index; the final MU fit uses the base seed. The gate scale is estimated only from the current training fold. Use the source's existing manifest dataset code `MU` (the canonical MU-Glioma-Post name is accepted as an alias); select patients marked eligible and GBM and their earliest primary pair with nonempty input core. Fail if fewer than five unique development patients remain or any fitting fold lacks the two classes needed by the head.
 
-Also attempt an OASA/SegMamba comparison because it is the closest published same-dataset forecaster. Its original use of MRI channels and continuous proxy labels differs from the mask-only inputs and binary target here. A direct superiority claim is permitted only if a retrained comparison uses the same target, patient folds, forecast origins, score, and a clearly declared input set. If this cannot be done within available licensed compute, report the comparison as infeasible and do not claim to beat the strongest published same-dataset method. Do not compare our new scores numerically with the preprint’s published scores as if they were a head-to-head test.
+### 3.4 Development and locked external test
 
-Keep all eligible cases, including observed shrinkage. Count numerical failures and use persistence with the same error wrapper as the fixed fallback for failed PDE forecasts. Report fallback frequency. The endpoint measures agreement with supplied masks, not the true tumor boundary or scanner noise.
+On MU, run five-fold patient-grouped cross-validation. Fit the full hybrid and prespecified alternatives in each training fold. The non-full alternatives are: ungated hybrid, MRI-only ridge head, diffusion-only score, negative distance-to-core, and uniform no-change score. Select exactly one primary comparator by the highest mean patient-specific development AUC; ties follow that fixed order. Fit the final hybrid and comparator heads on all eligible MU development patients. Do not tune any spatial parameter or model setting on UCSD.
 
-### 3.5 Weakest point
+Before reading any UCSD segmentation voxel array, the protocol and all scoring modules must be committed and clean in Git, the local v3 workbook must match its pinned SHA-256, and development/source manifests are hashed. Header-only preflight may read paths, NIfTI shapes, and affines, but not image or target label values. Create an exclusive `analysis_started.json` marker after metadata/header preflight and development fitting; record the locked code digests and selected UCSD path/size manifest. Then hash the complete selected MRI and segmentation file contents, write that digest into the marker, and only then load any UCSD label array. Re-hash selected files after scoring and stop without an aggregate result if any source file changed. The scoring command has no alternate output-path option and refuses to run again if that marker or aggregate result exists. If a failure occurs after the marker, stop and document it before any amended rerun; do not silently restart until a favorable result appears. Write aggregate metrics only, with no subject IDs, per-patient scores, masks, or voxel predictions.
 
-A single supplied segmentation per scan does not identify segmentation noise. The spatial field may absorb real growth, treatment effects, registration error, and mask error. The cohort is post-treatment, some tumors shrink, and all data were previously examined. The PDE’s added spatial value may be zero, and the proposed uncertainty model may be too expensive or too weakly identified for these data.
+For each test patient whose target in R_0 contains at least one positive and one negative voxel, calculate patient-specific ROC AUC for each score. The primary estimand is the equal-patient mean of the paired difference between the full hybrid AUC and the single comparator selected using MU only. Obtain its two-sided 95% percentile interval from 10,000 patient-level paired bootstrap resamples (seed 20261126). The added-value rule requires the interval lower bound to exceed 0.02 AUC; this project-set margin is not a clinically validated minimum important difference. The metadata maximum of 48 repeat-eligible GBM patients is not a power calculation, and no adequate-power claim is made before image- and endpoint-eligibility are known. Do not assign AUC to patients with no additions or no negatives; keep them in cohort flow and report separately. Report all arm-level patient-macro AUCs, evaluable n, interval-stratified descriptive differences, observed intervals, zero-addition pairs, additions outside R_0, and technical exclusions. No inferential tests are run on secondary arms.
+
+### 3.5 Source and interpretation limits
+
+A positive result supports only ranking of changes in source-provided NETC+ET labels for this public cohort under the specified next-visit sampling rule. It does not show biological tumor growth, a clinically useful forecast, a fixed-day forecast, or superiority to all published methods. UCSD is public and includes BraTS challenge material; other methods may have used these same cases. Cross-cohort overlap with MU cannot be ruled out from a documented patient-level crosswalk. The external test is protocol-locked but is not an externally preregistered clinical validation study.
+
+### 3.6 Weakest point
+
+Only 48 GBM patients have at least two visits in the v3 metadata before image completeness checks. Their observed intervals vary widely, and treatment, registration, contour changes, and source-label corrections can all contribute to target changes. The final event-positive, AUC-evaluable cohort may be small. The test can therefore be imprecise or inconclusive even if the code runs. A future study with an independent, prospectively specified cohort and repeated annotation would be needed to establish biological or clinical value.
 ## 4. Track C: robust virtual treatment control
 
 ### 4.1 Simulator and scenario design
@@ -198,7 +196,7 @@ For each held-out scenario and noise level, average time to progression over its
 The treatment model and parameter ranges are assumed, not measured from patients or experiments. A filter may appear calibrated because its assumed likelihood and simulator agree, and all policies may inherit the same structural error. More simulations reduce Monte Carlo error but cannot show that a real drug works or that a policy would help a patient. Track C is an algorithm comparison inside one stated model family.
 ## 5. Prior-art boundary
 
-Prior work already includes GBM Core/Periphery cell classification, donor-held-out single-cell annotation, graph and sparse-feature methods, reaction-diffusion tumor models, probabilistic mask forecasting, spatial uncertainty models, and model-informed adaptive therapy. In particular, Lopes and Vinga (2020) classify GBM Core versus Periphery cells with sparse logistic models; scTab and scANVI provide strong annotation references; Jung and Shin’s 2026 preprint forecasts a label-derived tumor-state proxy on the same MU collection; and Zhang et al. (2017) and Liu et al. (2025) establish adaptive evolutionary treatment methods. The three proposed combinations remain hypotheses for testing, not established novelties. A limited literature scan cannot support a “first” or “beats all current methods” claim. Before such a claim, read the closest full papers, inspect available code, and run fair, input-matched comparisons on the same units and endpoints.
+Prior work already includes GBM Core/Periphery cell classification, donor-held-out single-cell annotation, graph and sparse-feature methods, reaction-diffusion tumor models, probabilistic mask forecasting, spatial uncertainty models, and model-informed adaptive therapy. In particular, Lopes and Vinga (2020) classify GBM Core versus Periphery cells with sparse logistic models; scTab and scANVI provide strong annotation references; Jung and Shin’s 2026 preprint forecasts a label-derived tumor-state proxy on the same MU collection; TaDiff and mechanistic/diffusion MRI-generation work are close to spatial tumor-mask prediction; and Zhang et al. (2017) and Liu et al. (2025) establish adaptive evolutionary treatment methods. The three proposed combinations remain hypotheses for testing, not established novelties. A limited literature scan cannot support a “first” or “beats all current methods” claim. Before such a claim, read the closest full papers, inspect available code, and run fair, input-matched comparisons on the same units and endpoints.
 
 ## 6. References and source records
 
@@ -206,6 +204,7 @@ Prior work already includes GBM Core/Periphery cell classification, donor-held-o
 
 - UCSC Cell Browser, multiomic-gbm: https://cells.ucsc.edu/?ds=multiomic-gbm
 - MU-Glioma-Post v1, TCIA: https://www.cancerimagingarchive.net/collection/mu-glioma-post/
+- UCSD-PTGBM v3, TCIA: https://www.cancerimagingarchive.net/collection/ucsd-ptgbm/
 
 ### Literature
 
@@ -222,6 +221,8 @@ Hormuth, D. A., II, Al Feghali, K. A., Elliott, A. M., Yankeelov, T. E., & Chung
 Liu, Z., Zhang, J., Hong, L., Nie, Q., & Sun, X. (2025). Multiscale mathematical model-informed reinforcement learning optimizes combination treatment scheduling in glioblastoma evolution. Science Advances, 11(32), eadv3316. https://doi.org/10.1126/sciadv.adv3316
 
 Mahmoud, E., Gass, J., Dhemesh, Y., Greaser, J., Pogorzelski, K., Isufi, E., Garrett, F., Thacker, J., Tahon, N. H. M., Sinclair, J., Layfield, L. J., Altes, T., & Nada, A. (2025). MU-Glioma Post: A comprehensive dataset of automated MR multi-sequence segmentation and clinical features. Scientific Data, 12, 1847. https://doi.org/10.1038/s41597-025-06011-7
+
+Gagnon, L., Gupta, D., Mastorakos, G., et al. (2025). The University of California San Diego annotated post-treatment high-grade glioma multimodal MRI dataset (Version 3) [dataset]. The Cancer Imaging Archive. https://doi.org/10.7937/fwv2-dt74
 
 Monteiro, M., Le Folgoc, L., Coelho de Castro, D., Pawlowski, N., Marques, B., Kamnitsas, K., van der Wilk, M., & Glocker, B. (2020). Stochastic segmentation networks: Modelling spatially correlated aleatoric uncertainty. Advances in Neural Information Processing Systems, 33, 12756–12767. https://arxiv.org/abs/2006.06015
 

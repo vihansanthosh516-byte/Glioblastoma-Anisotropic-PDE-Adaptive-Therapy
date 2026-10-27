@@ -34,6 +34,7 @@ FEATURE_NAMES = (
     "label2_indicator",
     "prior_addition_density",
 )
+ORIGIN_FEATURE_NAMES = tuple(name for name in FEATURE_NAMES if name != "prior_addition_density")
 
 
 @dataclass(frozen=True)
@@ -65,6 +66,24 @@ class DiffusionParameters:
             raise ValueError("screening length and candidate radius must be positive")
         if self.solver_tolerance <= 0 or self.solver_max_iterations < 1:
             raise ValueError("invalid iterative-solver settings")
+
+
+@dataclass(frozen=True)
+class OriginDiffusionParameters:
+    """Parameters for the whole-brain, one-origin-scan spatial prior."""
+
+    edge_sensitivity: float = 0.5
+    screening_length_mm: float = 10.0
+    label2_log_permeability: float = 0.69314718056
+    block_cavity: bool = True
+    solver_tolerance: float = 1e-6
+    solver_max_iterations: int = 1000
+
+    def __post_init__(self) -> None:
+        if self.edge_sensitivity < 0:
+            raise ValueError("edge sensitivity must be nonnegative")
+        if self.screening_length_mm <= 0 or self.solver_tolerance <= 0 or self.solver_max_iterations < 1:
+            raise ValueError("invalid origin diffusion settings")
 
 
 @dataclass(frozen=True)
@@ -366,6 +385,69 @@ def build_visit_features(
     )
 
 
+def build_origin_features(
+    current: VisitVolume,
+    parameters: OriginDiffusionParameters,
+) -> VisitFeatures:
+    """Build next-visit features from one forecast-origin scan only.
+
+    The risk set is the full skull-stripped support in the current MRI. Current
+    core and resection-cavity voxels are excluded from the addition risk set;
+    no fixed-radius crop or previous-transition feature is used. The spatial
+    prior solves on the same support with cavity voxels removed from the graph.
+    """
+    images, labels, _, spacing = validate_visit(current, "origin")
+    support = brain_support(images, labels)
+    source = annotated_core_mask(labels)
+    cavity = labels == 4
+    candidate = support & ~source & ~cavity
+    graph_domain = support & (~cavity if parameters.block_cavity else np.ones_like(cavity))
+    if not np.any(source):
+        raise ValueError("origin visit has no label-1/3 source voxels")
+    if not np.any(candidate):
+        raise ValueError("origin visit has no full-brain addition risk voxels")
+
+    normalized = {key: _robust_z(images[key], support) for key in MODALITIES}
+    field = _screened_graph_field(
+        normalized,
+        labels,
+        source,
+        candidate,
+        graph_domain,
+        spacing,
+        parameters,
+    )
+    log_field = np.zeros(field.shape, dtype=np.float32)
+    log_field[candidate] = np.log(np.maximum(field[candidate], 1e-8))
+    if np.any(cavity):
+        distance_to_cavity = distance_transform_edt(~cavity, sampling=spacing).astype(np.float32)
+    else:
+        maximum_distance = float(np.linalg.norm(np.asarray(labels.shape) * np.asarray(spacing)))
+        distance_to_cavity = np.full(labels.shape, maximum_distance, dtype=np.float32)
+
+    maps = {
+        "distance_to_core_mm": distance_transform_edt(~source, sampling=spacing).astype(np.float32),
+        "distance_to_cavity_mm": distance_to_cavity,
+        "t1n_z": normalized["t1n"],
+        "t1c_z": normalized["t1c"],
+        "t2w_z": normalized["t2w"],
+        "t2f_z": normalized["t2f"],
+        "label2_indicator": (labels == 2).astype(np.float32),
+        # Retain the common VisitFeatures contract while making history absent.
+        "prior_addition_density": np.zeros(labels.shape, dtype=np.float32),
+    }
+    return VisitFeatures(
+        candidate=candidate,
+        source=source,
+        recent_additions=np.zeros(labels.shape, dtype=bool),
+        prior_addition_count=0,
+        prior_candidate_voxels=int(np.count_nonzero(candidate)),
+        maps=maps,
+        pde_field=field,
+        log_pde_field=log_field,
+    )
+
+
 def feature_matrix(features: VisitFeatures) -> tuple[np.ndarray, tuple[str, ...]]:
     """Return a compact design matrix for matched non-PDE and residual arms."""
     columns = [np.asarray(features.maps[name][features.candidate], dtype=np.float32) for name in FEATURE_NAMES]
@@ -373,6 +455,88 @@ def feature_matrix(features: VisitFeatures) -> tuple[np.ndarray, tuple[str, ...]
     if not np.all(np.isfinite(matrix)):
         raise ValueError("feature matrix contains non-finite values")
     return matrix, FEATURE_NAMES
+
+
+def origin_feature_matrix(features: VisitFeatures) -> tuple[np.ndarray, tuple[str, ...]]:
+    """Return current-scan predictors only; no prior-transition column."""
+    columns = [
+        np.asarray(features.maps[name][features.candidate], dtype=np.float32)
+        for name in ORIGIN_FEATURE_NAMES
+    ]
+    matrix = np.column_stack(columns).astype(np.float32, copy=False)
+    if not np.all(np.isfinite(matrix)):
+        raise ValueError("origin feature matrix contains non-finite values")
+    return matrix, ORIGIN_FEATURE_NAMES
+
+
+def fixed_origin_perturbation_draws(
+    current: VisitVolume,
+    reference: VisitFeatures,
+    parameters: OriginDiffusionParameters,
+) -> np.ndarray:
+    """Recompute the spatial prior after fixed one-voxel core erosions/dilation.
+
+    These two deterministic boundary stresses define sensitivity, not a
+    probability distribution over segmentation or registration uncertainty.
+    """
+    images, labels, _, _ = validate_visit(current, "origin")
+    source = annotated_core_mask(labels)
+    structure = np.ones((3, 3, 3), dtype=bool)
+    eroded = binary_erosion(source, structure=structure, border_value=0)
+    dilated = binary_dilation(source, structure=structure, border_value=0)
+
+    def replace_source(new_source: np.ndarray) -> VisitVolume:
+        changed = labels.copy()
+        changed[source] = 0
+        changed[new_source & (changed != 4)] = 1
+        return VisitVolume(images=images, labels=changed, affine=current.affine)
+
+    if np.any(eroded):
+        eroded_log = build_origin_features(replace_source(eroded), parameters).log_pde_field
+    else:
+        eroded_log = np.full(reference.log_pde_field.shape, -18.0, dtype=np.float32)
+    dilated_log = build_origin_features(replace_source(dilated), parameters).log_pde_field
+    draws = np.stack((eroded_log, dilated_log), axis=0).astype(np.float32, copy=False)
+    if draws.shape[1:] != reference.candidate.shape:
+        raise RuntimeError("origin perturbation draws do not match reference grid")
+    return draws
+
+
+def origin_perturbation_instability(
+    reference_log_field: np.ndarray,
+    perturbed_log_fields: np.ndarray,
+    candidate: np.ndarray,
+) -> np.ndarray:
+    """Compute median absolute change in the log prior under the fixed stresses."""
+    reference = np.asarray(reference_log_field, dtype=np.float32)
+    draws = np.asarray(perturbed_log_fields, dtype=np.float32)
+    roi = np.asarray(candidate, dtype=bool)
+    if reference.shape != roi.shape or draws.ndim != 4 or draws.shape[1:] != roi.shape:
+        raise ValueError("origin prior perturbations and candidate mask must share a grid")
+    if draws.shape[0] < 2 or not np.all(np.isfinite(draws)):
+        raise ValueError("at least two finite origin perturbations are required")
+    instability = np.median(np.abs(draws - reference[None, ...]), axis=0).astype(np.float32)
+    instability[~roi] = 0.0
+    return instability
+
+
+def origin_stability_gate(
+    instability: np.ndarray,
+    candidate: np.ndarray,
+    *,
+    scale: float,
+    strength: float = 1.0,
+) -> np.ndarray:
+    """Shrink the learned residual where the spatial prior is perturbation-sensitive."""
+    values = np.asarray(instability, dtype=np.float32)
+    roi = np.asarray(candidate, dtype=bool)
+    if values.shape != roi.shape or not np.all(np.isfinite(values)):
+        raise ValueError("instability and candidate mask must share a finite grid")
+    if not np.isfinite(scale) or scale <= 0 or not np.isfinite(strength) or strength < 0:
+        raise ValueError("gate scale must be positive and strength nonnegative")
+    gate = np.ones(values.shape, dtype=np.float32)
+    gate[roi] = np.exp(-strength * values[roi] / scale).astype(np.float32)
+    return gate
 
 
 def make_transition_target(
