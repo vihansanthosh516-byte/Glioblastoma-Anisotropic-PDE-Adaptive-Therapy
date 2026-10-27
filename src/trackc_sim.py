@@ -270,17 +270,18 @@ class ParticleFilter:
 
 # ---------------------------------------------------------------- policies
 class Periodic:
-    """A course every q cycles from cycle 0 (q = 1 front-loaded fixed, q = 4 paced)."""
+    """A course every q cycles from cycle `start` (q = 1 front-loaded fixed, q = 4 paced;
+    start > 0 delays the first course, script 167)."""
     uses_filter = False
 
-    def __init__(self, q):
-        self.q = q
+    def __init__(self, q, start=0):
+        self.q, self.start = q, start
 
     def reset(self, scen, rng):
         pass
 
     def act(self, j, y):
-        return np.full(y.shape, j % self.q == 0)
+        return np.full(y.shape, j >= self.start and (j - self.start) % self.q == 0)
 
     def advance(self, j, treat):
         pass
@@ -490,7 +491,7 @@ def score_spec_reps(args):
 def make_policy(spec):
     kind = spec[0]
     if kind == "periodic":
-        return Periodic(spec[1])
+        return Periodic(*spec[1:])
     if kind == "raw":
         return RawThreshold(*spec[1:])
     if kind == "filt":

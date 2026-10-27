@@ -120,6 +120,13 @@ def test_paced_uses_twelve_courses_when_no_progression():
     assert (out["courses"][capped] == tc.BUDGET).all()
 
 
+def test_periodic_delayed_start():
+    pol = tc.make_policy(("periodic", 3, 2))
+    acts = [bool(pol.act(j, np.zeros(1))[0]) for j in range(9)]
+    assert acts == [False, False, True, False, False, True, False, False, True]
+    assert [bool(tc.make_policy(("periodic", 2)).act(j, np.zeros(1))[0]) for j in range(4)] == [True, False, True, False]
+
+
 def test_raw_threshold_hysteresis():
     pol = tc.RawThreshold(1.0, 0.5)
     pol.reset(None, None)
