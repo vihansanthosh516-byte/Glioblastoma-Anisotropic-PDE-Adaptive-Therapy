@@ -41,6 +41,7 @@ def _pair(
     day_in: float,
     day_out: float,
     *,
+    dt_days: float | None = None,
     in_primary: bool = True,
     input_core_nonempty: bool = True,
 ) -> dict[str, object]:
@@ -50,6 +51,7 @@ def _pair(
         "tp_out": tp_out,
         "day_in": day_in,
         "day_out": day_out,
+        "dt_days": day_out - day_in if dt_days is None else dt_days,
         "in_primary": str(in_primary).lower(),
         "input_core_nonempty": str(input_core_nonempty).lower(),
     }
@@ -70,7 +72,7 @@ def test_manifest_triplets_apply_patient_pair_and_chain_filters(tmp_path: Path) 
     )
     _write_csv(
         pair_path,
-        ["patient_id", "tp_in", "tp_out", "day_in", "day_out", "in_primary", "input_core_nonempty"],
+        ["patient_id", "tp_in", "tp_out", "day_in", "day_out", "dt_days", "in_primary", "input_core_nonempty"],
         [
             # Valid consecutive chain. Day mismatch is within the source tolerance.
             _pair("eligible_gbm", 1, 2, 0, 30),
@@ -110,7 +112,7 @@ def test_manifest_triplets_fail_when_no_valid_chain_exists(tmp_path: Path) -> No
     )
     _write_csv(
         pair_path,
-        ["patient_id", "tp_in", "tp_out", "day_in", "day_out", "in_primary", "input_core_nonempty"],
+        ["patient_id", "tp_in", "tp_out", "day_in", "day_out", "dt_days", "in_primary", "input_core_nonempty"],
         [
             _pair("gbm", 1, 2, 0, 30),
             _pair("gbm", 2, 3, 31, 60),  # sequential scan IDs, but inconsistent visit day
@@ -120,3 +122,261 @@ def test_manifest_triplets_fail_when_no_valid_chain_exists(tmp_path: Path) -> No
 
     with pytest.raises(ValueError, match="no chained, eligible GBM scan triplets"):
         CV._manifest_triplets(patient_path, pair_path)
+
+
+def test_manifest_rejects_duplicate_patient_ids(tmp_path: Path) -> None:
+    patient_path = tmp_path / "patients.csv"
+    pair_path = tmp_path / "pairs.csv"
+    _write_csv(
+        patient_path,
+        ["patient_id", "dataset", "eligible", "is_gbm"],
+        [_patient("P1"), _patient(" P1 ")],
+    )
+    _write_csv(
+        pair_path,
+        ["patient_id", "tp_in", "tp_out", "day_in", "day_out", "dt_days", "in_primary", "input_core_nonempty"],
+        [_pair("P1", 1, 2, 0, 30), _pair("P1", 2, 3, 30, 60)],
+    )
+
+    with pytest.raises(ValueError, match="duplicate patient_id"):
+        CV._manifest_triplets(patient_path, pair_path)
+
+
+def test_manifest_rejects_duplicate_pairs_and_unknown_patient_ids(tmp_path: Path) -> None:
+    patient_path = tmp_path / "patients.csv"
+    pair_path = tmp_path / "pairs.csv"
+    _write_csv(patient_path, ["patient_id", "dataset", "eligible", "is_gbm"], [_patient("P1")])
+    _write_csv(
+        pair_path,
+        ["patient_id", "tp_in", "tp_out", "day_in", "day_out", "dt_days", "in_primary", "input_core_nonempty"],
+        [_pair("P1", 1, 2, 0, 30), _pair("P1", 1, 2, 0, 30)],
+    )
+    with pytest.raises(ValueError, match="duplicate patient/timepoint pair"):
+        CV._manifest_triplets(patient_path, pair_path)
+
+    _write_csv(
+        pair_path,
+        ["patient_id", "tp_in", "tp_out", "day_in", "day_out", "dt_days", "in_primary", "input_core_nonempty"],
+        [_pair("UNKNOWN", 1, 2, 0, 30)],
+    )
+    with pytest.raises(ValueError, match="absent from patient manifest"):
+        CV._manifest_triplets(patient_path, pair_path)
+
+
+@pytest.mark.parametrize(
+    ("pair", "message"),
+    [
+        (_pair("P1", 1, 2, 0, 30, dt_days=29), "dt_days disagrees"),
+        (_pair("P1", 1, 2, 0, 30, dt_days=float("nan")), "finite numeric"),
+        (_pair("P1", 1, 2, 0, 30, dt_days=0), "interval must be positive"),
+        (_pair("P1", 1.5, 2, 0, 30), "nonnegative integer"),
+    ],
+)
+def test_manifest_rejects_invalid_pair_intervals_and_timepoints(
+    tmp_path: Path, pair: dict[str, object], message: str
+) -> None:
+    patient_path = tmp_path / "patients.csv"
+    pair_path = tmp_path / "pairs.csv"
+    _write_csv(patient_path, ["patient_id", "dataset", "eligible", "is_gbm"], [_patient("P1")])
+    _write_csv(
+        pair_path,
+        ["patient_id", "tp_in", "tp_out", "day_in", "day_out", "dt_days", "in_primary", "input_core_nonempty"],
+        [pair],
+    )
+
+    with pytest.raises(ValueError, match=message):
+        CV._manifest_triplets(patient_path, pair_path)
+
+
+def test_manifest_rejects_ambiguous_flags_and_missing_required_columns(tmp_path: Path) -> None:
+    patient_path = tmp_path / "patients.csv"
+    pair_path = tmp_path / "pairs.csv"
+    _write_csv(
+        patient_path,
+        ["patient_id", "dataset", "eligible", "is_gbm"],
+        [{"patient_id": "P1", "dataset": "MU", "eligible": "sometimes", "is_gbm": "true"}],
+    )
+    _write_csv(
+        pair_path,
+        ["patient_id", "tp_in", "tp_out", "day_in", "day_out", "dt_days", "in_primary", "input_core_nonempty"],
+        [_pair("P1", 1, 2, 0, 30)],
+    )
+    with pytest.raises(ValueError, match="boolean must be explicit"):
+        CV._manifest_triplets(patient_path, pair_path)
+
+    _write_csv(patient_path, ["patient_id", "eligible"], [{"patient_id": "P1", "eligible": "true"}])
+    with pytest.raises(ValueError, match="lacks required columns"):
+        CV._manifest_triplets(patient_path, pair_path)
+
+
+def test_run_preflight_rejects_existing_output_before_manifest_or_image_access(tmp_path: Path, monkeypatch) -> None:
+    output_path = tmp_path / "already-there.json"
+    output_path.write_text("synthetic sentinel", encoding="utf-8")
+    args = type("Args", (), {
+        "outer_folds": 2,
+        "inner_folds": 2,
+        "ridge_grid": [0.1],
+        "output": output_path,
+        "patient_manifest": tmp_path / "missing-patients.csv",
+        "pair_manifest": tmp_path / "missing-pairs.csv",
+        "data_root": tmp_path / "missing-data",
+        "overwrite": False,
+    })()
+
+    def forbidden(*_args, **_kwargs):
+        pytest.fail("patient image loader must not run during preflight")
+
+    monkeypatch.setattr(CV, "_load_raw_samples", forbidden)
+    with pytest.raises(FileExistsError, match="refusing to overwrite"):
+        CV.run(args)
+
+
+def test_run_preflight_rejects_output_inside_data_root_even_with_overwrite(tmp_path: Path, monkeypatch) -> None:
+    data_root = tmp_path / "data"
+    data_root.mkdir()
+    output_path = data_root / "result.json"
+    output_path.write_text("synthetic sentinel", encoding="utf-8")
+    args = type("Args", (), {
+        "outer_folds": 2,
+        "inner_folds": 2,
+        "ridge_grid": [0.1],
+        "output": output_path,
+        "patient_manifest": tmp_path / "missing-patients.csv",
+        "pair_manifest": tmp_path / "missing-pairs.csv",
+        "data_root": data_root,
+        "overwrite": True,
+    })()
+
+    def forbidden(*_args, **_kwargs):
+        pytest.fail("patient image loader must not run during preflight")
+
+    monkeypatch.setattr(CV, "_load_raw_samples", forbidden)
+    with pytest.raises(ValueError, match="output path must not be inside the data root"):
+        CV.run(args)
+
+
+def test_run_preflight_checks_patient_count_before_image_access(tmp_path: Path, monkeypatch) -> None:
+    patient_path = tmp_path / "patients.csv"
+    pair_path = tmp_path / "pairs.csv"
+    data_root = tmp_path / "data"
+    data_root.mkdir()
+    output_path = tmp_path / "result.json"
+    _write_csv(patient_path, ["patient_id", "dataset", "eligible", "is_gbm"], [_patient("P1")])
+    _write_csv(
+        pair_path,
+        ["patient_id", "tp_in", "tp_out", "day_in", "day_out", "dt_days", "in_primary", "input_core_nonempty"],
+        [_pair("P1", 1, 2, 0, 30), _pair("P1", 2, 3, 30, 60)],
+    )
+    args = type("Args", (), {
+        "outer_folds": 2,
+        "inner_folds": 2,
+        "ridge_grid": [0.1],
+        "output": output_path,
+        "patient_manifest": patient_path,
+        "pair_manifest": pair_path,
+        "data_root": data_root,
+        "overwrite": False,
+        "edge_sensitivity": 0.5,
+        "screening_length_mm": 10.0,
+        "label2_log_permeability": 0.69314718056,
+        "candidate_radius_mm": 20.0,
+        "prior_smoothing_mm": 2.0,
+        "open_cavity_ablation": False,
+    })()
+
+    def forbidden(*_args, **_kwargs):
+        pytest.fail("patient image loader must not run during preflight")
+
+    monkeypatch.setattr(CV, "_load_raw_samples", forbidden)
+    with pytest.raises(ValueError, match="fewer unique patients than outer folds"):
+        CV.run(args)
+
+
+def test_run_preflight_rejects_bad_interval_before_image_access(tmp_path: Path, monkeypatch) -> None:
+    patient_path = tmp_path / "patients.csv"
+    pair_path = tmp_path / "pairs.csv"
+    data_root = tmp_path / "data"
+    data_root.mkdir()
+    _write_csv(
+        patient_path,
+        ["patient_id", "dataset", "eligible", "is_gbm"],
+        [_patient("P1"), _patient("P2")],
+    )
+    _write_csv(
+        pair_path,
+        ["patient_id", "tp_in", "tp_out", "day_in", "day_out", "dt_days", "in_primary", "input_core_nonempty"],
+        [
+            _pair("P1", 1, 2, 0, 30),
+            _pair("P1", 2, 3, 30, 60),
+            _pair("P2", 1, 2, 0, 30, dt_days=29),
+            _pair("P2", 2, 3, 30, 60),
+        ],
+    )
+    args = type("Args", (), {
+        "outer_folds": 2,
+        "inner_folds": 2,
+        "ridge_grid": [0.1],
+        "output": tmp_path / "result.json",
+        "patient_manifest": patient_path,
+        "pair_manifest": pair_path,
+        "data_root": data_root,
+        "overwrite": False,
+        "edge_sensitivity": 0.5,
+        "screening_length_mm": 10.0,
+        "label2_log_permeability": 0.69314718056,
+        "candidate_radius_mm": 20.0,
+        "prior_smoothing_mm": 2.0,
+        "open_cavity_ablation": False,
+    })()
+
+    def forbidden(*_args, **_kwargs):
+        pytest.fail("patient image loader must not run during preflight")
+
+    monkeypatch.setattr(CV, "_load_raw_samples", forbidden)
+    with pytest.raises(ValueError, match="dt_days disagrees"):
+        CV.run(args)
+
+
+def test_run_preflight_requires_inner_training_patients_before_image_access(tmp_path: Path, monkeypatch) -> None:
+    patient_path = tmp_path / "patients.csv"
+    pair_path = tmp_path / "pairs.csv"
+    data_root = tmp_path / "data"
+    data_root.mkdir()
+    _write_csv(
+        patient_path,
+        ["patient_id", "dataset", "eligible", "is_gbm"],
+        [_patient("P1"), _patient("P2")],
+    )
+    _write_csv(
+        pair_path,
+        ["patient_id", "tp_in", "tp_out", "day_in", "day_out", "dt_days", "in_primary", "input_core_nonempty"],
+        [
+            _pair("P1", 1, 2, 0, 30),
+            _pair("P1", 2, 3, 30, 60),
+            _pair("P2", 1, 2, 0, 30),
+            _pair("P2", 2, 3, 30, 60),
+        ],
+    )
+    args = type("Args", (), {
+        "outer_folds": 2,
+        "inner_folds": 2,
+        "ridge_grid": [0.1],
+        "output": tmp_path / "result.json",
+        "patient_manifest": patient_path,
+        "pair_manifest": pair_path,
+        "data_root": data_root,
+        "overwrite": False,
+        "edge_sensitivity": 0.5,
+        "screening_length_mm": 10.0,
+        "label2_log_permeability": 0.69314718056,
+        "candidate_radius_mm": 20.0,
+        "prior_smoothing_mm": 2.0,
+        "open_cavity_ablation": False,
+    })()
+
+    def forbidden(*_args, **_kwargs):
+        pytest.fail("patient image loader must not run during preflight")
+
+    monkeypatch.setattr(CV, "_load_raw_samples", forbidden)
+    with pytest.raises(ValueError, match="outer training fold has too few patients"):
+        CV.run(args)

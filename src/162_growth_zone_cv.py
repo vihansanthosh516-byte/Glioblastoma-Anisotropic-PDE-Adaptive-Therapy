@@ -17,7 +17,7 @@ import hashlib
 import importlib.util
 import json
 import sys
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Sequence
 
@@ -36,6 +36,19 @@ FORECAST_HORIZON = {
     "known_at_forecast_origin": False,
     "deployment_interpretation": "not a pre-schedule forecast; supply the interval at origin or prespecify a fixed horizon",
 }
+
+DAY_TOLERANCE = 1e-3
+PATIENT_MANIFEST_COLUMNS = ("patient_id", "eligible", "is_gbm")
+PAIR_MANIFEST_COLUMNS = (
+    "patient_id",
+    "tp_in",
+    "tp_out",
+    "day_in",
+    "day_out",
+    "dt_days",
+    "in_primary",
+    "input_core_nonempty",
+)
 
 
 def _load_local_module(alias: str, path: Path) -> Any:
@@ -72,59 +85,166 @@ class RawSample:
     all_addition_count: int
     outside_roi_addition_count: int
 
-    def materialize(self, scales: tuple[float, float], strength: float = 1.0) -> Any:
+    def materialize(
+        self,
+        scales: tuple[float, float],
+        strength: float = 1.0,
+        *,
+        include_history: bool = True,
+    ) -> Any:
         log_scale, prior_scale = scales
         instability = 0.5 * np.clip(self.log_instability / log_scale, 0.0, 1.0)
-        instability += 0.5 * np.clip(self.prior_instability / prior_scale, 0.0, 1.0)
+        features = self.features
+        prior_addition_count = self.prior_addition_count
+        prior_candidate_voxels = self.prior_candidate_voxels
+        prior_interval_days = self.prior_interval_days
+        if include_history:
+            instability += 0.5 * np.clip(self.prior_instability / prior_scale, 0.0, 1.0)
+        else:
+            # Remove all prior-transition inputs. VoxelSample validation
+            # requires positive prior exposure, so use neutral placeholders.
+            features = self.features.copy()
+            features[:, -1] = 0.0
+            prior_addition_count = 0
+            prior_candidate_voxels = 1
+            prior_interval_days = 1.0
         gate = np.exp(-strength * instability).astype(np.float32, copy=False)
         return MODELS.VoxelSample(
             patient_id=self.patient_id,
-            features=self.features,
+            features=features,
             log_pde=self.log_pde,
             gate=gate,
             target=self.target.astype(np.uint8, copy=False),
-            prior_addition_count=self.prior_addition_count,
-            prior_candidate_voxels=self.prior_candidate_voxels,
-            prior_interval_days=self.prior_interval_days,
+            prior_addition_count=prior_addition_count,
+            prior_candidate_voxels=prior_candidate_voxels,
+            prior_interval_days=prior_interval_days,
             forecast_interval_days=self.forecast_interval_days,
         )
 
 
 def _truth(value: Any) -> bool:
-    return str(value).strip().lower() in {"1", "true", "yes", "y"}
+    token = str(value).strip().lower()
+    if token in {"1", "true", "yes", "y"}:
+        return True
+    if token in {"0", "false", "no", "n"}:
+        return False
+    raise ValueError(f"manifest boolean must be explicit, got {value!r}")
 
 
-def _read_csv(path: Path) -> list[dict[str, str]]:
+def _read_csv(path: Path, required_columns: Sequence[str]) -> list[dict[str, Any]]:
     if not path.is_file():
         raise FileNotFoundError(path)
     with path.open("r", encoding="utf-8-sig", newline="") as handle:
-        return list(csv.DictReader(handle))
+        reader = csv.DictReader(handle)
+        if reader.fieldnames is None:
+            raise ValueError(f"manifest has no header: {path}")
+        columns = [str(name).strip() if name is not None else "" for name in reader.fieldnames]
+        if any(not name for name in columns):
+            raise ValueError(f"manifest has a blank column name: {path}")
+        if len(set(columns)) != len(columns):
+            raise ValueError(f"manifest has duplicate column names: {path}")
+        missing = sorted(set(required_columns) - set(columns))
+        if missing:
+            raise ValueError(f"manifest lacks required columns {missing}: {path}")
+        reader.fieldnames = columns
+        rows = list(reader)
+    if not rows:
+        raise ValueError(f"manifest has no data rows: {path}")
+    for index, row in enumerate(rows, start=2):
+        if None in row:
+            raise ValueError(f"manifest row {index} has more fields than its header: {path}")
+        missing_values = [column for column in required_columns if row.get(column) is None]
+        if missing_values:
+            raise ValueError(f"manifest row {index} lacks fields {missing_values}: {path}")
+    return rows
 
 
-def _manifest_triplets(patient_manifest: Path, pair_manifest: Path) -> list[tuple[str, dict[str, str], dict[str, str]]]:
+def _manifest_id(value: Any, field: str) -> str:
+    identifier = "" if value is None else str(value).strip()
+    if not identifier:
+        raise ValueError(f"manifest {field} must be nonempty")
+    return identifier
+
+
+def _finite_number(value: Any, field: str) -> float:
+    try:
+        number = float(value)
+    except (TypeError, ValueError) as exc:
+        raise ValueError(f"manifest {field} must be finite numeric data") from exc
+    if not np.isfinite(number):
+        raise ValueError(f"manifest {field} must be finite numeric data")
+    return number
+
+
+def _timepoint(value: Any, field: str) -> int:
+    number = _finite_number(value, field)
+    if number < 0 or not number.is_integer():
+        raise ValueError(f"manifest {field} must be a nonnegative integer")
+    return int(number)
+
+
+def _manifest_triplets(
+    patient_manifest: Path,
+    pair_manifest: Path,
+) -> list[tuple[str, dict[str, Any], dict[str, Any]]]:
+    patient_rows = _read_csv(patient_manifest, PATIENT_MANIFEST_COLUMNS)
+    all_patients: dict[str, dict[str, Any]] = {}
+    for row in patient_rows:
+        patient_id = _manifest_id(row.get("patient_id"), "patient_id")
+        if patient_id in all_patients:
+            raise ValueError(f"patient manifest has duplicate patient_id: {patient_id}")
+        row["patient_id"] = patient_id
+        row["_eligible"] = _truth(row["eligible"])
+        row["_is_gbm"] = _truth(row["is_gbm"])
+        all_patients[patient_id] = row
     patients = {
-        row["patient_id"]: row
-        for row in _read_csv(patient_manifest)
-        if _truth(row.get("eligible", "")) and _truth(row.get("is_gbm", ""))
+        patient_id: row
+        for patient_id, row in all_patients.items()
+        if row["_eligible"] and row["_is_gbm"]
     }
-    by_patient: dict[str, list[dict[str, str]]] = {}
-    for row in _read_csv(pair_manifest):
-        patient_id = row.get("patient_id", "")
-        if patient_id not in patients or not _truth(row.get("in_primary", "")):
-            continue
-        if not _truth(row.get("input_core_nonempty", "")):
+
+    by_patient: dict[str, list[dict[str, Any]]] = {}
+    pair_rows = _read_csv(pair_manifest, PAIR_MANIFEST_COLUMNS)
+    seen_pairs: set[tuple[str, int, int]] = set()
+    for row in pair_rows:
+        patient_id = _manifest_id(row.get("patient_id"), "patient_id")
+        if patient_id not in all_patients:
+            raise ValueError(f"pair manifest patient is absent from patient manifest: {patient_id}")
+        tp_in = _timepoint(row["tp_in"], "tp_in")
+        tp_out = _timepoint(row["tp_out"], "tp_out")
+        if tp_out <= tp_in:
+            raise ValueError(f"pair manifest timepoints must be ordered for patient {patient_id}")
+        row["tp_in"] = str(tp_in)
+        row["tp_out"] = str(tp_out)
+        day_in = _finite_number(row["day_in"], "day_in")
+        day_out = _finite_number(row["day_out"], "day_out")
+        dt_days = _finite_number(row["dt_days"], "dt_days")
+        if day_out <= day_in or dt_days <= 0:
+            raise ValueError(f"pair manifest interval must be positive for patient {patient_id}")
+        if not np.isclose(dt_days, day_out - day_in, rtol=0.0, atol=DAY_TOLERANCE):
+            raise ValueError(f"pair manifest dt_days disagrees with day_out - day_in for patient {patient_id}")
+        pair_key = (patient_id, tp_in, tp_out)
+        if pair_key in seen_pairs:
+            raise ValueError(f"pair manifest has duplicate patient/timepoint pair: {pair_key}")
+        seen_pairs.add(pair_key)
+        row["_tp_in"] = tp_in
+        row["_tp_out"] = tp_out
+        row["_day_in"] = day_in
+        row["_day_out"] = day_out
+        row["_dt_days"] = dt_days
+        row["_in_primary"] = _truth(row["in_primary"])
+        row["_input_core_nonempty"] = _truth(row["input_core_nonempty"])
+        if patient_id not in patients or not row["_in_primary"] or not row["_input_core_nonempty"]:
             continue
         by_patient.setdefault(patient_id, []).append(row)
 
-    triplets: list[tuple[str, dict[str, str], dict[str, str]]] = []
+    triplets: list[tuple[str, dict[str, Any], dict[str, Any]]] = []
     for patient_id, pairs in by_patient.items():
-        pairs.sort(key=lambda row: (float(row["day_in"]), int(row["tp_in"]), int(row["tp_out"])))
+        pairs.sort(key=lambda row: (row["_day_in"], row["_tp_in"], row["_tp_out"]))
         for first, second in zip(pairs, pairs[1:]):
-            if int(first["tp_out"]) != int(second["tp_in"]):
+            if first["_tp_out"] != second["_tp_in"]:
                 continue
-            if abs(float(first["day_out"]) - float(second["day_in"])) > 1e-3:
-                continue
-            if not _truth(second.get("input_core_nonempty", "")):
+            if abs(first["_day_out"] - second["_day_in"]) > DAY_TOLERANCE:
                 continue
             triplets.append((patient_id, first, second))
     if not triplets:
@@ -253,6 +373,19 @@ def _mean_patient_metric(samples: Sequence[Any], values: Sequence[float]) -> flo
     return float(np.mean([np.mean(patient_values) for patient_values in grouped.values()]))
 
 
+def _select_best_inner_ap(scores: dict[Any, Sequence[float]], model_name: str) -> Any:
+    """Select candidate by mean finite inner-fold AP, failing when none is defined."""
+    means: dict[Any, float] = {}
+    for candidate, values in scores.items():
+        finite = np.asarray(values, dtype=np.float64)
+        finite = finite[np.isfinite(finite)]
+        means[candidate] = float(np.mean(finite)) if finite.size else float("nan")
+    valid = {candidate: value for candidate, value in means.items() if np.isfinite(value)}
+    if not valid:
+        raise ValueError(f"inner validation average precision is undefined for all {model_name} candidates")
+    return max(valid, key=valid.get)
+
+
 def _sample_ap(sample: Any, score: np.ndarray, count: float) -> tuple[np.ndarray, dict[str, float]]:
     probability = MODELS.calibrate_probability_mass(score, count)
     target = np.asarray(sample.target, dtype=np.uint8)
@@ -271,7 +404,10 @@ def _choose_ridge(
     ridge_grid: Sequence[float],
     inner_folds: int,
     seed: int,
+    *,
+    include_history: bool = True,
 ) -> float:
+    """Tune residual ridge with the matching history and count-prediction arm."""
     groups = np.asarray([sample.patient_id for sample in train_raw])
     n_groups = np.unique(groups).size
     n_folds = min(inner_folds, n_groups)
@@ -283,9 +419,19 @@ def _choose_ridge(
         inner_train_raw = [train_raw[index] for index in inner_train_idx]
         inner_val_raw = [train_raw[index] for index in inner_val_idx]
         scales = _fold_scales(inner_train_raw)
-        inner_train = [sample.materialize(scales) for sample in inner_train_raw]
-        inner_val = [sample.materialize(scales) for sample in inner_val_raw]
-        prior = MODELS.fit_count_prior(inner_train)
+        history_train = [sample.materialize(scales) for sample in inner_train_raw]
+        inner_train = (
+            history_train
+            if include_history
+            else [sample.materialize(scales, include_history=False) for sample in inner_train_raw]
+        )
+        inner_val = [
+            sample.materialize(scales, include_history=include_history)
+            for sample in inner_val_raw
+        ]
+        # Cohort rates use inner-training histories only. Validation counts for
+        # the ablation never consume a patient's prior count or prior exposure.
+        prior = MODELS.fit_count_prior(history_train)
         for ridge in ridge_grid:
             model = MODELS.fit_residual_model(
                 inner_train,
@@ -295,24 +441,28 @@ def _choose_ridge(
                 use_gate=True,
             )
             ap = []
-            for raw, sample in zip(inner_val_raw, inner_val):
-                count = MODELS.predict_addition_count(
-                    prior,
-                    sample.prior_addition_count,
-                    sample.prior_candidate_voxels,
-                    sample.prior_interval_days,
-                    sample.forecast_interval_days,
-                    sample.features.shape[0],
-                )
+            for sample in inner_val:
+                if include_history:
+                    count = MODELS.predict_addition_count(
+                        prior,
+                        sample.prior_addition_count,
+                        sample.prior_candidate_voxels,
+                        sample.prior_interval_days,
+                        sample.forecast_interval_days,
+                        sample.features.shape[0],
+                    )
+                else:
+                    count = MODELS.predict_cohort_rate_count(
+                        prior,
+                        sample.forecast_interval_days,
+                        sample.features.shape[0],
+                    )
                 score = model.predict_score(sample.features, sample.log_pde, sample.gate)
                 _, metric = _sample_ap(sample, score, count)
                 ap.append(metric["average_precision"])
             scores[float(ridge)].append(_mean_patient_metric(inner_val, ap))
-    means = {
-        ridge: float(np.nanmean(values)) if np.any(np.isfinite(values)) else float("-inf")
-        for ridge, values in scores.items()
-    }
-    return max(means, key=means.get)
+    arm_name = "ridge" if include_history else "no-history ridge"
+    return _select_best_inner_ap(scores, arm_name)
 
 
 def _choose_tree_leaves(
@@ -357,11 +507,7 @@ def _choose_tree_leaves(
                 _, metric = _sample_ap(sample, score, count)
                 ap.append(metric["average_precision"])
             scores[int(leaves)].append(_mean_patient_metric(inner_val, ap))
-    means = {
-        leaves: float(np.nanmean(values)) if np.any(np.isfinite(values)) else float("-inf")
-        for leaves, values in scores.items()
-    }
-    return max(means, key=means.get)
+    return _select_best_inner_ap(scores, "tree leaf-count")
 
 
 def _evaluate_outer_fold(
@@ -376,6 +522,13 @@ def _evaluate_outer_fold(
     train = [sample.materialize(scales) for sample in train_raw]
     test = [sample.materialize(scales) for sample in test_raw]
     ridge = _choose_ridge(train_raw, ridge_grid, inner_folds, seed + fold)
+    no_history_ridge = _choose_ridge(
+        train_raw,
+        ridge_grid,
+        inner_folds,
+        seed + fold,
+        include_history=False,
+    )
     tree_leaves = _choose_tree_leaves(train_raw, inner_folds, seed + fold)
     count_prior = MODELS.fit_count_prior(train)
     full_model = MODELS.fit_residual_model(train, ridge=ridge, seed=seed + fold)
@@ -388,8 +541,12 @@ def _evaluate_outer_fold(
     tree_model = MODELS.fit_tree_baseline(
         train, max_leaf_nodes=tree_leaves, max_per_class_per_interval=1000, seed=seed + fold
     )
-    no_history_train = [replace(sample, features=np.column_stack((sample.features[:, :-1], np.zeros(len(sample.target))))) for sample in train]
-    no_history_model = MODELS.fit_residual_model(no_history_train, ridge=ridge, seed=seed + fold)
+    no_history_train = [sample.materialize(scales, include_history=False) for sample in train_raw]
+    no_history_model = MODELS.fit_residual_model(
+        no_history_train,
+        ridge=no_history_ridge,
+        seed=seed + fold,
+    )
 
     fold_rows: list[dict[str, Any]] = []
     for raw, sample in zip(test_raw, test):
@@ -408,8 +565,12 @@ def _evaluate_outer_fold(
         no_gate_score = no_gate_model.predict_score(sample.features, sample.log_pde, sample.gate)
         matched_score = matched_model.predict_score(sample.features, sample.log_pde, sample.gate)
         tree_score = tree_model.predict_score(sample.features)
-        no_history_features = np.column_stack((sample.features[:, :-1], np.zeros(len(sample.target))))
-        no_history_score = no_history_model.predict_score(no_history_features, sample.log_pde, sample.gate)
+        no_history_sample = raw.materialize(scales, include_history=False)
+        no_history_score = no_history_model.predict_score(
+            no_history_sample.features,
+            no_history_sample.log_pde,
+            no_history_sample.gate,
+        )
         distance_score = -sample.features[:, 0]
         spatial_scores = {
             "hybrid": hybrid_score,
@@ -422,8 +583,10 @@ def _evaluate_outer_fold(
         }
         arm_metrics: dict[str, Any] = {}
         cohort_count_brier = None
+        arm_counts = {arm: predicted_count for arm in spatial_scores}
+        arm_counts["hybrid_no_prior_transition"] = cohort_count
         for arm, score in spatial_scores.items():
-            _, arm_metrics[arm] = _sample_ap(sample, score, predicted_count)
+            _, arm_metrics[arm] = _sample_ap(sample, score, arm_counts[arm])
             if arm == "hybrid":
                 _, cohort_metrics = _sample_ap(sample, score, cohort_count)
                 cohort_count_brier = cohort_metrics["brier"]
@@ -439,13 +602,22 @@ def _evaluate_outer_fold(
                 "additions_outside_roi": raw.outside_roi_addition_count,
                 "predicted_addition_count": predicted_count,
                 "cohort_rate_count": cohort_count,
+                "no_prior_transition_predicted_count": arm_counts["hybrid_no_prior_transition"],
                 "count_absolute_error": abs(predicted_count - target_count),
                 "cohort_count_absolute_error": abs(cohort_count - target_count),
                 "hybrid_cohort_count_brier": cohort_count_brier,
                 "arms": arm_metrics,
             }
         )
-    return fold_rows, {"fold": fold, "selected_ridge": ridge, "selected_tree_max_leaf_nodes": tree_leaves, "n_train_patients": len({s.patient_id for s in train_raw}), "n_test_patients": len({s.patient_id for s in test_raw}), "gate_scales": {"pde": scales[0], "history": scales[1]}}
+    return fold_rows, {
+        "fold": fold,
+        "selected_ridge": ridge,
+        "selected_no_history_ridge": no_history_ridge,
+        "selected_tree_max_leaf_nodes": tree_leaves,
+        "n_train_patients": len({s.patient_id for s in train_raw}),
+        "n_test_patients": len({s.patient_id for s in test_raw}),
+        "gate_scales": {"pde": scales[0], "history": scales[1]},
+    }
 
 
 def _paired_patient_bootstrap(
@@ -494,8 +666,55 @@ def _json_safe(value: Any) -> Any:
     return value
 
 
-def run(args: argparse.Namespace) -> dict[str, Any]:
+def _preflight_run(args: argparse.Namespace) -> tuple[list[Any], Any, tuple[float, ...]]:
+    """Validate run configuration and metadata before opening any scan image."""
+    if args.outer_folds < 2:
+        raise ValueError("outer_folds must be at least 2")
+    if args.inner_folds < 2:
+        raise ValueError("inner_folds must be at least 2")
+    ridge_grid = tuple(float(value) for value in args.ridge_grid)
+    if not ridge_grid or any(not np.isfinite(value) or value < 0 for value in ridge_grid):
+        raise ValueError("ridge_grid must contain finite nonnegative values")
+
+    patient_manifest = Path(args.patient_manifest).expanduser()
+    pair_manifest = Path(args.pair_manifest).expanduser()
+    output = Path(args.output).expanduser()
+    args.patient_manifest = patient_manifest
+    args.pair_manifest = pair_manifest
+    args.output = output
+    input_manifests = {
+        patient_manifest.resolve(),
+        pair_manifest.resolve(),
+    }
+    if output.resolve() in input_manifests:
+        raise ValueError("output path must not replace an input manifest")
+    if output.exists():
+        if output.is_dir():
+            raise IsADirectoryError(f"output path is a directory: {output}")
+        if not args.overwrite:
+            raise FileExistsError(f"refusing to overwrite {output}; use --overwrite intentionally")
+    existing_parent = output.parent
+    while not existing_parent.exists() and existing_parent != existing_parent.parent:
+        existing_parent = existing_parent.parent
+    if not existing_parent.is_dir():
+        raise NotADirectoryError(f"output path has a non-directory parent: {existing_parent}")
+    data_root = Path(args.data_root).expanduser()
+    if not data_root.is_dir():
+        raise NotADirectoryError(f"data root is not a directory: {data_root}")
+    args.data_root = data_root
+    if output.resolve().is_relative_to(data_root.resolve()):
+        raise ValueError("output path must not be inside the data root")
+
     triplets = _manifest_triplets(args.patient_manifest, args.pair_manifest)
+    groups = np.asarray([patient_id for patient_id, _, _ in triplets])
+    if np.unique(groups).size < args.outer_folds:
+        raise ValueError("fewer unique patients than outer folds")
+    for train_indices, _ in GroupKFold(n_splits=args.outer_folds).split(
+        np.zeros(len(triplets)), groups=groups
+    ):
+        if np.unique(groups[train_indices]).size < 2:
+            raise ValueError("outer training fold has too few patients for inner grouped selection")
+
     diffusion = FEATURES.DiffusionParameters(
         edge_sensitivity=args.edge_sensitivity,
         screening_length_mm=args.screening_length_mm,
@@ -504,12 +723,14 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
         prior_smoothing_mm=args.prior_smoothing_mm,
         block_cavity=not args.open_cavity_ablation,
     )
+    return triplets, diffusion, ridge_grid
+
+
+def run(args: argparse.Namespace) -> dict[str, Any]:
+    triplets, diffusion, ridge_grid = _preflight_run(args)
     raw_samples = _load_raw_samples(triplets, args.data_root, diffusion)
-    if len({sample.patient_id for sample in raw_samples}) < args.outer_folds:
-        raise ValueError("fewer unique patients than outer folds")
     groups = np.asarray([sample.patient_id for sample in raw_samples])
     splitter = GroupKFold(n_splits=args.outer_folds)
-    ridge_grid = tuple(float(value) for value in args.ridge_grid)
     rows: list[dict[str, Any]] = []
     folds: list[dict[str, Any]] = []
     for fold, (train_idx, test_idx) in enumerate(
@@ -590,8 +811,6 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
         "folds": folds,
         "sample_metrics": rows,
     }
-    if args.output.exists() and not args.overwrite:
-        raise FileExistsError(f"refusing to overwrite {args.output}; use --overwrite intentionally")
     args.output.parent.mkdir(parents=True, exist_ok=True)
     safe_output = _json_safe(output)
     args.output.write_text(json.dumps(safe_output, indent=2, allow_nan=False), encoding="utf-8")
