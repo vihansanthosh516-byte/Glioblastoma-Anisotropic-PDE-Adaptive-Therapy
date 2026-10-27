@@ -726,11 +726,66 @@ def _update_analysis_lock(lock_path: Path, **updates: Any) -> dict[str, Any]:
     return record
 
 
-def _preflight(args: argparse.Namespace) -> tuple[list[PatientPair], dict[str, int]]:
+def _preflight(args: argparse.Namespace) -> tuple[list[PatientPair], dict[str, int], dict[str, int]]:
     pairs, counts = select_ucsd_pairs(args.ucsd_clinical, args.ucsd_root)
     if not pairs:
         raise ValueError("no GBM patient has a complete, aligned pair with all four standard modalities and masks")
-    return pairs, counts
+    modality_failures: Counter[str] = Counter()
+    failed_origins = 0
+    for pair in pairs:
+        images = _load_ucsd_origin_images(pair.first_files)
+        failures = _origin_intensity_quality_issues(images)
+        if failures:
+            failed_origins += 1
+            modality_failures.update(failures)
+    counts["origin_inputs_quality_checked"] = len(pairs)
+    counts["origin_inputs_quality_failed"] = failed_origins
+    return pairs, counts, dict(modality_failures)
+
+
+def _load_ucsd_origin_images(scan: ScanFiles) -> dict[str, np.ndarray]:
+    """Load forecast-origin MRI only; never read current or future mask voxels."""
+    import nibabel as nib
+
+    images: dict[str, np.ndarray] = {}
+    reference_shape = None
+    reference_affine = None
+    for modality in FEATURES.MODALITIES:
+        image = nib.load(str(scan.paths[modality]))
+        if reference_shape is None:
+            reference_shape = image.shape
+            reference_affine = np.asarray(image.affine, dtype=np.float64)
+        elif image.shape != reference_shape or not np.allclose(
+            np.asarray(image.affine), reference_affine, rtol=0.0, atol=1e-3
+        ):
+            raise ValueError("forecast-origin MRI modalities are not aligned")
+        images[modality] = np.asarray(image.dataobj, dtype=np.float32)
+    return images
+
+
+def _origin_intensity_quality_issues(images: Mapping[str, np.ndarray]) -> list[str]:
+    """Check normalization inputs from MRI intensities alone, without masks."""
+    if set(images) != set(FEATURES.MODALITIES):
+        raise ValueError("origin MRI quality check requires exactly four standard modalities")
+    arrays = {name: np.asarray(images[name], dtype=np.float32) for name in FEATURES.MODALITIES}
+    shape = arrays[FEATURES.MODALITIES[0]].shape
+    if len(shape) != 3 or any(array.shape != shape for array in arrays.values()):
+        raise ValueError("origin MRI quality check requires aligned 3-D arrays")
+    support = np.zeros(shape, dtype=bool)
+    issues: list[str] = []
+    for name, array in arrays.items():
+        if not np.all(np.isfinite(array)):
+            issues.append(name)
+            continue
+        support |= np.abs(array) > 1e-6
+    for name, array in arrays.items():
+        if name in issues:
+            continue
+        try:
+            FEATURES._robust_z(array, support)
+        except ValueError:
+            issues.append(name)
+    return issues
 
 
 def _read_pair(pair: PatientPair) -> tuple[Any, np.ndarray, np.ndarray]:
@@ -764,7 +819,13 @@ def run_locked_test(args: argparse.Namespace) -> dict[str, Any]:
     if not args.patient_manifest.is_file() or not args.pair_manifest.is_file():
         raise FileNotFoundError("the frozen MU development manifests are required")
     _validate_locked_source_paths(args)
-    pairs, preflight_counts = _preflight(args)
+    pairs, preflight_counts, modality_failures = _preflight(args)
+    if preflight_counts["origin_inputs_quality_failed"]:
+        raise ValueError(
+            "forecast-origin intensity preflight failed for "
+            f"{preflight_counts['origin_inputs_quality_failed']} pair(s); "
+            f"modalities={modality_failures}; future label arrays were not read"
+        )
     ucsd_source_paths = [
         path for pair in pairs for bundle in (pair.first_files, pair.second_files) for path in bundle.paths.values()
     ]
@@ -789,8 +850,8 @@ def run_locked_test(args: argparse.Namespace) -> dict[str, Any]:
         "mri_only": _fit_head(development, scale=gate_scale, use_prior=False, use_gate=False, seed=FIT_SEED),
     }
 
-    # Preflight inspected only file names and NIfTI headers. Lock immediately
-    # before reading the first UCSD segmentation voxel.
+    # Preflight checks file names, NIfTI headers, and forecast-origin MRI
+    # normalization inputs. It never reads UCSD mask voxel arrays.
     analysis_lock = _create_analysis_lock(
         protocol=args.protocol,
         clinical_path=args.ucsd_clinical,
@@ -979,7 +1040,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--patient-manifest", type=Path, default=DEFAULT_PATIENT_MANIFEST)
     parser.add_argument("--pair-manifest", type=Path, default=DEFAULT_PAIR_MANIFEST)
     parser.add_argument("--protocol", type=Path, default=DEFAULT_PROTOCOL)
-    parser.add_argument("--preflight-only", action="store_true", help="check source pair completeness and grid headers only")
+    parser.add_argument("--preflight-only", action="store_true", help="check source pairs, grid headers, and forecast-origin MRI normalization inputs; do not read mask arrays")
     parser.add_argument("--score-locked-test", action="store_true", help="fit on MU and score UCSD once using the frozen protocol")
     return parser
 
@@ -990,9 +1051,14 @@ def main() -> int:
     if args.preflight_only == args.score_locked_test:
         parser.error("choose exactly one: --preflight-only or --score-locked-test")
     if args.preflight_only:
-        pairs, counts = _preflight(args)
-        print(json.dumps({"ucsd_file_complete_pairs": len(pairs), "counts": counts}, indent=2))
-        return 0
+        pairs, counts, modality_failures = _preflight(args)
+        print(json.dumps({
+            "ucsd_file_complete_pairs": len(pairs),
+            "counts": counts,
+            "origin_input_quality_failure_modalities": modality_failures,
+            "future_label_arrays_read": False,
+        }, indent=2))
+        return 2 if counts["origin_inputs_quality_failed"] else 0
     result = run_locked_test(args)
     print(json.dumps({"status": result["status"], "n_ucsd_pairs": result["cohort"]["metadata_and_file_eligible_unique_patients"], "primary": result["primary_test"]}, indent=2))
     print(f"wrote aggregate locked-test result: {DEFAULT_OUTPUT}", flush=True)

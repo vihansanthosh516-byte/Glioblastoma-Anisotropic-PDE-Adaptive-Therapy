@@ -69,6 +69,34 @@ def test_ucsd_standard_brats_segmentation_excludes_cellular_masks() -> None:
     assert RUNNER._modality(Path("case_total_cellular_tumor_seg.nii.gz")) is None
 
 
+def test_preflight_catches_flat_origin_modality_without_future_masks(monkeypatch) -> None:
+    shape = (12, 12, 12)
+    base = np.indices(shape).sum(axis=0).astype(np.float32) + 1.0
+    images = {
+        name: base * float(index + 1)
+        for index, name in enumerate(RUNNER.FEATURES.MODALITIES)
+    }
+    images["t2w"] = np.zeros(shape, dtype=np.float32)
+    pair = SimpleNamespace(first_files=object(), second_files=object())
+    loaded = []
+    monkeypatch.setattr(RUNNER, "select_ucsd_pairs", lambda *_args: ([pair], {"gbm": 1}))
+    monkeypatch.setattr(
+        RUNNER,
+        "_load_ucsd_origin_images",
+        lambda scan: (loaded.append(scan), images)[1],
+    )
+
+    pairs, counts, modality_failures = RUNNER._preflight(
+        Namespace(ucsd_clinical=Path("unused"), ucsd_root=Path("unused"))
+    )
+
+    assert pairs == [pair]
+    assert loaded == [pair.first_files]
+    assert counts["origin_inputs_quality_checked"] == 1
+    assert counts["origin_inputs_quality_failed"] == 1
+    assert modality_failures == {"t2w": 1}
+
+
 def test_segmentation_loader_rejects_fractional_or_unknown_codes(tmp_path: Path) -> None:
     affine = np.eye(4)
     valid = tmp_path / "valid.nii.gz"
