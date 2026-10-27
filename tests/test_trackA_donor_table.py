@@ -65,6 +65,44 @@ def test_matching_missing_metadata_never_confirms_shared_orig_ident():
     assert blocked[0]["missing_fields"] == ["age"]
 
 
+@pytest.mark.parametrize("missing_part", ["None", "nan", "N/A", "<NA>", "unknown", " "])
+def test_missing_orig_ident_parts_never_create_r2_aliases(missing_part):
+    donor, _, merges, conflicts, links = run([
+        S("A1", oi=[f"core:{missing_part}"]),
+        S("B2", oi=[f"periphery:{missing_part}"]),
+    ])
+    assert donor["A1"] != donor["B2"]
+    assert merges == [] and conflicts == [] and links == []
+
+
+@pytest.mark.parametrize("missing_orig_ident", [None, pd.NA, float("nan"), "None"])
+def test_missing_orig_ident_values_are_skipped(missing_orig_ident):
+    donor, _, merges, conflicts, links = run([
+        S("A1", oi=[missing_orig_ident]),
+        S("B2", oi=[missing_orig_ident]),
+    ])
+    assert donor["A1"] != donor["B2"]
+    assert merges == [] and conflicts == [] and links == []
+
+
+def test_identity_status_marks_conflict_candidates_machine_readably():
+    samples = pd.DataFrame([S("A1"), S("A1citeseq", age="None")])
+    donor, _, merges, conflicts, _ = dt.resolve_donors(samples)
+    candidates, _, _ = dt.metadata_only_candidates(samples, donor)
+    statuses, issue_fields = dt.identity_statuses(samples, donor, merges, conflicts, candidates)
+    assert statuses == {"A1": "unresolved_missing_metadata", "A1citeseq": "unresolved_missing_metadata"}
+    assert issue_fields == {"A1": ["age"], "A1citeseq": ["age"]}
+
+
+def test_identity_status_marks_metadata_only_collision_unresolved():
+    samples = pd.DataFrame([S("A1"), S("B2")])
+    donor, _, merges, conflicts, _ = dt.resolve_donors(samples)
+    candidates, _, _ = dt.metadata_only_candidates(samples, donor)
+    statuses, issue_fields = dt.identity_statuses(samples, donor, merges, conflicts, candidates)
+    assert statuses == {"A1": "unresolved_metadata_only_candidate", "B2": "unresolved_metadata_only_candidate"}
+    assert issue_fields == {"A1": ["metadata_only_candidate"], "B2": ["metadata_only_candidate"]}
+
+
 @pytest.mark.parametrize("field,val", [("sex", "Female"), ("mgmt", "unmethylated"), ("dx", "Meningioma")])
 def test_refuse_on_each_field(field, val):
     kw = {"dx": val} if field == "dx" else {field: val}

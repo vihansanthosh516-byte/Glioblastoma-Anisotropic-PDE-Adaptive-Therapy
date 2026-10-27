@@ -6,11 +6,11 @@ Question: how much of core-vs-periphery prediction comes only from the cell-type
 cells of the SAME type differ between core and periphery in held-out donors?
 
 Data: output/01_filtered_three_class.h5ad (UCSC multiomic-gbm atlas; X holds NORMALIZED values,
-not raw counts). The 7 GBM donors with both Core and Periphery cells (script 151); SNU33 and
-SNU33citeseq merged. Up to 3,000 cells per donor and region (seeded subsample). Cell types are
+not raw counts). Donors with both Core and Periphery cells from the validated script-151 manifest.
+Up to 3,000 cells per donor and region (seeded subsample). Cell types are
 the atlas authors' `Major.celltype` labels, not re-derived here.
 
-Exploratory: 7 donors, so per-donor results and exact sign-flip p-values (minimum 1/128).
+Exploratory: donor count comes from the validated manifest; per-donor results and exact sign-flip p-values.
 Output stays LOCAL (UCSC-derived; public repo): output/trackA_composition_audit/.
 
 Run:  python src/157_trackA_composition_audit.py
@@ -26,16 +26,20 @@ from pathlib import Path
 
 import h5py
 import numpy as np
+import pandas as pd
 import scipy.sparse as sp
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(PROJECT_ROOT))
 sys.path.insert(0, str(PROJECT_ROOT / "src"))
 import trackA_composition_audit as ca  # noqa: E402
+from src import trackA_identity as identity  # noqa: E402
 
 H5AD = PROJECT_ROOT / "output" / "01_filtered_three_class.h5ad"
+MANIFEST = PROJECT_ROOT / "data" / "manifests" / "trackA_donors.csv"
+MANIFEST_SUMMARY = PROJECT_ROOT / "output" / "trackA_donor_table" / "summary.json"
+MANIFEST_GENERATOR = PROJECT_ROOT / "src" / "151_trackA_donor_table.py"
 OUT_DIR = PROJECT_ROOT / "output" / "trackA_composition_audit"
-DONORS = {"SNU27": "SNU27", "SNU32": "SNU32", "SNU33": "SNU33", "SNU33citeseq": "SNU33",
-          "SNU34citeseq": "SNU34citeseq", "SNU35": "SNU35", "SNU46": "SNU46", "SNU51": "SNU51"}
 WITHIN = ("microglia", "oligodendrocyte", "macrophage", "granulocyte", "tumor cell")
 
 
@@ -56,17 +60,40 @@ def _cat(obs, key):
     return values
 
 
-def load(max_per_group, seed):
+def load(max_per_group, seed, sensitivity_policy=None):
+    manifest_summary = identity.verify_manifest_provenance(
+        MANIFEST,
+        MANIFEST_SUMMARY,
+        H5AD,
+        MANIFEST_GENERATOR,
+        {
+            "donor_cv": PROJECT_ROOT / "src" / "donor_cv.py",
+            "leakage_checks": PROJECT_ROOT / "src" / "leakage_checks.py",
+        },
+        expected_input_relative_path="output/01_filtered_three_class.h5ad",
+    )
+    if not MANIFEST.is_file():
+        raise FileNotFoundError(f"validated donor manifest is required: {MANIFEST}")
+    manifest = pd.read_csv(MANIFEST)
     with h5py.File(H5AD, "r") as f:
         obs = f["obs"]
         sample, cls, ctype = _cat(obs, "ID1"), _cat(obs, "class"), _cat(obs, "Major.celltype")
+        donor_map, excluded_samples = identity.validate_manifest_mapping(
+            manifest, identity.known_sample_ids(sample), sensitivity_policy=sensitivity_policy)
+        identity_counts = identity.validate_manifest_cell_counts(
+            manifest, sample, cls, donor_map, excluded_samples)
+        gbm_donors = identity.manifest_gbm_donors(manifest, donor_map, excluded_samples)
         rng = np.random.default_rng(seed)
         keep = []
-        donor_all = np.array([DONORS.get(s, "") for s in sample], dtype=object)
-        missing_sample_rows = sum(value is None for value in sample)
+        sample_ids_by_cell = identity.normalize_sample_ids(sample)
+        donor_all = np.array(["" if sample_id is None or sample_id in excluded_samples
+                              else donor_map.loc[sample_id] for sample_id in sample_ids_by_cell], dtype=object)
+        missing_sample_rows = sum(sample_id is None for sample_id in sample_ids_by_cell)
         missing_class_rows = sum(value is None for value in cls)
         missing_celltype_in_analysis_rows = 0
-        for d in sorted(set(DONORS.values())):
+        eligible_donors = sorted(d for d, counts in identity_counts.items()
+                                  if d in gbm_donors and counts["Core"] > 0 and counts["Periphery"] > 0)
+        for d in eligible_donors:
             for c in ("Core", "Periphery"):
                 idx = np.flatnonzero((donor_all == d) & (cls == c))
                 valid_celltype = np.array([value is not None for value in ctype[idx]], dtype=bool)
@@ -86,7 +113,26 @@ def load(max_per_group, seed):
         genes = np.array([g.decode() if isinstance(g, bytes) else g for g in raw])
     diagnostics = {"missing_sample_id_rows": missing_sample_rows,
                    "missing_class_label_rows": missing_class_rows,
-                   "eligible_core_periphery_rows_excluded_missing_celltype": missing_celltype_in_analysis_rows}
+                   "eligible_core_periphery_rows_excluded_missing_celltype": missing_celltype_in_analysis_rows,
+                   "donor_manifest_validation": "passed",
+                   "donor_manifest_sample_count": int(len(manifest)),
+                   "manifest_gbm_donor_count": int(len(gbm_donors)),
+                   "eligible_core_periphery_donors": eligible_donors,
+                   "identity_status_counts": {
+                       str(key): int(value)
+                       for key, value in manifest["identity_status"].value_counts(dropna=False).items()
+                   },
+                   "identity_sensitivity_excluded_sample_count": int(len(excluded_samples)),
+                   "identity_sensitivity_policy": sensitivity_policy,
+                   "verified_provenance_hashes": {
+                       "source_h5ad_sha256": manifest_summary["input_sha256"],
+                       "donor_manifest_sha256": manifest_summary["manifest_sha256"],
+                       "donor_manifest_generator_sha256": manifest_summary["source_script_sha256"],
+                       "donor_manifest_dependency_sha256": manifest_summary["dependency_sha256"],
+                       "scoring_runner_sha256": identity.sha256_file(Path(__file__)),
+                       "composition_audit_module_sha256": identity.sha256_file(Path(ca.__file__)),
+                       "identity_validator_sha256": identity.sha256_file(Path(identity.__file__)),
+                   }}
     return (M.toarray().astype(np.float32), (cls[rows] == "Periphery").astype(int),
             donor_all[rows], ctype[rows], genes, diagnostics)
 
@@ -135,11 +181,16 @@ def main():
     ap.add_argument("--n-genes", type=int, default=2000)
     ap.add_argument("--seed", type=int, default=20261025)
     ap.add_argument("--exclude-technical", action="store_true")
+    ap.add_argument("--identity-sensitivity-policy", type=Path,
+                    help="JSON with explicit groups/exclude for every unresolved sample identity")
     args = ap.parse_args()
+    sensitivity_policy = None
+    if args.identity_sensitivity_policy is not None:
+        sensitivity_policy = identity.load_identity_policy(args.identity_sensitivity_policy)
     out_dir = OUT_DIR / ("exclude_technical" if args.exclude_technical else "")
-    out_dir.mkdir(parents=True, exist_ok=True)
     t0 = time.time()
-    X, y, donor, ctype, genes, input_missingness = load(args.max_per_group, args.seed)
+    X, y, donor, ctype, genes, input_missingness = load(args.max_per_group, args.seed, sensitivity_policy)
+    out_dir.mkdir(parents=True, exist_ok=True)
     t_load = time.time() - t0
     n_excluded = 0
     if args.exclude_technical:
@@ -183,17 +234,26 @@ def main():
                   "by_type_periphery": {t: int(((donor == d) & (y == 1) & (ctype == t)).sum()) for t in WITHIN},
                   "by_type_core": {t: int(((donor == d) & (y == 0) & (ctype == t)).sum()) for t in WITHIN}}
               for d in sorted(set(donor))}
+    status_counts = input_missingness["identity_status_counts"]
+    identity_label = identity.identity_resolution_label(
+        status_counts,
+        input_missingness["identity_sensitivity_excluded_sample_count"],
+    )
     result = {
         "script": "157_trackA_composition_audit",
-        "label": ("EXPLORATORY, 7 donors, leave-one-donor-out. X is normalized (not raw counts). Cell types are "
-                  "atlas labels. Not a diagnostic or clinical result."),
+        "label": (f"EXPLORATORY, {len(counts)} GBM donors, leave-one-donor-out. X is normalized (not raw counts). "
+                  f"Cell types are atlas labels. {identity_label}. Not a diagnostic or clinical result."),
         "git_commit_at_run": commit, "input": str(H5AD.relative_to(PROJECT_ROOT)),
         "settings": {"max_per_group": args.max_per_group, "n_genes": args.n_genes, "seed": args.seed,
                      "model": "L2 logistic regression, C = 0.1, standardized features",
                      "within_min_cells_per_side": 50,
-                     "exclude_technical": args.exclude_technical, "n_genes_excluded": n_excluded},
+                     "exclude_technical": args.exclude_technical, "n_genes_excluded": n_excluded,
+                     "donor_manifest": str(MANIFEST.relative_to(PROJECT_ROOT)),
+                     "donor_identity_resolution": identity_label,
+                     "identity_sensitivity_policy": sensitivity_policy},
         "cells_used": counts,
         "input_missingness": input_missingness,
+        "run_provenance_hashes": input_missingness["verified_provenance_hashes"],
         "auc": s,
         "celltype_only_to_gene_excess_auc_ratio": (c - 0.5) / (g - 0.5) if g and g > 0.5 else None,
         "tests": tests,

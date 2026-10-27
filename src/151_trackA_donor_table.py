@@ -39,7 +39,7 @@ ASSAY_BY_SUFFIX = {"citeseq": "CITE-seq (inferred from ID suffix)"}
 ASSAY_DEFAULT = "not recorded in file (no assay column)"
 CSV_COLUMNS = ["sample_id", "donor_id", "alias_evidence", "diagnosis", "is_gbm", "source_fresh_frozen", "assay",
                "n_core", "n_periphery", "n_healthy", "age", "sex", "mgmt", "orig_ident", "donor_id_conservative",
-               "metadata_only_candidates"]
+               "metadata_only_candidates", "identity_status", "identity_issue_fields", "identity_evidence"]
 
 
 # ----------------------------------------------------------------------------------------------- alias logic
@@ -52,7 +52,11 @@ def strip_suffix(sample_id: str) -> tuple[str, str | None]:
 
 
 def donor_part(orig_ident: str) -> str:
-    return orig_ident.split(":", 1)[-1]
+    """Return a known donor part from orig.ident; missing sentinels return empty."""
+    if _is_missing_meta(orig_ident):
+        return ""
+    part = str(orig_ident).split(":", 1)[-1].strip()
+    return "" if _is_missing_meta(part) else part
 
 
 def _is_missing_meta(value) -> bool:
@@ -107,7 +111,9 @@ def resolve_donors(samples: pd.DataFrame):
     by_part: dict[str, list[str]] = {}
     for i in ids:
         for oi in s.loc[i, "orig_idents"]:
-            by_part.setdefault(donor_part(oi), []).append(i)
+            part = donor_part(oi)
+            if part:
+                by_part.setdefault(part, []).append(i)
     for part, members in by_part.items():
         members = sorted(set(members))
         if len(members) > 1:
@@ -190,6 +196,36 @@ def metadata_only_candidates(samples: pd.DataFrame, donor: pd.Series):
                 alias[i] = canon
     cons = donor.map(lambda x: alias.get(x, x))
     return groups, diag_conflicts, cons
+
+
+def identity_statuses(samples: pd.DataFrame, donor: pd.Series, merges: list, conflicts: list,
+                      candidate_groups: list) -> tuple[dict[str, str], dict[str, list[str]]]:
+    """Classify rule-based identities and explicitly flag every unresolved candidate sample."""
+    statuses = {sample_id: "assumed_single_sample_id" for sample_id in samples["sample_id"]}
+    issues = {sample_id: [] for sample_id in samples["sample_id"]}
+    for group in merges:
+        for sample_id in group["members"]:
+            statuses[sample_id] = "merged_by_alias_rule"
+    for group in conflicts:
+        fields = sorted(set(group["conflicting_fields"]) | set(group["missing_fields"]))
+        if group["conflicting_fields"] and group["missing_fields"]:
+            status = "unresolved_conflict_and_missing_metadata"
+        elif group["conflicting_fields"]:
+            status = "unresolved_metadata_conflict"
+        else:
+            status = "unresolved_missing_metadata"
+        for sample_id in group["members"]:
+            statuses[sample_id] = status
+            issues[sample_id] = fields
+
+    candidate_donors = {donor_id for group in candidate_groups for donor_id in group["donors"]}
+    donor_by_sample = donor.reindex(samples["sample_id"])
+    for sample_id, donor_id in donor_by_sample.items():
+        if donor_id in candidate_donors and statuses[sample_id] in {
+                "assumed_single_sample_id", "merged_by_alias_rule"}:
+            statuses[sample_id] = "unresolved_metadata_only_candidate"
+            issues[sample_id] = ["metadata_only_candidate"]
+    return statuses, issues
 
 
 # ----------------------------------------------------------------------------------------------- h5ad reading
@@ -294,6 +330,7 @@ def main() -> int:
 
     donor, evidence, merges, conflicts, links = resolve_donors(samples)
     cand_groups, cand_diag_conf, cons = metadata_only_candidates(samples, donor)
+    identity_status, identity_issue_fields = identity_statuses(samples, donor, merges, conflicts, cand_groups)
     cand_for = {}
     for g in cand_groups:
         for d_ in g["donors"]:
@@ -302,12 +339,16 @@ def main() -> int:
     out = samples.copy()
     out["donor_id"] = donor.to_numpy()
     out["alias_evidence"] = evidence.to_numpy()
-    out["is_gbm"] = out["diagnosis"].str.fullmatch("Glioblastoma")
+    out["is_gbm"] = out["diagnosis"].astype(str).str.strip().str.casefold().eq("glioblastoma")
     out["source_fresh_frozen"] = out["source"]
     out["assay"] = [ASSAY_BY_SUFFIX.get((strip_suffix(s)[1] or "").lower(), ASSAY_DEFAULT) for s in out["sample_id"]]
     out["orig_ident"] = out["orig_idents"].map(";".join)
     out["donor_id_conservative"] = cons.to_numpy()
     out["metadata_only_candidates"] = out["donor_id"].map(lambda d_: cand_for.get(d_, ""))
+    out["identity_status"] = out["sample_id"].map(identity_status)
+    out["identity_issue_fields"] = out["sample_id"].map(lambda sample_id: json.dumps(identity_issue_fields[sample_id]))
+    # Rule-based aliases and singleton IDs remain assumptions until a source crosswalk is checked.
+    out["identity_evidence"] = ""
     MANIFEST.parent.mkdir(parents=True, exist_ok=True)
     out[CSV_COLUMNS].to_csv(MANIFEST, index=False)
 
@@ -330,6 +371,12 @@ def main() -> int:
     summary = {
         "script": SCRIPT, "input_file": str(H5AD.relative_to(PROJECT_ROOT)).replace("\\", "/"),
         "input_sha256": sha256_file(H5AD), "input_size_bytes": H5AD.stat().st_size,
+        "manifest_sha256": sha256_file(MANIFEST),
+        "source_script_sha256": sha256_file(_Path(__file__)),
+        "dependency_sha256": {
+            "donor_cv": sha256_file(PROJECT_ROOT / "src" / "donor_cv.py"),
+            "leakage_checks": sha256_file(PROJECT_ROOT / "src" / "leakage_checks.py"),
+        },
         "n_cells": int(n_cells), "n_samples": int(len(samples)),
         "class_cell_counts": {k: int(v) for k, v in df["cls"].value_counts().items()},
         "n_donors_after_merge": primary["n_donors"],
@@ -337,6 +384,7 @@ def main() -> int:
         "primary_rule_donors": primary,
         "conservative_rule_donors": conservative,
         "merges_applied": merges, "alias_links_found": links, "conflicts": conflicts,
+        "identity_status_counts": {str(k): int(v) for k, v in out["identity_status"].value_counts().items()},
         "metadata_only_candidates_not_merged_in_donor_id": cand_groups,
         "metadata_only_diagnosis_conflicts": cand_diag_conf,
         "assay_column_present": has_assay,
@@ -344,6 +392,7 @@ def main() -> int:
         "raw_count_check": raw,
         "caveats": ["Raw-count check reads slices only (first/middle/end values and first 200 cells), not the full matrix.",
                     "Donor identity rests on ID suffixes, shared orig.ident and age/sex/MGMT metadata; no genotype check was done.",
+                    "assumed_single_sample_id is a rule-based assumption, not source-verified donor identity; alias merges are also rule-based.",
                     "No classifier was fit or scored."],
     }
     SUMMARY.parent.mkdir(parents=True, exist_ok=True)
