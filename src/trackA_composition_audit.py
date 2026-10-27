@@ -39,6 +39,18 @@ def _fit_score(Xtr, ytr, Xte, C=0.1, seed=0):
     return clf.predict_proba((Xte - mu) / sd)[:, 1]
 
 
+def _shuffle_within_groups(y, groups, rng):
+    """Shuffle labels within each group using a stable group iteration order."""
+    y, groups = np.asarray(y), np.asarray(groups)
+    if y.ndim != 1 or groups.ndim != 1 or len(y) != len(groups):
+        raise ValueError("labels and groups must be one-dimensional with equal length")
+    shuffled = y.copy()
+    for group in sorted(set(groups), key=str):
+        mask = groups == group
+        shuffled[mask] = rng.permutation(shuffled[mask])
+    return shuffled
+
+
 def _auc(y, s):
     return float(roc_auc_score(y, s)) if 0 < y.sum() < y.size else float("nan")
 
@@ -53,9 +65,7 @@ def lodo_audit(X, y, donor, ctype, n_genes=2000, min_cells=50, within_types=(), 
         tr, te = donor != d, donor == d
         ytr = y[tr].copy()
         if rng is not None:                      # shuffle labels within each training donor
-            for dd in set(donor[tr]):
-                m = donor[tr] == dd
-                ytr[m] = rng.permutation(ytr[m])
+            ytr = _shuffle_within_groups(ytr, donor[tr], rng)
         g = top_var_genes(X[tr], n_genes)
         row = {"n_test": int(te.sum())}
         row["celltype_only"] = _auc(y[te], _fit_score(oh[tr], ytr, oh[te], C))
@@ -85,11 +95,11 @@ def random_split_auc(X, y, n_genes=2000, seed=0, C=0.1):
     return float(np.mean(aucs))
 
 
-def sign_flip_p(diffs):
+def sign_flip_p(diffs) -> float | None:
     """Exact one-sided sign-flip p-value for mean(diffs) > 0 (all 2^n sign patterns)."""
     d = np.asarray([x for x in diffs if np.isfinite(x)], float)
     if d.size == 0:
-        return float("nan")
+        return None
     obs = d.mean()
     flips = np.array(list(itertools.product((1, -1), repeat=d.size)))
     return float(np.mean((flips * d).mean(1) >= obs - 1e-12))

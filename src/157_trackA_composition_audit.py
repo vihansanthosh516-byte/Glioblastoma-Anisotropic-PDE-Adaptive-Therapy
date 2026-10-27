@@ -40,9 +40,20 @@ WITHIN = ("microglia", "oligodendrocyte", "macrophage", "granulocyte", "tumor ce
 
 
 def _cat(obs, key):
+    """Decode an AnnData categorical column; code -1 becomes explicit ``None``."""
     g = obs[key]
     cats = np.array([c.decode() if isinstance(c, bytes) else c for c in g["categories"][:]])
-    return cats[g["codes"][:]]
+    codes = np.asarray(g["codes"][:])
+    if codes.ndim != 1 or not np.issubdtype(codes.dtype, np.integer):
+        raise ValueError(f"categorical codes for {key!r} must be a one-dimensional integer array")
+    invalid = (codes < -1) | (codes >= len(cats))
+    if invalid.any():
+        bad = codes[invalid]
+        raise ValueError(f"categorical codes for {key!r} contain out-of-range values: {bad[:5].tolist()}")
+    values = np.full(codes.shape, None, dtype=object)
+    valid = codes >= 0  # AnnData uses -1 as the standard missing-category code.
+    values[valid] = cats[codes[valid]]
+    return values
 
 
 def load(max_per_group, seed):
@@ -51,22 +62,33 @@ def load(max_per_group, seed):
         sample, cls, ctype = _cat(obs, "ID1"), _cat(obs, "class"), _cat(obs, "Major.celltype")
         rng = np.random.default_rng(seed)
         keep = []
-        donor_all = np.array([DONORS.get(s, "") for s in sample])
+        donor_all = np.array([DONORS.get(s, "") for s in sample], dtype=object)
+        missing_sample_rows = sum(value is None for value in sample)
+        missing_class_rows = sum(value is None for value in cls)
+        missing_celltype_in_analysis_rows = 0
         for d in sorted(set(DONORS.values())):
             for c in ("Core", "Periphery"):
                 idx = np.flatnonzero((donor_all == d) & (cls == c))
+                valid_celltype = np.array([value is not None for value in ctype[idx]], dtype=bool)
+                missing_celltype_in_analysis_rows += int((~valid_celltype).sum())
+                idx = idx[valid_celltype]
                 if idx.size > max_per_group:
                     idx = np.sort(rng.choice(idx, max_per_group, replace=False))
                 keep.append(idx)
         rows = np.sort(np.concatenate(keep))
+        if rows.size == 0:
+            raise ValueError("no Core/Periphery rows with known donor and cell type are eligible")
         X = f["X"]
         shape = tuple(X.attrs["shape"])
         M = sp.csr_matrix((X["data"][:], X["indices"][:], X["indptr"][:]), shape=shape)[rows]
         gi = f["var"]["_index"]
         raw = gi["values"][:] if isinstance(gi, h5py.Group) else gi[:]     # nullable-string encoding
         genes = np.array([g.decode() if isinstance(g, bytes) else g for g in raw])
+    diagnostics = {"missing_sample_id_rows": missing_sample_rows,
+                   "missing_class_label_rows": missing_class_rows,
+                   "eligible_core_periphery_rows_excluded_missing_celltype": missing_celltype_in_analysis_rows}
     return (M.toarray().astype(np.float32), (cls[rows] == "Periphery").astype(int),
-            donor_all[rows], ctype[rows], genes)
+            donor_all[rows], ctype[rows], genes, diagnostics)
 
 
 # Region and library are confounded (core and periphery are separate libraries per donor), so a
@@ -77,7 +99,7 @@ MG_HOMEOSTATIC = {"P2RY12", "TMEM119", "CX3CR1", "SALL1", "CSF1R", "SELPLG", "GP
 
 
 def top_genes(X, y, genes, n_genes, n_top=25):
-    """Genes-only microglia model on ALL donors (descriptive; not an evaluation)."""
+    """Descriptive all-donor logistic coefficient ranking; not differential expression."""
     from sklearn.linear_model import LogisticRegression
     g = ca.top_var_genes(X, n_genes)
     Z = (X[:, g] - X[:, g].mean(0)) / (X[:, g].std(0) + 1e-6)
@@ -91,8 +113,10 @@ def top_genes(X, y, genes, n_genes, n_top=25):
                 "ribo_mito": [x for x in lst if x.startswith(("RPL", "RPS", "MT-"))],
                 "homeostatic": [x for x in lst if x in MG_HOMEOSTATIC]}
 
-    return {"higher_in_periphery": up, "higher_in_core": down,
-            "flags_periphery": flag(up), "flags_core": flag(down)}
+    return {"positive_logistic_coefficient_genes": up,
+            "negative_logistic_coefficient_genes": down,
+            "positive_coefficient_gene_flags": flag(up),
+            "negative_coefficient_gene_flags": flag(down)}
 
 
 def summarize(res, keys):
@@ -115,7 +139,7 @@ def main():
     out_dir = OUT_DIR / ("exclude_technical" if args.exclude_technical else "")
     out_dir.mkdir(parents=True, exist_ok=True)
     t0 = time.time()
-    X, y, donor, ctype, genes = load(args.max_per_group, args.seed)
+    X, y, donor, ctype, genes, input_missingness = load(args.max_per_group, args.seed)
     t_load = time.time() - t0
     n_excluded = 0
     if args.exclude_technical:
@@ -169,8 +193,9 @@ def main():
                      "within_min_cells_per_side": 50,
                      "exclude_technical": args.exclude_technical, "n_genes_excluded": n_excluded},
         "cells_used": counts,
+        "input_missingness": input_missingness,
         "auc": s,
-        "share_of_gene_auc_from_composition": (c - 0.5) / (g - 0.5) if g and g > 0.5 else None,
+        "celltype_only_to_gene_excess_auc_ratio": (c - 0.5) / (g - 0.5) if g and g > 0.5 else None,
         "tests": tests,
         "shuffle_control": summarize(shuf, ["celltype_only", "genes", "within_microglia"]),
         "random_cell_split_auc_genes": rand,
@@ -178,9 +203,9 @@ def main():
         "microglia_top_genes_all_donors_descriptive": mg_genes,
         "runtime_s": {"load": t_load, "total": time.time() - t0},
     }
-    (out_dir / "audit_results.json").write_text(json.dumps(result, indent=2, default=float))
-    print(json.dumps({k: result[k] for k in ("share_of_gene_auc_from_composition", "tests",
-                                             "random_cell_split_auc_genes")}, indent=1, default=float))
+    (out_dir / "audit_results.json").write_text(json.dumps(result, indent=2, default=float, allow_nan=False))
+    print(json.dumps({k: result[k] for k in ("celltype_only_to_gene_excess_auc_ratio", "tests",
+                                             "random_cell_split_auc_genes")}, indent=1, default=float, allow_nan=False))
     print({k: v["mean"] for k, v in s.items()})
 
 

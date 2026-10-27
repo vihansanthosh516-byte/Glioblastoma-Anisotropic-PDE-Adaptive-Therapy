@@ -3,14 +3,20 @@ cell-mix signal must be found by the cell-type-only model and NOT within a cell 
 within-type signal must be found within type; shuffled labels must give AUC near 0.5."""
 from __future__ import annotations
 
+import importlib
+import os
+import subprocess
 import sys
 from pathlib import Path
 
 import numpy as np
+import pytest
 
 REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO / "src"))
 import trackA_composition_audit as ca  # noqa: E402
+
+script = importlib.import_module("src.157_trackA_composition_audit")
 
 
 def make(within_signal, n_donors=5, n=600, n_genes=60, seed=0):
@@ -61,3 +67,42 @@ def test_shuffle_control_is_null():
 def test_sign_flip_p():
     assert ca.sign_flip_p([1, 1, 1, 1, 1, 1, 1]) == 1 / 128
     assert ca.sign_flip_p([1, -1]) > 0.4
+    assert ca.sign_flip_p([np.nan, np.nan]) is None
+
+
+def test_shuffle_within_groups_is_deterministic_and_preserves_each_group():
+    y = np.array([0, 0, 1, 1, 0, 1, 1, 0])
+    groups = np.array(["b", "b", "b", "b", "a", "a", "a", "a"])
+    out1 = ca._shuffle_within_groups(y, groups, np.random.default_rng(17))
+    out2 = ca._shuffle_within_groups(y, groups, np.random.default_rng(17))
+    assert np.array_equal(out1, out2)
+    for group in np.unique(groups):
+        assert np.array_equal(np.sort(out1[groups == group]), np.sort(y[groups == group]))
+
+
+def test_shuffle_control_is_stable_across_python_hash_seeds():
+    code = (
+        "import json, numpy as np; "
+        "from src.trackA_composition_audit import _shuffle_within_groups; "
+        "y=np.tile([0,1,1,0,1,0], 6); "
+        "g=np.repeat(['donor-z','donor-a','donor-m'], 12); "
+        "print(json.dumps(_shuffle_within_groups(y,g,np.random.default_rng(7)).tolist()))"
+    )
+    outputs = []
+    for hash_seed in ("1", "987654"):
+        env = os.environ.copy()
+        env["PYTHONHASHSEED"] = hash_seed
+        outputs.append(subprocess.check_output([sys.executable, "-c", code], cwd=REPO,
+                                               env=env, text=True).strip())
+    assert outputs[0] == outputs[1]
+
+
+def test_categorical_decoder_rejects_missing_or_out_of_range_codes():
+    obs = {"class": {"categories": np.array([b"Core", b"Periphery"]),
+                     "codes": np.array([0, 1], dtype=np.int8)}}
+    assert script._cat(obs, "class").tolist() == ["Core", "Periphery"]
+    obs["class"]["codes"] = np.array([0, -1], dtype=np.int8)
+    assert script._cat(obs, "class").tolist() == ["Core", None]
+    obs["class"]["codes"] = np.array([0, 2], dtype=np.int8)
+    with pytest.raises(ValueError, match="out-of-range"):
+        script._cat(obs, "class")

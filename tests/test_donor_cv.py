@@ -54,6 +54,27 @@ def test_grouped_folds_partition_donors():
         dc.grouped_folds([0, 1], np.array(["a", None], dtype=object), 2, seed=1)
 
 
+def test_grouped_folds_supports_leave_one_donor_out_and_checks_lengths():
+    _, y, groups = synth(n_donors=6, cells=10)
+    folds = dc.grouped_folds(y, groups, "lodo", seed=1)
+    assert len(folds) == 6
+    assert all(len(np.unique(groups[test])) == 1 for _, test in folds)
+    with pytest.raises(ValueError, match="equal length"):
+        dc.grouped_folds([0, 1], ["a"], 2, seed=1)
+
+
+def test_nested_cv_supports_leave_one_donor_out_at_both_levels():
+    X, y, groups = synth(n_donors=6, cells=20)
+
+    def fit_predict(Xa, ya, Xb, hp, seed):
+        return (Xb[:, 1] > 0.5).astype(int)
+
+    result = dc.nested_grouped_cv(X, y, groups, [None], fit_predict, acc,
+                                  outer="lodo", inner="lodo", seed=4)
+    assert len(result) == 6
+    assert all(len(row["test_donors"]) == 1 for row in result)
+
+
 def test_nested_cv_never_fits_on_outer_test_rows():
     X, y, g = synth()
     calls = []
@@ -88,6 +109,43 @@ def test_nested_cv_selects_best_inner_hp():
     assert all(r["outer_score"] > 0.8 for r in res)
 
 
+def test_nested_cv_can_minimize_lower_is_better_score():
+    X, y, g = synth(n_donors=8, cells=20)
+
+    def fit_predict(Xa, ya, Xb, hp, seed):
+        pred = (Xb[:, 1] > 0.5).astype(int)
+        return 1 - pred if hp == "bad" else pred
+
+    def error(y_true, y_pred):
+        return float(np.mean(np.asarray(y_true) != np.asarray(y_pred)))
+
+    res = dc.nested_grouped_cv(X, y, g, ["bad", "good"], fit_predict, error,
+                               outer=4, inner=3, seed=2, score_direction="minimize")
+    assert all(row["selected_hp"] == "good" for row in res)
+    assert all(row["score_direction"] == "minimize" for row in res)
+
+
+def test_donor_macro_score_weights_donors_equally():
+    y = np.array([1, 1, 0, 0, 0, 0])
+    pred = np.array([0, 0, 0, 0, 0, 0])
+    groups = np.array(["small", "small", "large", "large", "large", "large"])
+    macro, by_donor = dc._score_fold(y, pred, groups, acc, donor_macro=True)
+    assert macro == 0.5
+    assert by_donor == {"large": 1.0, "small": 0.0}
+
+
+def test_nested_cv_enforces_minimum_two_class_training_donors():
+    donors = np.repeat([f"D{i}" for i in range(6)], 8)
+    y = np.repeat(np.arange(6) % 2, 8)  # every donor has only one class
+    X = np.column_stack([np.arange(len(y)), y]).astype(float)
+
+    def fit_predict(Xa, ya, Xb, hp, seed):
+        return np.zeros(len(Xb), dtype=int)
+
+    with pytest.raises(ValueError, match="two-class donors"):
+        dc.nested_grouped_cv(X, y, donors, [None], fit_predict, acc, outer=3, inner=2)
+
+
 def test_donor_lookup_does_not_transfer_across_grouped_folds():
     """A model that memorises donor -> label gets near-perfect accuracy if donors leak, and chance under
     donor-grouped CV. Here each donor has one label, so donor identity fully predicts the label."""
@@ -100,7 +158,8 @@ def test_donor_lookup_does_not_transfer_across_grouped_folds():
         table = dict(zip(Xa[:, 1], ya))
         return np.array([table.get(d, 0) for d in Xb[:, 1]])
 
-    res = dc.nested_grouped_cv(X, y, donors.astype(str), [None], lookup, acc, outer=5, inner=2, seed=0)
+    res = dc.nested_grouped_cv(X, y, donors.astype(str), [None], lookup, acc, outer=5, inner=2, seed=0,
+                               min_train_two_class_donors=0)
     assert np.mean([r["outer_score"] for r in res]) <= 0.6
 
 
