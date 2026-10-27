@@ -40,7 +40,16 @@ def test_visit_file_matching_does_not_confuse_timepoint_one_with_ten(tmp_path: P
     visit = RUNNER.ClinicalVisit("case", 1, "1", "BraTS-case-1", None)
     paths = []
     for visit_number in (1, 10):
-        for suffix in ("t1n", "t1c", "t2w", "t2f", "seg"):
+        for suffix in (
+            "T1pre",
+            "T1post",
+            "T2",
+            "FLAIR",
+            "BraTS_tumor_seg",
+            "enhancing_cellular_tumor_seg",
+            "non_enhancing_cellular_tumor_seg",
+            "total_cellular_tumor_seg",
+        ):
             paths.append(tmp_path / f"case_{visit_number}_BraTS-case-{visit_number}_{suffix}.nii.gz")
 
     bundle = RUNNER._files_for_visit(paths, visit)
@@ -48,6 +57,16 @@ def test_visit_file_matching_does_not_confuse_timepoint_one_with_ten(tmp_path: P
     assert bundle is not None
     assert len(bundle.paths) == 5
     assert all("case_1_" in path.name and "case_10_" not in path.name for path in bundle.paths.values())
+    assert bundle.paths["t2w"].name.endswith("_T2.nii.gz")
+    assert bundle.paths["seg"].name.endswith("_BraTS_tumor_seg.nii.gz")
+
+
+def test_ucsd_standard_brats_segmentation_excludes_cellular_masks() -> None:
+    assert RUNNER._modality(Path("case_T2.nii.gz")) == "t2w"
+    assert RUNNER._modality(Path("case_BraTS_tumor_seg.nii.gz")) == "seg"
+    assert RUNNER._modality(Path("case_enhancing_cellular_tumor_seg.nii.gz")) is None
+    assert RUNNER._modality(Path("case_non_enhancing_cellular_tumor_seg.nii.gz")) is None
+    assert RUNNER._modality(Path("case_total_cellular_tumor_seg.nii.gz")) is None
 
 
 def test_segmentation_loader_rejects_fractional_or_unknown_codes(tmp_path: Path) -> None:

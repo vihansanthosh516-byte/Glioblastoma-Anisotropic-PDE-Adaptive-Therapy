@@ -193,16 +193,20 @@ def _nifti_stem(path: Path) -> str:
 
 
 def _modality(path: Path) -> str | None:
-    tokens = set(re.split(r"[^a-z0-9]+", _nifti_stem(path)))
+    stem = _nifti_stem(path)
+    tokens = set(re.split(r"[^a-z0-9]+", stem))
     if tokens & {"t1n", "t1pre", "t1w"}:
         return "t1n"
     if tokens & {"t1c", "t1ce", "t1gd", "t1post"}:
         return "t1c"
-    if tokens & {"t2w"}:
+    if tokens & {"t2", "t2w"}:
         return "t2w"
     if tokens & {"t2f", "flair"}:
         return "t2f"
-    if tokens & {"seg", "segmentation"}:
+    # UCSD-PTGBM also supplies cellular-tumor segmentations whose labels use
+    # information across visits. The frozen endpoint requires the standard
+    # BraTS compartment mask only.
+    if stem.endswith("_brats_tumor_seg") or stem == "brats_tumor_seg":
         return "seg"
     return None
 
