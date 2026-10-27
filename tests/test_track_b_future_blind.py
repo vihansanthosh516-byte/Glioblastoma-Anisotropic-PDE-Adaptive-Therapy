@@ -176,6 +176,31 @@ def test_signed_runner_labels_realized_interval_as_conditional_horizon():
         assert "not a pre-schedule forecast" in horizon["deployment_interpretation"]
 
 
+def test_signed_evaluation_completes_on_synthetic_patient_intervals():
+    intervals = []
+    for index in range(6):
+        previous, current, affine, _, future, parameters = _synthetic_visits()
+        intervals.append(SIGNED._interval_features(
+            f"SYNTHETIC-{index}",
+            previous,
+            current,
+            future,
+            affine,
+            parameters,
+            f"SYNTHETIC-{index}:2-3",
+            previous_interval_days=30.0,
+            forecast_interval_days=45.0,
+            perturbation_radius_mm=1.0,
+        ))
+
+    result = SIGNED.evaluate(intervals, n_splits=3, seed=260)
+
+    assert result["n_patients"] == 6
+    assert result["n_intervals"] == 6
+    assert len(result["folds"]) == 3
+    assert len(result["patient_bootstrap_contrasts"]) == 23
+
+
 def test_output_input_paths_do_not_expose_external_user_paths(tmp_path: Path):
     repo = tmp_path / "synthetic-repo"
     repo.mkdir()
