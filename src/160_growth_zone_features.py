@@ -117,6 +117,13 @@ def validate_visit(visit: VisitVolume, name: str = "visit") -> tuple[dict[str, n
     spacing = np.linalg.norm(affine[:3, :3], axis=0)
     if np.any(spacing <= 0) or not np.all(np.isfinite(spacing)):
         raise ValueError(f"{name} has invalid voxel spacing")
+    directions = affine[:3, :3] / spacing[np.newaxis, :]
+    axis_gram = directions.T @ directions
+    if not np.allclose(axis_gram, np.eye(3), rtol=0.0, atol=1e-5):
+        raise ValueError(
+            f"{name} affine has non-orthogonal voxel axes; "
+            "distance and graph operators require an orthogonal grid"
+        )
     return images, labels, affine, spacing
 
 
