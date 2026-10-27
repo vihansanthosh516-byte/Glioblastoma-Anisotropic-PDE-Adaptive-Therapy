@@ -83,18 +83,66 @@ def _rk4(S, R, p, u, dt):
             R + dt / 6.0 * (k1r + 2 * k2r + 2 * k3r + k4r))
 
 
-def run_cycle(S, R, p, treat, t0, dt=DT, prog_level=None, ttp=None):
+# Event-time mode (2026-10-26, audit C1). "refine": a step that crosses the progression level
+# is re-solved by bisection on a single RK4 sub-step from the start of that step, so the
+# reported time is the RK4 crossing time, not the next grid point. "grid": the old rule
+# (first grid point at or above the level), kept only to reproduce outputs of scripts 150-158.
+EVENT_MODE = "refine"
+_BISECT_ITERS = 40
+
+
+def _segments(dt):
+    """Steps for the on (0-5 d) and off (5-28 d) parts. Each part gets a whole number of equal
+    steps no longer than dt, so the treatment switch always falls on a step boundary. For
+    dt = 0.25 this is 20 + 92 steps, identical to the earlier single-grid loop."""
+    n_on = int(np.ceil(COURSE_DAYS / dt - 1e-9))
+    n_off = int(np.ceil((CYCLE_DAYS - COURSE_DAYS) / dt - 1e-9))
+    return [(n_on, COURSE_DAYS / n_on, True), (n_off, (CYCLE_DAYS - COURSE_DAYS) / n_off, False)]
+
+
+def _crossing_time(S, R, p, u, h, level):
+    """Bisection for tau in (0, h] with B(tau) = level, B from one RK4 step of size tau."""
+    lo, hi = np.zeros_like(h), h.copy()
+    for _ in range(_BISECT_ITERS):
+        mid = 0.5 * (lo + hi)
+        s, r = _rk4(S, R, p, u, mid)
+        above = (s + r) >= level
+        hi = np.where(above, mid, hi)
+        lo = np.where(above, lo, mid)
+    return hi
+
+
+def _take(x, m):
+    x = np.asarray(x)
+    return x[m] if x.ndim and x.shape[0] == m.shape[0] else x
+
+
+def run_cycle(S, R, p, treat, t0, dt=None, prog_level=None, ttp=None):
     """Integrate one 28-day cycle. `treat` broadcasts against S. If `prog_level` is given,
-    record in `ttp` (NaN = not yet) the first step time where S + R >= prog_level."""
-    n_steps = int(round(CYCLE_DAYS / dt))
-    on_steps = int(round(COURSE_DAYS / dt))
+    record in `ttp` (NaN = not yet) the first time S + R reaches prog_level (see EVENT_MODE).
+    dt=None uses the module value DT at call time."""
+    dt = DT if dt is None else dt
     treat = np.asarray(treat, float)
-    for i in range(n_steps):
-        u = treat if i < on_steps else 0.0
-        S, R = _rk4(S, R, p, u, dt)
-        if prog_level is not None:
-            hit = np.isnan(ttp) & (S + R >= prog_level)
-            ttp[hit] = t0 + (i + 1) * dt
+    t = t0
+    for n, h, on in _segments(dt):
+        u = treat if on else 0.0
+        for _ in range(n):
+            S1, R1 = _rk4(S, R, p, u, h)
+            if prog_level is not None:
+                hit = np.isnan(ttp) & (S1 + R1 >= prog_level)
+                if hit.any():
+                    if EVENT_MODE == "grid":
+                        ttp[hit] = t + h
+                    else:
+                        S0b, R0b = np.broadcast_arrays(S, R, ttp)[:2]
+                        pp = {k: _take(np.broadcast_to(v, ttp.shape) if np.ndim(v) else v, hit)
+                              for k, v in p.items()}
+                        ub = _take(np.broadcast_to(u, ttp.shape), hit) if np.ndim(u) else u
+                        lv = _take(np.broadcast_to(prog_level, ttp.shape), hit)
+                        tau = _crossing_time(S0b[hit], R0b[hit], pp, ub, np.full(int(hit.sum()), h), lv)
+                        ttp[hit] = t + tau
+            S, R = S1, R1
+            t += h
     return S, R
 
 
@@ -131,8 +179,9 @@ def _from_z(z, ranges=RANGES):
 class ParticleFilter:
     """Batch of independent filters, one per scenario (axis 0), P particles (axis 1)."""
 
-    def __init__(self, sigma, n_particles, rng, h=0.90, dt=DT, ranges=RANGES):
-        self.N, self.P, self.rng, self.h, self.dt = len(sigma), n_particles, rng, h, dt
+    def __init__(self, sigma, n_particles, rng, h=0.90, dt=None, ranges=RANGES):
+        self.N, self.P, self.rng, self.h = len(sigma), n_particles, rng, h
+        self.dt = DT if dt is None else dt
         self.ranges = ranges
         self.sigma = np.asarray(sigma, float)[:, None]
         u = rng.random((self.N, self.P, len(PARAMS)))

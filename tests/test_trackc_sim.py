@@ -50,6 +50,41 @@ def test_step_size_converged():
     assert np.max(np.abs(a[0] + a[1] - b[0] - b[1]) / (b[0] + b[1])) < 1e-4
 
 
+def test_switch_boundary_exact_when_dt_does_not_divide_course():
+    # dt = 0.3 does not divide 5 days; the on/off switch must still land on a step boundary
+    scen = tc.draw_scenarios(32, seed=19)
+    S0, R0 = (1 - scen["f0"]) * scen["B0"], scen["f0"] * scen["B0"]
+    a = tc.run_cycle(S0, R0, scen, np.ones(32), 0.0, dt=0.3)
+    b = tc.run_cycle(S0, R0, scen, np.ones(32), 0.0, dt=0.01)
+    assert np.max(np.abs(a[0] + a[1] - b[0] - b[1]) / (b[0] + b[1])) < 1e-4
+
+
+def test_event_time_matches_independent_solver():
+    import trackc_oracle as to
+    import trackc_reference as ref
+    scen = tc.draw_scenarios(12, seed=20)
+    scheds = to.periodic_schedules(qs=[1, 4]).tolist() + [[0] * tc.N_CYCLES]
+    for i in range(12):
+        p = to._scalar(scen, i)
+        ours = to.rollout(p, scheds)
+        for s, t in zip(scheds, ours):
+            assert abs(t - ref.reference_ttp(p, s)) < 0.01
+
+
+def test_grid_mode_is_the_old_rounded_rule():
+    import trackc_oracle as to
+    scen = tc.draw_scenarios(20, seed=21)
+    sched = to.periodic_schedules(qs=[2])
+    try:
+        tc.EVENT_MODE = "grid"
+        grid = np.array([to.rollout(to._scalar(scen, i), sched)[0] for i in range(20)])
+    finally:
+        tc.EVENT_MODE = "refine"
+    fine = np.array([to.rollout(to._scalar(scen, i), sched)[0] for i in range(20)])
+    assert np.allclose(grid / tc.DT, np.round(grid / tc.DT))
+    assert (grid >= fine - 1e-9).all() and (grid - fine <= tc.DT + 1e-9).all()
+
+
 def test_endpoint_reachable_without_treatment():
     scen = tc.draw_scenarios(400, seed=2)
     out = tc.simulate(scen, NoTreat(), seed=3)
