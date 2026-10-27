@@ -45,6 +45,26 @@ def test_refuse_merge_on_conflict():
     assert ev["A1citeseq"].startswith("NOT merged")
 
 
+@pytest.mark.parametrize("missing", [None, float("nan"), pd.NA, "", " ", "None", "nan", "N/A", "Unknown"])
+def test_matching_missing_metadata_never_confirms_suffix_alias(missing):
+    donor, ev, merges, blocked, _ = run([S("A1", age=missing), S("A1citeseq", age=missing)])
+    assert donor["A1"] != donor["A1citeseq"]
+    assert merges == [] and len(blocked) == 1
+    assert blocked[0]["missing_fields"] == ["age"]
+    assert blocked[0]["conflicting_fields"] == {}
+    assert "missing metadata" in ev["A1citeseq"]
+
+
+def test_matching_missing_metadata_never_confirms_shared_orig_ident():
+    donor, _, merges, blocked, _ = run([
+        S("A1", oi=["core:shared"], age="None"),
+        S("B2", oi=["periphery:shared"], age="None"),
+    ])
+    assert donor["A1"] != donor["B2"]
+    assert merges == [] and len(blocked) == 1
+    assert blocked[0]["missing_fields"] == ["age"]
+
+
 @pytest.mark.parametrize("field,val", [("sex", "Female"), ("mgmt", "unmethylated"), ("dx", "Meningioma")])
 def test_refuse_on_each_field(field, val):
     kw = {"dx": val} if field == "dx" else {field: val}
@@ -64,6 +84,17 @@ def test_metadata_only_collision_not_merged_but_flagged():
     groups, diag_conf, cons = dt.metadata_only_candidates(samples, donor)
     assert len(groups) == 1 and groups[0]["donors"] == ["A1", "B2"] and diag_conf == []
     assert cons["A1"] == cons["B2"]
+
+
+@pytest.mark.parametrize("missing", ["None", "Unknown", ""])
+def test_metadata_only_missing_values_do_not_create_conservative_links(missing):
+    samples = pd.DataFrame([S("A1", age=missing), S("B2", age=missing), S("C3", age="64")])
+    donor, *_ = dt.resolve_donors(samples)
+    groups, diag_conf, cons = dt.metadata_only_candidates(samples, donor)
+    assert groups == [] and diag_conf == []
+    assert cons["A1"] != cons["B2"]
+    assert cons["A1"] != cons["C3"]
+    assert cons["B2"] != cons["C3"]
 
 
 def test_metadata_only_diagnosis_conflict_not_merged():

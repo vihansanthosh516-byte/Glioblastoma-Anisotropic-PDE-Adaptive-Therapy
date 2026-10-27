@@ -33,6 +33,8 @@ SUMMARY = PROJECT_ROOT / "output" / "trackA_donor_table" / "summary.json"
 SCRIPT = "151_trackA_donor_table"
 SUFFIXES = ("accutase", "citeseq")
 META_FIELDS = ("diagnosis", "age", "sex", "mgmt")
+MISSING_META_TOKENS = {"", "na", "n/a", "nan", "none", "null", "<na>", "unknown", "not known",
+                       "not available", "not recorded", "not reported", "missing"}
 ASSAY_BY_SUFFIX = {"citeseq": "CITE-seq (inferred from ID suffix)"}
 ASSAY_DEFAULT = "not recorded in file (no assay column)"
 CSV_COLUMNS = ["sample_id", "donor_id", "alias_evidence", "diagnosis", "is_gbm", "source_fresh_frozen", "assay",
@@ -53,8 +55,30 @@ def donor_part(orig_ident: str) -> str:
     return orig_ident.split(":", 1)[-1]
 
 
-def _meta_conflicts(rows: list[pd.Series]) -> dict[str, list[str]]:
-    return {f: sorted({str(r[f]) for r in rows}) for f in META_FIELDS if len({str(r[f]) for r in rows}) > 1}
+def _is_missing_meta(value) -> bool:
+    """Return true for nulls and common string encodings of missing metadata."""
+    try:
+        is_null = pd.isna(value)
+        if isinstance(is_null, (bool, np.bool_)) and is_null:
+            return True
+    except (TypeError, ValueError):
+        pass
+    if isinstance(value, bytes):
+        value = value.decode("utf-8", errors="replace")
+    return str(value).strip().casefold() in MISSING_META_TOKENS
+
+
+def _meta_issues(rows: list[pd.Series]) -> tuple[dict[str, list[str]], list[str]]:
+    """Return conflicting and missing fields; missing metadata cannot confirm identity."""
+    conflicting, missing = {}, []
+    for field in META_FIELDS:
+        values = [row[field] for row in rows]
+        known = {str(value).strip() for value in values if not _is_missing_meta(value)}
+        if any(_is_missing_meta(value) for value in values):
+            missing.append(field)
+        if len(known) > 1:
+            conflicting[field] = sorted(known)
+    return conflicting, missing
 
 
 def _meta_str(r: pd.Series) -> str:
@@ -116,11 +140,17 @@ def resolve_donors(samples: pd.DataFrame):
         rows = [s.loc[m] for m in members]
         why = [r for k, rs in reasons.items() if k <= set(members) for r in rs]
         links.append({"members": members, "reasons": why})
-        conf = _meta_conflicts(rows)
-        if conf:
-            conflicts.append({"members": members, "reasons": why, "conflicting_fields": conf})
+        conf, missing = _meta_issues(rows)
+        if conf or missing:
+            conflicts.append({"members": members, "reasons": why, "conflicting_fields": conf,
+                              "missing_fields": missing})
+            issue_text = []
+            if conf:
+                issue_text.append(f"conflicting metadata {conf}")
+            if missing:
+                issue_text.append(f"missing metadata {missing}")
             for m in members:
-                evidence[m] = f"NOT merged: candidate alias of {members} but metadata conflict {conf}"
+                evidence[m] = f"NOT merged: candidate alias of {members} but " + "; ".join(issue_text)
             continue
         canon = members[0]
         ev = "; ".join(why) + f"; metadata agree ({_meta_str(rows[0])})"
@@ -137,10 +167,12 @@ def resolve_donors(samples: pd.DataFrame):
 
 def metadata_only_candidates(samples: pd.DataFrame, donor: pd.Series):
     """Post-merge donors sharing age, sex, MGMT and diagnosis but not linked by an alias rule.
-    Returns (candidate groups list, conservative donor Series). Groups with a diagnosis conflict are listed in
-    `diag_conflicts` and not merged."""
+    Missing metadata is not identity evidence. Returns (candidate groups list, conservative donor Series).
+    Groups with a diagnosis conflict are listed in `diag_conflicts` and not merged."""
     d = samples.assign(donor_id=donor.reindex(samples["sample_id"]).to_numpy())
     one = d.drop_duplicates("donor_id")
+    complete = one[list(META_FIELDS)].apply(lambda col: col.map(lambda value: not _is_missing_meta(value)))
+    one = one.loc[complete.all(axis=1)]
     groups, diag_conflicts, alias = [], [], {}
     for key, g in one.groupby(["age", "sex", "mgmt"], observed=True):
         if g["donor_id"].nunique() < 2:
