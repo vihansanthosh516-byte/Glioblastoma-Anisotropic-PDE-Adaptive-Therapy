@@ -261,6 +261,7 @@ def run_exploratory(args: argparse.Namespace) -> dict[str, Any]:
         "original_locked_marker_sha256": output_original_sha,
         "original_locked_output_preserved": True,
         "cohort_flow": flow,
+        "technical_failures_before_scoring": failed_pairs,
         "technical_failure_policy": "exclude origins with any nonfinite or unusable robust MRI normalization; no missing-modality fallback",
         "ucsd_all_selected_path_size_manifest_sha256": all_path_manifest,
         "ucsd_scored_path_size_manifest_sha256": path_manifest,
@@ -290,6 +291,11 @@ def run_exploratory(args: argparse.Namespace) -> dict[str, Any]:
             records.append(_patient_record(pair_order, sample, scores, primary_comparator))
         except Exception as exc:
             scoring_failures.append({"pair_order": pair_order, "failure_type": type(exc).__name__})
+        _update_marker(
+            status="exploratory_scoring_in_progress",
+            pairs_processed=position,
+            scoring_technical_failures=scoring_failures,
+        )
         print(f"processed eligible pair {position}/{len(eligible_pairs)}", flush=True)
 
     if RUNNER._hash_files(ucsd_source_paths, args.ucsd_root) != ucsd_content_hash:
@@ -305,6 +311,7 @@ def run_exploratory(args: argparse.Namespace) -> dict[str, Any]:
     if RUNNER._sha256(ORIGINAL_MARKER) != output_original_sha:
         raise RuntimeError("the original locked-test marker changed during exploratory scoring")
     if not records:
+        _update_marker(status="exploratory_scoring_failed", pairs_processed=len(eligible_pairs))
         raise RuntimeError("no eligible pairs produced a score; preserve the exploratory marker and investigate")
 
     patient_differences = [
@@ -338,7 +345,9 @@ def run_exploratory(args: argparse.Namespace) -> dict[str, Any]:
         "exploratory_reason": "the original locked UCSD run accessed target labels for at least five pairs before stopping and wrote no aggregate result",
         "source": {
             "dataset": "UCSD-PTGBM v3",
+            "license": "CC BY 4.0 per the current TCIA collection page",
             "dataset_doi": "10.7937/fwv2-dt74",
+            "dataset_article": "Gagnon et al., Scientific Data (2025), doi:10.1038/s41597-025-06499-z",
             "clinical_workbook_sha256": RUNNER._sha256(args.ucsd_clinical),
             "development_patient_manifest_sha256": patient_manifest_sha256,
             "development_pair_manifest_sha256": pair_manifest_sha256,
