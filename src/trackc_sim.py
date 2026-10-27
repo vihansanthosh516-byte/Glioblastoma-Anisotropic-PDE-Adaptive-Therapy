@@ -442,11 +442,49 @@ def paired_bootstrap_cvar(a, b, n_boot=2000, seed=0, alpha=0.10):
 
 
 def evaluate(scen, policy, seeds):
-    """Average capped TTP over noise replicates, per scenario."""
+    """Capped TTP per scenario averaged over noise replicates ("ttp"), plus the unaveraged
+    replicate x scenario array ("ttp_reps", shape (len(seeds), N)) and max courses used."""
     runs = [simulate(scen, policy, s) for s in seeds]
-    return {"ttp": np.mean([r["ttp"] for r in runs], 0),
+    reps = np.stack([r["ttp"] for r in runs])
+    return {"ttp": reps.mean(0), "ttp_reps": reps,
             "capped_frac": float(np.mean([r["capped"].mean() for r in runs])),
-            "courses": np.mean([r["courses"] for r in runs], 0)}
+            "courses": np.mean([r["courses"] for r in runs], 0),
+            "max_courses": int(max(r["courses"].max() for r in runs))}
+
+
+# ---------------------------------------------------------------- estimands (audit C2, 2026-10-26)
+# Two different lower-tail quantities; name the one you report.
+#   cvar_scenario_mean: CVaR_alpha over scenarios of the noise-averaged TTP. This is what
+#                       scripts 150-158 report as "cvar10".
+#   cvar_joint:         CVaR_alpha over all scenario x noise-replicate outcomes.
+def cvar_scenario_mean(reps, alpha=0.10):
+    return cvar_lower(np.asarray(reps).mean(0), alpha)
+
+
+def cvar_joint(reps, alpha=0.10):
+    return cvar_lower(np.ravel(reps), alpha)
+
+
+def hier_bootstrap_diff(a_reps, b_reps, stat, n_boot=2000, seed=0):
+    """Paired two-stage bootstrap of stat(a) - stat(b) for (n_rep, N) outcome arrays.
+    Stage 1 resamples scenarios; stage 2 resamples noise replicates within each drawn
+    scenario. Both arms get the same indices, since replicate k uses the same noise seed in
+    every arm. With few replicates stage 2 is crude; report the replicate count."""
+    a, b = np.asarray(a_reps, float), np.asarray(b_reps, float)
+    n_rep, n = a.shape
+    rng = np.random.default_rng(seed)
+    diffs = np.empty(n_boot)
+    for i in range(n_boot):
+        sc = np.broadcast_to(rng.integers(0, n, n), (n_rep, n))
+        rp = rng.integers(0, n_rep, (n_rep, n))
+        diffs[i] = stat(a[rp, sc]) - stat(b[rp, sc])
+    return float(stat(a) - stat(b)), np.percentile(diffs, [2.5, 97.5]).tolist()
+
+
+def score_spec_reps(args):
+    """Worker entry point keeping replicates: (spec, scen, seeds) -> (spec, (n_rep, N) TTP)."""
+    spec, scen, seeds = args
+    return spec, evaluate(scen, make_policy(spec), seeds)["ttp_reps"]
 
 
 def make_policy(spec):

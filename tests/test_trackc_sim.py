@@ -202,6 +202,32 @@ def test_wrong_model_reading_options():
             assert 0.04 < y0.std() < 0.06
 
 
+def test_cvar_estimands_differ_as_defined():
+    # scenario 0 is bad in one replicate only; joint CVaR sees it, scenario-mean CVaR halves it
+    reps = np.array([[0.0] + [100.0] * 9, [100.0] * 10])
+    assert tc.cvar_joint(reps, 0.1) == pytest.approx((0 + 100) / 2)        # lowest 2 of 20
+    assert tc.cvar_scenario_mean(reps, 0.1) == pytest.approx(50.0)          # lowest 1 of 10
+    reps2 = np.array([[0.0] * 2 + [100.0] * 18])
+    assert tc.cvar_joint(reps2, 0.1) == pytest.approx(0.0)
+
+
+def test_hier_bootstrap_paired_and_shift():
+    rng = np.random.default_rng(22)
+    a = rng.normal(500, 100, (3, 200))
+    d, ci = tc.hier_bootstrap_diff(a, a, tc.cvar_joint, n_boot=200)
+    assert d == 0 and ci == [0.0, 0.0]
+    d, ci = tc.hier_bootstrap_diff(a + 5, a, lambda x: float(np.mean(x)), n_boot=200)
+    assert d == pytest.approx(5) and ci[0] == pytest.approx(5) and ci[1] == pytest.approx(5)
+
+
+def test_evaluate_keeps_replicates():
+    scen = tc.draw_scenarios(10, seed=23)
+    out = tc.evaluate(scen, tc.Periodic(4), [1, 2, 3])
+    assert out["ttp_reps"].shape == (3, 10)
+    assert np.allclose(out["ttp_reps"].mean(0), out["ttp"])
+    assert out["max_courses"] <= tc.BUDGET
+
+
 def test_cvar_lower():
     assert tc.cvar_lower(np.arange(1, 11), 0.1) == pytest.approx(1.0)
     x = np.arange(15.0)
