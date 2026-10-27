@@ -6,6 +6,10 @@ MRI-only arms. A bounded shared-frailty count law constrains all probability
 maps. MU-Glioma-Post has been examined in earlier project work, so results are
 exploratory even with patient-grouped folds. Endpoints are supplied mask
 transitions, not verified biological tumor growth or response.
+
+Count predictions condition on the realized next-scan interval from the
+retrospective manifest. They are not pre-schedule forecasts unless the
+interval is supplied at forecast origin or replaced by a prespecified horizon.
 """
 from __future__ import annotations
 
@@ -32,6 +36,22 @@ BASE_RUNNER_PATH = ROOT / "src/162_growth_zone_cv.py"
 TRANSITIONS_PATH = ROOT / "src/163_signed_transition.py"
 HEADS_PATH = ROOT / "src/164_signed_spatial_heads.py"
 DEFAULT_OUTPUT_DIR = ROOT / "output"
+FORECAST_HORIZON = {
+    "estimand": "retrospective prediction conditional on realized next-scan interval",
+    "interval_source": "actual future interval in the chained scan manifest",
+    "known_at_forecast_origin": False,
+    "deployment_interpretation": "not a pre-schedule forecast; supply the interval at origin or prespecify a fixed horizon",
+}
+
+
+def _logical_input_path(path: Path, repo_root: Path = ROOT) -> str:
+    """Describe an input by repo-relative name without exposing external paths."""
+    try:
+        resolved = Path(path).expanduser().resolve()
+        relative = resolved.relative_to(Path(repo_root).resolve())
+    except (OSError, RuntimeError, ValueError):
+        return "external-input"
+    return relative.as_posix() or "."
 
 
 def _load_module(alias: str, path: Path) -> Any:
@@ -68,7 +88,7 @@ REMOVAL_FEATURES = (
 
 @dataclass(frozen=True)
 class RawSignedInterval:
-    """Compact forecast-origin features and one future target interval."""
+    """Origin-only predictors, future targets, and realized next-scan gap."""
 
     sample_id: str
     target_interval_id: str
@@ -260,6 +280,33 @@ def _unique_count_observations(intervals: Sequence[RawSignedInterval]) -> list[A
             raise ValueError("duplicate patient transition has conflicting count observations")
         by_interval[row.target_interval_id] = row.target_count
     return list(by_interval.values())
+
+
+def _forecast_count_pair(
+    count_model: Any,
+    row: RawSignedInterval,
+    *,
+    addition_rate_multiplier: float,
+    removal_rate_multiplier: float,
+) -> tuple[Any, Any]:
+    """Forecast counts from origin history, risk-set sizes, and realized horizon.
+
+    The realized future interval length is used as a conditional horizon.
+    Future addition and removal counts are not passed to the count model.
+    """
+    arguments = {
+        "prior_observations": [row.history_count],
+        "future_addition_risk_voxels": row.addition_target.size,
+        "future_removal_risk_voxels": row.removal_target.size,
+        "future_interval_days": row.target_count.interval_days,
+    }
+    uncalibrated = count_model.forecast(**arguments)
+    calibrated = count_model.forecast(
+        **arguments,
+        future_addition_rate_multiplier=addition_rate_multiplier,
+        future_removal_rate_multiplier=removal_rate_multiplier,
+    )
+    return uncalibrated, calibrated
 
 
 def _crossfit_count_rate_calibration(
@@ -517,19 +564,11 @@ def evaluate(
             seed=seed + 100 + fold,
         )
         for row in test:
-            uncalibrated_count_forecast = count_model.forecast(
-                prior_observations=[row.history_count],
-                future_addition_risk_voxels=row.addition_target.size,
-                future_removal_risk_voxels=row.removal_target.size,
-                future_interval_days=row.target_count.interval_days,
-            )
-            count_forecast = count_model.forecast(
-                prior_observations=[row.history_count],
-                future_addition_risk_voxels=row.addition_target.size,
-                future_removal_risk_voxels=row.removal_target.size,
-                future_interval_days=row.target_count.interval_days,
-                future_addition_rate_multiplier=count_calibration["addition"]["rate_multiplier"],
-                future_removal_rate_multiplier=count_calibration["removal"]["rate_multiplier"],
+            uncalibrated_count_forecast, count_forecast = _forecast_count_pair(
+                count_model,
+                row,
+                addition_rate_multiplier=count_calibration["addition"]["rate_multiplier"],
+                removal_rate_multiplier=count_calibration["removal"]["rate_multiplier"],
             )
             hybrid_add_score = hybrid.addition_head.predict_score(
                 row.addition_features,
@@ -696,6 +735,7 @@ def evaluate(
     return {
         "status": "exploratory; MU-Glioma-Post has prior project use",
         "endpoint": "future annotated label-1/3 additions and removals inside forecast-origin risk sets",
+        "forecast_horizon": dict(FORECAST_HORIZON),
         "method": "direction-specific spatial-prior residual heads plus bounded shared-frailty binomial counts, rank-constrained probabilities, and a fixed equal-weight hybrid/prior probability mixture",
         "n_patients": int(unique_patients.size),
         "n_intervals": len(intervals),
@@ -713,6 +753,7 @@ def evaluate(
         "interval_records": records,
         "limitations": [
             "Observed segmentation transitions are not verified biological growth or treatment response.",
+            "Count predictions use the realized next-scan interval from retrospective data; they are conditional-horizon estimates, not pre-schedule forecasts.",
             "Boundary perturbation radius is a sensitivity assumption, not measured segmentation noise.",
             "MU results are exploratory because the cohort has prior project use.",
             "Spatial heads use fixed hyperparameters; no inner-fold tuning was performed.",
@@ -766,10 +807,41 @@ def main() -> int:
     result = evaluate(intervals, n_splits=args.n_splits, seed=args.seed)
     result["runtime_seconds"] = float(time.perf_counter() - start)
     result["source_paths"] = {
-        "data_root": str(args.data_root),
-        "patient_manifest": str(args.patient_manifest),
-        "pair_manifest": str(args.pair_manifest),
+        "data_root": _logical_input_path(args.data_root),
+        "patient_manifest": _logical_input_path(args.patient_manifest),
+        "pair_manifest": _logical_input_path(args.pair_manifest),
     }
+    result["run_configuration"] = {
+        "n_splits": args.n_splits,
+        "max_patients": args.max_patients,
+        "seed": args.seed,
+        "perturbation_radius_mm": args.perturbation_radius_mm,
+        "diffusion_parameters": {
+            "edge_sensitivity": parameters.edge_sensitivity,
+            "screening_length_mm": parameters.screening_length_mm,
+            "label2_log_permeability": parameters.label2_log_permeability,
+            "candidate_radius_mm": parameters.candidate_radius_mm,
+            "prior_smoothing_mm": parameters.prior_smoothing_mm,
+            "block_cavity": parameters.block_cavity,
+            "solver_tolerance": parameters.solver_tolerance,
+            "solver_max_iterations": parameters.solver_max_iterations,
+        },
+    }
+    result["run_provenance"] = BASE.RUN_PROVENANCE.build_run_provenance(
+        BASE.ROOT,
+        manifests={
+            "patient_manifest": args.patient_manifest,
+            "pair_manifest": args.pair_manifest,
+        },
+        source_files={
+            "signed_transition_runner": Path(__file__),
+            "growth_zone_runner": Path(BASE.__file__),
+            "growth_zone_features": Path(FEATURES.__file__),
+            "signed_transition_model": Path(TRANSITIONS.__file__),
+            "signed_spatial_heads": Path(HEADS.__file__),
+            "run_provenance_helper": Path(BASE.RUN_PROVENANCE.__file__),
+        },
+    )
     output.parent.mkdir(parents=True, exist_ok=True)
     result = _json_safe(result)
     output.write_text(json.dumps(result, indent=2, allow_nan=False), encoding="utf-8")

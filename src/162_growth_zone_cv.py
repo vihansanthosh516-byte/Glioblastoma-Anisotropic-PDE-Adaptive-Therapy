@@ -6,6 +6,8 @@ It requires an explicit acknowledgement flag before loading/scoring patient
 images and writes no voxel-level predictions.  All MU results are marked
 exploratory because this cohort has already been examined in earlier Track B
 work; a new fold assignment cannot make it an independent confirmation set.
+Predictions condition on the realized next-scan interval and are not
+pre-schedule forecasts unless that interval is known at forecast origin.
 """
 from __future__ import annotations
 
@@ -28,6 +30,12 @@ ROOT = Path(__file__).resolve().parent.parent
 DATA_ROOT = ROOT / "data/tcia/MU-Glioma-Post"
 PATIENT_MANIFEST = ROOT / "data/manifests/patient_manifest.csv"
 PAIR_MANIFEST = ROOT / "data/manifests/forecast_pairs_mu.csv"
+FORECAST_HORIZON = {
+    "estimand": "retrospective prediction conditional on realized next-scan interval",
+    "interval_source": "actual future interval in the chained scan manifest",
+    "known_at_forecast_origin": False,
+    "deployment_interpretation": "not a pre-schedule forecast; supply the interval at origin or prespecify a fixed horizon",
+}
 
 
 def _load_local_module(alias: str, path: Path) -> Any:
@@ -42,6 +50,7 @@ def _load_local_module(alias: str, path: Path) -> Any:
 
 FEATURES = _load_local_module("growth_zone_features_impl", ROOT / "src/160_growth_zone_features.py")
 MODELS = _load_local_module("growth_zone_model_impl", ROOT / "src/161_growth_zone_model.py")
+RUN_PROVENANCE = _load_local_module("track_b_run_provenance_impl", ROOT / "src/track_b_run_provenance.py")
 
 
 @dataclass(frozen=True)
@@ -532,6 +541,7 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
         "reason": "MU-Glioma-Post cases were examined in earlier Track B work; grouped CV does not create a fresh cohort.",
         "target": "newly annotated label-1/3 voxels within the forecast-origin candidate region",
         "target_limitation": "Segmentation transitions are not verified viable tumor growth or clinical recurrence; treatment effects are not modeled, and only label-4 cavity voxels are explicitly blocked (there is no CSF mask yet).",
+        "forecast_horizon": dict(FORECAST_HORIZON),
         "cohort": {
             "n_triplets": len(raw_samples),
             "n_patients": len({sample.patient_id for sample in raw_samples}),
@@ -552,6 +562,19 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
             "cavity_blocked": diffusion.block_cavity,
             "stability_strength": 1.0,
         },
+        "run_provenance": RUN_PROVENANCE.build_run_provenance(
+            ROOT,
+            manifests={
+                "patient_manifest": args.patient_manifest,
+                "pair_manifest": args.pair_manifest,
+            },
+            source_files={
+                "growth_zone_runner": Path(__file__),
+                "growth_zone_features": Path(FEATURES.__file__),
+                "growth_zone_model": Path(MODELS.__file__),
+                "run_provenance_helper": Path(RUN_PROVENANCE.__file__),
+            },
+        ),
         "primary_comparison": {
             "hybrid_minus_matched_logistic_average_precision": bootstrap,
             "hybrid_minus_hist_gradient_boosting_average_precision": _paired_patient_bootstrap(
