@@ -286,3 +286,31 @@ def test_delayed_and_missed_readings():
     pol = Record()
     tc.simulate(dict(quiet, miss_p=np.full(10, 1.0)), pol, seed=29)
     assert all(np.allclose(y, pol.y[0]) for y in pol.y)
+
+
+def test_visible_missing_scans():
+    scen = tc.draw_scenarios(40, seed=30, sigmas=(0.05,))
+    miss = dict(scen, miss_p=np.full(40, 0.4))
+    vis = dict(miss, miss_visible=np.ones(40, bool))
+    # the raw rule reuses its last reading either way, so it acts the same
+    for spec in (("raw", 0.6, 0.6), ("raw", 1.0, 0.5)):
+        a = tc.simulate(miss, tc.make_policy(spec), seed=31)
+        b = tc.simulate(vis, tc.make_policy(spec), seed=31)
+        assert np.array_equal(a["ttp"], b["ttp"])
+    pol = Record()
+    tc.simulate(vis, pol, seed=31)
+    ys = np.array(pol.y)
+    assert np.isnan(ys).any() and not np.isnan(ys[0]).any()
+    out = tc.simulate(vis, tc.make_policy(("risk", 0.1, 2, 0.0, True)), seed=31)
+    assert np.isfinite(out["ttp"]).all() and out["courses"].max() <= tc.BUDGET
+
+
+def test_filter_skips_missing_reading():
+    scen = tc.draw_scenarios(6, seed=32, sigmas=(0.05,))
+    pf = tc.ParticleFilter(np.full(6, 5.0), 200, np.random.default_rng(33))   # wide sd: no resampling
+    y = np.log(scen["B0"])
+    y[:3] = np.nan
+    before = pf.logw.copy()
+    pf.update(0, y)
+    assert np.array_equal(pf.logw[:3], before[:3]) and not np.array_equal(pf.logw[3:], before[3:])
+    assert pf.n_resample == 0

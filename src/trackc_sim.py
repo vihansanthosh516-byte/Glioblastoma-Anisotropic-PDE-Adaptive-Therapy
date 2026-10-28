@@ -218,7 +218,8 @@ class ParticleFilter:
 
     def update(self, j, y):
         B = np.maximum(self.S + self.R, 1e-300)
-        self.logw += -0.5 * ((y[:, None] - np.log(B)) / self.sigma) ** 2
+        seen = ~np.isnan(y)[:, None]            # NaN = known missing scan (script 170): no update
+        self.logw += np.where(seen, -0.5 * ((np.where(seen, y[:, None], 0.0) - np.log(B)) / self.sigma) ** 2, 0.0)
         w = self.w
         ess = 1.0 / (w ** 2).sum(1)
         idx = np.flatnonzero(ess < self.P / 2)
@@ -305,11 +306,14 @@ class RawThreshold:
         self.a_on, self.a_off = a_on, a_off
 
     def reset(self, scen, rng):
-        self.y0, self.on = None, None
+        self.y0, self.on, self.last = None, None, None
 
     def act(self, j, y):
         if j == 0:
             self.y0, self.on = y.copy(), np.zeros(y.shape, bool)
+        if self.last is not None:               # NaN = known missing scan: reuse the last reading
+            y = np.where(np.isnan(y), self.last, y)
+        self.last = y
         m = np.exp(y - self.y0)
         self.on = np.where(self.on, m > self.a_off, m >= self.a_on)
         return self.on.copy()
@@ -402,7 +406,8 @@ def simulate(scen, policy, seed, track_fr=False):
         noise = noise + scen["bias"][:, None]
     # script 169 truth-only options (per-scenario arrays; policies are not told): mu (S -> R
     # switching under drug, in _deriv), drift (fractional loss of m per treated course),
-    # miss_p (reading lost; the last reading is repeated), delay (days 0/7/14: the reading shows
+    # miss_p (reading lost; the last reading is repeated, or NaN if miss_visible is set so the
+    # policy knows the scan is missing, script 170), delay (days 0/7/14: the reading shows
     # burden that long before the decision), prog_factor (true endpoint level / B0)
     p = scen
     if "drift" in scen:
@@ -428,7 +433,7 @@ def simulate(scen, policy, seed, track_fr=False):
         y = np.log(B) + noise[:, j]
         if missed is not None:
             if j > 0:
-                y = np.where(missed[:, j], y_prev, y)
+                y = np.where(missed[:, j], np.nan if "miss_visible" in scen else y_prev, y)
             y_prev = y
         treat = policy.act(j, y) & (used < BUDGET)
         if track_fr and policy.uses_filter:
