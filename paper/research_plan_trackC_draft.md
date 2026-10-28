@@ -47,7 +47,7 @@ Both must hold for the claim "robust within the tested simulator". If H1 holds a
 
 ## Procedures
 
-1. **Freeze arms (no retuning).** Wide containment (p* 0.10, horizon 2 cycles, m prior [3, 20]) and narrow containment (p* 0.05, h 2) from `output/trackc_sealed_containment/frozen_protocol.json`. Comparators: raw single threshold 0.6 (pre-set primary comparator), raw on/off 0.6/0.5, front-loaded periodic, Zhang-style rule (1.0/0.5). Ablation: filtered-burden threshold without the risk rule, same wide prior, tuned on the script-167 tuning draw only, before any new scoring.
+1. **Freeze arms (no retuning).** Wide containment (p* 0.10, horizon 2 cycles, m prior [3, 20]) from `output/trackc_sealed_containment/frozen_protocol.json`. Comparators: raw single threshold 0.6 (pre-set primary comparator), raw on/off 0.6/0.5, front-loaded periodic, Zhang-style rule (1.0/0.5). Narrow containment is not re-scored (its weak-drug failure is already shown in script 168). Ablation: filtered-burden threshold without the risk rule, same wide prior, tuned on the script-167 tuning draw only, before any new scoring.
 2. **New misspecification axes (not used in 150–168).**
    - Acquired resistance: sensitive cells convert to resistant at rate μ ∈ [1e-4, 1e-3] per day under drug.
    - Drug-strength drift: m falls by 2–5% per treated course.
@@ -58,9 +58,14 @@ Both must hold for the claim "robust within the tested simulator". If H1 holds a
    Each at two pre-set severities → 12 suites, plus a nominal reference.
 3. **Sampled-uncertainty suite (H2).** For each virtual patient, draw independently: noise multiplier ∈ {1, 2, 3}, bias ∈ {0, +10%, +20%}, drug strength m from [3, 20] log-uniform, growth r from [0.001, 0.10] log-uniform, competition (1,1) or (2, 0.5), and one new axis from step 2 with probability 0.5. Weights fixed now; not tuned.
 4. **Size.** n 600 scenarios per suite (4× script 168) and 1,500 for the sampled suite, to narrow intervals in noisy suites. Two noise replicates per scenario. Rough runtime estimate from 168: about 4–6 hours on this laptop; to be measured, not assumed.
-5. **Seeds.** New scenario seeds 20261300 + k and noise seeds 1_300_000 + 10k + {1, 2}; never used before. Filter Monte Carlo: three particle-filter seeds per scenario, averaged, to reduce resampling sensitivity.
+5. **Seeds.** New scenario seeds 20261300 + k and noise seeds [1_300_000 + 10k + rep, chunk] for rep 1-2, chunks of 150 scenarios; never used before. Each noise replicate also has its own particle-filter randomness, so averaging two replicates partly averages filter Monte Carlo error.
 6. **Seal.** Write the protocol in code with a SHA-256 hash, commit and push it before the first scoring run, and refuse to overwrite the result file. A smoke run at reduced n writes elsewhere and is not interpreted.
 7. **Score once.** Report every suite, every arm, with intervals, whether or not it helps the claim.
+
+### Amendments before sealing (2026-10-27, made before any script-169 result)
+
+- Concrete severities fixed in `src/169_trackc_sealed_new_axes.py`: switching mu [1e-4, 1e-3] / [1e-3, 1e-2] per drug-day; drift 2% / 5% per course; missed 0.2 / 0.4; delay 7 / 14 days; endpoint 1.15 / 1.25 x B0; start burden [0.5, 0.6] / [0.6, 0.7].
+- Runtime: script 168 needed about 1,370 CPU-seconds per containment job of 150 scenarios x 2 replicates. Three filter seeds and a narrow arm would take about 12+ hours here. So: two noise replicates (no separate filter seeds) and no narrow arm. Expected run about 5 hours. This lowers precision; it does not change the hypotheses or the margin.
 
 ## Risk Assessment
 

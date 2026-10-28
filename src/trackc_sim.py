@@ -71,6 +71,8 @@ def subset(scen, idx):
 def _deriv(S, R, p, u):
     dS = p["r"] * S * (1.0 - (S + p["a_rs"] * R)) - p["m"] * p["r"] * u * S
     dR = p["r"] * (1.0 - p["c"]) * R * (1.0 - (p["a_sr"] * S + R)) - p["eps"] * p["m"] * p["r"] * u * R
+    if "mu" in p:                     # script 169: drug-induced switching S -> R at rate mu (truth only)
+        dS, dR = dS - p["mu"] * u * S, dR + p["mu"] * u * S
     return dS, dR
 
 
@@ -117,10 +119,11 @@ def _take(x, m):
     return x[m] if x.ndim and x.shape[0] == m.shape[0] else x
 
 
-def run_cycle(S, R, p, treat, t0, dt=None, prog_level=None, ttp=None):
+def run_cycle(S, R, p, treat, t0, dt=None, prog_level=None, ttp=None, snaps=None):
     """Integrate one 28-day cycle. `treat` broadcasts against S. If `prog_level` is given,
     record in `ttp` (NaN = not yet) the first time S + R reaches prog_level (see EVENT_MODE).
-    dt=None uses the module value DT at call time."""
+    dt=None uses the module value DT at call time. `snaps` {day offset: None} is filled with
+    (S, R) at those offsets into the cycle (offsets must fall on a step boundary)."""
     dt = DT if dt is None else dt
     treat = np.asarray(treat, float)
     t = t0
@@ -143,6 +146,12 @@ def run_cycle(S, R, p, treat, t0, dt=None, prog_level=None, ttp=None):
                         ttp[hit] = t + tau
             S, R = S1, R1
             t += h
+            if snaps is not None:
+                for d in snaps:
+                    if abs(t - t0 - d) < 1e-6:
+                        snaps[d] = (S, R)
+    if snaps is not None and any(v is None for v in snaps.values()):
+        raise ValueError("snapshot offset not on a step boundary")
     return S, R
 
 
@@ -391,15 +400,36 @@ def simulate(scen, policy, seed, track_fr=False):
         noise = rng.standard_normal((N, N_CYCLES)) * sd
     if "bias" in scen:
         noise = noise + scen["bias"][:, None]
+    # script 169 truth-only options (per-scenario arrays; policies are not told): mu (S -> R
+    # switching under drug, in _deriv), drift (fractional loss of m per treated course),
+    # miss_p (reading lost; the last reading is repeated), delay (days 0/7/14: the reading shows
+    # burden that long before the decision), prog_factor (true endpoint level / B0)
+    p = scen
+    if "drift" in scen:
+        p = dict(scen, m=scen["m"].copy())
+    missed = None
+    if "miss_p" in scen:                    # own stream, so the noise draws above are unchanged
+        missed = np.random.default_rng([*np.atleast_1d(seed).tolist(), 1]).random((N, N_CYCLES)) < scen["miss_p"][:, None]
+        missed[:, 0] = False
+    delays = sorted(set(np.asarray(scen.get("delay", [0])).tolist()) - {0})
     S = (1 - scen["f0"]) * scen["B0"]
     R = scen["f0"] * scen["B0"]
-    level = PROG_FACTOR * scen["B0"]
+    past = {d: S + R for d in delays}
+    level = scen.get("prog_factor", PROG_FACTOR) * scen["B0"]
     ttp = np.full(N, np.nan)
     used = np.zeros(N, int)
     hits, total = 0, 0
     policy.reset(scen, rng)
+    y_prev = None
     for j in range(N_CYCLES):
-        y = np.log(S + R) + noise[:, j]
+        B = S + R
+        for d in delays:
+            B = np.where(scen["delay"] == d, past[d], B)
+        y = np.log(B) + noise[:, j]
+        if missed is not None:
+            if j > 0:
+                y = np.where(missed[:, j], y_prev, y)
+            y_prev = y
         treat = policy.act(j, y) & (used < BUDGET)
         if track_fr and policy.uses_filter:
             lo, hi = policy.pf.fr_interval()
@@ -409,7 +439,12 @@ def simulate(scen, policy, seed, track_fr=False):
             total += int(live.sum())
         treat = treat & np.isnan(ttp)           # nothing is given after progression
         used += treat
-        S, R = run_cycle(S, R, scen, treat, j * CYCLE_DAYS, prog_level=level, ttp=ttp)
+        snaps = {CYCLE_DAYS - d: None for d in delays} if delays else None
+        S, R = run_cycle(S, R, p, treat, j * CYCLE_DAYS, prog_level=level, ttp=ttp, snaps=snaps)
+        for d in delays:
+            past[d] = sum(snaps[CYCLE_DAYS - d])
+        if "drift" in scen:
+            p["m"] = np.where(treat, p["m"] * (1.0 - scen["drift"]), p["m"])
         policy.advance(j, treat)
         if not np.isnan(ttp).any():
             break
@@ -496,6 +531,9 @@ def make_policy(spec):
         return RawThreshold(*spec[1:])
     if kind == "filt":
         return FilteredThreshold(*spec[1:])
+    if kind == "filtw":                     # script 169 ablation: filtered single threshold, wide prior
+        a = spec[1]
+        return FilteredThreshold(a, a, a, 0.5, single=True, ranges=RANGES_WIDE_M)
     if kind == "risk":
         return RiskContainment(*spec[1:])
     raise ValueError(kind)

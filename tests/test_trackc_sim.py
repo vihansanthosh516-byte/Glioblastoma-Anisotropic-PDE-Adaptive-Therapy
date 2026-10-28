@@ -239,3 +239,50 @@ def test_cvar_lower():
     assert tc.cvar_lower(np.arange(1, 11), 0.1) == pytest.approx(1.0)
     x = np.arange(15.0)
     assert tc.cvar_lower(x, 0.1) == pytest.approx((0 + 0.5 * 1) / 1.5)
+
+
+def test_script169_options_off_change_nothing():
+    scen = tc.draw_scenarios(60, seed=24)
+    off = dict(scen, mu=np.zeros(60), drift=np.zeros(60), miss_p=np.zeros(60),
+               delay=np.zeros(60), prog_factor=np.full(60, tc.PROG_FACTOR))
+    for spec in (("raw", 0.8, 0.5), ("periodic", 2)):
+        a = tc.simulate(scen, tc.make_policy(spec), seed=25)
+        b = tc.simulate(off, tc.make_policy(spec), seed=25)
+        assert np.array_equal(a["ttp"], b["ttp"]) and np.array_equal(a["courses"], b["courses"])
+
+
+def test_switching_moves_cells_to_resistant_only_under_drug():
+    p = one(f0=0.01)
+    S0, R0 = 0.99 * 0.2, 0.01 * 0.2
+    pm = dict(p, mu=np.array([0.01]))
+    S1, R1 = tc.run_cycle(S0, R0, pm, np.ones(1), 0.0)
+    S2, R2 = tc.run_cycle(S0, R0, p, np.ones(1), 0.0)
+    assert R1 > R2 and S1 < S2
+    S3, R3 = tc.run_cycle(S0, R0, pm, np.zeros(1), 0.0)
+    S4, R4 = tc.run_cycle(S0, R0, p, np.zeros(1), 0.0)
+    assert S3 == pytest.approx(S4) and R3 == pytest.approx(R4)
+
+
+def test_drift_weakens_drug_and_endpoint_level_moves():
+    scen = tc.draw_scenarios(80, seed=26)
+    base = tc.simulate(scen, tc.Periodic(1), seed=27)["ttp"]
+    drift = tc.simulate(dict(scen, drift=np.full(80, 0.2)), tc.Periodic(1), seed=27)["ttp"]
+    assert (drift <= base + 1e-9).all() and drift.mean() < base.mean()
+    hi = tc.simulate(dict(scen, prog_factor=np.full(80, 1.25)), NoTreat(), seed=27)["ttp"]
+    lo = tc.simulate(scen, NoTreat(), seed=27)["ttp"]
+    assert (hi > lo).all()
+
+
+def test_delayed_and_missed_readings():
+    scen = tc.draw_scenarios(10, seed=28, sigmas=(0.05,))
+    quiet = dict(scen, sigma_true=np.zeros(10))
+    pol = Record()
+    tc.simulate(dict(quiet, delay=np.full(10, 7.0)), pol, seed=29)
+    S0, R0 = (1 - scen["f0"]) * scen["B0"], scen["f0"] * scen["B0"]
+    snaps = {21: None}
+    tc.run_cycle(S0, R0, scen, np.zeros(10), 0.0, snaps=snaps)
+    assert np.allclose(pol.y[0], np.log(scen["B0"]))
+    assert np.allclose(pol.y[1], np.log(sum(snaps[21])))
+    pol = Record()
+    tc.simulate(dict(quiet, miss_p=np.full(10, 1.0)), pol, seed=29)
+    assert all(np.allclose(y, pol.y[0]) for y in pol.y)
