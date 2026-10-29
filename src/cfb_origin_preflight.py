@@ -1,10 +1,18 @@
-"""Outcome-blind CFB file, header, provenance, and origin-MRI preflight.
+"""Outcome-blind CFB preflight for the mixed-provenance exploratory protocol.
 
+Run with ``--cohort-policy mixed_exploratory`` to match the current CFB draft.
+The default ``strict_matched`` mode preserves historical audit behavior.
 This tool does not authorize scoring. It reads NIfTI headers for all listed
 files and reads voxel values only from each patient's t1 T1-Gd image to check
 the frozen robust-normalization inputs. It never reads any GTV mask voxels or
 t0/t2 MRI voxels. The official CFB pipeline uses baseline t0 T1-Gd as the
 fixed reference. All three MRI and GTV files must already share that grid.
+In mixed-exploratory mode, mixed t0/t1/t2 provenance and unknown review status
+are reported, not used as exclusions. That mode requires source-backed
+per-visit annotation/acquisition support and full-volume plus tumor-boundary
+registration QC. Evidence files are SHA-256 pinned under an evidence/ folder;
+human review must confirm their meaning. A row preflight pass is not scoring
+authorization.
 
 Crosswalk CSV columns. CFB v4 paths must use this layout:
 `<crosswalk directory>/<three-digit folder>/<t0|t1|t2>/`,
@@ -22,6 +30,15 @@ t1_to_t0_transform_documented, t1_to_t0_transform_source,
 t1_to_t0_qc_pass, t1_to_t0_qc_source,
 t2_to_t0_transform_documented, t2_to_t0_transform_source,
 t2_to_t0_qc_pass, t2_to_t0_qc_source.
+
+Mixed-mode support columns are optional in the crosswalk schema but fail closed
+when absent: gtv_domain_verified_<visit>, gtv_zero_semantics_verified_<visit>,
+gtv_support_source_<visit>, gtv_support_evidence_path_<visit>,
+gtv_support_evidence_sha256_<visit>, mri_acquisition_support_verified_<visit>,
+mri_support_source_<visit>, mri_support_evidence_path_<visit>, and
+mri_support_evidence_sha256_<visit>, for visit t0, t1, and t2. Registration
+evidence also requires each visit's QC method, reference, interpolation,
+full-volume pass, tumor-boundary pass, and hash-pinned transform/QC files.
 
 Paths may be absolute or relative to the crosswalk file. A successful report
 means only that these preflight checks passed. It does not resolve source
@@ -76,6 +93,36 @@ REQUIRED_COLUMNS = (
     "t2_to_t0_transform_source",
     "t2_to_t0_qc_pass",
     "t2_to_t0_qc_source",
+)
+SUPPORT_COLUMNS = tuple(
+    column
+    for visit in ("t0", "t1", "t2")
+    for column in (
+        f"gtv_domain_verified_{visit}",
+        f"gtv_zero_semantics_verified_{visit}",
+        f"gtv_support_source_{visit}",
+        f"gtv_support_evidence_path_{visit}",
+        f"gtv_support_evidence_sha256_{visit}",
+        f"mri_acquisition_support_verified_{visit}",
+        f"mri_support_source_{visit}",
+        f"mri_support_evidence_path_{visit}",
+        f"mri_support_evidence_sha256_{visit}",
+    )
+)
+REGISTRATION_QC_COLUMNS = tuple(
+    column
+    for visit in ("t1", "t2")
+    for column in (
+        f"{visit}_to_t0_qc_method",
+        f"{visit}_to_t0_qc_reference",
+        f"{visit}_to_t0_qc_interpolation",
+        f"{visit}_to_t0_qc_full_volume_pass",
+        f"{visit}_to_t0_qc_tumor_boundary_pass",
+        f"{visit}_to_t0_transform_evidence_path",
+        f"{visit}_to_t0_transform_evidence_sha256",
+        f"{visit}_to_t0_qc_evidence_path",
+        f"{visit}_to_t0_qc_evidence_sha256",
+    )
 )
 UNKNOWN_PROVENANCE = {"", "unknown", "unverified", "na", "n/a", "none"}
 UNKNOWN_REVIEW = {"", "unknown", "unverified", "pending", "not_recorded", "na", "n/a", "none"}
@@ -234,7 +281,45 @@ def _field_nonempty(row: Mapping[str, Any], key: str) -> bool:
     return bool(str(row.get(key, "") or "").strip())
 
 
-def _documented_check(row: Mapping[str, Any], prefix: str) -> tuple[bool, list[str]]:
+def _affirmative(value: Any) -> bool:
+    return _normalize_label(value) in {"true", "yes", "verified", "pass", "documented"}
+
+
+def _evidence_file_check(
+    row: Mapping[str, Any], path_field: str, digest_field: str, evidence_root: Path,
+) -> tuple[bool, list[str], str | None]:
+    errors: list[str] = []
+    raw_path = str(row.get(path_field, "") or "").strip()
+    expected = str(row.get(digest_field, "") or "").strip().lower()
+    if not raw_path:
+        return False, [f"{path_field}_missing"], None
+    if not re.fullmatch(r"[0-9a-f]{64}", expected):
+        errors.append(f"{digest_field}_invalid_or_missing")
+    root = evidence_root.resolve()
+    candidate = Path(raw_path)
+    candidate = (candidate if candidate.is_absolute() else root / candidate).resolve()
+    try:
+        candidate.relative_to(root)
+    except ValueError:
+        errors.append(f"{path_field}_outside_evidence_directory")
+        return False, errors, None
+    if not candidate.is_file():
+        errors.append(f"{path_field}_file_not_found")
+        return False, errors, None
+    digest = hashlib.sha256()
+    with candidate.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    actual = digest.hexdigest()
+    if expected and actual != expected:
+        errors.append(f"{digest_field}_mismatch")
+    return not errors, errors, actual
+
+
+def _documented_check(
+    row: Mapping[str, Any], prefix: str, *, require_extended_qc: bool = False,
+    evidence_root: Path | None = None,
+) -> tuple[bool, list[str]]:
     errors: list[str] = []
     documented = _parse_transform_documented(row.get(f"{prefix}_transform_documented"))
     qc_pass = _parse_qc_pass(row.get(f"{prefix}_qc_pass"))
@@ -246,7 +331,80 @@ def _documented_check(row: Mapping[str, Any], prefix: str) -> tuple[bool, list[s
         errors.append(f"{prefix}_qc_not_passed")
     if not _field_nonempty(row, f"{prefix}_qc_source"):
         errors.append(f"{prefix}_qc_source_missing")
+    if require_extended_qc:
+        for suffix in ("qc_method", "qc_reference", "qc_interpolation"):
+            if not _field_nonempty(row, f"{prefix}_{suffix}"):
+                errors.append(f"{prefix}_{suffix}_missing")
+        for suffix in ("qc_full_volume_pass", "qc_tumor_boundary_pass"):
+            if not _affirmative(row.get(f"{prefix}_{suffix}")):
+                errors.append(f"{prefix}_{suffix}_not_passed")
+        if evidence_root is None:
+            errors.append("evidence_directory_missing")
+        else:
+            for kind in ("transform", "qc"):
+                ok, evidence_errors, _ = _evidence_file_check(
+                    row,
+                    f"{prefix}_{kind}_evidence_path",
+                    f"{prefix}_{kind}_evidence_sha256",
+                    evidence_root,
+                )
+                if not ok:
+                    errors.extend(evidence_errors)
     return not errors, errors
+
+
+def _support_check(
+    row: Mapping[str, Any], evidence_root: Path,
+) -> tuple[bool, dict[str, Any], list[str]]:
+    """Require source-backed mask and MRI support for every modeled visit."""
+    details: dict[str, Any] = {}
+    errors: list[str] = []
+    for visit in ("t0", "t1", "t2"):
+        gtv_domain = _affirmative(row.get(f"gtv_domain_verified_{visit}"))
+        zero_semantics = _affirmative(row.get(f"gtv_zero_semantics_verified_{visit}"))
+        mri_support = _affirmative(row.get(f"mri_acquisition_support_verified_{visit}"))
+        gtv_source = _field_nonempty(row, f"gtv_support_source_{visit}")
+        mri_source = _field_nonempty(row, f"mri_support_source_{visit}")
+        gtv_file_pass, gtv_file_errors, gtv_digest = _evidence_file_check(
+            row,
+            f"gtv_support_evidence_path_{visit}",
+            f"gtv_support_evidence_sha256_{visit}",
+            evidence_root,
+        )
+        mri_file_pass, mri_file_errors, mri_digest = _evidence_file_check(
+            row,
+            f"mri_support_evidence_path_{visit}",
+            f"mri_support_evidence_sha256_{visit}",
+            evidence_root,
+        )
+        details[visit] = {
+            "gtv_domain_verified": gtv_domain,
+            "gtv_zero_semantics_verified": zero_semantics,
+            "gtv_support_source_recorded": gtv_source,
+            "gtv_support_evidence_hash_matches": gtv_file_pass,
+            "gtv_support_evidence_sha256": gtv_digest,
+            "mri_acquisition_support_verified": mri_support,
+            "mri_support_source_recorded": mri_source,
+            "mri_support_evidence_hash_matches": mri_file_pass,
+            "mri_support_evidence_sha256": mri_digest,
+        }
+        errors.extend(gtv_file_errors)
+        errors.extend(mri_file_errors)
+        if not gtv_domain:
+            errors.append(f"gtv_domain_{visit}_not_verified")
+        if not zero_semantics:
+            errors.append(f"gtv_zero_semantics_{visit}_not_verified")
+        if not gtv_source:
+            errors.append(f"gtv_support_source_{visit}_missing")
+        if not gtv_file_pass:
+            errors.append(f"gtv_support_evidence_{visit}_not_pinned")
+        if not mri_support:
+            errors.append(f"mri_acquisition_support_{visit}_not_verified")
+        if not mri_source:
+            errors.append(f"mri_support_source_{visit}_missing")
+        if not mri_file_pass:
+            errors.append(f"mri_support_evidence_{visit}_not_pinned")
+    return not errors, details, errors
 
 
 def _provenance_check(row: Mapping[str, Any]) -> tuple[bool, list[str], list[str]]:
@@ -307,9 +465,13 @@ def preflight_rows(
     crosswalk_dir: Path,
     package_root: Path | None = None,
     image_loader: Callable[[Path], Any] | None = None,
+    cohort_policy: str = "strict_matched",
 ) -> list[dict[str, Any]]:
     """Evaluate explicit rows; no visit is selected or ranked from outcomes."""
+    if cohort_policy not in {"strict_matched", "mixed_exploratory"}:
+        raise ValueError("cohort_policy must be strict_matched or mixed_exploratory")
     trusted_root = (package_root or crosswalk_dir).resolve()
+    evidence_root = (crosswalk_dir / "evidence").resolve()
     if not trusted_root.is_dir():
         raise ValueError(f"package root is not a directory: {trusted_root}")
     loader = _load_nifti if image_loader is None else image_loader
@@ -330,11 +492,14 @@ def preflight_rows(
             "target_mask_voxels_read": False,
             "t0_t2_mri_voxels_read": False,
             "scoring_authorized": False,
+            "cohort_policy": cohort_policy,
+            "preflight_scope": "local pre-outcome checks only; not full scoring readiness",
             "alignment_reference": "t0_t1gd",
             "metadata_evidence": {
                 key: str(row.get(key, "") or "").strip()
                 for key in REQUIRED_COLUMNS
-                if key.endswith("_source") or key == "identity_mapping_source"
+                if key.endswith("_source") or key in SUPPORT_COLUMNS or key in REGISTRATION_QC_COLUMNS
+                or key == "identity_mapping_source"
             },
         }
         errors: list[str] = result["errors"]
@@ -349,16 +514,43 @@ def preflight_rows(
 
         provenance_pass, provenance_values, provenance_errors = _provenance_check(row)
         result["provenance"] = provenance_values
-        result["provenance_pass"] = provenance_pass
-        errors.extend(provenance_errors)
+        result["provenance_classes_matched_pass"] = provenance_pass
+        result["provenance_pass"] = provenance_pass  # historical strict-match field
+        provenance_known_errors = [error for error in provenance_errors if error != "provenance_classes_not_matched"]
+        result["provenance_source_classes_known_pass"] = not provenance_known_errors
+        result["mixed_provenance_allowed"] = cohort_policy == "mixed_exploratory"
+        if cohort_policy == "strict_matched":
+            errors.extend(provenance_errors)
+        else:
+            errors.extend(provenance_known_errors)
         review_pass, review_values, review_errors = _review_check(row)
         result["mask_review_status"] = review_values
-        result["mask_review_pass"] = review_pass
-        errors.extend(review_errors)
+        result["mask_review_lineage_resolved_pass"] = review_pass
+        result["mask_review_pass"] = review_pass  # historical resolved-lineage field
+        result["unknown_review_allowed_by_protocol"] = cohort_policy == "mixed_exploratory"
+        result["lineage_warnings"] = []
+        if cohort_policy == "mixed_exploratory":
+            result["lineage_warnings"] = review_errors + [
+                error for error in provenance_errors if error == "provenance_classes_not_matched"
+            ]
+        else:
+            errors.extend(review_errors)
         for prefix in ("t1_to_t0", "t2_to_t0"):
-            passed, doc_errors = _documented_check(row, prefix)
+            passed, doc_errors = _documented_check(
+                row,
+                prefix,
+                require_extended_qc=cohort_policy == "mixed_exploratory",
+                evidence_root=evidence_root,
+            )
             result[f"{prefix}_documented_qc_pass"] = passed
             errors.extend(doc_errors)
+        if cohort_policy == "mixed_exploratory":
+            support_pass, support_details, support_errors = _support_check(row, evidence_root)
+        else:
+            support_pass, support_details, support_errors = True, {"policy": "not_checked_in_strict_mode"}, []
+        result["support_gates_pass"] = support_pass
+        result["support_evidence"] = support_details
+        errors.extend(support_errors)
 
         loaded: dict[str, Any] = {}
         headers: dict[str, dict[str, Any]] = result["file_headers"]
@@ -438,14 +630,15 @@ def preflight_rows(
         )
         result["metadata_gates_pass"] = (
             _field_nonempty(row, "identity_mapping_source")
-            and provenance_pass
-            and review_pass
+            and (provenance_pass and review_pass if cohort_policy == "strict_matched"
+                 else result["provenance_source_classes_known_pass"])
             and result["t1_to_t0_documented_qc_pass"]
             and result["t2_to_t0_documented_qc_pass"]
         )
         result["origin_qc_pass"] = bool(result["origin_t1_t1gd_qc"].get("pass"))
         result["preflight_pass"] = (
-            not errors and result["headers_pass"] and result["metadata_gates_pass"] and result["origin_qc_pass"]
+            not errors and result["headers_pass"] and result["metadata_gates_pass"]
+            and result["origin_qc_pass"] and result["support_gates_pass"]
         )
         results.append(result)
     return results
@@ -476,6 +669,7 @@ def run_preflight(
     output_dir: Path,
     package_root: Path,
     protocol_path: Path,
+    cohort_policy: str = "strict_matched",
 ) -> dict[str, Any]:
     rows = read_crosswalk(crosswalk_path)
     if not rows:
@@ -488,7 +682,12 @@ def run_preflight(
     protocol_resolved = protocol_path.resolve()
     if not protocol_resolved.is_file():
         raise ValueError(f"protocol file does not exist: {protocol_resolved}")
-    results = preflight_rows(rows, crosswalk_path.resolve().parent, package_root=trusted_root)
+    results = preflight_rows(
+        rows,
+        crosswalk_path.resolve().parent,
+        package_root=trusted_root,
+        cohort_policy=cohort_policy,
+    )
     crosswalk_digest = hashlib.sha256(crosswalk_path.read_bytes()).hexdigest()
     script_path = Path(__file__).resolve()
     summary = {
@@ -500,14 +699,35 @@ def run_preflight(
         "analysis_protocol": str(protocol_resolved),
         "analysis_protocol_sha256": hashlib.sha256(protocol_resolved.read_bytes()).hexdigest(),
         "candidate_rows": len(results),
+        "cohort_policy": cohort_policy,
+        "preflight_scope": (
+            "legacy strict matched-lineage checks only; not full scoring readiness"
+            if cohort_policy == "strict_matched"
+            else "mixed-provenance pre-outcome evidence checks only; not full scoring readiness"
+        ),
+        "manual_source_review_required": cohort_policy == "mixed_exploratory",
         "alignment_reference": "t0_t1gd",
+        "metadata_gate_pass_rows": sum(bool(row["metadata_gates_pass"]) for row in results),
+        "support_gate_pass_rows": (
+            sum(bool(row["support_gates_pass"]) for row in results)
+            if cohort_policy == "mixed_exploratory" else None
+        ),
+        "registration_qc_gate_pass_rows": (
+            sum(bool(row["t1_to_t0_documented_qc_pass"] and row["t2_to_t0_documented_qc_pass"])
+                for row in results)
+            if cohort_policy == "mixed_exploratory" else None
+        ),
         "preflight_pass_rows": sum(bool(row["preflight_pass"]) for row in results),
         "preflight_fail_rows": sum(not bool(row["preflight_pass"]) for row in results),
         "target_mask_voxels_read": False,
         "t0_t2_mri_voxels_read": False,
         "scoring_authorized": False,
         "limitations": [
+            "Mixed visit provenance and unknown mask-review status are allowed and reported under the mixed exploratory policy.",
             "Header alignment does not prove registration provenance or anatomical registration quality.",
+            "Mixed-mode evidence files must be stored under the crosswalk directory's evidence subdirectory and match their declared SHA-256 values.",
+            "Evidence hashes pin files but do not verify their scientific meaning; a human must confirm each source supports its claimed field.",
+            "Missing support or full-volume/tumor-boundary registration evidence fails the mixed-mode row preflight.",
             "All three MRI and GTV files must already share the baseline t0 T1-Gd grid; this tool does not transform files.",
             "Metadata source fields are recorded but are not independently verified by this tool.",
             "This preflight does not resolve TCIA release crosswalk or collection-count discrepancies.",
@@ -526,12 +746,19 @@ def main() -> int:
     parser.add_argument("--out-dir", required=True, type=Path, help="new directory for preflight report files")
     parser.add_argument("--package-root", required=True, type=Path, help="trusted root of the downloaded CFB package")
     parser.add_argument("--protocol", required=True, type=Path, help="frozen protocol file to hash into the report")
+    parser.add_argument(
+        "--cohort-policy",
+        choices=("strict_matched", "mixed_exploratory"),
+        default="strict_matched",
+        help="lineage policy; use mixed_exploratory for the current separate CFB side-study draft",
+    )
     args = parser.parse_args()
     summary = run_preflight(
         args.crosswalk,
         args.out_dir,
         package_root=args.package_root,
         protocol_path=args.protocol,
+        cohort_policy=args.cohort_policy,
     )
     print(json.dumps(summary, indent=2))
     return 0

@@ -1,0 +1,57 @@
+# Track B PDE external-test protocol draft (2026-10-28)
+
+**Status:** candidate protocol only. It defines a two-history next-scan PDE forecast at a nominal 90-day horizon. Duke access has not been requested, no Duke files or outcomes have been accessed, and the patient-data model is not ready to score. This draft does not certify novelty or predict a positive result.
+
+## 1. Question and primary estimand
+
+Does a patient-specific reaction-diffusion forecast, issued 90 days after forecast origin, improve prediction of the immediate next eligible released tumor-core mask when its observed gap is 76–104 days, compared with a matched-volume no-PDE forecast? This is a 90-day target-window estimand, not an exact-day-90 validation: report every actual origin-to-target gap and describe the observed-mask timing mismatch.
+
+- **Forecast origin and one-pair rule:** use each patient's first two chronological eligible MRI/mask visits as history; the second visit is the origin. The immediate next eligible visit is the only target. Include the patient only if this third visit is 76–104 days after origin. Do not substitute a later scan. Make one forecast per patient. Use dates, file availability, and MRI-only QC only; never use target-mask values to choose history or target. If visit dates are missing, duplicated, or source-flagged uncertain, exclude the patient before outcome access. Otherwise use published relative-day values as given; do not manually shift dates. Report source date uncertainty as a limitation and prespecify a boundary sensitivity that excludes observed gaps of 76–78 and 102–104 days.
+- **Scheduled forecast:** forecast exactly at origin day +90. Do not give the realized target interval or any target-visit MRI to the prediction model. Use the selected target MRI only for outcome-independent registration and QC; do not use its GTV for registration or acceptance.
+- **Target:** labels 1 (necrotic tumor core) and 3 (enhancing tumor); exclude label 2 (nonenhancing T2-FLAIR abnormality) and label 4 (resection cavity). This is the label map documented on the official release record. Keep it in the release manifest. The Duke masks are automated nnU-Net outputs, so the endpoint is agreement with released masks, not independent biological ground truth.
+- **Independent unit and primary score:** patient; patient-macro Dice. Primary contrast is paired patient-level Dice difference between the PDE-hybrid forecast and its matched-volume signed-distance no-PDE comparator, with a patient-cluster bootstrap 95% interval. Persistence and geometric train-rate are required secondary baselines. Use the same patients, target masks, and failure policy for every arm.
+
+The forecast estimates future released-mask geometry under the care observed in this cohort. Do not call it untreated biological growth or clinical progression. Record treatment changes after origin, but do not give future treatment to the model or make causal claims.
+
+## 2. Cohort and selection
+
+Duke is a restricted candidate cohort with 61 patients and 503 visits. The dataset description reports 3–18 sessions per patient, automated masks at each visit, and that recurrence may be defined by tumor-volume change or clinical progression. The cohort-selection details remain pending. If used, describe results as applying to this recurrence-enriched cohort, not to all GBM patients.
+
+Before any mask-value access, screen only patient/visit metadata, file availability, image headers, and dates to report how many patients' first three eligible visits meet the 76–104-day rule. Use no GTV foreground or target-derived summaries in this screen. Do not widen the window or substitute a later visit if the count is low. Exclude patients with missing, duplicate, or source-flagged uncertain visit dates. Otherwise use published relative-day values as operational dates; report the source's few-day date uncertainty and run the prespecified boundary sensitivity.
+
+Apply the same first-two-to-third-visit rule to every patient; do not cherry-pick recurrence-labeled targets. Patient overlap with MU, UCSD-PTGBM, CFB-GBM, PREDICT-GBM, and prior project data must be checked before designating Duke as independent.
+
+## 3. Forecast and baselines
+
+The candidate PDE-hybrid is the existing joint-posterior Fisher–Kolmogorov shape forecast with a training-only shrunk patient volume trend and spatial boundary uncertainty. It must be made into a patient-data runner before scoring. Resample masks to a common 2-mm grid using nearest-neighbor interpolation after the registration gate passes. All population priors, shrinkage, hyperparameter selection, predictive variance, and boundary-error calibration must be estimated using development patients only.
+
+The matched-volume signed-distance no-PDE comparator uses identical training-shrunk future-volume draws and the same boundary-uncertainty model as the PDE arm. Estimate each patient's log-volume slope from the two history masks; shrink it toward the outer-training population median using the training-selected time constant. Estimate horizon-dependent log-volume variance from outer-training residuals, then draw positive future volumes. For the PDE arm, evolve the latest history mask to day 90 with posterior draws of (rho, D), then match each draw to its sampled volume. For the no-PDE arm, rank voxels by signed distance from the latest history mask to match those same sampled volumes; this retains the latest mask's shape and removes PDE shape evolution. Convert each ensemble to one hard forecast by thresholding voxelwise inclusion probability at 0.5. Persistence is the latest history mask unchanged. Geometric train-rate uses the latest mask's signed distance to grow or shrink it to volume V_origin × exp(g_train × 90), where g_train is the outer-training median log-volume slope. A positive primary interval supports added value over the matched-volume comparator only. If persistence or geometric train-rate performs better, do not claim broad PDE superiority. A broad superiority statement requires Holm-adjusted paired intervals favoring PDE against every prespecified baseline. These are intended rules already exercised in synthetic utilities or the existing MU baseline ladder; the Duke patient-data runner is not implemented.
+
+With two history masks there is one observed transition. Reaction and diffusion may remain on a rho–D ridge. Fit a joint posterior using a prior estimated only from training patients, report posterior/profile intervals, rho–D correlation, bound mass, and Jacobian/profile identifiability. If the ridge remains, report the forecast without claiming separately identified or biological patient parameters.
+
+## 4. Registration, support, and annotation gates
+
+The Duke repository says sessions were atlas-standardized but **not registered to one another**. Freeze an MRI-only longitudinal registration method, reference, interpolation, and per-case QC before any mask is transformed. Never fit or accept a registration using GTV contours. The release provides vessel-landmark pairs for some preoperative/recurrence scans; assess whether those landmarks cover the chosen forecast pairs and define a source-justified QC rule. If registration quality cannot be established for the selected pairs, stop before scoring.
+
+Before target-mask access, verify that target labels cover the stated acquisition domain and define where zero means a valid negative. Establish valid MRI acquisition support and its mapping to the forecast-origin grid. Shared atlas space or matching headers alone do not establish full anatomical or tumor-boundary alignment. If the data lack a valid-support field or source-backed full-coverage statement, do not score.
+
+Verify mask label provenance and version, treatment timing, scan-day reliability, segmentation algorithm/version, and any available expert review. Report automated-mask uncertainty. Do not treat recurrence labels selected partly by tumor-volume criteria as independent ground truth for a volume-growth hypothesis.
+
+## 5. Development, external evaluation, and failure rules
+
+Use previously explored MU only for development. All visits from one patient stay in one fold. Use nested patient-grouped folds to develop the model, fit training-only priors/calibration, and compare prespecified baselines; then refit once on the full development set. Before Duke target-mask access, estimate precision with metadata-only eligible-patient count N and nested out-of-fold MU paired differences from the same locked PDE-hybrid versus matched-volume comparator. Draw 10,000 patient-bootstrap samples of size N, compute the mean paired Dice difference in each, and use the 2.5th and 97.5th percentiles as the simulated 95% interval. Its half-width is half the upper-minus-lower interval width. Require half-width ≤0.05 Dice. This is a study-resolution target, not a clinical minimum important difference. Existing MU results from a different PDE arm or comparator cannot substitute. The required hybrid patient-runner and paired differences do not yet exist, so this precision gate is unevaluated and Duke target masks must remain closed. If the criterion later fails, report external-study infeasibility; do not open Duke target masks. Freeze this rule before using Duke metadata to set N. Freeze code, dependencies, preprocessing, target rule, folds, input manifest and hashes, model settings, calibration, metrics, and failure rules before opening Duke target masks. Evaluate Duke once as an external cohort; no tuning or cohort changes on Duke.
+
+Keep every candidate and failure in the flow. If the PDE forecast fails, use the prespecified history-only fallback (persistence) for the intent-to-evaluate primary analysis; report technical success rate and a separate successful-forecast summary. Never drop difficult patients after seeing their target. Report paired patient-bootstrap intervals, calibration/coverage, surface distance and volume error as secondary, and parameter identifiability separately from forecast accuracy.
+
+## 6. Required access decision and stop conditions
+
+The Zenodo record says Duke files are restricted (119.3 GB) and require an access request under CC BY-NC-ND 4.0 or a custom Duke license. Before any request, the school/fair sponsor must confirm the chosen license and derivative restrictions fit the project and presentation. No request or contact has been made.
+
+Do not download or score until permitted use, access, overlap, date quality, target support, longitudinal registration, and mask provenance are resolved. After access but before target-value use, run the metadata-only count and eligibility screen. If precision or eligible n is inadequate, report infeasibility; do not broaden the horizon post hoc.
+
+## Source basis
+
+- [Duke Zenodo dataset, label map, and license record](https://zenodo.org/records/20548528).
+- [Duke GBM-DIR-QA registration and date guidance](https://github.com/deshanyang/GBM-DIR-QA).
+- [Current Track B scope and previous MU results](../START_HERE.md).
+- [MU patient-level PDE runner](../src/100_pde_manifest.py) and [synthetic joint-posterior gate](../src/fk_full_hybrid_gate.py).
