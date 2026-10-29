@@ -1,6 +1,6 @@
 # CFB-GBM annotation-change side-study protocol draft
 
-**Status (updated 2026-10-28):** this is a separate exploratory annotation-change side study, not Track B's PDE core and not authorization to score. All 107 candidates pass file/header checks against the official baseline t0 T1-Gd reference grid and pass t1 origin-MRI normalization QC. These checks establish shared geometry and usable origin intensities, not anatomical registration quality. Mask review lineage and source transform records remain unresolved. The UCSD annotation-change test is partially exposed; its existing protocol remains historical and cannot serve as fresh confirmation.
+**Status (updated 2026-10-28):** this is a separate exploratory annotation-change side study, not Track B's PDE core and not authorization to score. All 107 candidates pass file/header checks against the official baseline t0 T1-Gd reference grid and pass t1 origin-MRI normalization QC. A full-cohort 2-mm HD-BET brain-mask screen also found broad shape overlap (median Dice 0.9789 at t1 and 0.9781 at t2); 14 IQR outliers were visually reviewed from mask-only overlays. This proxy does not establish anatomical or tumor-boundary registration. The run read no T1-Gd intensity voxels and opened no GTV files. Mask review lineage and source transform records remain unresolved. The UCSD annotation-change test is partially exposed; its existing protocol remains historical and cannot serve as fresh confirmation.
 
 ## 1. Question and scope
 
@@ -74,7 +74,7 @@ A statistically positive direction requires the two-sided 95% CI for Delta to li
 
 1. Record current v4 public/CC BY 4.0 terms, required attribution, package version, and prior exposure history. Verify whether the paper’s deceased-patient inclusion rule applies to this cohort and state its generalizability limit.
 2. Preserve the verified current-table-to-package mapping: 107 candidate pairs have all six files; the 112 table rows match 112 package t2 GTV files. Keep the 122 and 3,981 aggregate counts as documented, unresolved source discrepancies.
-3. All 107 candidates pass six-file header alignment to baseline t0 T1-Gd and t1 origin-only intensity QC. Before mask access, obtain per-case anatomical registration evidence and QC independent of GTV contours; shared shape and affine do not prove anatomical registration quality.
+3. All 107 candidates pass six-file header alignment to baseline t0 T1-Gd and t1 origin-only intensity QC. The completed HD-BET brain-mask screen is a coarse shape check only. Before mask access, recover per-case transforms/QC or complete MRI-intensity anatomical alignment review independent of GTV contours; shared shape, affine, and brain-mask overlap do not prove tumor-boundary registration quality.
 4. Resolve per-mask review status or freeze a separate exploratory plan that explicitly retains unknown review status and mixed t0 provenance. No provenance-matched, review-resolved set is currently established.
 5. Verify whether an independent development source is compatible. If none exists, freeze CFB-only nested cross-validation as exploratory, not external confirmation.
 6. Freeze code, patient and visit rule, physical-distance implementation, feature definitions, fold assignment, failure rules, metrics, bootstrap, power assumptions, and file hashes before any target-mask voxel access.
