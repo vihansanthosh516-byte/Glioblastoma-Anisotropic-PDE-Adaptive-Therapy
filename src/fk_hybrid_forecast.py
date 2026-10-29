@@ -31,7 +31,8 @@ def estimate_log_volume_slope(volumes, days) -> float:
     return float(centered_days @ (log_volumes - log_volumes.mean()) / denominator)
 
 
-def _perturb_boundary_or_keep(mask, *, boundary_covariance, spacing_mm, seed, n_anchors):
+def _perturb_boundary_or_keep(mask, *, boundary_covariance, spacing_mm, seed, n_anchors,
+                             domain=None, target_voxels=None):
     """Keep the valid pre-draw mask if boundary rasterization collapses a draw."""
     mask = np.asarray(mask, dtype=bool)
     perturbed = correlated_boundary_perturbation(
@@ -42,6 +43,8 @@ def _perturb_boundary_or_keep(mask, *, boundary_covariance, spacing_mm, seed, n_
         spacing_mm=spacing_mm,
         seed=seed,
         n_anchors=n_anchors,
+        domain=domain,
+        target_voxels=target_voxels,
     )
     if not perturbed.any() or perturbed.all():
         return mask.copy(), True
@@ -122,6 +125,8 @@ def signed_distance_volume_baseline_draws(last_mask, target_voxels, *, domain=No
             spacing_mm=spacing,
             seed=int(child_seed.generate_state(1)[0]),
             n_anchors=n_anchors,
+            domain=domain,
+            target_voxels=int(target),
         )
         fallback_count += int(collapsed)
         draw &= domain
@@ -233,6 +238,8 @@ def hybrid_posterior_predictive_forecast(masks, days, target_day, *, prior: dict
                     spacing_mm=h,
                     seed=int(seed_sequences[draw_index].generate_state(1)[0]),
                     n_anchors=n_anchors,
+                    domain=domain,
+                    target_voxels=int(requested_voxels[draw_index]),
                 )
                 hybrid_boundary_fallback_count += int(collapsed)
                 boundary_draw &= domain
@@ -256,10 +263,18 @@ def hybrid_posterior_predictive_forecast(masks, days, target_day, *, prior: dict
         seed=int(geometric_seed.generate_state(1)[0]), n_anchors=n_anchors,
         return_fallback_count=True,
     )
+    no_pde_final_volumes = no_pde_ranker_draws.reshape(n_draws, -1).sum(axis=1)
+    geometric_final_volume = int(geometric_train_rate_draws[0].sum())
+    if (not np.array_equal(final_volumes, requested_voxels)
+            or not np.array_equal(no_pde_final_volumes, requested_voxels)):
+        raise RuntimeError("hybrid and matched-volume no-PDE draws must preserve every requested voxel count")
+    if geometric_final_volume != geometric_target_voxels:
+        raise RuntimeError("geometric train-rate draw did not preserve its requested voxel count")
     return {
         "mask_draws": mask_draws,
         "pre_boundary_probability": pre_boundary_probability,
         "no_pde_ranker_mask_draws": no_pde_ranker_draws,
+        "no_pde_ranker_final_volume_draws_voxels": no_pde_final_volumes,
         "geometric_train_rate_mask": geometric_train_rate_draws[0],
         "geometric_train_rate_requested_volume_voxels": geometric_target_voxels,
         "geometric_train_rate_boundary_uncertainty": "none; deterministic signed-distance baseline",

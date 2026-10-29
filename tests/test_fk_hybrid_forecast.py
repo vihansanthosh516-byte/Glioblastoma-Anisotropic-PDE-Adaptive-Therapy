@@ -70,6 +70,16 @@ def test_history_only_hybrid_draws_preserve_sampled_volume_without_boundary_nois
     assert "no target mask used" in result["scope"]
 
 
+def test_boundary_uncertainty_preserves_sampled_volume_in_both_arms(monkeypatch):
+    result = forecast(monkeypatch, seed=23, n_draws=4, uncertain=True, population_slope=0.01)
+    hybrid_counts = result["mask_draws"].reshape(4, -1).sum(axis=1)
+    no_pde_counts = result["no_pde_ranker_mask_draws"].reshape(4, -1).sum(axis=1)
+
+    assert np.array_equal(hybrid_counts, result["requested_volume_draws_voxels"])
+    assert np.array_equal(no_pde_counts, result["requested_volume_draws_voxels"])
+    assert np.array_equal(no_pde_counts, result["no_pde_ranker_final_volume_draws_voxels"])
+
+
 def test_repeated_parameter_draws_reuse_pde_solutions_and_keep_sample_order(monkeypatch):
     mask = ball()
     parameter_draws = np.asarray([

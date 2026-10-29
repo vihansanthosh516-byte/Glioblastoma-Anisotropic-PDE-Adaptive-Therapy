@@ -92,14 +92,44 @@ def sample_anchor_displacements(anchor_points_mm, *, sigma_b_mm: float, tau_b_mm
     return factor @ np.random.default_rng(seed).normal(size=len(covariance))
 
 
+def _mask_with_exact_voxel_count(scores, domain, target_voxels: int, *, seed: int = 0) -> np.ndarray:
+    """Select the highest-scoring domain voxels with deterministic handling of score ties."""
+    scores = np.asarray(scores, dtype=float)
+    domain = np.asarray(domain, dtype=bool)
+    if scores.ndim != 3 or domain.shape != scores.shape or not np.isfinite(scores).all():
+        raise ValueError("scores and domain must be finite arrays on one 3D grid")
+    if isinstance(target_voxels, (bool, np.bool_)) or not isinstance(target_voxels, (int, np.integer)):
+        raise ValueError("target_voxels must be an integer")
+    domain_indices = np.flatnonzero(domain)
+    if target_voxels < 1 or target_voxels >= domain_indices.size:
+        raise ValueError("target_voxels must be positive and below domain capacity")
+
+    domain_scores = scores.reshape(-1)[domain_indices]
+    threshold_index = domain_scores.size - int(target_voxels)
+    threshold = np.partition(domain_scores, threshold_index)[threshold_index]
+    above_threshold = domain_scores > threshold
+    n_tied = int(target_voxels) - int(above_threshold.sum())
+    tied_indices = domain_indices[np.flatnonzero(domain_scores == threshold)]
+    if n_tied < 0 or n_tied > len(tied_indices):
+        raise RuntimeError("exact-volume threshold produced an inconsistent tie count")
+    selected = np.zeros(scores.size, dtype=bool)
+    selected[domain_indices[above_threshold]] = True
+    if n_tied:
+        tie_order = np.random.default_rng(seed).permutation(len(tied_indices))
+        selected[tied_indices[tie_order[:n_tied]]] = True
+    return selected.reshape(scores.shape)
+
+
 def correlated_boundary_perturbation(mask, *, sigma_b_mm: float, tau_b_mm: float, ell_mm: float,
                                      spacing_mm=1.0, seed: int = 0, n_anchors: int = 256,
-                                     anchor_points_mm=None, band_mm: float = 10.0) -> np.ndarray:
+                                     anchor_points_mm=None, band_mm: float = 10.0,
+                                     domain=None, target_voxels: int | None = None) -> np.ndarray:
     """Move a signed-distance contour using a correlated Gaussian field on surface anchors.
 
     Anchor displacements are interpolated to voxels in the boundary band from their three nearest anchors,
     with weights proportional to (distance + 0.1 mm)^-2. Updating the signed-distance level set approximates
-    moving the contour along its local normals, then rasterizes it back to a binary mask.
+    moving the contour along its local normals, then rasterizes it back to a binary mask. If target_voxels is
+    supplied, rethreshold the deformed level set within domain so boundary uncertainty is conditional on size.
     """
     mask = np.asarray(mask, dtype=bool)
     spacing = _spacing3(spacing_mm)
@@ -111,6 +141,16 @@ def correlated_boundary_perturbation(mask, *, sigma_b_mm: float, tau_b_mm: float
     band_mm = float(band_mm)
     if not np.isfinite(ell_mm) or ell_mm <= 0 or not np.isfinite(band_mm) or band_mm <= 0:
         raise ValueError("ell_mm and band_mm must be positive and finite")
+    domain_mask = None if domain is None else np.asarray(domain, dtype=bool)
+    if domain_mask is not None and (domain_mask.shape != mask.shape or np.any(mask & ~domain_mask)):
+        raise ValueError("domain must match and contain mask")
+    if target_voxels is not None:
+        if domain_mask is None:
+            domain_mask = np.ones(mask.shape, dtype=bool)
+        if (isinstance(target_voxels, (bool, np.bool_))
+                or not isinstance(target_voxels, (int, np.integer))
+                or target_voxels < 1 or target_voxels >= int(domain_mask.sum())):
+            raise ValueError("target_voxels must be a positive integer below domain capacity")
     if anchor_points_mm is None:
         anchors = deterministic_surface_anchors(mask, spacing_mm=spacing, n_anchors=n_anchors)
     else:
@@ -118,7 +158,11 @@ def correlated_boundary_perturbation(mask, *, sigma_b_mm: float, tau_b_mm: float
         if anchors.ndim != 2 or anchors.shape[1] != 3 or len(anchors) < 1 or not np.isfinite(anchors).all():
             raise ValueError("anchor_points_mm must be a nonempty finite array with shape (n, 3)")
     if sigma_b_mm == 0 and tau_b_mm == 0:
-        return mask.copy()
+        if target_voxels is None or int(mask.sum()) == int(target_voxels):
+            return mask.copy()
+        signed_distance = (ndimage.distance_transform_edt(mask, sampling=spacing)
+                           - ndimage.distance_transform_edt(~mask, sampling=spacing))
+        return _mask_with_exact_voxel_count(signed_distance, domain_mask, target_voxels, seed=seed)
 
     displacement = sample_anchor_displacements(
         anchors, sigma_b_mm=sigma_b_mm, tau_b_mm=tau_b_mm, ell_mm=ell_mm, seed=seed
@@ -128,7 +172,9 @@ def correlated_boundary_perturbation(mask, *, sigma_b_mm: float, tau_b_mm: float
     in_band = np.abs(signed_distance) <= band_mm
     voxel_indices = np.flatnonzero(in_band)
     if not len(voxel_indices):
-        return mask.copy()
+        if target_voxels is None or int(mask.sum()) == int(target_voxels):
+            return mask.copy()
+        return _mask_with_exact_voxel_count(signed_distance, domain_mask, target_voxels, seed=seed)
     voxel_coords_mm = np.column_stack(np.unravel_index(voxel_indices, mask.shape)).astype(float) * spacing
     k = min(3, len(anchors))
     distances, nearest = cKDTree(anchors).query(voxel_coords_mm, k=k)
@@ -139,7 +185,9 @@ def correlated_boundary_perturbation(mask, *, sigma_b_mm: float, tau_b_mm: float
     interpolated = np.sum(weights * displacement[nearest], axis=1)
     deformed = signed_distance.copy()
     deformed.flat[voxel_indices] += interpolated
-    return deformed > 0
+    if target_voxels is None:
+        return deformed > 0
+    return _mask_with_exact_voxel_count(deformed, domain_mask, target_voxels, seed=seed)
 
 
 def fixed_boundary_score_pairs(history_mask, *, spacing_mm=1.0, n_voxels: int = 256,

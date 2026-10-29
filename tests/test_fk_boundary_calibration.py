@@ -16,7 +16,10 @@ from src.fk_boundary_calibration import (  # noqa: E402
     run_cross_fitted_boundary_calibration,
 )
 from src.fk_patient_cv import PatientSeries  # noqa: E402
-from src.fk_spatial_uncertainty import exponential_covariance_matrix  # noqa: E402
+from src.fk_spatial_uncertainty import (  # noqa: E402
+    correlated_boundary_perturbation,
+    exponential_covariance_matrix,
+)
 
 
 def test_cross_fitted_variogram_estimator_recovers_simulated_covariance_scale():
@@ -46,6 +49,31 @@ def test_cross_fitted_variogram_estimator_recovers_simulated_covariance_scale():
     assert result["n_calibration_patients"] == 200
     assert result["n_anchor_pairs"] == 200 * 120
     assert "not scanner noise" in result["scope"]
+
+
+def test_boundary_perturbation_can_hold_exact_volume_inside_domain():
+    shape = (17, 17, 17)
+    coords = np.ogrid[tuple(slice(0, size) for size in shape)]
+    center = tuple((size - 1) / 2 for size in shape)
+    mask = sum((axis - value) ** 2 for axis, value in zip(coords, center)) <= 3.0**2
+    domain = np.ones(shape, dtype=bool)
+    domain[:, :, 0] = False
+    target_voxels = int(mask.sum()) + 7
+
+    draw = correlated_boundary_perturbation(
+        mask, sigma_b_mm=0.6, tau_b_mm=0.1, ell_mm=4.0,
+        spacing_mm=1.0, seed=19, n_anchors=32,
+        domain=domain, target_voxels=target_voxels,
+    )
+    repeated = correlated_boundary_perturbation(
+        mask, sigma_b_mm=0.6, tau_b_mm=0.1, ell_mm=4.0,
+        spacing_mm=1.0, seed=19, n_anchors=32,
+        domain=domain, target_voxels=target_voxels,
+    )
+
+    assert int(draw.sum()) == target_voxels
+    assert np.all(~draw | domain)
+    assert np.array_equal(draw, repeated)
 
 
 def test_covariance_fit_rejects_calibration_patient_in_its_training_set():
