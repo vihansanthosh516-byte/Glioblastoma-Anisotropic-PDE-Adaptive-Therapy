@@ -77,6 +77,9 @@ TAB, NL = "\t", "\n"
 CACHE_DIR = OUT_DIR / "cache"                 # per-patient checkpoints (resume after interruption)
 
 H = 2.0                       # mm, simulation / scoring grid
+MAX_EXPLICIT_DT_DAYS = 0.5
+DIFFUSION_STABILITY_FRACTION = 0.9
+REACTION_STABILITY_LIMIT = 0.05
 SRI_SHAPE = (240, 240, 155)
 GRID2 = (120, 120, 77)        # 2 mm grid (last 1 mm slice dropped)
 RHOS = [0.0, 0.01, 0.03, 0.1]            # 1/day
@@ -194,7 +197,24 @@ class TensorFK:
             out = out + (Fp.narrow(dim, 1, Fp.shape[dim] - 1) - Fp.narrow(dim, 0, Fp.shape[dim] - 1)) / self.h
         return out
 
-    def run(self, u0: np.ndarray, rhos, t_end: float, max_dt: float = 0.5,
+    def step_count(self, rhos, t_end: float, max_dt: float = MAX_EXPLICIT_DT_DAYS,
+                   kill_schedule: TreatmentSchedule | None = None,
+                   alpha: float = ALPHA_TMZ, beta: float = BETA_RT) -> int:
+        """Return the exact explicit integration step count for these rates and this operator."""
+        rhos = np.asarray(rhos, dtype=np.float32)
+        if rhos.ndim != 1 or len(rhos) < 1 or not np.isfinite(rhos).all() or np.any(rhos < 0):
+            raise ValueError("rhos must be a nonempty finite nonnegative 1D array")
+        if not np.isfinite(t_end) or not np.isfinite(max_dt) or max_dt <= 0:
+            raise ValueError("t_end and max_dt must be finite and max_dt must be positive")
+        kmax = 0.0
+        if kill_schedule is not None:
+            rt_max = kill_schedule.radiation.corrected_dose_per_fraction if kill_schedule.radiation else 0.0
+            kmax = alpha + beta * rt_max
+        dt_max = min(max_dt, DIFFUSION_STABILITY_FRACTION * self.h ** 2 / (6.0 * self.lam_max),
+                     REACTION_STABILITY_LIMIT / max(float(rhos.max()) + kmax, 1e-6))
+        return max(1, math.ceil(t_end / dt_max))
+
+    def run(self, u0: np.ndarray, rhos, t_end: float, max_dt: float = MAX_EXPLICIT_DT_DAYS,
             kill_schedule: TreatmentSchedule | None = None, t_start: float = 0.0,
             alpha: float = ALPHA_TMZ, beta: float = BETA_RT):
         """Integrate one initial field or matching batch to t_end; returns (B, X, Y, Z) numpy.
@@ -213,13 +233,8 @@ class TensorFK:
         else:
             raise ValueError("u0 must be 3D or a 4D batch aligned to rhos and solver grid")
         rho = torch.as_tensor(rhos)[:, None, None, None]
-        kmax = 0.0
-        if kill_schedule is not None:
-            rt_max = kill_schedule.radiation.corrected_dose_per_fraction if kill_schedule.radiation else 0.0
-            kmax = alpha + beta * rt_max
-        dt_max = min(max_dt, 0.9 * self.h ** 2 / (6.0 * self.lam_max),
-                     0.05 / max(float(rho.max()) + kmax, 1e-6))
-        n = max(1, math.ceil(t_end / dt_max))
+        n = self.step_count(rhos, t_end, max_dt=max_dt, kill_schedule=kill_schedule,
+                            alpha=alpha, beta=beta)
         dt = t_end / n
         # clamp bookkeeping (verification, script 97): mass the lower clamp adds / the upper clamp removes, per member
         lo = torch.zeros(len(rhos))

@@ -82,18 +82,19 @@ def test_repeated_parameter_draws_reuse_pde_solutions_and_keep_sample_order(monk
         hybrid, "infer_joint_log_parameter_posterior",
         lambda *args, **kwargs: {"parameter_draws_log": parameter_draws},
     )
-    calls = []
+    parameter_batches = []
 
-    def counted_forward(mask0, domain, rho, diffusion, days, h):
-        calls.append((rho, diffusion))
-        coords = np.ogrid[tuple(slice(0, size) for size in mask0.shape)]
-        center_x = 5.0 if rho < 0.04 else 10.0
-        concentration = np.exp(-((coords[0] - center_x) ** 2
-                                  + (coords[1] - 8.0) ** 2
-                                  + (coords[2] - 8.0) ** 2) / 8.0)
-        return [concentration.astype(np.float32)]
+    def fake_parameter_batches(mask0, domain, unique_parameters, *, horizon_days, spacing_mm, batch_size=4):
+        parameter_batches.append(np.asarray(unique_parameters).copy())
+        for parameter_index, (rho, _diffusion) in enumerate(unique_parameters):
+            coords = np.ogrid[tuple(slice(0, size) for size in mask0.shape)]
+            center_x = 5.0 if rho < 0.04 else 10.0
+            concentration = np.exp(-((coords[0] - center_x) ** 2
+                                      + (coords[1] - 8.0) ** 2
+                                      + (coords[2] - 8.0) ** 2) / 8.0)
+            yield np.asarray([parameter_index]), concentration.astype(np.float32)[None, ...]
 
-    monkeypatch.setattr(hybrid.fi, "forward_concentrations", counted_forward)
+    monkeypatch.setattr(hybrid, "_batched_parameter_concentrations", fake_parameter_batches)
     result = hybrid.hybrid_posterior_predictive_forecast(
         [mask, mask], [0.0, 20.0], 40.0,
         prior={"distribution": "log_uniform"}, h=1.0,
@@ -103,7 +104,8 @@ def test_repeated_parameter_draws_reuse_pde_solutions_and_keep_sample_order(monk
         n_draws=4, n_anchors=32, seed=17,
     )
 
-    assert len(calls) == 2
+    assert len(parameter_batches) == 1
+    assert parameter_batches[0].shape == (2, 2)
     assert np.array_equal(result["mask_draws"][0], result["mask_draws"][2])
     assert np.array_equal(result["mask_draws"][0], result["mask_draws"][3])
     assert not np.array_equal(result["mask_draws"][0], result["mask_draws"][1])
@@ -112,6 +114,42 @@ def test_repeated_parameter_draws_reuse_pde_solutions_and_keep_sample_order(monk
         + result["mask_draws"][1].astype(np.float32) * 0.25
     )
     assert np.array_equal(result["pre_boundary_probability"], expected_probability)
+
+
+def test_batched_parameter_concentrations_match_scalar_cfl_endpoint_fields():
+    initial = ball(shape=(16, 16, 16), radius=2.5)
+    domain = np.ones(initial.shape, dtype=bool)
+    rhos = (0.02, 0.04, 0.08, 0.1)
+    for diffusion, expected_steps in (
+        (0.05, (180, 180, 180, 181)),
+        (0.5, (180, 180, 180, 181)),
+        (2.0, (300, 300, 300, 300)),
+    ):
+        tensor = np.zeros(initial.shape + (6,), dtype=np.float32)
+        tensor[..., :3] = diffusion
+        solver = fi.ria.TensorFK(tensor, domain, h=2.0)
+        assert tuple(solver.step_count([rho], 90.0) for rho in rhos) == expected_steps
+    parameters = np.asarray([
+        [rho, diffusion]
+        for diffusion in (0.05, 0.5, 2.0)
+        for rho in rhos
+    ], dtype=np.float32)
+    batched_fields = {}
+    batch_count = 0
+    for indices, fields in hybrid._batched_parameter_concentrations(
+        initial, domain, parameters, horizon_days=90.0, spacing_mm=2.0,
+    ):
+        batch_count += 1
+        for lane, parameter_index in enumerate(indices):
+            batched_fields[int(parameter_index)] = fields[lane]
+
+    assert len(batched_fields) == len(parameters)
+    assert batch_count == 5
+    for index, (rho, diffusion) in enumerate(parameters):
+        scalar_field = fi.forward_concentrations(
+            initial, domain, float(rho), float(diffusion), [0.0, 90.0], 2.0,
+        )[0]
+        assert np.array_equal(batched_fields[index], scalar_field)
 
 
 def test_hybrid_forecast_seed_reproduces_volume_and_boundary_draws(monkeypatch):

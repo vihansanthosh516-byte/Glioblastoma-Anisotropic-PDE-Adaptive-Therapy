@@ -48,6 +48,49 @@ def _perturb_boundary_or_keep(mask, *, boundary_covariance, spacing_mm, seed, n_
     return perturbed, False
 
 
+def _batched_parameter_concentrations(initial_mask, domain, parameter_pairs, *, horizon_days, spacing_mm,
+                                      batch_size=4):
+    """Yield PDE fields in small batches sharing D and scalar-equivalent CFL step counts."""
+    initial_mask = np.asarray(initial_mask, dtype=bool)
+    domain = np.asarray(domain, dtype=bool)
+    parameters = np.asarray(parameter_pairs, dtype=np.float32)
+    horizon_days = float(horizon_days)
+    spacing_mm = float(spacing_mm)
+    if (initial_mask.ndim != 3 or domain.shape != initial_mask.shape
+            or parameters.ndim != 2 or parameters.shape[1] != 2 or not len(parameters)
+            or not np.isfinite(parameters).all() or np.any(parameters <= 0)
+            or not np.isfinite(horizon_days) or horizon_days <= 0
+            or not np.isfinite(spacing_mm) or spacing_mm <= 0):
+        raise ValueError("batched PDE inputs must be finite positive parameter pairs on a matching 3D grid")
+    if np.any(initial_mask & ~domain):
+        raise ValueError("initial PDE mask must be contained in the computational domain")
+    if isinstance(batch_size, (bool, np.bool_)) or int(batch_size) != batch_size or batch_size < 1:
+        raise ValueError("batch_size must be a positive integer")
+
+    unique_diffusion, diffusion_index = np.unique(parameters[:, 1], return_inverse=True)
+    for d_index, diffusion in enumerate(unique_diffusion):
+        parameter_indices = np.flatnonzero(diffusion_index == d_index)
+        diffusion_tensor = np.zeros(initial_mask.shape + (6,), dtype=np.float32)
+        diffusion_tensor[..., :3] = diffusion
+        solver = fi.ria.TensorFK(diffusion_tensor, domain, h=spacing_mm)
+
+        indices_by_step_count = {}
+        for parameter_index in parameter_indices:
+            rho = np.asarray([parameters[parameter_index, 0]], dtype=np.float32)
+            step_count = solver.step_count(rho, horizon_days)
+            indices_by_step_count.setdefault(step_count, []).append(int(parameter_index))
+
+        for step_count, same_step_indices in sorted(indices_by_step_count.items()):
+            for start in range(0, len(same_step_indices), int(batch_size)):
+                batch_indices = np.asarray(same_step_indices[start:start + int(batch_size)], dtype=int)
+                fields, observed_step_count = solver.run(
+                    initial_mask, parameters[batch_indices, 0], horizon_days,
+                )
+                if observed_step_count != step_count:
+                    raise RuntimeError("batched PDE integration changed the scalar-equivalent CFL step count")
+                yield batch_indices, fields
+
+
 def signed_distance_volume_baseline_draws(last_mask, target_voxels, *, domain=None, spacing_mm=1.0,
                                           boundary_covariance: dict, seed: int = 0,
                                           n_anchors: int = 256,
@@ -157,10 +200,14 @@ def hybrid_posterior_predictive_forecast(masks, days, target_day, *, prior: dict
         raise ValueError("forecast volume reaches computational-domain capacity; enlarge the domain")
 
     seed_sequences = boundary_seed.spawn(n_draws)
-    parameter_draws = np.asarray(posterior["parameter_draws_log"], dtype=float)
-    unique_parameter_draws, draw_to_parameter = np.unique(
-        parameter_draws, axis=0, return_inverse=True,
-    )
+    parameter_draws_log = np.asarray(posterior["parameter_draws_log"], dtype=float)
+    if (parameter_draws_log.shape != (n_draws, 2) or not np.isfinite(parameter_draws_log).all()):
+        raise RuntimeError("joint posterior returned malformed log-parameter draws")
+    # TensorFK receives float32 rho and D values. Deduplicate on those effective solver values.
+    parameter_draws = np.exp(parameter_draws_log).astype(np.float32)
+    if not np.isfinite(parameter_draws).all() or np.any(parameter_draws <= 0):
+        raise RuntimeError("joint posterior draws are outside the finite positive PDE parameter range")
+    unique_parameter_draws, draw_to_parameter = np.unique(parameter_draws, axis=0, return_inverse=True)
     draw_indices_by_parameter = [
         np.flatnonzero(draw_to_parameter == parameter_index)
         for parameter_index in range(len(unique_parameter_draws))
@@ -168,28 +215,28 @@ def hybrid_posterior_predictive_forecast(masks, days, target_day, *, prior: dict
     masks_out = [None] * n_draws
     hybrid_boundary_fallback_count = 0
     pre_boundary_inclusion_counts = np.zeros(masks[0].shape, dtype=np.uint32)
-    for parameter_index, (log_rho, log_D) in enumerate(unique_parameter_draws):
-        rho, diffusion = float(np.exp(log_rho)), float(np.exp(log_D))
-        concentration = fi.forward_concentrations(
-            masks[-1], domain, rho, diffusion, [float(days[-1]), target_day], h
-        )[0]
-        for draw_index in draw_indices_by_parameter[parameter_index]:
-            sized_mask = volume_match_concentration(
-                concentration, domain, target_voxels=int(requested_voxels[draw_index])
-            )
-            if sized_mask.all() or not sized_mask.any():
-                raise ValueError("volume-matched forecast has no usable boundary")
-            pre_boundary_inclusion_counts += sized_mask
-            boundary_draw, collapsed = _perturb_boundary_or_keep(
-                sized_mask,
-                boundary_covariance=boundary_covariance,
-                spacing_mm=h,
-                seed=int(seed_sequences[draw_index].generate_state(1)[0]),
-                n_anchors=n_anchors,
-            )
-            hybrid_boundary_fallback_count += int(collapsed)
-            boundary_draw &= domain
-            masks_out[draw_index] = boundary_draw
+    for parameter_indices, concentration_batch in _batched_parameter_concentrations(
+        masks[-1], domain, unique_parameter_draws, horizon_days=horizon, spacing_mm=h,
+    ):
+        for lane, parameter_index in enumerate(parameter_indices):
+            concentration = concentration_batch[lane]
+            for draw_index in draw_indices_by_parameter[int(parameter_index)]:
+                sized_mask = volume_match_concentration(
+                    concentration, domain, target_voxels=int(requested_voxels[draw_index])
+                )
+                if sized_mask.all() or not sized_mask.any():
+                    raise ValueError("volume-matched forecast has no usable boundary")
+                pre_boundary_inclusion_counts += sized_mask
+                boundary_draw, collapsed = _perturb_boundary_or_keep(
+                    sized_mask,
+                    boundary_covariance=boundary_covariance,
+                    spacing_mm=h,
+                    seed=int(seed_sequences[draw_index].generate_state(1)[0]),
+                    n_anchors=n_anchors,
+                )
+                hybrid_boundary_fallback_count += int(collapsed)
+                boundary_draw &= domain
+                masks_out[draw_index] = boundary_draw
 
     mask_draws = np.stack(masks_out, axis=0)
     pre_boundary_probability = pre_boundary_inclusion_counts.astype(np.float32) / n_draws

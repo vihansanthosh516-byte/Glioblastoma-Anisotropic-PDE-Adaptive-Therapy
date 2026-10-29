@@ -187,10 +187,12 @@ def evaluate_parameter_grid_log_likelihood(masks, days, log_parameter_points, *,
         diffusion = float(np.exp(log_D))
         tensor = np.zeros(masks[0].shape + (6,), dtype=np.float32)
         tensor[..., :3] = diffusion
+        # The tensor operator depends on D and the domain, not on rho. Reuse its
+        # precomputed face weights across all rho chunks for this diffusion value.
+        solver = fi.ria.TensorFK(tensor, domain, h=h)
         for batch_start in range(0, len(member_indices), batch_size):
             indices = member_indices[batch_start:batch_start + batch_size]
             rhos = parameter_values[indices, 0]
-            solver = fi.ria.TensorFK(tensor, domain, h=h)
             state = masks[0].astype(np.float32)
             previous_day = float(days[0])
             batch_values = np.zeros(len(indices), dtype=float)

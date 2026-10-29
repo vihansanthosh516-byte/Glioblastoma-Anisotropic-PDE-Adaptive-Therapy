@@ -133,6 +133,35 @@ def test_batched_grid_likelihood_matches_serial_pde_runs():
     assert np.allclose(actual, expected, rtol=1e-10, atol=1e-8)
 
 
+def test_parameter_grid_reuses_solver_across_rho_batches(monkeypatch):
+    initial = ellipsoid()
+    domain = np.ones(initial.shape, bool)
+    days = [0.0, 10.0, 20.0]
+    masks = [initial, *fi.forward_masks(initial, domain, 0.04, 0.05, days, 2.0)]
+    log_D = np.log(0.05)
+    points = np.asarray([
+        [np.log(rho), log_D] for rho in (0.02, 0.03, 0.04, 0.05, 0.06)
+    ])
+    original_solver = fgl.fi.ria.TensorFK
+    constructed = []
+
+    class CountingTensorFK(original_solver):
+        def __init__(self, *args, **kwargs):
+            constructed.append(1)
+            super().__init__(*args, **kwargs)
+
+    monkeypatch.setattr(fgl.fi.ria, "TensorFK", CountingTensorFK)
+    values = evaluate_parameter_grid_log_likelihood(
+        masks, days, points, h=2.0, domain=domain,
+        covariance_parameters={"sigma_b_mm": 1.0, "tau_b_mm": 0.2, "ell_mm": 5.0},
+        n_anchors=32,
+    )
+
+    assert len(constructed) == 1
+    assert values.shape == (5,)
+    assert np.isfinite(values).all()
+
+
 def test_parameter_grid_reuses_reference_covariance_factor(monkeypatch):
     initial = ellipsoid()
     domain = np.ones(initial.shape, bool)
