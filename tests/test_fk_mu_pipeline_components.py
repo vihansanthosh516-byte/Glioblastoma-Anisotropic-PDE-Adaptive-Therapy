@@ -89,7 +89,7 @@ def test_secondary_surface_and_volume_metrics_use_physical_spacing():
     assert result["volume_interval_90_covered_hybrid"] is True
 
     empty_result = score_first_third_target(
-        {"fallback_masks": {"hybrid": target, "no_pde": empty, "persistence": empty}},
+        {"fallback_masks": {"hybrid": target, "no_pde": target, "persistence": empty}},
         {"patient_id": "patient-2", "mask": empty},
         voxel_volume_mm3=8.0,
         valid_support=np.ones_like(target),

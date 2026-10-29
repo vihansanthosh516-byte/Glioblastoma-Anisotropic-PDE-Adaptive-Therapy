@@ -1,7 +1,8 @@
 """Target-only scoring callback for the first-two-to-third Track B forecasts.
 
 The forecast code must not receive the target. This module receives the forecast output and target only after
-the forecast is complete, thresholds ensemble inclusion probabilities at 0.5, and returns one patient score row.
+the forecast is complete, thresholds hybrid inclusion probabilities at 0.5, volume-matches the no-PDE point
+mask to that hybrid mask, and returns one patient score row.
 Use :func:`make_first_third_score_callback` with the grid's voxel spacing for physical volume and surface metrics.
 """
 from __future__ import annotations
@@ -64,6 +65,34 @@ def _ensemble_probabilities_and_volumes(draws, *, name: str, expected_shape, sup
         (np.count_nonzero(draw & support) for draw in array), dtype=np.int64, count=len(array),
     )
     return probabilities, volumes
+
+
+def _ranked_probability_mask(probabilities, *, support, target_voxels: int) -> np.ndarray:
+    """Select top probabilities inside support, breaking ties by ascending flat index."""
+    probabilities = np.asarray(probabilities, dtype=float)
+    support = np.asarray(support, dtype=bool)
+    if (probabilities.ndim != 3 or support.shape != probabilities.shape
+            or not np.isfinite(probabilities).all()):
+        raise ValueError("probabilities and support must be matching finite 3D arrays")
+    if isinstance(target_voxels, (bool, np.bool_)) or int(target_voxels) != target_voxels:
+        raise ValueError("target_voxels must be an integer")
+    target_voxels = int(target_voxels)
+    indices = np.flatnonzero(support)
+    if target_voxels < 0 or target_voxels > len(indices):
+        raise ValueError("target_voxels must be between zero and support size")
+    selected = np.zeros(probabilities.shape, dtype=bool)
+    if target_voxels == 0:
+        return selected
+    values = probabilities.ravel()[indices]
+    threshold_index = values.size - target_voxels
+    threshold = np.partition(values, threshold_index)[threshold_index]
+    above = values > threshold
+    selected.ravel()[indices[above]] = True
+    tied_count = target_voxels - int(above.sum())
+    if tied_count:
+        tied_indices = indices[np.flatnonzero(values == threshold)]
+        selected.ravel()[tied_indices[:tied_count]] = True
+    return selected
 
 
 def dice_with_empty_rule(prediction, target) -> float:
@@ -171,7 +200,8 @@ def _get_prediction_masks(prediction, target_shape, *, support, spacing_mm):
         design, design_status = _history_only_boundary_design(
             None, support=support, spacing_mm=spacing_mm,
         )
-        return fallback, fallback, fallback, fallback, "persistence_fallback", {}, {}, {}, design, design_status
+        return (fallback, fallback, fallback, fallback, "persistence_fallback", {}, {}, {}, design,
+                design_status, "identical persistence fallback masks; paired comparator difference is zero")
 
     history_raw = prediction.get("history_mask", prediction.get("persistence_mask"))
     history = None if history_raw is None else _binary_mask(history_raw, name="history/persistence mask")
@@ -182,6 +212,7 @@ def _get_prediction_masks(prediction, target_shape, *, support, spacing_mm):
     probability_fields = {}
     volume_samples = {}
     spatial_draws = {}
+    point_volume_rule = "identical persistence fallback masks; paired comparator difference is zero"
     if fallback_masks is not None:
         if not isinstance(fallback_masks, Mapping):
             raise ValueError("fallback_masks must map hybrid and no_pde to explicit masks")
@@ -198,6 +229,9 @@ def _get_prediction_masks(prediction, target_shape, *, support, spacing_mm):
             name="geometric train-rate fallback mask",
         )
         geometric_status = "persistence_fallback"
+        if int(hybrid.sum()) != int(no_pde.sum()):
+            raise ValueError("fallback masks must have equal volumes")
+        point_volume_rule = "explicit fallback masks supplied; equal voxel counts required"
     elif "fallback_mask" in prediction:
         hybrid = _binary_mask(prediction["fallback_mask"], name="explicit fallback mask")
         no_pde = hybrid
@@ -224,7 +258,14 @@ def _get_prediction_masks(prediction, target_shape, *, support, spacing_mm):
         )
         spatial_draws["no_pde"] = forecast["no_pde_ranker_mask_draws"]
         hybrid = probability_fields["hybrid"] >= 0.5
-        no_pde = probability_fields["no_pde"] >= 0.5
+        hybrid &= support
+        no_pde = _ranked_probability_mask(
+            probability_fields["no_pde"], support=support,
+            target_voxels=int(hybrid.sum()),
+        )
+        point_volume_rule = (
+            "rank no-PDE inclusion probabilities to hybrid point-mask voxel count; stable flat-index ties"
+        )
         persistence = history
         if "geometric_train_rate_mask" in forecast:
             geometric = _binary_mask(
@@ -249,7 +290,7 @@ def _get_prediction_masks(prediction, target_shape, *, support, spacing_mm):
         history, support=support, spacing_mm=spacing_mm,
     )
     return (hybrid, no_pde, persistence, geometric, geometric_status, probability_fields,
-            volume_samples, spatial_draws, design, design_status)
+            volume_samples, spatial_draws, design, design_status, point_volume_rule)
 
 
 def score_first_third_target(prediction, target, *, voxel_volume_mm3: float = 1.0,
@@ -290,7 +331,8 @@ def score_first_third_target(prediction, target, *, voxel_volume_mm3: float = 1.
         if support_mask.shape != target_mask.shape or not support_mask.any():
             raise ValueError("valid target support must be nonempty and match the target grid")
     (hybrid_mask, no_pde_mask, persistence_mask, geometric_mask, geometric_status,
-     probability_fields, volume_samples, spatial_draws, boundary_design, boundary_design_status) = (
+     probability_fields, volume_samples, spatial_draws, boundary_design, boundary_design_status,
+     point_volume_rule) = (
         _get_prediction_masks(
             prediction, target_mask.shape, support=support_mask, spacing_mm=spacing_mm,
         )
@@ -343,6 +385,7 @@ def score_first_third_target(prediction, target, *, voxel_volume_mm3: float = 1.
         "geometric_train_rate_prediction_empty": bool(geometric_voxels == 0),
         "geometric_train_rate_status": geometric_status,
         "ensemble_inclusion_threshold": 0.5,
+        "no_pde_matched_volume_point_forecast_rule": point_volume_rule,
         "empty_mask_dice_rule": "both_empty=1; one_empty=0",
         "boundary_spatial_score_design_status": boundary_design_status,
         "boundary_spatial_score_design_voxels": (
