@@ -1,4 +1,4 @@
-# Track B external cohort screen (2026-10-28)
+# Track B PDE external cohort screen (2026-10-28)
 
 **Status:** metadata-only source review. No access request or contact was made. No restricted files, patient-level outcomes, images, masks, or scores were accessed.
 
@@ -10,15 +10,15 @@ The record offers CC BY-NC-ND 4.0 or a custom Duke license. A request asks for a
 
 ## Fit and limitations
 
-- Multi-visit masks make this a plausible lead for a **new, separately amended patient-level trajectory evaluation**. The visit schedule is irregular, so the primary task must be explicitly next-observed-visit or use a prespecified fixed-day window supported by the available dates. The realized future gap must not be a predictor in an origin-time forecast.
+- Multi-visit masks make this a plausible lead for a **new, separately amended patient-level PDE growth-forecast evaluation**. A candidate design uses two historical masks to forecast the next eligible mask. The visit schedule is irregular, so freeze whether the estimand is next-observed-visit conditional on the realized gap or a prespecified fixed-day window supported by the available dates. Do not describe a realized-gap analysis as a scheduled-at-origin forecast.
 - The published record says full cohort-selection details will appear in a future paper. Its recurrence category can be assigned by tumor-volume change or clinical progression, so a recurrence-conditioned analysis can select on tumor change. The masks are automated nnU-Net outputs, not independent expert ground truth. Treat a mask-based endpoint as released-label change unless validated against an independent reference.
 - The 61 patients are not a power guarantee. Before outcome access, audit patient overlap and prior exposure against MU, UCSD-PTGBM, CFB-GBM, and other project cohorts; estimate precision under the final patient-level estimand; and freeze patient-grouped splits, baseline comparators, parameter-identifiability and calibration checks, and technical-failure rules.
-- The current UCSD-PTGBM test remains partially exposed and its exploratory result was negative. Duke would require a new protocol/amendment and cannot retroactively make the UCSD test confirmatory.
-- CFB-GBM remains a separate annotation-transition candidate with unresolved review lineage and registration QC. A CFB result cannot complete the broader PDE parameter-estimation and forecasting program.
+- UCSD-PTGBM is a separate, partially exposed annotation-change side study with a negative exploratory result; it is not the PDE core. Duke would require a new protocol/amendment and cannot retroactively change that result.
+- CFB-GBM is a separate annotation-transition candidate with unresolved review lineage and registration QC. A CFB result cannot complete the PDE parameter-estimation and forecasting program.
 
 ## Decision
 
-Duke is the best metadata-level lead found for advancing a revised multi-visit Track B study, but it is **not ready for scoring**. First resolve permitted use and access, then audit overlap/exposure and the target-label limitations. If these gates fail, retain the current negative and exploratory evidence; do not substitute another cohort after inspecting outcomes.
+Duke is the best metadata-level lead found for a future multi-visit Track B PDE study, but it is **not ready for scoring**. First resolve permitted use and access, then audit overlap/exposure, registration, and target-label limitations. If these gates fail, retain the current exploratory evidence; do not substitute another cohort after inspecting outcomes.
 
 ## Sources
 
