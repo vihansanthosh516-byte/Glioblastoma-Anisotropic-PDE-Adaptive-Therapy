@@ -8,7 +8,7 @@ Among eligible CFB-GBM patients with three consecutive, file-matched visits (t0,
 
 The target is **future released-annotation addition**, not tumor growth, recurrence, progression, treatment response, or clinical benefit. CFB GTV masks include clinical and nnU-Net-generated annotations; the endpoint can reflect annotation source and review process. No result, positive direction, or uniqueness is guaranteed.
 
-**One primary hypothesis:** the trajectory-augmented model has higher mean patient-level AUC than the frozen t1-only comparator (two-sided alpha .05; direction declared in advance as augmented minus comparator > 0). There is one primary contrast. Dose, alternate modalities, gap strata, and alternate endpoints are secondary or descriptive, not rescue analyses.
+**Proposed side-study primary hypothesis:** the trajectory-augmented model has higher mean patient-level AUC than the frozen t1-only comparator (two-sided alpha .05; direction declared in advance as augmented minus comparator > 0). This is a proposed side-study contrast only; it is not the primary Track B hypothesis, and scoring is not authorized. Dose, alternate modalities, gap strata, and alternate endpoints are secondary or descriptive, not rescue analyses.
 
 ## 2. Estimand and endpoint
 
@@ -36,7 +36,7 @@ Current metadata joins show 107 file-matched candidate t1-to-t2 pairs with T1-Gd
 
 Before target-mask voxels are opened, obtain a row-level record of whether every t0, t1, and t2 GTV was clinical/manual, generated, reviewed/corrected, or unknown, plus the evidence source for each classification. In the 107 file-matched candidates, current metadata marks all t1 and t2 GTVs `genSegmentation`; t0 has 93 `humanSegmentation` and 14 `genSegmentation`. The source paper reports that 44 generated masks were sampled and reviewed/corrected by five radiation oncologists, but publishes no patient/timepoint IDs. Current linked TSVs contain no per-mask review field. Review status is therefore unknown for every candidate. For 93/107, the t0-to-t1 trajectory also crosses human-to-generated annotation types and may encode annotation-process change.
 
-Primary confirmatory-style analysis requires one prespecified, consistent provenance and review class across all three visits. Do not combine label-generation classes in the primary set merely to increase n. Current evidence identifies only 14 candidates with generated masks at all three visits; their case-level review status is still unknown, so no provenance-and-review-matched primary set is established. A mixed-source annotation-transition analysis could only be explicitly exploratory under a separate frozen protocol; report provenance strata and the human-to-generated transition. Unknown review status must remain unknown. Do not exclude cases based on future mask appearance or observed AUC.
+The original proposed provenance-matched side-study analysis requires one prespecified, consistent provenance and review class across all three visits. Do not combine label-generation classes in that set merely to increase n. Current evidence identifies only 14 candidates with generated masks at all three visits; their case-level review status is still unknown, so no provenance-and-review-matched primary side-study set is established. A mixed-source annotation-transition analysis could only be explicitly exploratory under a separate frozen protocol; report provenance strata and the human-to-generated transition. Unknown review status must remain unknown. Do not exclude cases based on future mask appearance or observed AUC.
 
 ## 5. Inputs, models, and development
 
@@ -56,7 +56,7 @@ Dose-aware prediction is not primary. Only consider it as a later secondary anal
 
 ## 6. Evaluation and failure handling
 
-The primary metric is patient-specific ROC AUC on the frozen risk set. Both model arms must be scored on exactly the same patients. Report the paired denominator and reasons for every loss from candidate to eligible to AUC-evaluable cohort. No pooled-voxel AUC for inference. Report secondary arms (persistence/no-change, distance-only, T1-Gd-only) descriptively on the same patients if preregistered and technically valid; no cherry-picking the comparator after results.
+The proposed side-study primary metric is patient-specific ROC AUC on the frozen risk set. Both model arms must be scored on exactly the same patients. Report the paired denominator and reasons for every loss from candidate to eligible to AUC-evaluable cohort. No pooled-voxel AUC for inference. Report secondary arms (persistence/no-change, distance-only, T1-Gd-only) descriptively on the same patients if preregistered and technically valid; no cherry-picking the comparator after results.
 
 A technical failure is determined using origin-only information or a predeclared file/geometry rule. Record it without inspecting target values. No method-specific exclusion from the paired primary comparison: if either arm fails for a patient, omit that patient from the paired contrast and report the failure; use one common paired denominator. Do not add missing-modality fallbacks after seeing outcomes. Keep zero-addition and one-class cases visible in cohort flow, even though their AUC is undefined.
 
@@ -75,10 +75,10 @@ A statistically positive direction requires the two-sided 95% CI for Delta to li
 1. Record current v4 public/CC BY 4.0 terms, required attribution, package version, and prior exposure history. Verify whether the paper’s deceased-patient inclusion rule applies to this cohort and state its generalizability limit.
 2. Preserve the verified current-table-to-package mapping: 107 candidate pairs have all six files; the 112 table rows match 112 package t2 GTV files. Keep the 122 and 3,981 aggregate counts as documented, unresolved source discrepancies.
 3. All 107 candidates pass six-file header alignment to baseline t0 T1-Gd and t1 origin-only intensity QC. Before mask access, obtain per-case anatomical registration evidence and QC independent of GTV contours; shared shape and affine do not prove anatomical registration quality.
-4. Resolve per-mask review status or freeze a separate exploratory plan that explicitly retains unknown review status and mixed t0 provenance. No confirmatory-style provenance-matched subset is currently established.
+4. Resolve per-mask review status or freeze a separate exploratory plan that explicitly retains unknown review status and mixed t0 provenance. No provenance-matched, review-resolved set is currently established.
 5. Verify whether an independent development source is compatible. If none exists, freeze CFB-only nested cross-validation as exploratory, not external confirmation.
 6. Freeze code, patient and visit rule, physical-distance implementation, feature definitions, fold assignment, failure rules, metrics, bootstrap, power assumptions, and file hashes before any target-mask voxel access.
-7. Assess precision using independent development/pilot information. If precision is inadequate, stop confirmatory-style scoring and retain feasibility/exploratory status.
+7. Assess precision using independent development/pilot information. If precision is inadequate, do not make an inferential side-study claim; retain feasibility/exploratory status.
 
 Do not score under this draft. Target-mask review status, per-case registration QC, compatible development, and a complete frozen runner remain open. If a separate exploratory protocol is later approved, open target masks only for that frozen analysis and preserve a one-shot exposure record. No outcome-driven protocol changes.
 
