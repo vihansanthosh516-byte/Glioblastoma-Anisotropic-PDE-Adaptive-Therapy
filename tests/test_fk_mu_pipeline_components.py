@@ -10,6 +10,7 @@ import pytest
 REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO))
 
+from src import fk_mu_development_data as fk_mu_development_data_module
 from src import fk_mu_patient_runner as fk_mu_patient_runner_module
 from src.fk_mu_patient_runner import (
     LOCKED_MU_INITIAL_BOUNDARY_COVARIANCE,
@@ -367,6 +368,82 @@ def test_fixed_day90_cv_keeps_each_target_out_of_forecast_and_uses_persistence_f
     assert all(row["scores"]["geometric_train_rate_status"] == "forecast"
                for row in result["rows"] if row["forecast_status"] == "ok")
     assert fallback_rows[0]["scores"]["geometric_train_rate_status"] == "persistence_fallback"
+
+
+def test_synthetic_mu_runner_completes_patient_cv_and_scores_all_comparator_arms(monkeypatch):
+    shape = (16, 16, 16)
+    records = []
+    for index in range(18):
+        target_gap = (76.0, 85.0, 94.0, 103.0)[index % 4]
+        days = np.asarray([0.0, 30.0, 30.0 + target_gap])
+        records.append(PatientSeries(
+            f"synthetic-{index:02d}", days,
+            (_mask(2 + index % 2, shape), _mask(3 + index % 3, shape),
+             _mask(4 + index % 2, shape)),
+        ))
+    patient_ids = [record.patient_id for record in records]
+    folds = {patient_id: index % 5 for index, patient_id in enumerate(patient_ids)}
+    domains = {patient_id: np.ones(shape, dtype=bool) for patient_id in patient_ids}
+    supports = {patient_id: np.ones(shape, dtype=bool) for patient_id in patient_ids}
+    audit = {"access": {
+        "source_backed_registration_gate_passed": True,
+        "source_backed_target_support_gate_passed": True,
+    }, "synthetic_fixture": True}
+    cohort = MUDevelopmentCohort(tuple(records), folds, domains, supports, audit)
+    fk_mu_development_data_module._LOADER_ISSUED_COHORTS.add(cohort)
+    forecast_patient_ids = []
+
+    def cheap_history_only_forecast(history, nuisance, domain_by_patient, boundary_covariance, *, seed, settings):
+        assert history.target_index == 2
+        assert len(history.masks) == 2
+        assert history.forecast_day == history.days[-1] + 90.0
+        assert history.patient_id not in nuisance["training_patient_ids"]
+        forecast_patient_ids.append(history.patient_id)
+        last = np.asarray(history.masks[-1], dtype=bool)
+        hybrid_mask = np.zeros_like(last)
+        hybrid_mask[:min(last.shape[0], 5), :min(last.shape[1], 5), :min(last.shape[2], 5)] = True
+        hybrid_draws = np.stack((hybrid_mask, hybrid_mask))
+        no_pde_draws = np.stack((last, last))
+        points = np.asarray([[0.0, 0.0], [1.0, 0.0], [0.0, 1.0], [1.0, 1.0]])
+        posterior = {
+            "grid": {"points": points},
+            "posterior_probabilities": np.full(4, 0.25),
+            "parameter_draws_log": np.asarray([[0.0, 0.0], [1.0, 1.0]]),
+            "posterior_mass_at_parameter_bounds": {
+                "rho_lower": 0.1, "rho_upper": 0.1, "D_lower": 0.1, "D_upper": 0.1,
+            },
+            "coarse_grid_points": 4,
+            "refined_grid_points": 4,
+            "n_likelihood_evaluations": 8,
+        }
+        return {
+            "mask_draws": hybrid_draws,
+            "no_pde_ranker_mask_draws": no_pde_draws,
+            "geometric_train_rate_mask": last,
+            "pre_boundary_probability": hybrid_mask.astype(np.float32),
+            "posterior": posterior,
+        }
+
+    monkeypatch.setattr(fk_mu_patient_runner_module, "_hybrid_forecast", cheap_history_only_forecast)
+    result = run_mu_first_two_to_third_development_cv(
+        cohort,
+        initial_boundary_covariance={"sigma_b_mm": 0.8, "tau_b_mm": 0.3, "ell_mm": 6.0},
+        calibration_minimum_patients=8,
+        calibration_folds=2,
+        n_draws=2,
+        n_anchors=16,
+    )
+
+    assert result["n_patients"] == 18
+    assert len(result["rows"]) == 18
+    assert set(row["patient_id"] for row in result["rows"]) == set(patient_ids)
+    assert result["precision_gate"] is None
+    assert result["precision_gate_status"].startswith("not computed")
+    assert all(row["scores"]["dice_hybrid"] is not None for row in result["rows"])
+    assert all(row["scores"]["dice_no_pde_matched_volume"] is not None for row in result["rows"])
+    assert all(row["scores"]["dice_geometric_train_rate"] is not None for row in result["rows"])
+    assert all("paired_delta_dice_hybrid_minus_no_pde" in row["scores"] for row in result["rows"])
+    assert len(forecast_patient_ids) >= 18
 
 
 def test_gap_sensitivity_excludes_edge_days_before_refitting():
