@@ -62,7 +62,8 @@ Notes are in `research_notes/trackA_spatial/`. The files are: sci-literature, sc
    - the Ravi `README.md` (9.55 KB);
    - the Greenwald `visium_dataset_description.csv` (10.7 kB).
 4. **Then fix the plan.** Use one primary endpoint, one p convention, a frozen published signature, one purity threshold, and one sign convention. Seal it in code with a SHA-256 hash before any scoring (the pattern is in `src/170_trackc_sealed_missed_scans.py`). Script number 172 is free.
-5. **Before coding:** read `research_notes/trackA_spatial/sci-coder.md` (file plan) and `sci-debugger.md` (12 failure-mode tests). Write synthetic tests first.
+5. **Before citing any count:** periphery cell-type counts sum to only 2,775-2,940 of the 3,000 sampled cells per donor (writer agent); explain the gap. Team summary: `research_notes/trackA_spatial/SUMMARY.md`.
+6. **Before coding:** read `research_notes/trackA_spatial/sci-coder.md` (file plan) and `sci-debugger.md` (12 failure-mode tests). Write synthetic tests first.
 
 ## Open gates (from START_HERE)
 - The Cell Browser reuse terms are unknown.
