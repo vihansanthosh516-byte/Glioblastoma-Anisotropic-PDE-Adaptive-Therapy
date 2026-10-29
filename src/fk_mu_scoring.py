@@ -1,14 +1,15 @@
 """Target-only scoring callback for the first-two-to-third Track B forecasts.
 
 The forecast code must not receive the target. This module receives the forecast output and target only after
-the forecast is complete, thresholds ensemble inclusion probabilities at 0.5, and returns one paired score row.
-Use :func:`make_first_third_score_callback` with the grid's voxel spacing to report volumes in mm^3.
+the forecast is complete, thresholds ensemble inclusion probabilities at 0.5, and returns one patient score row.
+Use :func:`make_first_third_score_callback` with the grid's voxel spacing for physical volume and surface metrics.
 """
 from __future__ import annotations
 
 from collections.abc import Mapping
 
 import numpy as np
+from scipy.ndimage import binary_erosion, distance_transform_edt, generate_binary_structure
 
 
 def _binary_mask(value, *, name: str) -> np.ndarray:
@@ -31,10 +32,27 @@ def _ensemble_median_mask(draws, *, name: str, expected_shape: tuple[int, int, i
         if (not np.issubdtype(array.dtype, np.number) or not np.isfinite(array).all()
                 or not np.isin(array, (0, 1)).all()):
             raise ValueError(f"{name} must contain only finite binary masks")
-    inclusion_probability = np.asarray(array, dtype=np.float64).mean(axis=0)
+    inclusion_probability = array.mean(axis=0, dtype=np.float32)
     if not np.isfinite(inclusion_probability).all():
         raise ValueError(f"{name} inclusion probabilities must be finite")
     return inclusion_probability >= 0.5
+
+
+def _ensemble_probabilities_and_volumes(draws, *, name: str, expected_shape, support) -> tuple[np.ndarray, np.ndarray]:
+    array = np.asarray(draws)
+    if array.ndim != 4 or tuple(array.shape[1:]) != expected_shape or array.shape[0] < 1:
+        raise ValueError(f"{name} must have shape (n_draws, *target_shape) with at least one draw")
+    if array.dtype != np.bool_:
+        if (not np.issubdtype(array.dtype, np.number) or not np.isfinite(array).all()
+                or not np.isin(array, (0, 1)).all()):
+            raise ValueError(f"{name} must contain only finite binary masks")
+    probabilities = array.mean(axis=0, dtype=np.float32)
+    if not np.isfinite(probabilities).all():
+        raise ValueError(f"{name} inclusion probabilities must be finite")
+    volumes = np.fromiter(
+        (np.count_nonzero(draw & support) for draw in array), dtype=np.int64, count=len(array),
+    )
+    return probabilities, volumes
 
 
 def dice_with_empty_rule(prediction, target) -> float:
@@ -50,6 +68,61 @@ def dice_with_empty_rule(prediction, target) -> float:
     return float(2 * int(np.count_nonzero(prediction & target)) / (prediction_count + target_count))
 
 
+def _surface_distance_metrics(prediction, target, *, spacing_mm, support) -> dict:
+    if not prediction.any() and not target.any():
+        return {"mean_surface_distance_mm": 0.0, "hausdorff95_surface_distance_mm": 0.0,
+                "surface_distance_status": "both_empty_zero_rule"}
+    if not prediction.any() or not target.any():
+        return {"mean_surface_distance_mm": None, "hausdorff95_surface_distance_mm": None,
+                "surface_distance_status": "undefined_one_empty"}
+    if not support.all():
+        return {"mean_surface_distance_mm": None, "hausdorff95_surface_distance_mm": None,
+                "surface_distance_status": "undefined_partial_support"}
+
+    structure = generate_binary_structure(3, 1)
+    prediction_surface = prediction & ~binary_erosion(prediction, structure=structure, border_value=0)
+    target_surface = target & ~binary_erosion(target, structure=structure, border_value=0)
+    distance_to_prediction = distance_transform_edt(~prediction_surface, sampling=spacing_mm)
+    distance_to_target = distance_transform_edt(~target_surface, sampling=spacing_mm)
+    distances = np.concatenate((
+        distance_to_target[prediction_surface],
+        distance_to_prediction[target_surface],
+    ))
+    return {
+        "mean_surface_distance_mm": float(distances.mean()),
+        "hausdorff95_surface_distance_mm": float(np.quantile(distances, 0.95)),
+        "surface_distance_status": "defined; 6-connected boundary voxels; symmetric directed distances",
+    }
+
+
+def _volume_error_metrics(prediction_voxels: int, target_voxels: int, *, voxel_volume_mm3: float) -> dict:
+    error_mm3 = float((prediction_voxels - target_voxels) * voxel_volume_mm3)
+    return {
+        "volume_error_mm3": error_mm3,
+        "absolute_volume_error_mm3": abs(error_mm3),
+        "relative_volume_error": float(prediction_voxels / target_voxels - 1.0) if target_voxels else None,
+    }
+
+
+def _volume_distribution_metrics(sample_volumes_voxels, target_voxels: int, *, voxel_volume_mm3: float) -> dict:
+    samples = np.asarray(sample_volumes_voxels, dtype=float)
+    if (samples.ndim != 1 or not len(samples) or not np.isfinite(samples).all()
+            or np.any(samples < 0)):
+        raise ValueError("volume forecast samples must be finite nonnegative voxel counts")
+    samples *= voxel_volume_mm3
+    target_volume = float(target_voxels * voxel_volume_mm3)
+    pairwise_distance = np.abs(samples[:, None] - samples[None, :]).mean()
+    crps = float(np.abs(samples - target_volume).mean() - 0.5 * pairwise_distance)
+    lower, upper = np.quantile(samples, [0.05, 0.95])
+    return {
+        "volume_crps_mm3": crps,
+        "volume_interval_90_lower_mm3": float(lower),
+        "volume_interval_90_upper_mm3": float(upper),
+        "volume_interval_90_covered": bool(lower <= target_volume <= upper),
+        "volume_interval_90_sample_count": int(len(samples)),
+    }
+
+
 def _get_target_mask(target) -> np.ndarray:
     if isinstance(target, Mapping):
         if "mask" not in target:
@@ -60,13 +133,13 @@ def _get_target_mask(target) -> np.ndarray:
     return _binary_mask(target, name="target")
 
 
-def _get_prediction_masks(prediction, target_shape) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+def _get_prediction_masks(prediction, target_shape, *, support):
     """Resolve a successful ensemble or explicit persistence-fallback masks."""
     if not isinstance(prediction, Mapping):
         fallback = _binary_mask(prediction, name="explicit fallback mask")
         if fallback.shape != target_shape:
             raise ValueError("fallback mask and target must have the same shape")
-        return fallback, fallback, fallback
+        return fallback, fallback, fallback, fallback, "persistence_fallback", {}, {}
 
     history_raw = prediction.get("history_mask", prediction.get("persistence_mask"))
     history = None if history_raw is None else _binary_mask(history_raw, name="history/persistence mask")
@@ -74,6 +147,8 @@ def _get_prediction_masks(prediction, target_shape) -> tuple[np.ndarray, np.ndar
         raise ValueError("history/persistence mask and target must have the same shape")
 
     fallback_masks = prediction.get("fallback_masks")
+    probability_fields = {}
+    volume_samples = {}
     if fallback_masks is not None:
         if not isinstance(fallback_masks, Mapping):
             raise ValueError("fallback_masks must map hybrid and no_pde to explicit masks")
@@ -85,12 +160,19 @@ def _get_prediction_masks(prediction, target_shape) -> tuple[np.ndarray, np.ndar
         if persistence_raw is None:
             raise ValueError("persistence mask is required for fallback scoring")
         persistence = _binary_mask(persistence_raw, name="persistence fallback mask")
+        geometric = _binary_mask(
+            fallback_masks.get("geometric_train_rate", persistence),
+            name="geometric train-rate fallback mask",
+        )
+        geometric_status = "persistence_fallback"
     elif "fallback_mask" in prediction:
         hybrid = _binary_mask(prediction["fallback_mask"], name="explicit fallback mask")
         no_pde = hybrid
         if history is None:
             raise ValueError("history_mask is required to score persistence separately")
         persistence = history
+        geometric = persistence
+        geometric_status = "persistence_fallback"
     else:
         forecast = prediction.get("forecast", prediction)
         if not isinstance(forecast, Mapping):
@@ -99,23 +181,40 @@ def _get_prediction_masks(prediction, target_shape) -> tuple[np.ndarray, np.ndar
             raise ValueError("hybrid forecast must contain mask_draws and no_pde_ranker_mask_draws")
         if history is None:
             raise ValueError("history_mask is required to score persistence")
-        hybrid = _ensemble_median_mask(
-            forecast["mask_draws"], name="mask_draws", expected_shape=target_shape,
+        probability_fields["hybrid"], volume_samples["hybrid"] = _ensemble_probabilities_and_volumes(
+            forecast["mask_draws"], name="mask_draws", expected_shape=target_shape, support=support,
         )
-        no_pde = _ensemble_median_mask(
-            forecast["no_pde_ranker_mask_draws"],
-            name="no_pde_ranker_mask_draws", expected_shape=target_shape,
+        probability_fields["no_pde"], volume_samples["no_pde"] = _ensemble_probabilities_and_volumes(
+            forecast["no_pde_ranker_mask_draws"], name="no_pde_ranker_mask_draws",
+            expected_shape=target_shape, support=support,
         )
+        hybrid = probability_fields["hybrid"] >= 0.5
+        no_pde = probability_fields["no_pde"] >= 0.5
         persistence = history
+        if "geometric_train_rate_mask" in forecast:
+            geometric = _binary_mask(
+                forecast["geometric_train_rate_mask"], name="geometric_train_rate_mask",
+            )
+            geometric_status = "forecast"
+        elif "geometric_train_rate_mask_draws" in forecast:
+            geometric = _ensemble_median_mask(
+                forecast["geometric_train_rate_mask_draws"],
+                name="geometric_train_rate_mask_draws", expected_shape=target_shape,
+            )
+            geometric_status = "forecast"
+        else:
+            geometric = persistence
+            geometric_status = "unavailable_persistence_fallback"
 
-    for name, mask in (("hybrid", hybrid), ("no-PDE", no_pde), ("persistence", persistence)):
+    for name, mask in (("hybrid", hybrid), ("no-PDE", no_pde),
+                       ("persistence", persistence), ("geometric train-rate", geometric)):
         if mask.shape != target_shape:
             raise ValueError(f"{name} prediction and target must have the same shape")
-    return hybrid, no_pde, persistence
+    return hybrid, no_pde, persistence, geometric, geometric_status, probability_fields, volume_samples
 
 
 def score_first_third_target(prediction, target, *, voxel_volume_mm3: float = 1.0,
-                             valid_support=None) -> dict:
+                             voxel_spacing_mm=None, valid_support=None) -> dict:
     """Score one target after forecasting; return finite, patient-level paired metrics.
 
     ``prediction`` may be the hybrid result directly, a wrapper containing ``forecast`` and ``history_mask``,
@@ -124,7 +223,8 @@ def score_first_third_target(prediction, target, *, voxel_volume_mm3: float = 1.
     PDE failure, pass the persistence mask as the same hybrid and no-PDE fallback; its paired delta is then zero.
 
     Dice treats an empty target and empty prediction as 1, and exactly one empty mask as 0. Every target remains
-    in the score output, including empty targets. Volumes use voxel counts multiplied by voxel_volume_mm3.
+    in the score output, including empty targets. Volume errors and mean/95th-percentile surface distances are
+    secondary metrics; surface distances are undefined for one empty mask or partial support.
     """
     try:
         voxel_volume_mm3 = float(voxel_volume_mm3)
@@ -132,28 +232,45 @@ def score_first_third_target(prediction, target, *, voxel_volume_mm3: float = 1.
         raise ValueError("voxel_volume_mm3 must be a positive finite scalar") from exc
     if not np.isfinite(voxel_volume_mm3) or voxel_volume_mm3 <= 0:
         raise ValueError("voxel_volume_mm3 must be a positive finite scalar")
+    if voxel_spacing_mm is None:
+        spacing_mm = np.full(3, voxel_volume_mm3 ** (1.0 / 3.0), dtype=float)
+    else:
+        try:
+            spacing_mm = np.broadcast_to(np.asarray(voxel_spacing_mm, dtype=float), (3,)).copy()
+        except (TypeError, ValueError) as exc:
+            raise ValueError("voxel_spacing_mm must be one positive value or three positive finite values") from exc
+        if not np.isfinite(spacing_mm).all() or np.any(spacing_mm <= 0):
+            raise ValueError("voxel_spacing_mm must be one positive value or three positive finite values")
+        if not np.isclose(float(np.prod(spacing_mm)), voxel_volume_mm3, rtol=1e-9, atol=1e-12):
+            raise ValueError("voxel_volume_mm3 must match the product of voxel_spacing_mm")
     target_mask = _get_target_mask(target)
-    hybrid_mask, no_pde_mask, persistence_mask = _get_prediction_masks(prediction, target_mask.shape)
     if valid_support is None:
         support_mask = np.ones(target_mask.shape, dtype=bool)
     else:
         support_mask = _binary_mask(valid_support, name="valid target support")
         if support_mask.shape != target_mask.shape or not support_mask.any():
             raise ValueError("valid target support must be nonempty and match the target grid")
+    (hybrid_mask, no_pde_mask, persistence_mask, geometric_mask, geometric_status,
+     probability_fields, volume_samples) = _get_prediction_masks(
+        prediction, target_mask.shape, support=support_mask,
+    )
     if np.any(target_mask & ~support_mask):
         raise ValueError("target foreground falls outside validated target support")
-    for name, mask in (("hybrid", hybrid_mask), ("no-PDE", no_pde_mask), ("persistence", persistence_mask)):
+    for name, mask in (("hybrid", hybrid_mask), ("no-PDE", no_pde_mask),
+                       ("persistence", persistence_mask), ("geometric train-rate", geometric_mask)):
         if np.any(mask & ~support_mask):
             raise ValueError(f"{name} prediction falls outside validated target support")
     target_mask = target_mask & support_mask
     hybrid_mask = hybrid_mask & support_mask
     no_pde_mask = no_pde_mask & support_mask
     persistence_mask = persistence_mask & support_mask
+    geometric_mask = geometric_mask & support_mask
 
     target_voxels = int(target_mask.sum())
     hybrid_voxels = int(hybrid_mask.sum())
     no_pde_voxels = int(no_pde_mask.sum())
     persistence_voxels = int(persistence_mask.sum())
+    geometric_voxels = int(geometric_mask.sum())
     dice_hybrid = dice_with_empty_rule(hybrid_mask, target_mask)
     dice_no_pde = dice_with_empty_rule(no_pde_mask, target_mask)
     dice_persistence = dice_with_empty_rule(persistence_mask, target_mask)
@@ -162,23 +279,58 @@ def score_first_third_target(prediction, target, *, voxel_volume_mm3: float = 1.
         "dice_hybrid": float(dice_hybrid),
         "dice_no_pde_matched_volume": float(dice_no_pde),
         "dice_persistence": float(dice_persistence),
+        "dice_geometric_train_rate": float(dice_with_empty_rule(geometric_mask, target_mask)),
         "paired_delta_dice_hybrid_minus_no_pde": paired_delta,
+        "paired_delta_dice_hybrid_minus_geometric_train_rate": float(
+            dice_hybrid - dice_with_empty_rule(geometric_mask, target_mask)
+        ),
         "target_voxels": target_voxels,
         "hybrid_prediction_voxels": hybrid_voxels,
         "no_pde_prediction_voxels": no_pde_voxels,
         "persistence_prediction_voxels": persistence_voxels,
+        "geometric_train_rate_prediction_voxels": geometric_voxels,
         "target_volume_mm3": float(target_voxels * voxel_volume_mm3),
         "hybrid_prediction_volume_mm3": float(hybrid_voxels * voxel_volume_mm3),
         "no_pde_prediction_volume_mm3": float(no_pde_voxels * voxel_volume_mm3),
         "persistence_prediction_volume_mm3": float(persistence_voxels * voxel_volume_mm3),
+        "geometric_train_rate_prediction_volume_mm3": float(geometric_voxels * voxel_volume_mm3),
         "target_empty": bool(target_voxels == 0),
         "valid_support_voxels": int(support_mask.sum()),
         "hybrid_prediction_empty": bool(hybrid_voxels == 0),
         "no_pde_prediction_empty": bool(no_pde_voxels == 0),
         "persistence_prediction_empty": bool(persistence_voxels == 0),
+        "geometric_train_rate_prediction_empty": bool(geometric_voxels == 0),
+        "geometric_train_rate_status": geometric_status,
         "ensemble_inclusion_threshold": 0.5,
         "empty_mask_dice_rule": "both_empty=1; one_empty=0",
     }
+    for name, predicted_mask in (
+        ("hybrid", hybrid_mask), ("no_pde", no_pde_mask), ("persistence", persistence_mask),
+        ("geometric_train_rate", geometric_mask),
+    ):
+        result.update({
+            f"{key}_{name}": value
+            for key, value in _volume_error_metrics(
+                int(predicted_mask.sum()), target_voxels, voxel_volume_mm3=voxel_volume_mm3,
+            ).items()
+        })
+        result.update({
+            f"{key}_{name}": value
+            for key, value in _surface_distance_metrics(
+                predicted_mask, target_mask, spacing_mm=spacing_mm, support=support_mask,
+            ).items()
+        })
+        probabilities = probability_fields.get(name, predicted_mask.astype(np.float32))
+        result[f"marginal_voxel_brier_{name}"] = float(
+            np.mean((probabilities[support_mask] - target_mask[support_mask]) ** 2)
+        )
+        samples = volume_samples.get(name, np.asarray([predicted_mask.sum()], dtype=np.int64))
+        result.update({
+            f"{key}_{name}": value
+            for key, value in _volume_distribution_metrics(
+                samples, target_voxels, voxel_volume_mm3=voxel_volume_mm3,
+            ).items()
+        })
     for key, value in result.items():
         if isinstance(value, (float, np.floating)) and not np.isfinite(value):
             raise RuntimeError(f"non-finite score generated for {key}")
@@ -216,6 +368,7 @@ def make_first_third_score_callback(spacing_mm=2.0, *, valid_support_by_patient=
             valid_support = support_mapping[patient_id]
         return score_first_third_target(
             prediction, target, voxel_volume_mm3=voxel_volume_mm3,
+            voxel_spacing_mm=tuple(spacing),
             valid_support=valid_support,
         )
 

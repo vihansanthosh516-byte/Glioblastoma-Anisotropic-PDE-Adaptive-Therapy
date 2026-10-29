@@ -147,6 +147,14 @@ def hybrid_posterior_predictive_forecast(masks, days, target_day, *, prior: dict
     domain_voxels = int(domain.sum())
     if np.any(requested_voxels >= domain_voxels):
         raise ValueError("forecast volume reaches computational-domain capacity; enlarge the domain")
+    geometric_volume = history_volumes[-1] * np.exp(
+        float(population_log_volume_slope_per_day) * horizon
+    )
+    if not np.isfinite(geometric_volume) or geometric_volume <= 0:
+        raise ValueError("geometric train-rate baseline produced an invalid target volume")
+    geometric_target_voxels = int(np.rint(geometric_volume))
+    if geometric_target_voxels < 1 or geometric_target_voxels >= domain_voxels:
+        raise ValueError("forecast volume reaches computational-domain capacity; enlarge the domain")
 
     seed_sequences = boundary_seed.spawn(n_draws)
     parameter_draws = posterior["parameter_draws_log"]
@@ -177,18 +185,31 @@ def hybrid_posterior_predictive_forecast(masks, days, target_day, *, prior: dict
 
     mask_draws = np.stack(masks_out, axis=0)
     final_volumes = mask_draws.reshape(n_draws, -1).sum(axis=1)
+    no_pde_seed, geometric_seed = boundary_seed.spawn(2)
     no_pde_ranker_draws, baseline_boundary_fallback_count = signed_distance_volume_baseline_draws(
         masks[-1], requested_voxels, domain=domain, spacing_mm=h,
         boundary_covariance=boundary_covariance,
-        seed=int(boundary_seed.generate_state(1)[0]), n_anchors=n_anchors,
+        seed=int(no_pde_seed.generate_state(1)[0]), n_anchors=n_anchors,
+        return_fallback_count=True,
+    )
+    geometric_train_rate_draws, geometric_boundary_fallback_count = signed_distance_volume_baseline_draws(
+        masks[-1], np.asarray([geometric_target_voxels], dtype=np.int64),
+        domain=domain, spacing_mm=h,
+        boundary_covariance={"sigma_b_mm": 0.0, "tau_b_mm": 0.0,
+                             "ell_mm": float(boundary_covariance["ell_mm"])},
+        seed=int(geometric_seed.generate_state(1)[0]), n_anchors=n_anchors,
         return_fallback_count=True,
     )
     return {
         "mask_draws": mask_draws,
         "pre_boundary_probability": pre_boundary_probability,
         "no_pde_ranker_mask_draws": no_pde_ranker_draws,
+        "geometric_train_rate_mask": geometric_train_rate_draws[0],
+        "geometric_train_rate_requested_volume_voxels": geometric_target_voxels,
+        "geometric_train_rate_boundary_uncertainty": "none; deterministic signed-distance baseline",
         "hybrid_boundary_draw_fallback_count": int(hybrid_boundary_fallback_count),
         "no_pde_boundary_draw_fallback_count": int(baseline_boundary_fallback_count),
+        "geometric_train_rate_boundary_draw_fallback_count": int(geometric_boundary_fallback_count),
         "parameter_draws_log": parameter_draws,
         "requested_volume_draws_voxels": requested_voxels,
         "final_volume_draws_voxels": final_volumes,

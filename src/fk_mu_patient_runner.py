@@ -81,6 +81,60 @@ def _patient_bootstrap_mean_interval(values, *, seed: int, n_bootstrap: int = 10
             "seed": int(seed), "bootstrap_unit": "patient"}
 
 
+def _summarize_posterior_parameters(posterior: Mapping) -> dict:
+    """Return compact history-only joint-parameter diagnostics, without posterior arrays."""
+    grid = posterior.get("grid")
+    points = np.asarray(grid.get("points") if isinstance(grid, Mapping) else None, dtype=float)
+    weights = np.asarray(posterior.get("posterior_probabilities"), dtype=float)
+    if (points.ndim != 2 or points.shape[1] != 2 or weights.shape != (len(points),)
+            or len(points) < 2 or not np.isfinite(points).all() or not np.isfinite(weights).all()
+            or np.any(weights < 0) or weights.sum() <= 0):
+        raise ValueError("posterior diagnostics require finite joint log-parameter points and probabilities")
+    weights = weights / weights.sum()
+    mean = np.average(points, axis=0, weights=weights)
+    centered = points - mean
+    covariance = (centered * weights[:, None]).T @ centered
+    standard_deviations = np.sqrt(np.maximum(np.diag(covariance), 0.0))
+    if np.all(standard_deviations > 0):
+        correlation = float(covariance[0, 1] / np.prod(standard_deviations))
+    else:
+        correlation = None
+
+    def weighted_quantiles(values):
+        order = np.argsort(values, kind="mergesort")
+        cumulative = np.cumsum(weights[order])
+        return np.interp((0.025, 0.5, 0.975), cumulative, values[order])
+
+    rho_quantiles = np.exp(weighted_quantiles(points[:, 0]))
+    diffusion_quantiles = np.exp(weighted_quantiles(points[:, 1]))
+    positive = weights > 0
+    entropy = -float(np.sum(weights[positive] * np.log(weights[positive])))
+    bound_mass = posterior.get("posterior_mass_at_parameter_bounds", {})
+    if not isinstance(bound_mass, Mapping) or any(
+        not np.isfinite(float(value)) or not 0 <= float(value) <= 1 for value in bound_mass.values()
+    ):
+        raise ValueError("posterior parameter-bound masses must be finite probabilities")
+    return {
+        "status": "descriptive posterior diagnostics; parameter identifiability is separate from forecast accuracy",
+        "parameter_order": ["log_rho", "log_D"],
+        "posterior_mean_log_parameters": [float(value) for value in mean],
+        "posterior_covariance_log_parameters": covariance.astype(float).tolist(),
+        "posterior_correlation_log_rho_log_D": correlation,
+        "posterior_marginal_quantiles": {
+            "rho_per_day_2_5_50_97_5": [float(value) for value in rho_quantiles],
+            "D_mm2_per_day_2_5_50_97_5": [float(value) for value in diffusion_quantiles],
+        },
+        "posterior_effective_grid_cells": float(np.exp(entropy)),
+        "posterior_mass_at_parameter_bounds": {
+            str(key): float(value) for key, value in bound_mass.items()
+        },
+        "coarse_grid_points": int(posterior["coarse_grid_points"]),
+        "refined_grid_points": int(posterior["refined_grid_points"]),
+        "n_likelihood_evaluations": int(posterior["n_likelihood_evaluations"]),
+        "posterior_draw_count": int(len(posterior.get("parameter_draws_log", ()))),
+    }
+
+
 def _hybrid_forecast(history: PatientHistory, nuisance: Mapping, domain_by_patient: Mapping,
                      boundary_covariance: Mapping, *, seed: int, settings: Mapping) -> dict:
     if not nuisance.get("model_ready", False):
@@ -329,6 +383,8 @@ def run_mu_first_two_to_third_development_cv(
         })
         return fitted
 
+    parameter_diagnostics_by_patient = {}
+
     def forecast(history, nuisance):
         if not nuisance.get("model_ready", False):
             raise ForecastFailure(str(nuisance.get("unavailable_reason", "outer-fold model unavailable")))
@@ -338,11 +394,15 @@ def run_mu_first_two_to_third_development_cv(
             history, nuisance, analysis_domains,
             nuisance["boundary_covariance"], seed=int(seed), settings=settings,
         )
+        parameter_diagnostics_by_patient[history.patient_id] = _summarize_posterior_parameters(
+            predicted["posterior"]
+        )
         return {"forecast": predicted, "history_mask": history.masks[-1]}
 
     def persistence_fallback(history, _nuisance):
         last = np.asarray(history.masks[-1], dtype=bool)
-        return {"fallback_masks": {"hybrid": last, "no_pde": last, "persistence": last},
+        return {"fallback_masks": {"hybrid": last, "no_pde": last, "persistence": last,
+                                   "geometric_train_rate": last},
                 "history_mask": last}
 
     cv = run_first_third_90day_patient_cv(
@@ -362,6 +422,9 @@ def run_mu_first_two_to_third_development_cv(
     gap_by_id = {record.patient_id: float(record.days[2] - record.days[1]) for record in records}
     for row in cv["rows"]:
         row["observed_target_gap_days"] = gap_by_id[row["patient_id"]]
+        row["parameter_posterior_diagnostics"] = parameter_diagnostics_by_patient.get(
+            row["patient_id"], {"status": "unavailable; forecast used persistence fallback"},
+        )
     primary_delta_values = [value for _, value in differences]
     precision = None
     if external_eligibility is not None:
@@ -396,12 +459,19 @@ def run_mu_first_two_to_third_development_cv(
         "n_patients": len(cv["rows"]),
         "n_successful_hybrid_forecasts": sum(row["forecast_status"] == "ok" for row in cv["rows"]),
         "n_persistence_fallbacks": sum(row["forecast_status"] == "fallback" for row in cv["rows"]),
+        "n_geometric_train_rate_persistence_fallbacks": sum(
+            row["scores"]["geometric_train_rate_status"] != "forecast" for row in cv["rows"]
+        ),
         "hybrid_forecast_success_rate": float(
             sum(row["forecast_status"] == "ok" for row in cv["rows"]) / len(cv["rows"])
         ),
         "n_empty_targets": sum(bool(row["scores"]["target_empty"]) for row in cv["rows"]),
         "primary_paired_difference_bootstrap": _patient_bootstrap_mean_interval(
             primary_delta_values, seed=20261030,
+        ),
+        "geometric_train_rate_paired_difference_bootstrap": _patient_bootstrap_mean_interval(
+            [row["scores"]["paired_delta_dice_hybrid_minus_geometric_train_rate"] for row in cv["rows"]],
+            seed=20261031,
         ),
         "boundary_gap_sensitivity_status": (
             "this run used a central-gap-only cohort and refit all outer/inner nuisances on that subset"

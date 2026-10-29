@@ -30,7 +30,7 @@ def install_fixed_posterior(monkeypatch, n_draws):
     )
 
 
-def forecast(monkeypatch, *, seed, n_draws=4, uncertain=False):
+def forecast(monkeypatch, *, seed, n_draws=4, uncertain=False, population_slope=0.0):
     mask = ball()
     install_fixed_posterior(monkeypatch, n_draws)
     boundary_covariance = {
@@ -45,21 +45,26 @@ def forecast(monkeypatch, *, seed, n_draws=4, uncertain=False):
         [mask.copy(), mask.copy(), mask.copy()], [0.0, 20.0, 40.0], 60.0,
         prior={"mean": np.log([0.03, 0.05]), "covariance": np.eye(2)}, h=1.0,
         boundary_covariance=boundary_covariance,
-        population_log_volume_slope_per_day=0.0, shrinkage_time_constant_days=90.0,
+        population_log_volume_slope_per_day=population_slope, shrinkage_time_constant_days=90.0,
         volume_variance_fit=variance_fit,
         n_draws=n_draws, n_anchors=32, seed=seed,
     )
 
 
 def test_history_only_hybrid_draws_preserve_sampled_volume_without_boundary_noise(monkeypatch):
-    result = forecast(monkeypatch, seed=13, n_draws=4)
+    result = forecast(monkeypatch, seed=13, n_draws=4, population_slope=0.01)
     counts = result["mask_draws"].reshape(4, -1).sum(axis=1)
     baseline_counts = result["no_pde_ranker_mask_draws"].reshape(4, -1).sum(axis=1)
+    geometric_count = int(result["geometric_train_rate_mask"].sum())
 
     assert result["mask_draws"].shape == (4, 16, 16, 16)
     assert result["no_pde_ranker_mask_draws"].shape == result["mask_draws"].shape
+    assert result["geometric_train_rate_mask"].shape == result["mask_draws"].shape[1:]
     assert np.array_equal(counts, result["requested_volume_draws_voxels"])
     assert np.array_equal(baseline_counts, result["requested_volume_draws_voxels"])
+    expected_geometric_volume = int(np.rint(ball().sum() * np.exp(0.01 * 20.0)))
+    assert result["geometric_train_rate_requested_volume_voxels"] == expected_geometric_volume
+    assert geometric_count == expected_geometric_volume
     assert np.array_equal(counts, result["final_volume_draws_voxels"])
     assert result["posterior"]["marker"] == "posterior-called"
     assert "no target mask used" in result["scope"]
@@ -70,6 +75,7 @@ def test_hybrid_forecast_seed_reproduces_volume_and_boundary_draws(monkeypatch):
     second = forecast(monkeypatch, seed=29, n_draws=4, uncertain=True)
 
     assert np.array_equal(first["mask_draws"], second["mask_draws"])
+    assert np.array_equal(first["geometric_train_rate_mask"], second["geometric_train_rate_mask"])
     assert np.array_equal(first["requested_volume_draws_voxels"], second["requested_volume_draws_voxels"])
 
 
@@ -97,6 +103,7 @@ def test_small_synthetic_case_runs_full_pde_posterior_forecast():
 
     assert result["mask_draws"].shape == (3, *initial.shape)
     assert result["no_pde_ranker_mask_draws"].shape == result["mask_draws"].shape
+    assert result["geometric_train_rate_mask"].shape == result["mask_draws"].shape[1:]
     assert result["posterior"]["refined_grid_points"] > result["posterior"]["coarse_grid_points"]
     assert np.isclose(result["posterior"]["posterior_probabilities"].sum(), 1.0)
     assert np.all(result["mask_draws"].reshape(3, -1).sum(axis=1) > 0)
