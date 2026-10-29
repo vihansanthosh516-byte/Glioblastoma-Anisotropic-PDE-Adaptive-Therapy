@@ -14,6 +14,7 @@ from src import fk_mu_patient_runner as fk_mu_patient_runner_module
 from src.fk_mu_patient_runner import (
     _select_analysis_records,
     _summarize_posterior_parameters,
+    run_and_write_mu_first_two_to_third_with_prior_sensitivity,
     run_mu_first_two_to_third_development_cv,
     write_mu_development_result,
 )
@@ -203,6 +204,45 @@ def test_result_writer_hashes_provenance_reopens_file_and_refuses_overwrite(tmp_
         write_mu_development_result(result, output_path)
     with pytest.raises(PermissionError, match="inside the project output"):
         write_mu_development_result(result, tmp_path.parent / "outside.json")
+
+
+def test_protocol_complete_runner_writes_nested_sensitivity_settings(tmp_path, monkeypatch):
+    monkeypatch.setattr(fk_mu_patient_runner_module, "OUTPUT_ROOT", tmp_path)
+    primary = {
+        "protocol": {"forecast_settings": {"rho_bounds": [1e-5, 1e-1]}},
+        "random_seeds": {"forecast_base": 7},
+        "cohort_audit": {"source_hashes": {"manifest": "b" * 64}},
+    }
+    result = {
+        "schema_version": 1,
+        "study": "synthetic protocol-complete result",
+        "runs": {
+            "primary": primary,
+            "one_decade_narrower": {**primary, "protocol": {"forecast_settings": {"rho_bounds": [1e-4, 1e-2]}}},
+            "one_decade_wider": {**primary, "protocol": {"forecast_settings": {"rho_bounds": [1e-6, 1.0]}}},
+        },
+        "boundary_gap_sensitivity_run": {"protocol": {"analysis_subset": "central_gap_only"}},
+    }
+    monkeypatch.setattr(
+        fk_mu_patient_runner_module,
+        "run_mu_first_two_to_third_with_prior_sensitivity",
+        lambda *args, **kwargs: result,
+    )
+    output_path = tmp_path / "track_b_mu" / "synthetic_protocol_complete.json"
+
+    written = run_and_write_mu_first_two_to_third_with_prior_sensitivity(
+        object(),
+        output_path=output_path,
+        initial_boundary_covariance={"sigma_b_mm": 1.0, "tau_b_mm": 0.1, "ell_mm": 3.0},
+    )
+    saved = json.loads(output_path.read_text(encoding="utf-8"))
+
+    assert written["result"] == result
+    assert saved["result"] == result
+    assert saved["provenance"]["run_settings"]["runs"]["one_decade_narrower"]["protocol"][
+        "forecast_settings"]["rho_bounds"] == [1e-4, 1e-2]
+    assert saved["provenance"]["run_settings"]["boundary_gap_sensitivity_run"]["protocol"][
+        "analysis_subset"] == "central_gap_only"
 
 
 def test_training_volume_nuisance_uses_only_supplied_three_visit_patients():

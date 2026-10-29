@@ -80,7 +80,38 @@ def write_mu_development_result(result: Mapping, output_path: str | Path) -> dic
         code_hashes[relative_path] = hashlib.sha256(code_path.read_bytes()).hexdigest()
     protocol_path = PROJECT_ROOT / "paper/track_b_pde_external_protocol_draft_2026-10-28.md"
     protocol_hash = hashlib.sha256(protocol_path.read_bytes()).hexdigest()
-    cohort_audit = result.get("cohort_audit", {})
+    nested_runs = result.get("runs")
+    if isinstance(nested_runs, Mapping):
+        expected_run_names = {"primary", "one_decade_narrower", "one_decade_wider"}
+        if set(nested_runs) != expected_run_names or any(
+                not isinstance(run, Mapping) for run in nested_runs.values()):
+            raise ValueError("protocol-complete result must contain all three locked prior-support runs")
+        boundary_gap_run = result.get("boundary_gap_sensitivity_run")
+        if not isinstance(boundary_gap_run, Mapping):
+            raise ValueError("protocol-complete result must contain the central-gap sensitivity run")
+        primary_run = nested_runs.get("primary")
+        if not isinstance(primary_run, Mapping):
+            raise ValueError("protocol-complete result must contain a primary run")
+        cohort_audit = primary_run.get("cohort_audit", {})
+        run_settings = {
+            "runs": {
+                name: {
+                    "protocol": run.get("protocol", {}),
+                    "random_seeds": run.get("random_seeds", {}),
+                }
+                for name, run in nested_runs.items()
+            },
+            "boundary_gap_sensitivity_run": {
+                "protocol": boundary_gap_run.get("protocol", {}),
+                "random_seeds": boundary_gap_run.get("random_seeds", {}),
+            },
+        }
+    else:
+        cohort_audit = result.get("cohort_audit", {})
+        run_settings = {
+            "protocol": result.get("protocol", {}),
+            "random_seeds": result.get("random_seeds", {}),
+        }
     data_hashes = cohort_audit.get("source_hashes", {}) if isinstance(cohort_audit, Mapping) else {}
     if (not isinstance(data_hashes, Mapping) or not data_hashes
             or any(not isinstance(name, str) or not name.strip()
@@ -94,8 +125,7 @@ def write_mu_development_result(result: Mapping, output_path: str | Path) -> dic
         "scipy": scipy.__version__,
     }
     run_spec = {
-        "protocol_settings": result.get("protocol", {}),
-        "random_seeds": result.get("random_seeds", {}),
+        "run_settings": run_settings,
         "source_hashes": dict(data_hashes),
         "code_sha256": code_hashes,
         "protocol_sha256": protocol_hash,
@@ -675,3 +705,19 @@ def run_mu_first_two_to_third_with_prior_sensitivity(
             "external performance, clinical validity, or novelty."
         ),
     }
+
+
+def run_and_write_mu_first_two_to_third_with_prior_sensitivity(
+    cohort, *, output_path: str | Path, initial_boundary_covariance: Mapping,
+    external_eligibility: ExternalEligibilityEvidence | None = None,
+    **runner_options,
+) -> dict:
+    """Run the locked four-analysis MU development workflow and save one immutable result artifact."""
+    result = run_mu_first_two_to_third_with_prior_sensitivity(
+        cohort,
+        initial_boundary_covariance=initial_boundary_covariance,
+        external_eligibility=external_eligibility,
+        **runner_options,
+    )
+    artifact = write_mu_development_result(result, output_path)
+    return {"result": result, "artifact_write": artifact}
