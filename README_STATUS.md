@@ -36,7 +36,9 @@ Within the older GBM platform, the recurrence-target study records the main hist
 | **Enhancing recurrence, H-2 former test (primary; now spent)** | +0.0088, CI −0.0115 to +0.0307, n=98 | `output/predictgbm/final/test_results.json` |
 | **Enhancing recurrence, H-3 former test (primary; now spent)** | +0.0044, CI −0.0182 to +0.0369, n=49 | ledger 2bd |
 | H-3 at 90% volume | −0.0053. Non-inferiority at −0.01 not shown | ledger 2bd |
-| PDE beats persistence (H1), GBM-only n=105, aniso r=1 | +0.0130, CI −0.0038 to +0.0292 (all eligible, n=133: +0.0088) | `output/pde_manifest/results.json`, ledger 2y |
+| MU all-pairs PDE (exploratory), directional anisotropic r=10, n=133 | +0.0059 vs persistence, CI −0.0085 to +0.0202; −0.0077 vs geometric train-rate, CI −0.0209 to +0.0055; both inconclusive | `output/pde_manifest_monotone/results.json` |
+| First-pair sensitivity, directional anisotropic r=10, n=122 | +0.0243 vs persistence, CI +0.0066 to +0.0423; +0.0084 vs geometric train-rate, CI −0.0082 to +0.0246; exploratory only | `output/pde_manifest_monotone/results.json` |
+| Separate global-Z control arm, all pairs, n=133 | +0.0106 vs persistence, CI −0.0043 to +0.0259; −0.0029 vs geometric train-rate, CI −0.0166 to +0.0111; not the directional anisotropic result | `output/pde_manifest_monotone/results.json` |
 | DTI direction on forecast (aniso r=1 vs iso_same, GBM-only n=105, exact solver, sensitivity analysis) | −0.0004 | `output/pde_manifest_monotone/results.json`, ledger 2ak |
 | Growth-only forecast vs no-change (LUMIERE) | worse (p 0.0003, HD-GLIO-AUTO; DeepBraTumIA p 0.004) | `output/lumiere_volume_forecast.json` |
 | H-3v volume forecast | dev null. Locked LUMIERE worse than persistence | ledger 2ba |
