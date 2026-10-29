@@ -1,6 +1,6 @@
 # Research Plan Draft — Track C: Robust Belief-Based Dose Timing in a Simulated GBM Model
 
-Status: DRAFT (2026-10-27, Claude). Track C only. This file does not replace `paper/research_plan_complete_project_form.md`; the Track C section there is the earlier plan and is superseded only if the author accepts this draft. Every number below cites an output file. All results are computer simulation with assumed parameters. Nothing here is a patient, drug, or clinical result.
+Status: DRAFT (2026-10-27, Claude; results of scripts 169-170 added 2026-10-28). Track C only. This file does not replace `paper/research_plan_complete_project_form.md`; the Track C section there is the earlier plan and is superseded only if the author accepts this draft. Every number below cites an output file. All results are computer simulation with assumed parameters. Nothing here is a patient, drug, or clinical result.
 
 ## Rationale
 
@@ -22,6 +22,8 @@ Novelty: not claimed. Risk- or probability-triggered dosing, particle filtering 
 | 166 | Filter calibration, **sealed** | Predictive 90% coverage 0.89; resistant-fraction coverage 0.73–0.77 (overconfident); high resistance not detectable from readings | Calibration of latent resistance fails | `output/trackc_filter_calibration/sealed_results.json` |
 | 167 | Equal-budget tuning, **sealed** nominal test | Narrow +24.7 (CI 19.6 to 29.8), rule met; wide +21.1 (CI 16.0 to 25.9); front-loaded best CVaR (182.2 vs 177.7) but mean −13.1 | Hypothesis came from post hoc work; nominal model only | `output/trackc_sealed_containment/sealed_results.json` |
 | 168 | Wrong-model grid, 17 suites, **sealed** | Wide: no suite with CI entirely < 0; CI entirely > 0 in 14/17; worst weak_drug_sev +1.2 (CI −3.1 to 5.4). Narrow: weak_drug_sev −81.7 (CI −98.1 to −65.5) | Author-chosen suites; n 150 too small for noisy suites (noise_x3 CI −17.9 to 29.0; combo_bias_noise CI −9.7 to 22.2) | `output/trackc_sealed_wrong_models/sealed_results.json` |
+| 169 | This plan, **sealed** (13 suites + mixture) | H1 FAILED: missed_sev (40% readings lost, last reading repeated) −4.7 (CI −16.6 to 7.0). H2 PASSED: mixture +14.3 (CI 9.7 to 18.9). Other suites +12.1 to +41.5 except start_burden_sev −1.6 (CI −6.2 to 3.0) | Mixture gain vs front-loaded only +3.6 (CI −0.5 to 7.6); ablation threshold at grid edge | `output/trackc_sealed_new_axes/sealed_results.json` |
+| 170 | Missed-scan follow-up, **sealed**, new seeds; controller told when a scan is missing | H passed: told wide containment vs comparator +34.5 / +51.7 / +72.9 days at 20 / 40 / 60% lost (lowest CI bound 27.8); told minus not-told +21.2 / +62.8 / +83.0 | Designed after seeing the 169 failure; comparator mean falls with missing scans (660.7 → 618.7), so much of the gap is comparator decline; front-loaded better CVaR_0.10 in all 3 suites (e.g. 188.6 vs 183.6); scans lost at random | `output/trackc_sealed_missed_scans/sealed_results.json` |
 
 Important negative facts kept in view:
 - Under a stricter non-inferiority margin of −7 days (used below), script 168 wide containment would **fail** in 2 of 17 suites (noise_x3 lower bound −17.9; combo_bias_noise lower bound −9.7). The 168 "no harm" result is absence of detected harm, not shown non-inferiority.

@@ -314,3 +314,30 @@ def test_filter_skips_missing_reading():
     pf.update(0, y)
     assert np.array_equal(pf.logw[:3], before[:3]) and not np.array_equal(pf.logw[3:], before[3:])
     assert pf.n_resample == 0
+
+
+def test_front_loaded_containment():
+    scen = tc.draw_scenarios(30, seed=34, sigmas=(0.05,))
+    a = tc.simulate(scen, tc.make_policy(("risk", 0.1, 2, 0.0, True)), seed=35)
+    b = tc.simulate(scen, tc.make_policy(("riskf", 0.1, 2, 0)), seed=35)
+    assert np.array_equal(a["ttp"], b["ttp"]) and np.array_equal(a["courses"], b["courses"])
+    out = tc.simulate(scen, tc.make_policy(("riskf", 1.01, 1, 3)), seed=35)   # risk rule never fires
+    assert out["courses"].max() <= 3
+    assert (out["courses"][out["ttp"] > 3 * tc.CYCLE_DAYS] == 3).all()
+
+
+def test_state_linked_missing_scans():
+    scen = tc.draw_scenarios(40, seed=36, sigmas=(0.05,))
+    vis = dict(scen, miss_visible=np.ones(40, bool))
+    plain = dict(vis, miss_p=np.full(40, 0.3))
+    same = dict(plain, miss_p_hi=np.full(40, 0.3))
+    spec = ("risk", 0.1, 2, 0.0, True)
+    assert np.array_equal(tc.simulate(plain, tc.make_policy(spec), seed=37)["ttp"],
+                          tc.simulate(same, tc.make_policy(spec), seed=37)["ttp"])
+    pol = Record()
+    tc.simulate(dict(vis, miss_p=np.zeros(40), miss_p_hi=np.ones(40)), pol, seed=37)
+    ys = np.array(pol.y)
+    assert not np.isnan(ys[0]).any() and np.isnan(ys).any()
+    # untreated burden only grows, so once a scan is lost every later scan is lost too
+    lost = np.isnan(ys)
+    assert (lost[1:] >= lost[:-1]).all()

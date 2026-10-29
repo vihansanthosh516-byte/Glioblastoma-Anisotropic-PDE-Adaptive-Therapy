@@ -358,13 +358,15 @@ class RiskContainment:
     oracle, which mostly doses near 1.1-1.19 x B0 (script 153 follow-up; training seeds)."""
     uses_filter = True
 
-    def __init__(self, p_star, horizon=1, guard=0.0, wide=False, n_particles=500, ranges=None):
+    def __init__(self, p_star, horizon=1, guard=0.0, wide=False, n_particles=500, ranges=None, front=0):
         """guard > 0: weak-drug guard (script 156). Treat every cycle while the filter gives
         P(m < guard) >= 0.5, since waiting near the line fails when one course cannot push
         burden back (script 155, M3). wide=True widens the filter prior on m to [3, 20] so
-        the filter can represent a weak drug."""
+        the filter can represent a weak drug. front > 0: also treat in cycles 0..front-1
+        (front-load then contain, script 171; aimed at the lower tail)."""
         self.p_star, self.horizon, self.guard, self.n_particles = p_star, horizon, guard, n_particles
         self.ranges = ranges or (RANGES_WIDE_M if wide else RANGES)
+        self.front = front
 
     def reset(self, scen, rng):
         self.pf = ParticleFilter(scen["sigma"], self.n_particles, rng, ranges=self.ranges)
@@ -381,6 +383,8 @@ class RiskContainment:
         treat = risk >= self.p_star
         if self.guard > 0:
             treat |= (pf.w * (pf.theta["m"] < self.guard)).sum(1) >= 0.5
+        if j < self.front:
+            treat[:] = True
         return treat
 
     def advance(self, j, treat):
@@ -408,14 +412,14 @@ def simulate(scen, policy, seed, track_fr=False):
     # switching under drug, in _deriv), drift (fractional loss of m per treated course),
     # miss_p (reading lost; the last reading is repeated, or NaN if miss_visible is set so the
     # policy knows the scan is missing, script 170), delay (days 0/7/14: the reading shows
-    # burden that long before the decision), prog_factor (true endpoint level / B0)
+    # burden that long before the decision), prog_factor (true endpoint level / B0).
+    # miss_p_hi (script 171): state-linked loss, prob miss_p_hi while true burden >= B0, else miss_p
     p = scen
     if "drift" in scen:
         p = dict(scen, m=scen["m"].copy())
-    missed = None
+    u_miss = None
     if "miss_p" in scen:                    # own stream, so the noise draws above are unchanged
-        missed = np.random.default_rng([*np.atleast_1d(seed).tolist(), 1]).random((N, N_CYCLES)) < scen["miss_p"][:, None]
-        missed[:, 0] = False
+        u_miss = np.random.default_rng([*np.atleast_1d(seed).tolist(), 1]).random((N, N_CYCLES))
     delays = sorted(set(np.asarray(scen.get("delay", [0])).tolist()) - {0})
     S = (1 - scen["f0"]) * scen["B0"]
     R = scen["f0"] * scen["B0"]
@@ -431,9 +435,12 @@ def simulate(scen, policy, seed, track_fr=False):
         for d in delays:
             B = np.where(scen["delay"] == d, past[d], B)
         y = np.log(B) + noise[:, j]
-        if missed is not None:
+        if u_miss is not None:
             if j > 0:
-                y = np.where(missed[:, j], np.nan if "miss_visible" in scen else y_prev, y)
+                q = scen["miss_p"]
+                if "miss_p_hi" in scen:
+                    q = np.where(S + R >= scen["B0"], scen["miss_p_hi"], q)
+                y = np.where(u_miss[:, j] < q, np.nan if "miss_visible" in scen else y_prev, y)
             y_prev = y
         treat = policy.act(j, y) & (used < BUDGET)
         if track_fr and policy.uses_filter:
@@ -541,6 +548,9 @@ def make_policy(spec):
         return FilteredThreshold(a, a, a, 0.5, single=True, ranges=RANGES_WIDE_M)
     if kind == "risk":
         return RiskContainment(*spec[1:])
+    if kind == "riskf":                     # script 171 hybrid: front-load K courses, then wide containment
+        p_star, horizon, k = spec[1:]
+        return RiskContainment(p_star, horizon, 0.0, True, front=k)
     raise ValueError(kind)
 
 
