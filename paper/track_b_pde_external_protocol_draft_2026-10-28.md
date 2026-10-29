@@ -51,7 +51,7 @@ The MU scorer now records Dice for the matched-volume no-PDE primary comparator,
 
 ## 6. Required access decision and stop conditions
 
-The Zenodo record says Duke files are restricted (119.3 GB) and require an access request under CC BY-NC-ND 4.0 or a custom Duke license. The user reports that an access request was submitted; the response and school/fair sponsor approval of the selected license and derivative restrictions are not yet confirmed. Do not download files until access and permitted-use terms are confirmed.
+The Zenodo record says Duke files are restricted (119.3 GB) and require an access request under CC BY-NC-ND 4.0 or a custom Duke license. The user reconfirmed on 2026-10-29 that an access request was submitted; the response and school/fair sponsor approval of the selected license and derivative restrictions are not yet confirmed. Do not download files until access and permitted-use terms are confirmed.
 
 Do not download or score until permitted use, access, overlap, date quality, target support, longitudinal registration, and mask provenance are resolved. After access but before target-value use, run the metadata-only count and eligibility screen. If precision or eligible n is inadequate, report infeasibility; do not broaden the horizon post hoc.
 
