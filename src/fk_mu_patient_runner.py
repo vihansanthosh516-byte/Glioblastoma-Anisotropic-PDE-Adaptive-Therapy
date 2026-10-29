@@ -33,6 +33,16 @@ def _stable_seed(base_seed: int, patient_id: str) -> int:
     return int.from_bytes(digest[:4], "little", signed=False)
 
 
+def _select_analysis_records(records, *, gap_sensitivity_only: bool):
+    records = tuple(records)
+    if not gap_sensitivity_only:
+        return records
+    return tuple(
+        record for record in records
+        if 78.0 < float(record.days[2] - record.days[1]) < 102.0
+    )
+
+
 def _validate_boundary_covariance(value: Mapping, *, name: str) -> dict[str, float]:
     if not isinstance(value, Mapping):
         raise ValueError(f"{name} must provide sigma_b_mm, tau_b_mm, and ell_mm")
@@ -103,6 +113,7 @@ def _hybrid_forecast(history: PatientHistory, nuisance: Mapping, domain_by_patie
 def run_mu_first_two_to_third_development_cv(
     cohort, *, initial_boundary_covariance: Mapping,
     target_external_patient_count: int | None = None,
+    gap_sensitivity_only: bool = False,
     seed: int = 20261028,
     boundary_calibration_seed: int = 20261029,
     calibration_minimum_patients: int = 8,
@@ -129,12 +140,32 @@ def run_mu_first_two_to_third_development_cv(
         raise PermissionError("scoring refused: source-backed registration evidence gate is not recorded as passed")
     if cohort.audit.get("access", {}).get("source_backed_target_support_gate_passed") is not True:
         raise PermissionError("scoring refused: source-backed target-support evidence gate is not recorded as passed")
-    records = tuple(cohort.records)
-    patient_ids = [str(record.patient_id) for record in records]
-    if len(patient_ids) != 18 or len(set(patient_ids)) != len(patient_ids):
+    all_records = tuple(cohort.records)
+    all_patient_ids = [str(record.patient_id) for record in all_records]
+    if len(all_patient_ids) != 18 or len(set(all_patient_ids)) != len(all_patient_ids):
         raise ValueError("runner requires exactly the reviewed 18-patient MU cohort with unique IDs")
-    if set(cohort.fold_by_patient) != set(patient_ids) or set(cohort.origin_domain_by_patient) != set(patient_ids):
+    if (set(cohort.fold_by_patient) != set(all_patient_ids)
+            or set(cohort.origin_domain_by_patient) != set(all_patient_ids)
+            or set(cohort.target_valid_support_by_patient) != set(all_patient_ids)):
         raise ValueError("folds and origin-only domains must cover exactly the loaded cohort")
+    if not isinstance(gap_sensitivity_only, bool):
+        raise ValueError("gap_sensitivity_only must be a boolean")
+    if gap_sensitivity_only and target_external_patient_count is not None:
+        raise ValueError("external precision is computed only for the full primary development cohort")
+    if gap_sensitivity_only:
+        records = _select_analysis_records(all_records, gap_sensitivity_only=True)
+        analysis_subset = "central-gap sensitivity; excludes observed gaps 76-78 and 102-104 days inclusive"
+    else:
+        records = all_records
+        analysis_subset = "all frozen 18 patients with observed gaps 76-104 days inclusive"
+    patient_ids = [str(record.patient_id) for record in records]
+    if len(patient_ids) < 5 or len(set(patient_ids)) != len(patient_ids):
+        raise ValueError("analysis subset must contain at least five unique patients")
+    analysis_folds = {patient_id: int(cohort.fold_by_patient[patient_id]) for patient_id in patient_ids}
+    if set(analysis_folds.values()) != set(range(5)):
+        raise ValueError("analysis subset must preserve at least one patient in every existing fold 0-4")
+    analysis_domains = {patient_id: cohort.origin_domain_by_patient[patient_id] for patient_id in patient_ids}
+    analysis_support = {patient_id: cohort.target_valid_support_by_patient[patient_id] for patient_id in patient_ids}
     if (isinstance(calibration_minimum_patients, bool)
             or int(calibration_minimum_patients) != calibration_minimum_patients
             or int(calibration_minimum_patients) < 5):
@@ -200,7 +231,7 @@ def run_mu_first_two_to_third_development_cv(
 
         def inner_forecast(history, inner_nuisance):
             return _hybrid_forecast(
-                history, inner_nuisance, cohort.origin_domain_by_patient,
+                history, inner_nuisance, analysis_domains,
                 initial_covariance, seed=int(boundary_calibration_seed), settings=settings,
             )
 
@@ -301,7 +332,7 @@ def run_mu_first_two_to_third_development_cv(
         if any(not np.asarray(mask, dtype=bool).any() for mask in history.masks):
             raise ForecastFailure("empty history mask requires the prespecified persistence fallback")
         predicted = _hybrid_forecast(
-            history, nuisance, cohort.origin_domain_by_patient,
+            history, nuisance, analysis_domains,
             nuisance["boundary_covariance"], seed=int(seed), settings=settings,
         )
         return {"forecast": predicted, "history_mask": history.masks[-1]}
@@ -312,10 +343,10 @@ def run_mu_first_two_to_third_development_cv(
                 "history_mask": last}
 
     cv = run_first_third_90day_patient_cv(
-        records, cohort.fold_by_patient, fit_outer_nuisance, forecast,
+        records, analysis_folds, fit_outer_nuisance, forecast,
         make_first_third_score_callback(
             spacing_mm=2.0,
-            valid_support_by_patient=cohort.target_valid_support_by_patient,
+            valid_support_by_patient=analysis_support,
         ),
         fallback_forecast=persistence_fallback,
         n_folds=5,
@@ -329,11 +360,6 @@ def run_mu_first_two_to_third_development_cv(
     for row in cv["rows"]:
         row["observed_target_gap_days"] = gap_by_id[row["patient_id"]]
     primary_delta_values = [value for _, value in differences]
-    boundary_sensitivity_differences = [
-        value for patient_id, value in differences
-        if 78.0 < gap_by_id[patient_id] < 102.0
-    ]
-    boundary_excluded_count = len(differences) - len(boundary_sensitivity_differences)
     precision = None
     if target_external_patient_count is not None:
         precision = precision_gate_from_patient_differences(
@@ -346,6 +372,7 @@ def run_mu_first_two_to_third_development_cv(
         "schema_version": 1,
         "study": "exploratory MU first-two-to-third PDE development",
         "protocol": {
+            "analysis_subset": analysis_subset,
             "forecast_horizon_days": 90.0,
             "observed_followup_window_days": [76.0, 104.0],
             "primary_difference": "Dice(hybrid) - Dice(matched-volume no-PDE)",
@@ -373,13 +400,11 @@ def run_mu_first_two_to_third_development_cv(
         "primary_paired_difference_bootstrap": _patient_bootstrap_mean_interval(
             primary_delta_values, seed=20261030,
         ),
-        "boundary_gap_sensitivity": {
-            "rule": "exclude observed gaps 76-78 and 102-104 days, inclusive",
-            "n_excluded_boundary_gap_patients": boundary_excluded_count,
-            "estimate": _patient_bootstrap_mean_interval(
-                boundary_sensitivity_differences, seed=20261031,
-            ),
-        },
+        "boundary_gap_sensitivity_status": (
+            "this run used a central-gap-only cohort and refit all outer/inner nuisances on that subset"
+            if gap_sensitivity_only else
+            "not run here; use the protocol-complete wrapper for the central-gap nested refit"
+        ),
         "prior_support_sensitivity_status": (
             "not run by this primary runner; freeze and run one-decade narrower and wider bounds before scoring"
         ),
@@ -401,14 +426,16 @@ def run_mu_first_two_to_third_with_prior_sensitivity(
     target_external_patient_count: int | None = None,
     **runner_options,
 ) -> dict:
-    """Run primary, one-decade-narrower, and one-decade-wider prior-support evaluations.
+    """Run three prior-support evaluations plus a central-gap-only nested refit.
 
-    This is the protocol-complete entry point. It runs three full nested patient-CV analyses with identical folds
-    and seeds. It can be substantially slower than one primary run. Only the primary bounds receive the optional
-    external-cohort precision calculation; the two sensitivity runs remain development-only comparisons.
+    This is the protocol-complete entry point. It runs four full nested patient-CV analyses. The three prior-support
+    runs use the same full cohort; the gap sensitivity excludes edge-gap patients from every outer and inner fit.
+    All runs preserve the existing fold assignments and random seeds. Only the primary bounds receive the optional
+    external-cohort precision calculation. This can be substantially slower than one primary run.
     """
-    if "rho_bounds" in runner_options or "D_bounds" in runner_options:
-        raise ValueError("the prior-sensitivity wrapper owns rho_bounds and D_bounds")
+    if ("rho_bounds" in runner_options or "D_bounds" in runner_options
+            or "gap_sensitivity_only" in runner_options):
+        raise ValueError("the protocol-complete wrapper owns prior bounds and gap-sensitivity selection")
     scenarios = {
         "primary": ((1e-5, 1e-1), (1e-5, 10.0)),
         "one_decade_narrower": ((1e-4, 1e-2), (1e-4, 1.0)),
@@ -424,6 +451,16 @@ def run_mu_first_two_to_third_with_prior_sensitivity(
             D_bounds=D_bounds,
             **runner_options,
         )
+
+    central_gap_run = run_mu_first_two_to_third_development_cv(
+        cohort,
+        initial_boundary_covariance=initial_boundary_covariance,
+        target_external_patient_count=None,
+        gap_sensitivity_only=True,
+        rho_bounds=scenarios["primary"][0],
+        D_bounds=scenarios["primary"][1],
+        **runner_options,
+    )
 
     patient_sets = [{row["patient_id"] for row in run["rows"]} for run in runs.values()]
     if any(patient_set != patient_sets[0] for patient_set in patient_sets[1:]):
@@ -456,6 +493,10 @@ def run_mu_first_two_to_third_with_prior_sensitivity(
         "runs": runs,
         "prior_support_sensitivity": sensitivity,
         "prior_support_sensitivity_status": "completed across identical patient folds and random seeds",
+        "boundary_gap_sensitivity_run": central_gap_run,
+        "boundary_gap_sensitivity_status": (
+            "completed as a central-gap-only nested refit; edge-gap patients were excluded from outer and inner fitting"
+        ),
         "interpretation_limit": (
             "All runs use previously explored MU development data. They do not establish independent confirmation, "
             "external performance, clinical validity, or novelty."
