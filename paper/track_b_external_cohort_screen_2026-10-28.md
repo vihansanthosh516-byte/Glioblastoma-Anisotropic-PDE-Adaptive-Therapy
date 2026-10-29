@@ -1,12 +1,12 @@
 # Track B PDE external cohort screen (2026-10-28)
 
-**Status:** metadata-only source review. The user reports submitting a Duke access request on 2026-10-28; access approval and school/fair permitted-use approval are unconfirmed. No restricted files, patient-level outcomes, images, masks, or scores were accessed.
+**Status:** metadata-only source review. Duke declined the first access request because planned-use and academic-affiliation details were missing. The user reports resubmitting on 2026-10-29 with the requested research-purpose and license-compliance information; access approval and school/fair permitted-use approval are pending. No restricted files, patient-level outcomes, images, masks, or scores were accessed.
 
 ## Strongest current lead: Duke longitudinal GBM MRI
 
 The [Zenodo record](https://zenodo.org/records/20548528), *A Longitudinal Glioblastoma MRI Dataset with Anatomical Landmark Pairs for DIR Validation*, describes 61 patients with 3–18 sessions each (503 total), skull-stripped 1-mm isotropic atlas-aligned NIfTI, and T1, T1-c, T2, FLAIR, ADC, and DWI at each session. Relative scan and treatment dates are available. Every session has an nnU-Net mask with necrotic core, nonenhancing T2/FLAIR abnormality, enhancing tumor, and resection cavity labels. The record was published 2026-06-12 and modified 2026-09-23; its data files are restricted and total 119.3 GB.
 
-The record offers CC BY-NC-ND 4.0 or a custom Duke license. A request asks for academic affiliation, if any, and a research-purpose description; access is not guaranteed. The user reports submitting the access request on 2026-10-28. School/fair acceptance of the selected license and derivative-data rules, and access approval, remain unconfirmed.
+The record offers CC BY-NC-ND 4.0 or a custom Duke license. A request asks for academic affiliation, if any, and a research-purpose description; access is not guaranteed. Duke declined the initial request for missing details, and the user reports resubmitting on 2026-10-29 with the requested information and license-compliance statement. School/fair acceptance of the selected license and derivative-data rules, and access approval, remain unconfirmed.
 
 ## Fit and limitations
 
