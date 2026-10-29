@@ -157,6 +157,28 @@ def test_precision_gate_requires_one_finite_difference_per_patient(
         )
 
 
+@pytest.mark.parametrize("invalid_difference", [-1.0001, 1.0001])
+def test_precision_gate_rejects_values_outside_possible_dice_difference(
+    tmp_path, invalid_difference,
+):
+    with pytest.raises(ValueError, match=r"paired Dice differences must be within \[-1, 1\]"):
+        precision_gate_from_patient_differences(
+            [("p1", invalid_difference), ("p2", 0.0)],
+            expected_patient_ids=["p1", "p2"],
+            external_eligibility=_validated_report(tmp_path),
+        )
+
+
+def test_precision_gate_accepts_closed_dice_difference_bounds(tmp_path):
+    result = precision_gate_from_patient_differences(
+        [("p1", -1.0), ("p2", 1.0)],
+        expected_patient_ids=["p1", "p2"],
+        external_eligibility=_validated_report(tmp_path),
+    )
+
+    assert result["mean_paired_dice_difference_development_only"] == 0.0
+
+
 def test_precision_gate_rejects_fabricated_evidence_object():
     forged = ExternalEligibilityEvidence(
         eligible_patient_count=7,

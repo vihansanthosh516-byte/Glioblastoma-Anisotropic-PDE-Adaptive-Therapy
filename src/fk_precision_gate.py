@@ -220,8 +220,8 @@ def precision_gate_from_patient_differences(
 ) -> dict:
     """Bootstrap paired mean Dice difference at a planned external patient count.
 
-    Rows must contain exactly one finite paired value for every expected patient. Patients are resampled with
-    replacement; visit/pair rows are never treated as independent observations.
+    Rows must contain exactly one finite paired Dice difference in [-1, 1] for every expected patient. Patients
+    are resampled with replacement; visit/pair rows are never treated as independent observations.
     """
     if not is_validated_external_eligibility(external_eligibility):
         raise PermissionError("precision calculation requires a validated metadata-only external eligibility report")
@@ -252,6 +252,8 @@ def precision_gate_from_patient_differences(
             raise ValueError("paired differences must be finite numbers") from exc
         if not np.isfinite(difference):
             raise ValueError("paired differences must be finite numbers")
+        if difference < -1.0 or difference > 1.0:
+            raise ValueError("paired Dice differences must be within [-1, 1]")
         seen.add(patient_id)
         normalized.append((patient_id, difference))
     observed_set = seen
