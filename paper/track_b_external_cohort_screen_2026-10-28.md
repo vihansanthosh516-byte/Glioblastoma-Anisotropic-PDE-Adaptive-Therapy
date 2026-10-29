@@ -16,6 +16,10 @@ The record offers CC BY-NC-ND 4.0 or a custom Duke license. A request asks for a
 - UCSD-PTGBM is a separate, partially exposed annotation-change side study with a negative exploratory result; it is not the PDE core. Duke would require a new protocol/amendment and cannot retroactively change that result.
 - CFB-GBM is a separate annotation-transition candidate with unresolved review lineage and registration QC. A CFB result cannot complete the PDE parameter-estimation and forecasting program.
 
+## PREDICT-GBM is not a fresh cohort
+
+The new [PREDICT-GBM platform](https://doi.org/10.1038/s41746-026-03194-0) reports 243 patients across TUM-GBM (142), LUMIERE (61), and RHUH-GBM (40), and releases processed data and an evaluation pipeline. Those cohorts already appear in this project’s development or prior analyses: the local PREDICT-GBM work used the 142 TUM patients, and LUMIERE/RHUH were also examined. Treat the platform as useful for reproducibility and baseline review, not as untouched external validation. Its primary endpoint is geometric coverage of later recurrence for radiotherapy planning, which is related to but distinct from a PDE forecast of future tumor-core geometry. See the local exposure record in `README_STATUS.md` and the [PREDICT-GBM data release](https://huggingface.co/datasets/LZimmer/PREDICT-GBM).
+
 ## Decision
 
 Duke is the best metadata-level lead found for a future multi-visit Track B PDE study, but it is **not ready for scoring**. First resolve permitted use and access, then audit overlap/exposure, registration, and target-label limitations. If these gates fail, retain the current exploratory evidence; do not substitute another cohort after inspecting outcomes.
