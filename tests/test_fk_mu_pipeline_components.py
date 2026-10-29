@@ -10,10 +10,12 @@ import pytest
 REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO))
 
+from src import fk_mu_patient_runner as fk_mu_patient_runner_module
 from src.fk_mu_patient_runner import (
     _select_analysis_records,
     _summarize_posterior_parameters,
     run_mu_first_two_to_third_development_cv,
+    write_mu_development_result,
 )
 from src.fk_mu_scoring import dice_with_empty_rule, score_first_third_target
 from src.fk_mu_training_nuisance import fit_mu_training_volume_nuisance
@@ -119,6 +121,36 @@ def test_probabilistic_brier_and_volume_coverage_use_frozen_draws():
     assert result["volume_interval_90_covered_hybrid"] is True
 
 
+def test_spatial_scores_share_history_only_boundary_design_across_arms():
+    history = _mask(3)
+    draws = np.stack((history, history))
+
+    result = score_first_third_target(
+        {
+            "forecast": {
+                "mask_draws": draws,
+                "no_pde_ranker_mask_draws": draws,
+                "geometric_train_rate_mask": history,
+            },
+            "history_mask": history,
+        },
+        {"patient_id": "patient-1", "mask": history},
+        voxel_volume_mm3=8.0,
+        voxel_spacing_mm=2.0,
+        valid_support=np.ones_like(history),
+    )
+
+    assert result["boundary_spatial_score_design_status"] == (
+        "selected from history only; fixed before target scoring"
+    )
+    assert 0 < result["boundary_spatial_score_design_voxels"] <= 128
+    assert result["boundary_spatial_score_design_pairs"] > 0
+    assert result["boundary_energy_score_hybrid"] == 0.0
+    assert result["boundary_variogram_score_hybrid"] == 0.0
+    assert result["boundary_marginal_brier_hybrid"] == 0.0
+    assert result["boundary_spatial_score_status_no_pde"] == "scored on locked history-only boundary design"
+
+
 def test_posterior_summary_keeps_correlation_quantiles_and_bound_mass_json_safe():
     points = np.asarray([[0.0, 0.0], [1.0, 0.0], [0.0, 1.0], [1.0, 1.0]])
     posterior = {
@@ -141,6 +173,36 @@ def test_posterior_summary_keeps_correlation_quantiles_and_bound_mass_json_safe(
     assert summary["posterior_mass_at_parameter_bounds"]["D_upper"] == 0.4
     assert summary["posterior_draw_count"] == 2
     json.dumps(summary, allow_nan=False)
+
+
+def test_result_writer_hashes_provenance_reopens_file_and_refuses_overwrite(tmp_path, monkeypatch):
+    monkeypatch.setattr(fk_mu_patient_runner_module, "OUTPUT_ROOT", tmp_path)
+    result = {
+        "schema_version": 1,
+        "protocol": {"forecast_horizon_days": 90.0},
+        "cohort_audit": {"source_hashes": {"manifest": "a" * 64}},
+        "rows": [{"patient_id": "synthetic-patient", "scores": {"dice": 0.5}}],
+    }
+    output_path = tmp_path / "track_b_mu" / "synthetic_result.json"
+
+    with pytest.raises(ValueError, match="nonempty SHA-256 source hashes"):
+        write_mu_development_result({**result, "cohort_audit": {"source_hashes": {}}}, output_path)
+
+    write_info = write_mu_development_result(result, output_path)
+    saved = json.loads(output_path.read_text(encoding="utf-8"))
+
+    assert saved["result"] == result
+    assert saved["provenance"]["source_hashes"] == {"manifest": "a" * 64}
+    assert "src/fk_spatial_uncertainty.py" in saved["provenance"]["code_sha256"]
+    assert "run_improved_aniso.py" in saved["provenance"]["code_sha256"]
+    assert saved["provenance"]["environment"]["scipy"]
+    assert len(saved["run_spec_sha256"]) == 64
+    assert write_info["artifact_sha256"]
+    assert write_info["size_bytes"] == output_path.stat().st_size
+    with pytest.raises(FileExistsError):
+        write_mu_development_result(result, output_path)
+    with pytest.raises(PermissionError, match="inside the project output"):
+        write_mu_development_result(result, tmp_path.parent / "outside.json")
 
 
 def test_training_volume_nuisance_uses_only_supplied_three_visit_patients():

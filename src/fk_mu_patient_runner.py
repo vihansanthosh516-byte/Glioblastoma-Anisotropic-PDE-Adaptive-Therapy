@@ -9,9 +9,15 @@ inside each outer training fold; the caller must lock that seed before scoring.
 from __future__ import annotations
 
 from collections.abc import Mapping
+from datetime import datetime, timezone
 import hashlib
+import json
+import os
+from pathlib import Path
+import platform
 
 import numpy as np
+import scipy
 
 from src.fk_boundary_calibration import run_cross_fitted_boundary_calibration
 from src.fk_mu_development_data import MUDevelopmentCohort, is_loader_issued_cohort
@@ -25,6 +31,9 @@ from src.fk_precision_gate import (
     precision_gate_from_patient_differences,
 )
 
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+OUTPUT_ROOT = PROJECT_ROOT / "output"
+
 
 _EXPECTED_MODEL_FAILURES = {
     "forecast volume reaches computational-domain capacity; enlarge the domain",
@@ -35,6 +44,89 @@ _EXPECTED_MODEL_FAILURES = {
 def _stable_seed(base_seed: int, patient_id: str) -> int:
     digest = hashlib.sha256(f"{int(base_seed)}\0{patient_id}".encode("utf-8")).digest()
     return int.from_bytes(digest[:4], "little", signed=False)
+
+
+def write_mu_development_result(result: Mapping, output_path: str | Path) -> dict:
+    """Write one no-overwrite JSON result with code, protocol, data, and environment hashes."""
+    if (not isinstance(result, Mapping) or type(result.get("schema_version")) is not int
+            or result.get("schema_version") != 1):
+        raise ValueError("result must be a schema-1 MU development result")
+    path = Path(output_path).resolve()
+    output_root = OUTPUT_ROOT.resolve()
+    if path != output_root and output_root not in path.parents:
+        raise PermissionError("MU development results must be written inside the project output directory")
+    if path.suffix.lower() != ".json":
+        raise ValueError("MU development result path must end in .json")
+
+    code_files = (
+        "src/fk_mu_patient_runner.py",
+        "src/fk_mu_development_data.py",
+        "src/fk_mu_training_nuisance.py",
+        "src/fk_mu_scoring.py",
+        "src/fk_hybrid_forecast.py",
+        "src/fk_grid_likelihood.py",
+        "src/fk_joint_posterior.py",
+        "src/fk_mask_inverse.py",
+        "src/fk_volume_model.py",
+        "src/fk_spatial_uncertainty.py",
+        "src/fk_precision_gate.py",
+        "src/fk_boundary_calibration.py",
+        "src/fk_patient_cv.py",
+        "run_improved_aniso.py",
+    )
+    code_hashes = {}
+    for relative_path in code_files:
+        code_path = PROJECT_ROOT / relative_path
+        code_hashes[relative_path] = hashlib.sha256(code_path.read_bytes()).hexdigest()
+    protocol_path = PROJECT_ROOT / "paper/track_b_pde_external_protocol_draft_2026-10-28.md"
+    protocol_hash = hashlib.sha256(protocol_path.read_bytes()).hexdigest()
+    cohort_audit = result.get("cohort_audit", {})
+    data_hashes = cohort_audit.get("source_hashes", {}) if isinstance(cohort_audit, Mapping) else {}
+    if (not isinstance(data_hashes, Mapping) or not data_hashes
+            or any(not isinstance(name, str) or not name.strip()
+                   or not isinstance(digest, str) or len(digest) != 64
+                   or any(char not in "0123456789abcdef" for char in digest.lower())
+                   for name, digest in data_hashes.items())):
+        raise ValueError("MU result cohort audit must contain nonempty SHA-256 source hashes")
+    environment = {
+        "python": platform.python_version(),
+        "numpy": np.__version__,
+        "scipy": scipy.__version__,
+    }
+    run_spec = {
+        "protocol_settings": result.get("protocol", {}),
+        "random_seeds": result.get("random_seeds", {}),
+        "source_hashes": dict(data_hashes),
+        "code_sha256": code_hashes,
+        "protocol_sha256": protocol_hash,
+        "environment": environment,
+    }
+    run_spec_digest = hashlib.sha256(json.dumps(
+        run_spec, sort_keys=True, separators=(",", ":"), allow_nan=False,
+    ).encode("utf-8")).hexdigest()
+    artifact = {
+        "artifact_schema_version": 1,
+        "written_utc": datetime.now(timezone.utc).isoformat(),
+        "run_spec_sha256": run_spec_digest,
+        "provenance": run_spec,
+        "result": dict(result),
+    }
+    serialized = json.dumps(artifact, sort_keys=True, indent=2, allow_nan=False) + "\n"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("x", encoding="utf-8", newline="\n") as handle:
+        handle.write(serialized)
+        handle.flush()
+        os.fsync(handle.fileno())
+    reopened = json.loads(path.read_text(encoding="utf-8"))
+    if reopened != artifact:
+        raise RuntimeError("saved MU result did not match the in-memory result artifact")
+    artifact_hash = hashlib.sha256(path.read_bytes()).hexdigest()
+    return {
+        "path": str(path),
+        "artifact_sha256": artifact_hash,
+        "run_spec_sha256": run_spec_digest,
+        "size_bytes": path.stat().st_size,
+    }
 
 
 def _select_analysis_records(records, *, gap_sensitivity_only: bool):
@@ -451,6 +543,13 @@ def run_mu_first_two_to_third_development_cv(
             "ensemble_inclusion_threshold": 0.5,
             "empty_mask_dice_rule": "both_empty=1; one_empty=0",
             "forecast_settings": settings,
+        },
+        "random_seeds": {
+            "forecast_base": int(seed),
+            "boundary_calibration": int(boundary_calibration_seed),
+            "mu_paired_difference_bootstrap": 20261030,
+            "geometric_train_rate_bootstrap": 20261031,
+            "external_precision_bootstrap": 20261028,
         },
         "cohort_audit": cohort.audit,
         "outer_fold_fit_audits": fold_fit_audits,

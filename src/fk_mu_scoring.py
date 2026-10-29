@@ -11,6 +11,17 @@ from collections.abc import Mapping
 import numpy as np
 from scipy.ndimage import binary_erosion, distance_transform_edt, generate_binary_structure
 
+from src.fk_spatial_uncertainty import (
+    energy_score_mask,
+    fixed_boundary_score_pairs,
+    marginal_brier_score,
+    spatial_variogram_score,
+)
+
+BOUNDARY_SCORE_VOXELS = 128
+BOUNDARY_SCORE_BAND_MM = 10.0
+BOUNDARY_SCORE_MAX_PAIR_DISTANCE_MM = 10.0
+
 
 def _binary_mask(value, *, name: str) -> np.ndarray:
     array = np.asarray(value)
@@ -123,6 +134,24 @@ def _volume_distribution_metrics(sample_volumes_voxels, target_voxels: int, *, v
     }
 
 
+def _history_only_boundary_design(history, *, support, spacing_mm):
+    if history is None:
+        return None, "unavailable_no_history_mask"
+    if not support.all():
+        return None, "undefined_partial_support"
+    if not history.any() or history.all():
+        return None, "unavailable_empty_or_full_history_mask"
+    try:
+        design = fixed_boundary_score_pairs(
+            history, spacing_mm=spacing_mm, n_voxels=BOUNDARY_SCORE_VOXELS,
+            band_mm=BOUNDARY_SCORE_BAND_MM,
+            max_pair_distance_mm=BOUNDARY_SCORE_MAX_PAIR_DISTANCE_MM,
+        )
+    except ValueError as exc:
+        return None, f"unavailable_history_only_boundary_design: {exc}"
+    return design, "selected from history only; fixed before target scoring"
+
+
 def _get_target_mask(target) -> np.ndarray:
     if isinstance(target, Mapping):
         if "mask" not in target:
@@ -133,13 +162,16 @@ def _get_target_mask(target) -> np.ndarray:
     return _binary_mask(target, name="target")
 
 
-def _get_prediction_masks(prediction, target_shape, *, support):
+def _get_prediction_masks(prediction, target_shape, *, support, spacing_mm):
     """Resolve a successful ensemble or explicit persistence-fallback masks."""
     if not isinstance(prediction, Mapping):
         fallback = _binary_mask(prediction, name="explicit fallback mask")
         if fallback.shape != target_shape:
             raise ValueError("fallback mask and target must have the same shape")
-        return fallback, fallback, fallback, fallback, "persistence_fallback", {}, {}
+        design, design_status = _history_only_boundary_design(
+            None, support=support, spacing_mm=spacing_mm,
+        )
+        return fallback, fallback, fallback, fallback, "persistence_fallback", {}, {}, {}, design, design_status
 
     history_raw = prediction.get("history_mask", prediction.get("persistence_mask"))
     history = None if history_raw is None else _binary_mask(history_raw, name="history/persistence mask")
@@ -149,6 +181,7 @@ def _get_prediction_masks(prediction, target_shape, *, support):
     fallback_masks = prediction.get("fallback_masks")
     probability_fields = {}
     volume_samples = {}
+    spatial_draws = {}
     if fallback_masks is not None:
         if not isinstance(fallback_masks, Mapping):
             raise ValueError("fallback_masks must map hybrid and no_pde to explicit masks")
@@ -184,10 +217,12 @@ def _get_prediction_masks(prediction, target_shape, *, support):
         probability_fields["hybrid"], volume_samples["hybrid"] = _ensemble_probabilities_and_volumes(
             forecast["mask_draws"], name="mask_draws", expected_shape=target_shape, support=support,
         )
+        spatial_draws["hybrid"] = forecast["mask_draws"]
         probability_fields["no_pde"], volume_samples["no_pde"] = _ensemble_probabilities_and_volumes(
             forecast["no_pde_ranker_mask_draws"], name="no_pde_ranker_mask_draws",
             expected_shape=target_shape, support=support,
         )
+        spatial_draws["no_pde"] = forecast["no_pde_ranker_mask_draws"]
         hybrid = probability_fields["hybrid"] >= 0.5
         no_pde = probability_fields["no_pde"] >= 0.5
         persistence = history
@@ -210,7 +245,11 @@ def _get_prediction_masks(prediction, target_shape, *, support):
                        ("persistence", persistence), ("geometric train-rate", geometric)):
         if mask.shape != target_shape:
             raise ValueError(f"{name} prediction and target must have the same shape")
-    return hybrid, no_pde, persistence, geometric, geometric_status, probability_fields, volume_samples
+    design, design_status = _history_only_boundary_design(
+        history, support=support, spacing_mm=spacing_mm,
+    )
+    return (hybrid, no_pde, persistence, geometric, geometric_status, probability_fields,
+            volume_samples, spatial_draws, design, design_status)
 
 
 def score_first_third_target(prediction, target, *, voxel_volume_mm3: float = 1.0,
@@ -251,8 +290,10 @@ def score_first_third_target(prediction, target, *, voxel_volume_mm3: float = 1.
         if support_mask.shape != target_mask.shape or not support_mask.any():
             raise ValueError("valid target support must be nonempty and match the target grid")
     (hybrid_mask, no_pde_mask, persistence_mask, geometric_mask, geometric_status,
-     probability_fields, volume_samples) = _get_prediction_masks(
-        prediction, target_mask.shape, support=support_mask,
+     probability_fields, volume_samples, spatial_draws, boundary_design, boundary_design_status) = (
+        _get_prediction_masks(
+            prediction, target_mask.shape, support=support_mask, spacing_mm=spacing_mm,
+        )
     )
     if np.any(target_mask & ~support_mask):
         raise ValueError("target foreground falls outside validated target support")
@@ -303,6 +344,13 @@ def score_first_third_target(prediction, target, *, voxel_volume_mm3: float = 1.
         "geometric_train_rate_status": geometric_status,
         "ensemble_inclusion_threshold": 0.5,
         "empty_mask_dice_rule": "both_empty=1; one_empty=0",
+        "boundary_spatial_score_design_status": boundary_design_status,
+        "boundary_spatial_score_design_voxels": (
+            int(len(boundary_design["voxel_indices"])) if boundary_design is not None else 0
+        ),
+        "boundary_spatial_score_design_pairs": (
+            int(len(boundary_design["pairs"])) if boundary_design is not None else 0
+        ),
     }
     for name, predicted_mask in (
         ("hybrid", hybrid_mask), ("no_pde", no_pde_mask), ("persistence", persistence_mask),
@@ -331,6 +379,26 @@ def score_first_third_target(prediction, target, *, voxel_volume_mm3: float = 1.
                 samples, target_voxels, voxel_volume_mm3=voxel_volume_mm3,
             ).items()
         })
+        if boundary_design is None:
+            result[f"boundary_energy_score_{name}"] = None
+            result[f"boundary_variogram_score_{name}"] = None
+            result[f"boundary_variogram_strata_{name}"] = None
+            result[f"boundary_marginal_brier_{name}"] = None
+            result[f"boundary_spatial_score_status_{name}"] = boundary_design_status
+        else:
+            draws = spatial_draws.get(name)
+            if draws is None:
+                draws = predicted_mask[None, ...]
+            variogram = spatial_variogram_score(draws, target_mask, boundary_design)
+            result[f"boundary_energy_score_{name}"] = float(
+                energy_score_mask(draws, target_mask, boundary_design["voxel_indices"])
+            )
+            result[f"boundary_variogram_score_{name}"] = variogram["score"]
+            result[f"boundary_variogram_strata_{name}"] = variogram["strata"]
+            result[f"boundary_marginal_brier_{name}"] = float(
+                marginal_brier_score(draws, target_mask, boundary_design["voxel_indices"])
+            )
+            result[f"boundary_spatial_score_status_{name}"] = "scored on locked history-only boundary design"
     for key, value in result.items():
         if isinstance(value, (float, np.floating)) and not np.isfinite(value):
             raise RuntimeError(f"non-finite score generated for {key}")
