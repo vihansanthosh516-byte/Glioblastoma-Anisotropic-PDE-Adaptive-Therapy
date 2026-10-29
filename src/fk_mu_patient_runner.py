@@ -19,7 +19,11 @@ from src.fk_hybrid_forecast import hybrid_posterior_predictive_forecast
 from src.fk_mu_scoring import make_first_third_score_callback
 from src.fk_mu_training_nuisance import fit_mu_training_volume_nuisance
 from src.fk_patient_cv import ForecastFailure, PatientHistory, run_first_third_90day_patient_cv
-from src.fk_precision_gate import precision_gate_from_patient_differences
+from src.fk_precision_gate import (
+    ExternalEligibilityEvidence,
+    is_validated_external_eligibility,
+    precision_gate_from_patient_differences,
+)
 
 
 _EXPECTED_MODEL_FAILURES = {
@@ -112,7 +116,7 @@ def _hybrid_forecast(history: PatientHistory, nuisance: Mapping, domain_by_patie
 
 def run_mu_first_two_to_third_development_cv(
     cohort, *, initial_boundary_covariance: Mapping,
-    target_external_patient_count: int | None = None,
+    external_eligibility: ExternalEligibilityEvidence | None = None,
     gap_sensitivity_only: bool = False,
     seed: int = 20261028,
     boundary_calibration_seed: int = 20261029,
@@ -130,6 +134,8 @@ def run_mu_first_two_to_third_development_cv(
     it seeds inner cross-fitted residual calibration and is not learned from a
     synthetic oracle. Patients with empty histories or unusable forecasts stay
     in the evaluation and receive the prespecified persistence fallback.
+    Optional precision uses only a validated metadata-only external eligibility
+    report; the runner does not accept a caller-entered external sample size.
     """
     required = ("records", "fold_by_patient", "origin_domain_by_patient",
                 "target_valid_support_by_patient", "audit")
@@ -150,7 +156,9 @@ def run_mu_first_two_to_third_development_cv(
         raise ValueError("folds and origin-only domains must cover exactly the loaded cohort")
     if not isinstance(gap_sensitivity_only, bool):
         raise ValueError("gap_sensitivity_only must be a boolean")
-    if gap_sensitivity_only and target_external_patient_count is not None:
+    if external_eligibility is not None and not is_validated_external_eligibility(external_eligibility):
+        raise PermissionError("external precision requires a validated metadata-only eligibility report")
+    if gap_sensitivity_only and external_eligibility is not None:
         raise ValueError("external precision is computed only for the full primary development cohort")
     if gap_sensitivity_only:
         records = _select_analysis_records(all_records, gap_sensitivity_only=True)
@@ -176,11 +184,6 @@ def run_mu_first_two_to_third_development_cv(
     initial_covariance = _validate_boundary_covariance(
         initial_boundary_covariance, name="initial_boundary_covariance"
     )
-    if target_external_patient_count is not None:
-        if (isinstance(target_external_patient_count, bool)
-                or int(target_external_patient_count) != target_external_patient_count
-                or target_external_patient_count < 2):
-            raise ValueError("target_external_patient_count must be an integer of at least two")
     settings = {
         "rho_bounds": tuple(rho_bounds), "D_bounds": tuple(D_bounds),
         "n_coarse": int(n_coarse), "mass_fraction": float(mass_fraction),
@@ -361,11 +364,11 @@ def run_mu_first_two_to_third_development_cv(
         row["observed_target_gap_days"] = gap_by_id[row["patient_id"]]
     primary_delta_values = [value for _, value in differences]
     precision = None
-    if target_external_patient_count is not None:
+    if external_eligibility is not None:
         precision = precision_gate_from_patient_differences(
             differences,
             expected_patient_ids=patient_ids,
-            target_n=int(target_external_patient_count),
+            external_eligibility=external_eligibility,
         )
 
     return {
@@ -410,8 +413,8 @@ def run_mu_first_two_to_third_development_cv(
         ),
         "precision_gate": precision,
         "precision_gate_status": (
-            "not computed: eligible external-cohort patient count is unknown"
-            if target_external_patient_count is None else precision["interpretation"]
+            "not computed: validated metadata-only external eligibility report unavailable"
+            if external_eligibility is None else precision["interpretation"]
         ),
         "interpretation_limit": (
             "Previously explored MU data provide exploratory development evidence only. This CV does not establish "
@@ -423,7 +426,7 @@ def run_mu_first_two_to_third_development_cv(
 
 def run_mu_first_two_to_third_with_prior_sensitivity(
     cohort, *, initial_boundary_covariance: Mapping,
-    target_external_patient_count: int | None = None,
+    external_eligibility: ExternalEligibilityEvidence | None = None,
     **runner_options,
 ) -> dict:
     """Run three prior-support evaluations plus a central-gap-only nested refit.
@@ -431,7 +434,8 @@ def run_mu_first_two_to_third_with_prior_sensitivity(
     This is the protocol-complete entry point. It runs four full nested patient-CV analyses. The three prior-support
     runs use the same full cohort; the gap sensitivity excludes edge-gap patients from every outer and inner fit.
     All runs preserve the existing fold assignments and random seeds. Only the primary bounds receive the optional
-    external-cohort precision calculation. This can be substantially slower than one primary run.
+    validated external-eligibility evidence for precision calculation. This can be substantially slower than one
+    primary run.
     """
     if ("rho_bounds" in runner_options or "D_bounds" in runner_options
             or "gap_sensitivity_only" in runner_options):
@@ -446,7 +450,7 @@ def run_mu_first_two_to_third_with_prior_sensitivity(
         runs[name] = run_mu_first_two_to_third_development_cv(
             cohort,
             initial_boundary_covariance=initial_boundary_covariance,
-            target_external_patient_count=(target_external_patient_count if name == "primary" else None),
+            external_eligibility=(external_eligibility if name == "primary" else None),
             rho_bounds=rho_bounds,
             D_bounds=D_bounds,
             **runner_options,
@@ -455,7 +459,7 @@ def run_mu_first_two_to_third_with_prior_sensitivity(
     central_gap_run = run_mu_first_two_to_third_development_cv(
         cohort,
         initial_boundary_covariance=initial_boundary_covariance,
-        target_external_patient_count=None,
+        external_eligibility=None,
         gap_sensitivity_only=True,
         rho_bounds=scenarios["primary"][0],
         D_bounds=scenarios["primary"][1],
