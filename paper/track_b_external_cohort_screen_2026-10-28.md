@@ -11,7 +11,7 @@ The record offers CC BY-NC-ND 4.0 or a custom Duke license. A request asks for a
 ## Fit and limitations
 
 - Multi-visit masks make this a plausible lead for a **new, separately amended patient-level PDE growth-forecast evaluation**. A candidate design uses two historical masks to forecast the next eligible mask. The visit schedule is irregular, so freeze whether the estimand is next-observed-visit conditional on the realized gap or a prespecified fixed-day window supported by the available dates. Do not describe a realized-gap analysis as a scheduled-at-origin forecast.
-- The published record says full cohort-selection details will appear in a future paper. Its recurrence category can be assigned by tumor-volume change or clinical progression, so a recurrence-conditioned analysis can select on tumor change. The masks are automated nnU-Net outputs, not independent expert ground truth. Treat a mask-based endpoint as released-label change unless validated against an independent reference.
+- The published record says full cohort-selection details will appear in a future paper. Its recurrence category can be assigned by tumor-volume change or clinical progression, so a recurrence-conditioned analysis can select on tumor change. The authors' [dataset guidance](https://github.com/deshanyang/GBM-DIR-QA) adds that separate sessions have not been registered to one another, and recommends rigid or affine registration before downstream use. It says scan dates were extracted automatically from exam/report dates and may be imperfect or off by a few days; its recurrence workflow can label a scan after >40% enhancing-volume growth from the postoperative nadir. These create registration, timing, and outcome-selection risks for a longitudinal forecast. The masks are automated nnU-Net outputs, not independent expert ground truth. Treat a mask-based endpoint as released-label change unless validated against an independent reference.
 - The 61 patients are not a power guarantee. Before outcome access, audit patient overlap and prior exposure against MU, UCSD-PTGBM, CFB-GBM, and other project cohorts; estimate precision under the final patient-level estimand; and freeze patient-grouped splits, baseline comparators, parameter-identifiability and calibration checks, and technical-failure rules.
 - UCSD-PTGBM is a separate, partially exposed annotation-change side study with a negative exploratory result; it is not the PDE core. Duke would require a new protocol/amendment and cannot retroactively change that result.
 - CFB-GBM is a separate annotation-transition candidate with unresolved review lineage and registration QC. A CFB result cannot complete the PDE parameter-estimation and forecasting program.
@@ -22,10 +22,11 @@ The new [PREDICT-GBM platform](https://doi.org/10.1038/s41746-026-03194-0) repor
 
 ## Decision
 
-Duke is the best metadata-level lead found for a future multi-visit Track B PDE study, but it is **not ready for scoring**. First resolve permitted use and access, then audit overlap/exposure, registration, and target-label limitations. If these gates fail, retain the current exploratory evidence; do not substitute another cohort after inspecting outcomes.
+Duke is the best metadata-level lead found for a future multi-visit Track B PDE study, but it is **not ready for scoring or download**. First confirm the school/fair can accept the license and derivative rules, then request access. If access is granted, audit overlap/exposure, session registration and landmark QC, date reliability, and target-label limitations before scoring. If these gates fail, retain the current exploratory evidence; do not substitute another cohort after inspecting outcomes.
 
 ## Sources
 
 - Primary dataset record and license: [Zenodo 10.5281/zenodo.20548528](https://zenodo.org/records/20548528).
+- Dataset-specific registration and date guidance: [GBM-DIR-QA README](https://github.com/deshanyang/GBM-DIR-QA).
 - Current Track B boundaries and CFB preflight: `START_HERE.md` and `paper/track_b_cfb_scoring_protocol_draft_2026-10-27.md`.
 - Historical cohort and access audit: `README_STATUS.md` section 5a.1 and ledger entry 2bm.
