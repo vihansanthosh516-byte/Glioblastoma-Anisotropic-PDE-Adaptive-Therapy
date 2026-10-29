@@ -15,6 +15,7 @@ import json
 import os
 from pathlib import Path
 import platform
+from types import MappingProxyType
 
 import numpy as np
 import scipy
@@ -33,6 +34,12 @@ from src.fk_precision_gate import (
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 OUTPUT_ROOT = PROJECT_ROOT / "output"
+# Match the existing synthetic-gate working start; this is an initialization, not measured noise or fitted truth.
+LOCKED_MU_INITIAL_BOUNDARY_COVARIANCE = MappingProxyType({
+    "sigma_b_mm": 0.8,
+    "tau_b_mm": 0.3,
+    "ell_mm": 6.0,
+})
 
 
 _EXPECTED_MODEL_FAILURES = {
@@ -624,7 +631,7 @@ def run_mu_first_two_to_third_development_cv(
 
 
 def run_mu_first_two_to_third_with_prior_sensitivity(
-    cohort, *, initial_boundary_covariance: Mapping,
+    cohort, *,
     external_eligibility: ExternalEligibilityEvidence | None = None,
     **runner_options,
 ) -> dict:
@@ -637,8 +644,11 @@ def run_mu_first_two_to_third_with_prior_sensitivity(
     primary run.
     """
     if ("rho_bounds" in runner_options or "D_bounds" in runner_options
-            or "gap_sensitivity_only" in runner_options):
-        raise ValueError("the protocol-complete wrapper owns prior bounds and gap-sensitivity selection")
+            or "gap_sensitivity_only" in runner_options
+            or "initial_boundary_covariance" in runner_options):
+        raise ValueError(
+            "the protocol-complete wrapper owns prior bounds, boundary seed, and gap-sensitivity selection"
+        )
     scenarios = {
         "primary": ((1e-5, 1e-1), (1e-5, 10.0)),
         "one_decade_narrower": ((1e-4, 1e-2), (1e-4, 1.0)),
@@ -648,7 +658,7 @@ def run_mu_first_two_to_third_with_prior_sensitivity(
     for name, (rho_bounds, D_bounds) in scenarios.items():
         runs[name] = run_mu_first_two_to_third_development_cv(
             cohort,
-            initial_boundary_covariance=initial_boundary_covariance,
+            initial_boundary_covariance=LOCKED_MU_INITIAL_BOUNDARY_COVARIANCE,
             external_eligibility=(external_eligibility if name == "primary" else None),
             rho_bounds=rho_bounds,
             D_bounds=D_bounds,
@@ -657,7 +667,7 @@ def run_mu_first_two_to_third_with_prior_sensitivity(
 
     central_gap_run = run_mu_first_two_to_third_development_cv(
         cohort,
-        initial_boundary_covariance=initial_boundary_covariance,
+        initial_boundary_covariance=LOCKED_MU_INITIAL_BOUNDARY_COVARIANCE,
         external_eligibility=None,
         gap_sensitivity_only=True,
         rho_bounds=scenarios["primary"][0],
@@ -708,14 +718,13 @@ def run_mu_first_two_to_third_with_prior_sensitivity(
 
 
 def run_and_write_mu_first_two_to_third_with_prior_sensitivity(
-    cohort, *, output_path: str | Path, initial_boundary_covariance: Mapping,
+    cohort, *, output_path: str | Path,
     external_eligibility: ExternalEligibilityEvidence | None = None,
     **runner_options,
 ) -> dict:
     """Run the locked four-analysis MU development workflow and save one immutable result artifact."""
     result = run_mu_first_two_to_third_with_prior_sensitivity(
         cohort,
-        initial_boundary_covariance=initial_boundary_covariance,
         external_eligibility=external_eligibility,
         **runner_options,
     )

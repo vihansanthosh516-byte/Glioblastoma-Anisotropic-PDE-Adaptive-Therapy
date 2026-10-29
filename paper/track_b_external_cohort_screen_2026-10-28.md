@@ -1,6 +1,6 @@
 # Track B PDE external cohort screen (2026-10-28)
 
-**Status:** metadata-only source review. No access request or contact was made. No restricted files, patient-level outcomes, images, masks, or scores were accessed.
+**Status:** metadata-only source review. The user reports submitting a Duke access request on 2026-10-28; access approval and school/fair permitted-use approval are unconfirmed. No restricted files, patient-level outcomes, images, masks, or scores were accessed.
 
 ## Strongest current lead: Duke longitudinal GBM MRI
 
@@ -22,7 +22,7 @@ The new [PREDICT-GBM platform](https://doi.org/10.1038/s41746-026-03194-0) repor
 
 ## Decision
 
-Duke is the best metadata-level lead found for a future multi-visit Track B PDE study, but it is **not ready for scoring or download**. First confirm the school/fair can accept the license and derivative rules, then request access. If access is granted, audit overlap/exposure, session registration and landmark QC, date reliability, and target-label limitations before scoring. If these gates fail, retain the current exploratory evidence; do not substitute another cohort after inspecting outcomes.
+Duke is the best metadata-level lead found for a future multi-visit Track B PDE study, but it is **not ready for scoring or download**. The user reports that an access request is submitted; confirm school/fair acceptance of the chosen license and derivative rules while access is pending. If access is granted, audit overlap/exposure, session registration and landmark QC, date reliability, and target-label limitations before scoring. If these gates fail, retain the current exploratory evidence; do not substitute another cohort after inspecting outcomes.
 
 ## Sources
 

@@ -273,10 +273,12 @@ def test_sensitivity_wrapper_passes_precision_evidence_only_to_primary(tmp_path,
     monkeypatch.setattr(fk_mu_patient_runner, "run_mu_first_two_to_third_development_cv", fake_run)
     fk_mu_patient_runner.run_mu_first_two_to_third_with_prior_sensitivity(
         None,
-        initial_boundary_covariance={"sigma_b_mm": 1.0, "tau_b_mm": 1.0, "ell_mm": 10.0},
         external_eligibility=eligibility,
     )
 
     assert len(calls) == 4
+    assert all(dict(call["initial_boundary_covariance"]) == {
+        "sigma_b_mm": 0.8, "tau_b_mm": 0.3, "ell_mm": 6.0,
+    } for call in calls)
     assert calls[0]["external_eligibility"] is eligibility
     assert all(call["external_eligibility"] is None for call in calls[1:])

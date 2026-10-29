@@ -12,6 +12,7 @@ sys.path.insert(0, str(REPO))
 
 from src import fk_mu_patient_runner as fk_mu_patient_runner_module
 from src.fk_mu_patient_runner import (
+    LOCKED_MU_INITIAL_BOUNDARY_COVARIANCE,
     _select_analysis_records,
     _summarize_posterior_parameters,
     run_and_write_mu_first_two_to_third_with_prior_sensitivity,
@@ -233,7 +234,6 @@ def test_protocol_complete_runner_writes_nested_sensitivity_settings(tmp_path, m
     written = run_and_write_mu_first_two_to_third_with_prior_sensitivity(
         object(),
         output_path=output_path,
-        initial_boundary_covariance={"sigma_b_mm": 1.0, "tau_b_mm": 0.1, "ell_mm": 3.0},
     )
     saved = json.loads(output_path.read_text(encoding="utf-8"))
 
@@ -243,6 +243,42 @@ def test_protocol_complete_runner_writes_nested_sensitivity_settings(tmp_path, m
         "forecast_settings"]["rho_bounds"] == [1e-4, 1e-2]
     assert saved["provenance"]["run_settings"]["boundary_gap_sensitivity_run"]["protocol"][
         "analysis_subset"] == "central_gap_only"
+
+
+def test_protocol_complete_runner_uses_only_locked_boundary_seed(monkeypatch):
+    assert dict(LOCKED_MU_INITIAL_BOUNDARY_COVARIANCE) == {
+        "sigma_b_mm": 0.8, "tau_b_mm": 0.3, "ell_mm": 6.0,
+    }
+    captured = []
+
+    def fake_run(cohort, *, initial_boundary_covariance, gap_sensitivity_only=False, **kwargs):
+        captured.append(dict(initial_boundary_covariance))
+        rows = [
+            {"patient_id": patient_id, "scores": {"paired_delta_dice_hybrid_minus_no_pde": 0.1}}
+            for patient_id in ("p1", "p2")
+        ]
+        return {
+            "rows": rows,
+            "n_successful_hybrid_forecasts": 2,
+            "n_persistence_fallbacks": 0,
+            "cohort_audit": {"source_hashes": {
+                "selected_patient_ids_sha256_sorted_nul_joined": "c" * 64,
+            }},
+            "gap_sensitivity_only": gap_sensitivity_only,
+        }
+
+    monkeypatch.setattr(
+        fk_mu_patient_runner_module, "run_mu_first_two_to_third_development_cv", fake_run,
+    )
+    result = fk_mu_patient_runner_module.run_mu_first_two_to_third_with_prior_sensitivity(object())
+
+    assert len(captured) == 4
+    assert all(seed == dict(LOCKED_MU_INITIAL_BOUNDARY_COVARIANCE) for seed in captured)
+    assert result["schema_version"] == 1
+    with pytest.raises(ValueError, match="owns prior bounds, boundary seed"):
+        fk_mu_patient_runner_module.run_mu_first_two_to_third_with_prior_sensitivity(
+            object(), initial_boundary_covariance={"sigma_b_mm": 1.0, "tau_b_mm": 1.0, "ell_mm": 10.0},
+        )
 
 
 def test_training_volume_nuisance_uses_only_supplied_three_visit_patients():
