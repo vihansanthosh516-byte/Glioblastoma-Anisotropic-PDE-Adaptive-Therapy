@@ -30,7 +30,8 @@ def install_fixed_posterior(monkeypatch, n_draws):
     )
 
 
-def forecast(monkeypatch, *, seed, n_draws=4, uncertain=False, population_slope=0.0):
+def forecast(monkeypatch, *, seed, n_draws=4, uncertain=False, population_slope=0.0,
+             calibration_only=False):
     mask = ball()
     install_fixed_posterior(monkeypatch, n_draws)
     boundary_covariance = {
@@ -47,7 +48,7 @@ def forecast(monkeypatch, *, seed, n_draws=4, uncertain=False, population_slope=
         boundary_covariance=boundary_covariance,
         population_log_volume_slope_per_day=population_slope, shrinkage_time_constant_days=90.0,
         volume_variance_fit=variance_fit,
-        n_draws=n_draws, n_anchors=32, seed=seed,
+        n_draws=n_draws, n_anchors=32, seed=seed, calibration_only=calibration_only,
     )
 
 
@@ -78,6 +79,23 @@ def test_boundary_uncertainty_preserves_sampled_volume_in_both_arms(monkeypatch)
     assert np.array_equal(hybrid_counts, result["requested_volume_draws_voxels"])
     assert np.array_equal(no_pde_counts, result["requested_volume_draws_voxels"])
     assert np.array_equal(no_pde_counts, result["no_pde_ranker_final_volume_draws_voxels"])
+
+
+def test_calibration_only_matches_pre_boundary_probability_and_skips_mask_draws(monkeypatch):
+    full = forecast(monkeypatch, seed=37, uncertain=True, population_slope=0.01)
+
+    def unused_boundary_path(*args, **kwargs):
+        raise AssertionError("calibration-only forecast must not draw final masks or comparators")
+
+    monkeypatch.setattr(hybrid, "_perturb_boundary_or_keep", unused_boundary_path)
+    calibration = forecast(
+        monkeypatch, seed=37, uncertain=True, population_slope=0.01, calibration_only=True,
+    )
+
+    assert np.array_equal(calibration["pre_boundary_probability"], full["pre_boundary_probability"])
+    assert calibration["calibration_only"] is True
+    assert "mask_draws" not in calibration
+    assert "no_pde_ranker_mask_draws" not in calibration
 
 
 def test_repeated_parameter_draws_reuse_pde_solutions_and_keep_sample_order(monkeypatch):

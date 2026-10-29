@@ -265,7 +265,8 @@ def _summarize_posterior_parameters(posterior: Mapping) -> dict:
 
 
 def _hybrid_forecast(history: PatientHistory, nuisance: Mapping, domain_by_patient: Mapping,
-                     boundary_covariance: Mapping, *, seed: int, settings: Mapping) -> dict:
+                     boundary_covariance: Mapping, *, seed: int, settings: Mapping,
+                     calibration_only: bool = False) -> dict:
     if not nuisance.get("model_ready", False):
         raise ForecastFailure(str(nuisance.get("unavailable_reason", "training nuisance fit unavailable")))
     domain = np.asarray(domain_by_patient[history.patient_id], dtype=bool)
@@ -289,6 +290,7 @@ def _hybrid_forecast(history: PatientHistory, nuisance: Mapping, domain_by_patie
             n_draws=int(settings["n_draws"]),
             n_anchors=int(settings["n_anchors"]),
             seed=_stable_seed(seed, history.patient_id),
+            calibration_only=calibration_only,
         )
     except ValueError as exc:
         if str(exc) in _EXPECTED_MODEL_FAILURES:
@@ -419,6 +421,7 @@ def run_mu_first_two_to_third_development_cv(
             return _hybrid_forecast(
                 history, inner_nuisance, analysis_domains,
                 initial_covariance, seed=int(boundary_calibration_seed), settings=settings,
+                calibration_only=True,
             )
 
         def inner_fallback(history, _inner_nuisance):

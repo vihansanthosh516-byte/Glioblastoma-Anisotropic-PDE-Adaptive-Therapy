@@ -32,8 +32,15 @@ def volume_match_concentration(concentration, domain, *, target_voxels: int) -> 
     if target_voxels == 0:
         return result
     values = concentration.ravel()[domain_indices]
-    order = np.lexsort((domain_indices, -values))
-    result.ravel()[domain_indices[order[:target_voxels]]] = True
+    threshold_index = values.size - target_voxels
+    threshold = np.partition(values, threshold_index)[threshold_index]
+    above_threshold = values > threshold
+    result.ravel()[domain_indices[above_threshold]] = True
+    n_tied = target_voxels - int(above_threshold.sum())
+    if n_tied:
+        # domain_indices are sorted; preserve the prior lexsort's stable flat-index tie order.
+        tied_indices = domain_indices[np.flatnonzero(values == threshold)]
+        result.ravel()[tied_indices[:n_tied]] = True
     return result
 
 

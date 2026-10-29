@@ -143,7 +143,8 @@ def hybrid_posterior_predictive_forecast(masks, days, target_day, *, prior: dict
                                          rho_bounds=(1e-5, 1e-1), D_bounds=(1e-5, 10.0),
                                          n_coarse: int = 21, mass_fraction: float = 0.9,
                                          n_refine: int = 11, n_draws: int = 200,
-                                         n_anchors: int = 256, seed: int = 0) -> dict:
+                                         n_anchors: int = 256, seed: int = 0,
+                                         calibration_only: bool = False) -> dict:
     """Draw joint PDE-shape, log-volume, and correlated-boundary forecasts from history only.
 
     A fixed prespecified prior or training-only prior is allowed; all fitted nuisance estimates must come from
@@ -166,6 +167,8 @@ def hybrid_posterior_predictive_forecast(masks, days, target_day, *, prior: dict
         raise ValueError("h must be positive and finite")
     if isinstance(n_draws, (bool, np.bool_)) or int(n_draws) != n_draws or n_draws < 2:
         raise ValueError("n_draws must be an integer of at least two")
+    if not isinstance(calibration_only, bool):
+        raise ValueError("calibration_only must be a boolean")
     n_draws = int(n_draws)
     domain = np.ones(masks[0].shape, dtype=bool) if domain is None else np.asarray(domain, dtype=bool)
     if domain.shape != masks[0].shape or any(np.any(mask & ~domain) for mask in masks):
@@ -204,7 +207,7 @@ def hybrid_posterior_predictive_forecast(masks, days, target_day, *, prior: dict
     if geometric_target_voxels < 1 or geometric_target_voxels >= domain_voxels:
         raise ValueError("forecast volume reaches computational-domain capacity; enlarge the domain")
 
-    seed_sequences = boundary_seed.spawn(n_draws)
+    seed_sequences = None if calibration_only else boundary_seed.spawn(n_draws)
     parameter_draws_log = np.asarray(posterior["parameter_draws_log"], dtype=float)
     if (parameter_draws_log.shape != (n_draws, 2) or not np.isfinite(parameter_draws_log).all()):
         raise RuntimeError("joint posterior returned malformed log-parameter draws")
@@ -217,7 +220,7 @@ def hybrid_posterior_predictive_forecast(masks, days, target_day, *, prior: dict
         np.flatnonzero(draw_to_parameter == parameter_index)
         for parameter_index in range(len(unique_parameter_draws))
     ]
-    masks_out = [None] * n_draws
+    masks_out = None if calibration_only else [None] * n_draws
     hybrid_boundary_fallback_count = 0
     pre_boundary_inclusion_counts = np.zeros(masks[0].shape, dtype=np.uint32)
     for parameter_indices, concentration_batch in _batched_parameter_concentrations(
@@ -232,6 +235,8 @@ def hybrid_posterior_predictive_forecast(masks, days, target_day, *, prior: dict
                 if sized_mask.all() or not sized_mask.any():
                     raise ValueError("volume-matched forecast has no usable boundary")
                 pre_boundary_inclusion_counts += sized_mask
+                if calibration_only:
+                    continue
                 boundary_draw, collapsed = _perturb_boundary_or_keep(
                     sized_mask,
                     boundary_covariance=boundary_covariance,
@@ -245,8 +250,16 @@ def hybrid_posterior_predictive_forecast(masks, days, target_day, *, prior: dict
                 boundary_draw &= domain
                 masks_out[draw_index] = boundary_draw
 
-    mask_draws = np.stack(masks_out, axis=0)
     pre_boundary_probability = pre_boundary_inclusion_counts.astype(np.float32) / n_draws
+    if calibration_only:
+        return {
+            "pre_boundary_probability": pre_boundary_probability,
+            "posterior": posterior,
+            "calibration_only": True,
+            "scope": "inner boundary calibration; volume-matched PDE marginals only; no final mask or comparator draws",
+        }
+
+    mask_draws = np.stack(masks_out, axis=0)
     final_volumes = mask_draws.reshape(n_draws, -1).sum(axis=1)
     no_pde_seed, geometric_seed = boundary_seed.spawn(2)
     no_pde_ranker_draws, baseline_boundary_fallback_count = signed_distance_volume_baseline_draws(
@@ -288,6 +301,7 @@ def hybrid_posterior_predictive_forecast(masks, days, target_day, *, prior: dict
         "shrunk_log_volume_slope_per_day": shrunk_slope,
         "horizon_days": float(horizon),
         "posterior": posterior,
+        "calibration_only": False,
         "boundary_covariance_assumed": dict(boundary_covariance),
         "scope": "synthetic utility; training-only prior and nuisance inputs required; no target mask used",
     }

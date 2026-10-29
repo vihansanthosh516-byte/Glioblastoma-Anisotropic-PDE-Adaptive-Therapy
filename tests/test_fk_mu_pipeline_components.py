@@ -393,7 +393,11 @@ def test_synthetic_mu_runner_completes_patient_cv_and_scores_all_comparator_arms
     fk_mu_development_data_module._LOADER_ISSUED_COHORTS.add(cohort)
     forecast_patient_ids = []
 
-    def cheap_history_only_forecast(history, nuisance, domain_by_patient, boundary_covariance, *, seed, settings):
+    forecast_modes = []
+
+    def cheap_history_only_forecast(history, nuisance, domain_by_patient, boundary_covariance, *,
+                                    seed, settings, calibration_only=False):
+        forecast_modes.append(calibration_only)
         assert history.target_index == 2
         assert len(history.masks) == 2
         assert history.forecast_day == history.days[-1] + 90.0
@@ -416,6 +420,9 @@ def test_synthetic_mu_runner_completes_patient_cv_and_scores_all_comparator_arms
             "refined_grid_points": 4,
             "n_likelihood_evaluations": 8,
         }
+        if calibration_only:
+            return {"pre_boundary_probability": hybrid_mask.astype(np.float32),
+                    "calibration_only": True}
         return {
             "mask_draws": hybrid_draws,
             "no_pde_ranker_mask_draws": no_pde_draws,
@@ -436,6 +443,7 @@ def test_synthetic_mu_runner_completes_patient_cv_and_scores_all_comparator_arms
 
     assert result["n_patients"] == 18
     assert len(result["rows"]) == 18
+    assert any(forecast_modes) and not all(forecast_modes)
     assert set(row["patient_id"] for row in result["rows"]) == set(patient_ids)
     assert result["precision_gate"] is None
     assert result["precision_gate_status"].startswith("not computed")

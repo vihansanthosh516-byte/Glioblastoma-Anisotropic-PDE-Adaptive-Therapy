@@ -31,6 +31,32 @@ def ellipsoid(shape=(24, 24, 24), axes=(6.0, 4.0, 2.5)):
     return sum(((axis - center_i) / axis_i) ** 2 for axis, center_i, axis_i in zip(coords, center, axes)) <= 1.0
 
 
+def test_volume_match_is_exactly_equivalent_to_stable_lexsort_for_ties_and_endpoints():
+    rng = np.random.default_rng(20261028)
+    shape = (9, 8, 7)
+    domain = rng.random(shape) > 0.2
+    fields = (
+        rng.normal(size=shape),
+        rng.integers(-2, 4, size=shape).astype(float),
+        np.ones(shape, dtype=float),
+    )
+    domain_indices = np.flatnonzero(domain)
+    targets = (0, 1, len(domain_indices) // 2, len(domain_indices))
+
+    for concentration in fields:
+        for target in targets:
+            expected = np.zeros(shape, dtype=bool)
+            values = concentration.ravel()[domain_indices]
+            order = np.lexsort((domain_indices, -values))
+            expected.ravel()[domain_indices[order[:target]]] = True
+
+            actual = volume_match_concentration(concentration, domain, target_voxels=target)
+
+            assert np.array_equal(actual, expected)
+            assert int(actual.sum()) == target
+            assert np.all(~actual | domain)
+
+
 def test_continuous_forward_fields_threshold_to_the_existing_binary_forecasts():
     mask = ball()
     domain = np.ones(mask.shape, bool)
