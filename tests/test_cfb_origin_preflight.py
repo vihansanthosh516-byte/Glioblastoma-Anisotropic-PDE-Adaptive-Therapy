@@ -56,14 +56,14 @@ def _row(tmp_path: Path) -> dict[str, str]:
         "review_source_t1": "mask-review-ledger-row-8",
         "review_status_t2": "not_applicable_manual",
         "review_source_t2": "mask-review-ledger-row-9",
-        "t0_to_t1_transform_documented": "true",
-        "t0_to_t1_transform_source": "transform-ledger-row-7",
-        "t0_to_t1_qc_pass": "true",
-        "t0_to_t1_qc_source": "registration-qc-row-7",
-        "t2_to_t1_transform_documented": "true",
-        "t2_to_t1_transform_source": "transform-ledger-row-9",
-        "t2_to_t1_qc_pass": "true",
-        "t2_to_t1_qc_source": "registration-qc-row-9",
+        "t1_to_t0_transform_documented": "true",
+        "t1_to_t0_transform_source": "transform-ledger-row-8",
+        "t1_to_t0_qc_pass": "true",
+        "t1_to_t0_qc_source": "registration-qc-row-8",
+        "t2_to_t0_transform_documented": "true",
+        "t2_to_t0_transform_source": "transform-ledger-row-9",
+        "t2_to_t0_qc_pass": "true",
+        "t2_to_t0_qc_source": "registration-qc-row-9",
     }
     for key, role in PREFLIGHT.IMAGE_COLUMNS.items():
         visit, modality = role.split("_")
@@ -92,6 +92,7 @@ def test_preflight_reads_only_t1_origin_mri_voxels(tmp_path: Path) -> None:
 
     assert result["preflight_pass"] is True
     assert result["scoring_authorized"] is False
+    assert result["alignment_reference"] == "t0_t1gd"
     assert result["target_mask_voxels_read"] is False
     assert result["t0_t2_mri_voxels_read"] is False
     assert accessed == ["t1_t1gd"]
@@ -132,7 +133,7 @@ def test_preflight_rejects_unaligned_header_and_mixed_provenance(tmp_path: Path)
 
     assert result["headers_pass"] is False
     assert result["provenance_pass"] is False
-    assert "t2_gtv_not_aligned_to_t1_reference" in result["errors"]
+    assert "t2_gtv_not_aligned_to_t0_reference" in result["errors"]
     assert "provenance_classes_not_matched" in result["errors"]
 
 
@@ -174,7 +175,7 @@ def test_preflight_rejects_review_status_incompatible_with_human_mask(tmp_path: 
 
 def test_qc_documented_value_does_not_count_as_qc_pass(tmp_path: Path) -> None:
     row = _row(tmp_path)
-    row["t0_to_t1_qc_pass"] = "documented"
+    row["t1_to_t0_qc_pass"] = "documented"
 
     def loader(path: Path) -> FakeImage:
         return FakeImage(
@@ -184,8 +185,8 @@ def test_qc_documented_value_does_not_count_as_qc_pass(tmp_path: Path) -> None:
 
     result = PREFLIGHT.preflight_rows([row], tmp_path, image_loader=loader)[0]
 
-    assert result["t0_to_t1_documented_qc_pass"] is False
-    assert "t0_to_t1_qc_not_passed" in result["errors"]
+    assert result["t1_to_t0_documented_qc_pass"] is False
+    assert "t1_to_t0_qc_not_passed" in result["errors"]
 
 
 def test_swapped_role_path_stops_before_any_image_loader_call(tmp_path: Path) -> None:
@@ -285,41 +286,46 @@ def test_preflight_rejects_nonorthogonal_geometry(tmp_path: Path) -> None:
     assert "t0_gtv_non_orthogonal_affine" in result["errors"]
 
 
-def test_native_t0_t2_mri_affines_are_allowed_but_gtv_masks_must_match_t1(tmp_path: Path) -> None:
+def test_all_six_image_headers_must_match_t0_reference(tmp_path: Path) -> None:
     row = _row(tmp_path)
     values = np.arange(12 * 12 * 12, dtype=np.float32).reshape(12, 12, 12) + 1
-    native_t0 = np.eye(4)
-    native_t0[0, 3] = 7.0
-    native_t2 = np.eye(4)
-    native_t2[1, 3] = 9.0
+    t0_reference = np.eye(4)
+    t0_reference[0, 3] = 7.0
 
     def loader(path: Path) -> FakeImage:
-        affine = {
-            f"{PATIENT_ID}_t0_t1gd.nii.gz": native_t0,
-            f"{PATIENT_ID}_t2_t1gd.nii.gz": native_t2,
-        }.get(path.name, np.eye(4))
         return FakeImage(
             dataobj=values,
-            affine=affine,
+            affine=t0_reference,
             allow_voxels=path.name == ORIGIN_NAME,
         )
 
-    native_result = PREFLIGHT.preflight_rows([row], tmp_path, image_loader=loader)[0]
+    aligned_result = PREFLIGHT.preflight_rows([row], tmp_path, image_loader=loader)[0]
 
-    assert native_result["headers_pass"] is True
-    assert native_result["preflight_pass"] is True
-    assert native_result["file_headers"]["t0_t1gd"]["aligned_to_t1_reference"] is None
-    assert native_result["file_headers"]["t0_gtv"]["aligned_to_t1_reference"] is True
+    assert aligned_result["headers_pass"] is True
+    assert aligned_result["preflight_pass"] is True
+    assert aligned_result["alignment_reference"] == "t0_t1gd"
+    assert all(
+        header["aligned_to_t0_reference"] is True
+        for header in aligned_result["file_headers"].values()
+    )
 
-    def misaligned_mask_loader(path: Path) -> FakeImage:
-        if path.name == f"{PATIENT_ID}_t2_gtv.nii.gz":
-            return FakeImage(dataobj=values, affine=native_t2)
-        return loader(path)
+    for role in PREFLIGHT.IMAGE_COLUMNS.values():
+        if role == "t0_t1gd":
+            continue
+        shifted = t0_reference.copy()
+        shifted[1, 3] += 2.0
 
-    mask_result = PREFLIGHT.preflight_rows([row], tmp_path, image_loader=misaligned_mask_loader)[0]
+        def misaligned_loader(path: Path, misaligned_role=role, affine=shifted) -> FakeImage:
+            return FakeImage(
+                dataobj=values,
+                affine=affine if path.name == f"{PATIENT_ID}_{misaligned_role}.nii.gz" else t0_reference,
+                allow_voxels=path.name == ORIGIN_NAME,
+            )
 
-    assert mask_result["headers_pass"] is False
-    assert "t2_gtv_not_aligned_to_t1_reference" in mask_result["errors"]
+        result = PREFLIGHT.preflight_rows([row], tmp_path, image_loader=misaligned_loader)[0]
+
+        assert result["headers_pass"] is False
+        assert f"{role}_not_aligned_to_t0_reference" in result["errors"]
 
 
 def test_run_report_hashes_crosswalk_script_and_protocol(tmp_path: Path, monkeypatch) -> None:

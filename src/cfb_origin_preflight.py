@@ -3,9 +3,8 @@
 This tool does not authorize scoring. It reads NIfTI headers for all listed
 files and reads voxel values only from each patient's t1 T1-Gd image to check
 the frozen robust-normalization inputs. It never reads any GTV mask voxels or
-t0/t2 MRI voxels. The t0, t1, and t2 GTV files in the crosswalk must already
-be transformed into the t1 reference grid. Native t0/t2 MRI files need valid
-headers but may retain their native affines.
+t0/t2 MRI voxels. The official CFB pipeline uses baseline t0 T1-Gd as the
+fixed reference. All three MRI and GTV files must already share that grid.
 
 Crosswalk CSV columns. CFB v4 paths must use this layout:
 `<crosswalk directory>/<three-digit folder>/<t0|t1|t2>/`,
@@ -19,10 +18,10 @@ provenance_t2, provenance_source_t2,
 review_status_t0, review_source_t0,
 review_status_t1, review_source_t1,
 review_status_t2, review_source_t2,
-t0_to_t1_transform_documented, t0_to_t1_transform_source,
-t0_to_t1_qc_pass, t0_to_t1_qc_source,
-t2_to_t1_transform_documented, t2_to_t1_transform_source,
-t2_to_t1_qc_pass, t2_to_t1_qc_source.
+t1_to_t0_transform_documented, t1_to_t0_transform_source,
+t1_to_t0_qc_pass, t1_to_t0_qc_source,
+t2_to_t0_transform_documented, t2_to_t0_transform_source,
+t2_to_t0_qc_pass, t2_to_t0_qc_source.
 
 Paths may be absolute or relative to the crosswalk file. A successful report
 means only that these preflight checks passed. It does not resolve source
@@ -52,7 +51,7 @@ IMAGE_COLUMNS = {
     "t1_gtv_path": "t1_gtv",
     "t2_gtv_path": "t2_gtv",
 }
-ALIGNMENT_REQUIRED = {"t1_t1gd", "t0_gtv", "t1_gtv", "t2_gtv"}
+ALIGNMENT_REQUIRED = set(IMAGE_COLUMNS.values())
 REQUIRED_COLUMNS = (
     "patient_id",
     "identity_mapping_source",
@@ -69,14 +68,14 @@ REQUIRED_COLUMNS = (
     "review_source_t1",
     "review_status_t2",
     "review_source_t2",
-    "t0_to_t1_transform_documented",
-    "t0_to_t1_transform_source",
-    "t0_to_t1_qc_pass",
-    "t0_to_t1_qc_source",
-    "t2_to_t1_transform_documented",
-    "t2_to_t1_transform_source",
-    "t2_to_t1_qc_pass",
-    "t2_to_t1_qc_source",
+    "t1_to_t0_transform_documented",
+    "t1_to_t0_transform_source",
+    "t1_to_t0_qc_pass",
+    "t1_to_t0_qc_source",
+    "t2_to_t0_transform_documented",
+    "t2_to_t0_transform_source",
+    "t2_to_t0_qc_pass",
+    "t2_to_t0_qc_source",
 )
 UNKNOWN_PROVENANCE = {"", "unknown", "unverified", "na", "n/a", "none"}
 UNKNOWN_REVIEW = {"", "unknown", "unverified", "pending", "not_recorded", "na", "n/a", "none"}
@@ -331,6 +330,7 @@ def preflight_rows(
             "target_mask_voxels_read": False,
             "t0_t2_mri_voxels_read": False,
             "scoring_authorized": False,
+            "alignment_reference": "t0_t1gd",
             "metadata_evidence": {
                 key: str(row.get(key, "") or "").strip()
                 for key in REQUIRED_COLUMNS
@@ -355,7 +355,7 @@ def preflight_rows(
         result["mask_review_status"] = review_values
         result["mask_review_pass"] = review_pass
         errors.extend(review_errors)
-        for prefix in ("t0_to_t1", "t2_to_t1"):
+        for prefix in ("t1_to_t0", "t2_to_t0"):
             passed, doc_errors = _documented_check(row, prefix)
             result[f"{prefix}_documented_qc_pass"] = passed
             errors.extend(doc_errors)
@@ -399,14 +399,14 @@ def preflight_rows(
                 if header_error:
                     errors.append(f"{role}_{header_error}")
 
-        reference = headers.get("t1_t1gd")
+        reference = headers.get("t0_t1gd")
         if reference and reference.get("header_pass"):
             ref_shape = reference["shape"]
             ref_affine = np.asarray(reference["affine"], dtype=np.float64)
             for role, header in headers.items():
                 header["alignment_required"] = role in ALIGNMENT_REQUIRED
                 if role not in ALIGNMENT_REQUIRED:
-                    header["aligned_to_t1_reference"] = None
+                    header["aligned_to_t0_reference"] = None
                     continue
                 if not header.get("header_pass"):
                     continue
@@ -414,9 +414,9 @@ def preflight_rows(
                     np.asarray(header["affine"], dtype=np.float64), ref_affine,
                     rtol=0.0, atol=1e-3,
                 )
-                header["aligned_to_t1_reference"] = bool(aligned)
+                header["aligned_to_t0_reference"] = bool(aligned)
                 if not aligned:
-                    errors.append(f"{role}_not_aligned_to_t1_reference")
+                    errors.append(f"{role}_not_aligned_to_t0_reference")
 
         if "t1_t1gd" in loaded and headers.get("t1_t1gd", {}).get("header_pass"):
             qc_pass, diagnostics, qc_error = _origin_t1_qc(loaded["t1_t1gd"])
@@ -431,7 +431,7 @@ def preflight_rows(
             len(headers) == len(IMAGE_COLUMNS)
             and all(header.get("header_pass") for header in headers.values())
             and all(
-                header.get("aligned_to_t1_reference") is True
+                header.get("aligned_to_t0_reference") is True
                 for role, header in headers.items()
                 if role in ALIGNMENT_REQUIRED
             )
@@ -440,8 +440,8 @@ def preflight_rows(
             _field_nonempty(row, "identity_mapping_source")
             and provenance_pass
             and review_pass
-            and result["t0_to_t1_documented_qc_pass"]
-            and result["t2_to_t1_documented_qc_pass"]
+            and result["t1_to_t0_documented_qc_pass"]
+            and result["t2_to_t0_documented_qc_pass"]
         )
         result["origin_qc_pass"] = bool(result["origin_t1_t1gd_qc"].get("pass"))
         result["preflight_pass"] = (
@@ -500,6 +500,7 @@ def run_preflight(
         "analysis_protocol": str(protocol_resolved),
         "analysis_protocol_sha256": hashlib.sha256(protocol_resolved.read_bytes()).hexdigest(),
         "candidate_rows": len(results),
+        "alignment_reference": "t0_t1gd",
         "preflight_pass_rows": sum(bool(row["preflight_pass"]) for row in results),
         "preflight_fail_rows": sum(not bool(row["preflight_pass"]) for row in results),
         "target_mask_voxels_read": False,
@@ -507,7 +508,7 @@ def run_preflight(
         "scoring_authorized": False,
         "limitations": [
             "Header alignment does not prove registration provenance or anatomical registration quality.",
-            "All three GTV mask files must already be transformed to the t1 reference grid; this tool does not transform masks.",
+            "All three MRI and GTV files must already share the baseline t0 T1-Gd grid; this tool does not transform files.",
             "Metadata source fields are recorded but are not independently verified by this tool.",
             "This preflight does not resolve TCIA release crosswalk or collection-count discrepancies.",
             "This preflight does not inspect target masks or compute outcomes.",

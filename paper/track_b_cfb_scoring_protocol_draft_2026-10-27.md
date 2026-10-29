@@ -1,6 +1,6 @@
 # CFB-GBM Track B scoring protocol draft
 
-**Status (updated 2026-10-28):** outcome-blind draft; not authorization to score. Metadata-to-file matching and t1 origin-MRI QC now pass for 107 candidates. Mask review lineage and per-case registration QC remain unresolved. This is a separate CFB protocol draft. The locked UCSD protocol remains unchanged.
+**Status (updated 2026-10-28):** outcome-blind draft; not authorization to score. All 107 candidates pass file/header checks against the official baseline t0 T1-Gd reference grid and pass t1 origin-MRI normalization QC. These checks establish shared geometry and usable origin intensities, not anatomical registration quality. Mask review lineage and source transform records remain unresolved. This is a separate CFB protocol draft. The locked UCSD protocol remains unchanged.
 
 ## 1. Question and scope
 
@@ -16,7 +16,7 @@ The target is **future released-annotation addition**, not tumor growth, recurre
 
 **Patient-level estimand:** for each AUC-evaluable patient i, calculate `d_i = AUC_i(trajectory model) - AUC_i(frozen comparator)`. The primary effect is `Delta = mean_i(d_i)`, giving every AUC-evaluable patient equal weight. Report Delta, its two-sided 95% paired patient-bootstrap confidence interval (10,000 resamples; fixed seed), evaluable n, and the full cohort flow. Bootstrap patients, carrying each patient's paired predictions and labels together.
 
-**Target:** at the t1 grid, `Y_i(x)=1` when voxel x is inside the t2 GTV but outside the t1 GTV; otherwise `Y_i(x)=0`. The primary risk set is the intersection of valid t1 brain support and valid t2 annotation support, excluding t1 GTV only. Do not exclude a cavity: the available CFB endpoint is GTV, and a compatible cavity label is not established. Do not infer cavity or edema from the binary GTV mask. Report t2 additions outside the risk set separately; they are not primary positives. The t0/t1/t2 GTVs must be transformed to the same verified t1 reference grid using documented transforms and QC.
+**Target:** on the shared baseline t0 T1-Gd grid, `Y_i(x)=1` when voxel x is inside the t2 GTV but outside the t1 GTV; otherwise `Y_i(x)=0`. The primary risk set is the intersection of valid t1 brain support and valid t2 annotation support, excluding t1 GTV only. Do not exclude a cavity: the available CFB endpoint is GTV, and a compatible cavity label is not established. Do not infer cavity or edema from the binary GTV mask. Report t2 additions outside the risk set separately; they are not primary positives. The official pipeline fixes baseline t0 T1-Gd and resamples follow-up images to that grid. All MRI and GTV files must share that grid. This header check does not prove anatomical registration quality.
 
 Define valid t2 support from documented annotation coverage and image-acquisition support, using source documentation and image/header information only. Never infer support from t2-mask foreground, connected components, or observed additions. If annotation coverage cannot be established without inspecting target-mask values, stop. Estimate and quality-check spatial transforms from image data and geometry only; never fit, select, or accept a transform using GTV contours or target-derived mask similarity. Freeze the transform method and QC tolerances before applying transforms to masks.
 
@@ -30,7 +30,7 @@ Eligible patient must have: (a) verified identity mapping across t0, t1, t2 in t
 
 **Horizon:** next observed eligible scan, variable follow-up. The model must not receive the realized t1-to-t2 interval as a predictor. Report interval distribution and predeclared descriptive strata; do not call this a fixed-horizon forecast. The 45–75-day band (34 table candidates before exclusions) is descriptive sensitivity only and cannot replace the primary cohort after outcome review.
 
-Current metadata joins show 107 file-matched candidate t1-to-t2 pairs with T1-Gd and GTV, median gap 84 days, IQR 56–98 using Tukey hinges, range 14–210. All 107 pass header checks and t1 T1-Gd robust-normalization QC. The t1 reference spacing is 0.5 × 0.5 × 1.0 mm; 102 t1 images are 512 × 512 × 208 and five are 512 × 512 × 224. These are file and origin-input checks, not proof of registration quality or eligible scoring n. The source paper lists deceased patients among inclusion criteria; verify whether this applies to these candidates and disclose any resulting survival-related selection.
+Current metadata joins show 107 file-matched candidate t1-to-t2 pairs with T1-Gd and GTV, median gap 84 days, IQR 56–98 using Tukey hinges, range 14–210. All 107 pass header checks against their t0 T1-Gd grid and t1 T1-Gd robust-normalization QC. Baseline grids use approximately 0.5 × 0.5 × 1.0 mm spacing; 102 are 512 × 512 × 208 and five are 512 × 512 × 224. Shared headers show geometry only. They do not establish anatomical registration quality or eligible scoring n. The source paper lists deceased patients among inclusion criteria; verify whether this applies to these candidates and disclose any resulting survival-related selection.
 
 ## 4. Mask provenance gate
 
@@ -40,7 +40,7 @@ Primary confirmatory-style analysis requires one prespecified, consistent proven
 
 ## 5. Inputs, models, and development
 
-**Primary input modality:** t1 T1-Gd only, with distance to current t1 GTV. Freeze the exact series name mapping, registration chain, voxel units, interpolation, brain-support rule, robust normalization, and finite-value/zero-scale failure rule before outcome access. The 107 t1 images use 0.5 × 0.5 × 1.0 mm spacing; compute spatial distances in physical millimetres. Do not reuse the existing 1-mm isotropic four-channel method or resample without a separate frozen plan. T1-Gd is the common candidate modality in the current metadata screen. Do not port the existing four-channel method as-is: its sequence mapping fits only 2 of 107 candidates under one mapping and none under an alternative. Adding FLAIR or any other MRI sequence defines a separate secondary model and requires a new compatible development plan.
+**Primary input modality:** t1 T1-Gd only, with distance to current t1 GTV, both on the shared t0 reference grid. Freeze the exact series name mapping, registration chain, voxel units, interpolation, brain-support rule, robust normalization, and finite-value/zero-scale failure rule before outcome access. Baseline grids use approximately 0.5 × 0.5 × 1.0 mm spacing; compute spatial distances in physical millimetres. Do not reuse the existing 1-mm isotropic four-channel method or resample without a separate frozen plan. T1-Gd is the common candidate modality in the current metadata screen. Do not port the existing four-channel method as-is: its sequence mapping fits only 2 of 107 candidates under one mapping and none under an alternative. Adding FLAIR or any other MRI sequence defines a separate secondary model and requires a new compatible development plan.
 
 **Comparator (frozen baseline):** a patient-level voxel-ranking score trained/developed using only t1 T1-Gd features and distance to the current t1 GTV. Freeze its feature definition, algorithm, coefficients/hyperparameters, and preprocessing before CFB target access.
 
@@ -74,7 +74,7 @@ A statistically positive direction requires the two-sided 95% CI for Delta to li
 
 1. Record current v4 public/CC BY 4.0 terms, required attribution, package version, and prior exposure history. Verify whether the paper’s deceased-patient inclusion rule applies to this cohort and state its generalizability limit.
 2. Preserve the verified current-table-to-package mapping: 107 candidate pairs have all six files; the 112 table rows match 112 package t2 GTV files. Keep the 122 and 3,981 aggregate counts as documented, unresolved source discrepancies.
-3. Header and origin-only QC pass for all 107 candidates. Before mask access, obtain per-case registration evidence and QC independent of GTV contours; shared shape and affine do not prove anatomical registration quality.
+3. All 107 candidates pass six-file header alignment to baseline t0 T1-Gd and t1 origin-only intensity QC. Before mask access, obtain per-case anatomical registration evidence and QC independent of GTV contours; shared shape and affine do not prove anatomical registration quality.
 4. Resolve per-mask review status or freeze a separate exploratory plan that explicitly retains unknown review status and mixed t0 provenance. No confirmatory-style provenance-matched subset is currently established.
 5. Verify whether an independent development source is compatible. If none exists, freeze CFB-only nested cross-validation as exploratory, not external confirmation.
 6. Freeze code, patient and visit rule, physical-distance implementation, feature definitions, fold assignment, failure rules, metrics, bootstrap, power assumptions, and file hashes before any target-mask voxel access.
@@ -97,6 +97,6 @@ Novelty remains unestablished. Adjacent literature already covers future-mask fo
 - Experiment-design conflicts: `research_notes/GBM CFB scoring readiness/experiment.md` and `hypothesis.md`.
 - Patient-level estimand and scale calculations: `research_notes/GBM CFB scoring readiness/stats.md`.
 - Current CFB collection page: https://www.cancerimagingarchive.net/collection/cfb-gbm/ (DOI 10.7937/v9pn-2f72).
-- CFB-GBM v2.0 methods paper: https://www.melba-journal.org/pdf/2026:038.pdf.
+- CFB-GBM v2.0 methods paper (baseline t0 T1-Gd is the fixed registration reference): https://www.melba-journal.org/pdf/2026:038.pdf.
 - Adjacent forecasting literature includes TaDiff: https://arxiv.org/abs/2309.05406; longitudinal post-treatment volume change: https://pmc.ncbi.nlm.nih.gov/articles/PMC9530762/; and dose-associated recurrence geography: https://pmc.ncbi.nlm.nih.gov/articles/PMC5628052/.
 
