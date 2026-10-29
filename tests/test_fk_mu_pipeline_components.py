@@ -6,6 +6,7 @@ import sys
 
 import numpy as np
 import pytest
+import torch
 
 REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO))
@@ -199,6 +200,13 @@ def test_result_writer_hashes_provenance_reopens_file_and_refuses_overwrite(tmp_
     assert "src/fk_spatial_uncertainty.py" in saved["provenance"]["code_sha256"]
     assert "run_improved_aniso.py" in saved["provenance"]["code_sha256"]
     assert saved["provenance"]["environment"]["scipy"]
+    torch_environment = saved["provenance"]["environment"]["torch"]
+    assert torch_environment["version"] == str(torch.__version__)
+    assert torch_environment["default_device"] == str(torch.get_default_device())
+    assert torch_environment["default_dtype"] == str(torch.get_default_dtype())
+    assert torch_environment["num_threads"] == torch.get_num_threads()
+    assert torch_environment["num_interop_threads"] == torch.get_num_interop_threads()
+    assert isinstance(torch_environment["deterministic_algorithms_enabled"], bool)
     assert len(saved["run_spec_sha256"]) == 64
     assert write_info["artifact_sha256"]
     assert write_info["size_bytes"] == output_path.stat().st_size
@@ -206,6 +214,25 @@ def test_result_writer_hashes_provenance_reopens_file_and_refuses_overwrite(tmp_
         write_mu_development_result(result, output_path)
     with pytest.raises(PermissionError, match="inside the project output"):
         write_mu_development_result(result, tmp_path.parent / "outside.json")
+
+
+def test_torch_runtime_settings_change_the_saved_run_spec_hash(tmp_path, monkeypatch):
+    monkeypatch.setattr(fk_mu_patient_runner_module, "OUTPUT_ROOT", tmp_path)
+    result = {
+        "schema_version": 1,
+        "protocol": {"forecast_horizon_days": 90.0},
+        "cohort_audit": {"source_hashes": {"manifest": "a" * 64}},
+        "rows": [{"patient_id": "synthetic-patient", "scores": {"dice": 0.5}}],
+    }
+    baseline_path = tmp_path / "track_b_mu" / "baseline.json"
+    changed_threads_path = tmp_path / "track_b_mu" / "changed_threads.json"
+
+    baseline = write_mu_development_result(result, baseline_path)
+    baseline_thread_count = torch.get_num_threads()
+    monkeypatch.setattr(torch, "get_num_threads", lambda: baseline_thread_count + 1)
+    changed = write_mu_development_result(result, changed_threads_path)
+
+    assert baseline["run_spec_sha256"] != changed["run_spec_sha256"]
 
 
 def test_protocol_complete_runner_writes_nested_sensitivity_settings(tmp_path, monkeypatch):

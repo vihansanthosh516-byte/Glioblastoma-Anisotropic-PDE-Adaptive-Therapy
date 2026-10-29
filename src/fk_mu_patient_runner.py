@@ -19,6 +19,7 @@ from types import MappingProxyType
 
 import numpy as np
 import scipy
+import torch
 
 from src.fk_boundary_calibration import run_cross_fitted_boundary_calibration
 from src.fk_mu_development_data import MUDevelopmentCohort, is_loader_issued_cohort
@@ -130,6 +131,16 @@ def write_mu_development_result(result: Mapping, output_path: str | Path) -> dic
         "python": platform.python_version(),
         "numpy": np.__version__,
         "scipy": scipy.__version__,
+        "torch": {
+            "version": str(torch.__version__),
+            "default_device": str(torch.get_default_device())
+            if hasattr(torch, "get_default_device") else "cpu",
+            "default_dtype": str(torch.get_default_dtype()),
+            "num_threads": int(torch.get_num_threads()),
+            "num_interop_threads": int(torch.get_num_interop_threads()),
+            "deterministic_algorithms_enabled": bool(torch.are_deterministic_algorithms_enabled())
+            if hasattr(torch, "are_deterministic_algorithms_enabled") else False,
+        },
     }
     run_spec = {
         "run_settings": run_settings,
