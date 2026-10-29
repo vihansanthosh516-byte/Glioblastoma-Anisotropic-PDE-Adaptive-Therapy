@@ -182,7 +182,10 @@ def run_cross_fitted_boundary_calibration(records: Sequence, fit_nuisance, forec
                                           n_folds: int = 5, seed: int = 0,
                                           minimum_history: int = 2, spacing_mm=1.0,
                                           n_anchors: int = 256,
-                                          ell_candidates_mm=(5.0, 10.0, 20.0)) -> dict:
+                                          ell_candidates_mm=(5.0, 10.0, 20.0),
+                                          forecast_horizon_days: float | None = None,
+                                          fallback_forecast=None,
+                                          allow_empty_history_masks: bool = False) -> dict:
     """Generate inner patient-held-out boundary residuals and fit their effective covariance.
 
     Call this only on an outer-training cohort. ``fit_nuisance`` sees inner-training patients only, and
@@ -192,6 +195,10 @@ def run_cross_fitted_boundary_calibration(records: Sequence, fit_nuisance, forec
     """
     if not isinstance(records, Sequence) or isinstance(records, (str, bytes)) or not records:
         raise ValueError("records must be a nonempty sequence of patient series")
+    if not isinstance(allow_empty_history_masks, bool):
+        raise ValueError("allow_empty_history_masks must be a boolean")
+    if allow_empty_history_masks and fallback_forecast is None:
+        raise ValueError("empty history masks require an explicit cross-fitted fallback forecast")
     folds = assign_patient_folds([record.patient_id for record in records], n_folds=n_folds, seed=seed)
     residual_cases = []
 
@@ -200,9 +207,20 @@ def run_cross_fitted_boundary_calibration(records: Sequence, fit_nuisance, forec
         return {"nuisance": fit_nuisance(training_records), "training_patient_ids": training_ids}
 
     def forecast_with_training_ids(history, context):
+        if allow_empty_history_masks and any(not mask.any() for mask in history.masks):
+            from src.fk_patient_cv import ForecastFailure
+            raise ForecastFailure("empty history mask requires the prespecified fallback")
         raw_prediction = forecast(history, context["nuisance"])
         if not isinstance(raw_prediction, Mapping):
             raise ValueError("cross-fitted forecast must return a mapping with pre_boundary_probability")
+        prediction = dict(raw_prediction)
+        prediction["_training_patient_ids"] = context["training_patient_ids"]
+        return prediction
+
+    def fallback_with_training_ids(history, context):
+        raw_prediction = fallback_forecast(history, context["nuisance"])
+        if not isinstance(raw_prediction, Mapping):
+            raise ValueError("cross-fitted fallback must return a mapping with pre_boundary_probability")
         prediction = dict(raw_prediction)
         prediction["_training_patient_ids"] = context["training_patient_ids"]
         return prediction
@@ -225,7 +243,10 @@ def run_cross_fitted_boundary_calibration(records: Sequence, fit_nuisance, forec
     from src.fk_patient_cv import run_outer_patient_cv
     evaluation = run_outer_patient_cv(
         records, folds, fit_with_training_ids, forecast_with_training_ids, score_residual,
+        fallback_forecast=fallback_with_training_ids if fallback_forecast is not None else None,
         n_folds=n_folds, minimum_history=minimum_history,
+        forecast_horizon_days=forecast_horizon_days,
+        allow_empty_history_masks=allow_empty_history_masks,
     )
     covariance_fit = fit_cross_fitted_boundary_covariance(
         residual_cases, ell_candidates_mm=ell_candidates_mm,

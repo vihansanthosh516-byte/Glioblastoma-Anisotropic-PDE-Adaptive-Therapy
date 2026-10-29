@@ -10,7 +10,7 @@ import numpy as np
 from scipy import ndimage
 
 from src import fk_mask_inverse as fi
-from src.fk_joint_posterior import (log_gaussian_prior_density,
+from src.fk_joint_posterior import (log_parameter_prior_density,
                                     make_log_parameter_grid, normalize_grid_posterior,
                                     refine_log_parameter_grid, sample_joint_log_parameters)
 from src.fk_spatial_uncertainty import deterministic_surface_anchors, exponential_covariance_matrix
@@ -211,17 +211,20 @@ def infer_joint_log_parameter_posterior(masks, days, *, prior: dict, h: float,
                                         n_coarse: int = 21, mass_fraction: float = 0.9,
                                         n_refine: int = 11, n_draws: int = 200,
                                         seed: int = 0, n_anchors: int = 256) -> dict:
-    """Fit one training-history posterior using an outer-training joint prior and spatial covariance.
+    """Fit one training-history posterior with a fixed or outer-training joint prior.
 
-    The prior and covariance must be estimated from outer-training patients only. ``masks`` must be the
-    history available before the forecast target; no forecast target is accepted by this function.
+    A data-derived prior and the spatial covariance must use outer-training patients only. A fixed, prespecified
+    prior such as ``{"distribution": "log_uniform"}`` is also supported. ``masks`` must be the history available
+    before the forecast target; no forecast target is accepted by this function.
     """
     coarse = make_log_parameter_grid(rho_bounds=rho_bounds, D_bounds=D_bounds, n_coarse=n_coarse)
     coarse_log_likelihood = evaluate_parameter_grid_log_likelihood(
         masks, days, coarse["points"], h=h, domain=domain,
         covariance_parameters=covariance_parameters, n_anchors=n_anchors,
     )
-    coarse_log_prior = log_gaussian_prior_density(coarse["points"], prior)
+    coarse_log_prior = log_parameter_prior_density(
+        coarse["points"], prior, rho_bounds=rho_bounds, D_bounds=D_bounds
+    )
     coarse_log_posterior = coarse_log_likelihood + coarse_log_prior
     coarse_result = normalize_grid_posterior(
         coarse_log_likelihood, coarse_log_prior, coarse["quadrature_weights"]
@@ -239,7 +242,9 @@ def infer_joint_log_parameter_posterior(masks, days, *, prior: dict, h: float,
             masks, days, refined["points"][new_points], h=h, domain=domain,
             covariance_parameters=covariance_parameters, n_anchors=n_anchors,
         )
-    refined_log_prior = log_gaussian_prior_density(refined["points"], prior)
+    refined_log_prior = log_parameter_prior_density(
+        refined["points"], prior, rho_bounds=rho_bounds, D_bounds=D_bounds
+    )
     posterior = normalize_grid_posterior(
         refined_log_likelihood, refined_log_prior, refined["quadrature_weights"]
     )
@@ -270,5 +275,6 @@ def infer_joint_log_parameter_posterior(masks, days, *, prior: dict, h: float,
         "n_reused_coarse_likelihoods": int(np.count_nonzero(reused)),
         "posterior_mass_at_parameter_bounds": boundary_mass,
         "parameter_order": ("log_rho", "log_D"),
-        "scope": "training history only; target excluded; prior and covariance must be outer-training estimates",
+        "prior_distribution": str(prior.get("distribution", "gaussian")),
+        "scope": "history only; target excluded; prior is fixed or development-only and covariance is outer-training",
     }

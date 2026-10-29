@@ -90,6 +90,35 @@ def log_gaussian_prior_density(points, prior: dict) -> np.ndarray:
     return -0.5 * (2.0 * math.log(2.0 * math.pi) + log_determinant + quadratic)
 
 
+def log_parameter_prior_density(points, prior: dict, *, rho_bounds, D_bounds) -> np.ndarray:
+    """Evaluate a fixed Gaussian or log-uniform joint parameter prior.
+
+    ``log_uniform`` is uniform in (log rho, log D) over the supplied computational bounds.
+    It is a prespecified support assumption, not a patient-derived population prior.
+    """
+    distribution = str(prior.get("distribution", "gaussian")).strip().lower()
+    if distribution in {"gaussian", "normal"}:
+        return log_gaussian_prior_density(points, prior)
+    if distribution != "log_uniform":
+        raise ValueError("prior distribution must be gaussian or log_uniform")
+
+    points = np.asarray(points, dtype=float)
+    if points.ndim != 2 or points.shape[1] != 2 or not np.isfinite(points).all():
+        raise ValueError("points must be a finite array with shape (n, 2)")
+    ranges = []
+    for bounds, name in ((rho_bounds, "rho_bounds"), (D_bounds, "D_bounds")):
+        values = np.asarray(bounds, dtype=float)
+        if values.shape != (2,) or not np.isfinite(values).all() or values[0] <= 0 or values[0] >= values[1]:
+            raise ValueError(f"{name} must contain two positive increasing finite values")
+        ranges.append(np.log(values))
+    lower = np.asarray([values[0] for values in ranges])
+    upper = np.asarray([values[1] for values in ranges])
+    inside = np.all((points >= lower) & (points <= upper), axis=1)
+    density = np.full(len(points), -np.inf, dtype=float)
+    density[inside] = -float(np.log(upper - lower).sum())
+    return density
+
+
 def normalize_grid_posterior(log_likelihood, log_prior, quadrature_weights) -> dict:
     """Normalize likelihood × prior on a grid using its nonuniform cell-quadrature weights."""
     log_likelihood = np.asarray(log_likelihood, dtype=float)

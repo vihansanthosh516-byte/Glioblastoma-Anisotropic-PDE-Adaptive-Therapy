@@ -1,7 +1,8 @@
 """Synthetic-only composition of Track B posterior, volume, and boundary uncertainty.
 
-Callers must provide the joint prior, volume-population slope, shrinkage time constant, and boundary
-covariance from outer-training patients only. This module accepts only pre-target history and has no data I/O.
+Callers must provide a fixed, prespecified joint prior or one derived from outer-training patients. Volume
+population slope, shrinkage time constant, predictive variance, and boundary covariance must use outer-training
+patients only. This module accepts only pre-target history and has no data I/O.
 """
 from __future__ import annotations
 
@@ -97,8 +98,9 @@ def hybrid_posterior_predictive_forecast(masks, days, target_day, *, prior: dict
                                          n_anchors: int = 256, seed: int = 0) -> dict:
     """Draw joint PDE-shape, log-volume, and correlated-boundary forecasts from history only.
 
-    The prior and nuisance estimates must come from outer-training patients. The target mask is deliberately
-    not an argument. Two masks support the planned first-two-to-third forecast, but one spatial follow-up can
+    A fixed prespecified prior or training-only prior is allowed; all fitted nuisance estimates must come from
+    outer-training patients. The target mask is deliberately not an argument. Two masks support the planned
+    first-two-to-third forecast, but one spatial follow-up can
     leave a joint rho-D ridge, so integrate posterior uncertainty and do not interpret the two parameters
     separately. A forecast that reaches the computational-domain edge fails instead of being clipped.
     """
