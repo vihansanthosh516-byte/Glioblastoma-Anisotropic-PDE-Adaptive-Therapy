@@ -1,6 +1,6 @@
-# CFB-GBM Track B scoring protocol draft
+# CFB-GBM annotation-change side-study protocol draft
 
-**Status (updated 2026-10-28):** outcome-blind draft; not authorization to score. All 107 candidates pass file/header checks against the official baseline t0 T1-Gd reference grid and pass t1 origin-MRI normalization QC. These checks establish shared geometry and usable origin intensities, not anatomical registration quality. Mask review lineage and source transform records remain unresolved. This is a separate CFB protocol draft. The locked UCSD protocol remains unchanged.
+**Status (updated 2026-10-28):** this is a separate exploratory annotation-change side study, not Track B's PDE core and not authorization to score. All 107 candidates pass file/header checks against the official baseline t0 T1-Gd reference grid and pass t1 origin-MRI normalization QC. These checks establish shared geometry and usable origin intensities, not anatomical registration quality. Mask review lineage and source transform records remain unresolved. The UCSD annotation-change test is partially exposed; its existing protocol remains historical and cannot serve as fresh confirmation.
 
 ## 1. Question and scope
 

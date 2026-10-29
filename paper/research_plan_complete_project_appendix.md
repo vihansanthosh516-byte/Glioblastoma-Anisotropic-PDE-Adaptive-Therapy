@@ -1,6 +1,6 @@
 # Technical Protocol for the Final GBM Research Plan
 
-This is the methods companion to the form plan, not a second project. Tracks A, B, and C are equal, use separate data and endpoints, and do not form a patient-level digital twin. The protocol states the intended final analyses; it does not list abandoned trial-and-error branches as separate research aims. Earlier exploratory analyses exist and must be disclosed.
+This is the methods companion to the form plan, not a second project. Tracks A, B, and C are equal, use separate data and endpoints, and do not form a patient-level digital twin. Track B's primary aim is reaction-diffusion/PDE tumor-growth forecasting. UCSD and CFB annotation-change analyses are separate exploratory side studies and do not complete that primary aim. The protocol states the intended analyses; earlier exploratory analyses exist and must be disclosed.
 
 ## 1. Shared design, data history, and decision rule
 
@@ -27,8 +27,9 @@ A track supports a within-study advantage only if all eligibility and validation
 | Source | Planned role | Public access and scale | Terms and use gate |
 |---|---|---|---|
 | UCSC Cell Browser, multiomic-gbm | Track A primary molecular/spatial data | Public Cell Browser page and bulk download | The page supports downloads but does not display an explicit license for each export. Record exact files and terms; keep local, do not upload to Kaggle or redistribute until terms are established. |
-| MU-Glioma-Post v1, TCIA | Track B development only | Official TCIA page lists 203 subjects and public NIfTI/clinical files | TCIA lists CC BY 4.0 for public packages. The source has been examined in earlier project work; all Track B results on MU are exploratory. |
-| UCSD-PTGBM v3, TCIA | Track B single external patient-level test | Official TCIA page lists 178 subjects and 243 timepoints; standard NIfTI images and segmentations total about 44.98 GB across two packages | Current TCIA page lists CC BY 4.0, data citation DOI 10.7937/fwv2-dt74. Download locally via Aspera; do not transfer patient files to Kaggle or commit them. |
+| MU-Glioma-Post v1, TCIA | Track B PDE development and exploratory patient-level evaluation | Official TCIA page lists 203 subjects and public NIfTI/clinical files | TCIA lists CC BY 4.0 for public packages. The source has been examined in earlier project work; all MU results are exploratory. |
+| UCSD-PTGBM v3, TCIA | Separate, partially exposed annotation-change side study; not PDE validation | Official TCIA page lists 178 subjects and 243 timepoints; standard NIfTI images and segmentations total about 44.98 GB across two packages | Current TCIA page lists CC BY 4.0, data citation DOI 10.7937/fwv2-dt74. The locked attempt failed after outcome access; any further analysis is exploratory. |
+| CFB-GBM v4, TCIA | Separate exploratory annotation-change side study; not PDE validation | Local package is file-matched to the downloaded release inventory | Confirm exact source terms for the intended use. Target-mask scoring remains unauthorized until registration QC, mask-review lineage, hashes, and an explicit side-study protocol are complete. |
 | Track C virtual simulator | Track C only | Generated locally or in Kaggle; no patient data | Synthetic inputs are project assumptions. Kaggle is permitted for Track C simulations because no patient files are transferred. |
 
 The UCSC source is publicly downloadable, but public access alone does not establish a reuse license. The current public repository already contains derived per-cell UCSC files according to the project audit. Do not add or publish additional source-derived files until their terms are clear; repository history or visibility is outside this protocol.
@@ -86,9 +87,39 @@ Check whether performance is driven by cell type, library, or batch. If source m
 
 The main risks are too few independent donors, unresolved aliases, donor/class confounding, and weak gains over logistic regression. If the eligibility gate fails, no resampling method can manufacture donor-level evidence. If the model only works in one library or cell type, report that dependence rather than a general donor-robust method. The result remains exploratory because the source donors have already been examined in the project.
 
-## 3. Track B: next-visit tumor-core annotation-change ranking
+## 3. Track B primary: uncertainty-aware reaction-diffusion forecasting
 
-### 3.1 Question, sources, and eligibility
+### 3.1 Question and current evidence
+
+The primary Track B question is whether a patient-specific reaction-diffusion/Fisher–Kolmogorov model can forecast future tumor-core geometry better than persistence, volume-trend, and geometric-trend baselines, with uncertainty and parameter identifiability evaluated explicitly. A forecast target is a later tumor-core mask defined before scoring; the patient, not the scan pair or voxel, is the independent evaluation unit.
+
+The saved MU-Glioma-Post patient run is relevant evidence but remains exploratory because this cohort has been used before. Its all-pairs result was inconclusive against persistence and showed no advantage over the geometric-trend comparator. A first-pair sensitivity was positive against persistence but not clearly better than the geometric baseline. The reported runner conditions on the realized future scan interval, so it is a retrospective conditional-horizon evaluation, not a schedule-known-at-origin forecast. The synthetic joint-posterior hybrid is not yet a patient-data scoring pipeline.
+
+### 3.2 Candidate estimand and cohort handling
+
+The candidate primary design uses two eligible historical tumor-core masks to estimate patient-specific state/parameters and forecasts the next eligible mask. Later rolling origins are secondary. Use only patients with sufficient prior masks and a target inside a prespecified scan-gap range; define tumor core consistently as the source-approved label set and record surgery, treatment, registration, and annotation provenance. If the target interval is the realized interval, state clearly that the estimand is conditional on that interval. Do not call it a fixed-horizon or scheduled forecast.
+
+MU is development/exploratory only. Keep every patient wholly within one outer fold. Any priors, tuning, population-level shrinkage, calibration, or comparator selection must use outer-training patients only. Fit a patient's PDE parameters from the history masks available at that forecast origin; never use the target mask to fit that patient's parameters. Hold target data out until the pipeline, hashes, and failure rules are frozen.
+
+### 3.3 Candidate model and required comparisons
+
+The leading candidate is a joint posterior over reaction-diffusion parameters (including the rho-D ridge when present), combined with a training-only patient-level volume-trend model and correlated boundary uncertainty. This is a candidate, not a proven winner. Reconcile the existing patient runner and synthetic hybrid implementation; freeze the exact PDE, solver, parameter bounds, image/mask resolution, posterior draws, nuisance estimates, seeds, and fallback rules before a new patient run.
+
+Compare the full method with persistence, volume-trend, geometric-train-rate, and prespecified component ablations on exactly the same patients, origins, target masks, and horizons. The primary outcome is patient-macro Dice for the forecast tumor core. Report patient-bootstrap intervals for paired differences. Report surface distance, volume error, and proper probabilistic scores as secondary outcomes; count every patient-level failure in cohort flow.
+
+### 3.4 Identifiability, calibration, and external validation
+
+Report parameter identifiability separately from forecast performance. Show posterior/profile uncertainty, parameter-bound hits, and the rho-D correlation. Do not give fitted parameters a biological interpretation if the data do not separate them. Evaluate uncertainty calibration on held-out patients and include uninformative or failed forecasts rather than dropping them silently.
+
+No untouched external cohort is currently ready. MU, LUMIERE, RHUH, UCSF, and other previously examined sources cannot be relabeled as fresh confirmation without an exact exposure audit. Duke is a restricted candidate, not an approved or ready test set: confirm use terms, access, patient overlap, registration, date quality, and mask provenance before download or label access. CFB-GBM and UCSD-PTGBM annotation-change analyses are separate exploratory side studies; neither can complete the PDE aim.
+
+### 3.5 Failure interpretation
+
+If the PDE does not beat the strongest prespecified simple baseline, report no demonstrated added value. If parameter posteriors remain ridged or hit bounds, do not claim patient-specific biological parameters. If registration, treatment history, mask provenance, scan-gap eligibility, or source rights cannot be established, stop before new patient scoring. Synthetic tests establish code behavior only; they do not establish patient forecast accuracy, novelty, or clinical value.
+
+## 4. Separate exploratory side study: next-visit tumor-core annotation-change ranking
+
+### 4.1 Question, sources, and eligibility
 
 The question is whether a screened graph-diffusion prior combined with an MRI residual attenuated by fixed boundary-perturbation sensitivity improves patient-level ranking of new standard tumor-core annotations at the next available visit. The endpoint is change in released labels. It is not tumor-cell growth, recurrence, progression, response, or a fixed-horizon clinical forecast.
 
@@ -96,7 +127,7 @@ Use MU-Glioma-Post v1 only for method fitting and development-only comparator se
 
 Use exact primary diagnosis `Glioblastoma`. Reject duplicate patient/timepoint rows. Group by TCIA subject and sort by numeric visit suffix. If both metadata acquisition-to-anchor values are present, require that the later visit suffix is chronologically later; stop on any contradiction. For each subject, choose at most the first adjacent pair with exactly one standard BraTS segmentation and exactly one each of T1-native, T1-contrast, T2, and FLAIR at each visit. Require internal modality-to-segmentation alignment, millimetre spatial units, the same shape and affine across visits within 0.001 mm, and orthogonal 1.000 ± 0.001 mm spacing on each axis. Resolve files by complete TCIA/BraTS ID tokens; do not permit visit suffix substring collisions. Pair selection may use only diagnosis, source chronology, modality/file completeness, and image-header geometry. It must not depend on target label counts or visual target quality. Use the earlier scan as origin and the next available scan as target; report actual interval in prespecified groups ≤90, 91–180, and >180 days, plus unknown. The interval is not a model input.
 
-### 3.2 Target and risk set
+### 4.2 Target and risk set
 
 Use only standard compartment labels. At visit t, let C_t(v)=1 for NETC or ET (source codes 1 or 3); SNFH (2) is a current-scan predictor and the resection cavity (4) is excluded. Operational brain support B_0 is the union of nonzero voxels in the four origin MRI modalities and any nonzero origin label. Let Q_0 be the origin cavity. The at-risk voxels are
 
@@ -107,7 +138,7 @@ Y(v)=\mathbf 1\{v\in C_1\setminus C_0\},\;v\in R_0.
 
 This is the full operational brain support, without a hand-picked 20 mm crop. Report additions outside R_0, including additions in current cavity and outside current support. Do not use the dataset's cellular-tumor segmentations because their definitions use prior/subsequent longitudinal information. TCIA describes the standard segmentation as software-initialized and manually corrected by trained radiologists; this does not make a single released mask error-free truth.
 
-### 3.3 Hybrid method
+### 4.3 Hybrid method
 
 Robust-normalize each origin MRI modality over B_0. On graph nodes B_0\Q_0, solve
 
@@ -134,7 +165,9 @@ S(v)=\beta\log u(v)+g(v)[\theta_0+x(v)^T\theta],\qquad\beta\ge0.
 
 Fit the ridge-logistic head on MU training patients only, with equal patient/class weights, ridge penalty 1, prior penalty 10^-3, at most 4,000 sampled positive and negative voxels per patient, and base seed 20261026. Development-fold fits use the base seed plus the one-based fold index; the final MU fit uses the base seed. The gate scale is estimated only from the current training fold. Use the source's existing manifest dataset code `MU` (the canonical MU-Glioma-Post name is accepted as an alias); select patients marked eligible and GBM and their earliest primary pair with nonempty input core. Fail if fewer than five unique development patients remain or any fitting fold lacks the two classes needed by the head.
 
-### 3.4 Development and locked external test
+### 4.4 Development and one-shot external attempt (historical)
+
+This subsection records the protocol that preceded the UCSD run. The one-shot attempt exposed outcomes for at least five patients before failing; the later complete-case run is exploratory and negative. These safeguards document the historical method and do not authorize a fresh confirmatory run.
 
 On MU, run five-fold patient-grouped cross-validation. Fit the full hybrid and prespecified alternatives in each training fold. The non-full alternatives are: ungated hybrid, MRI-only ridge head, diffusion-only score, negative distance-to-core, and uniform no-change score. Select exactly one primary comparator by the highest mean patient-specific development AUC; ties follow that fixed order. Fit the final hybrid and comparator heads on all eligible MU development patients. Do not tune any spatial parameter or model setting on UCSD.
 
@@ -142,16 +175,16 @@ Before reading any UCSD segmentation voxel array, the protocol and all scoring m
 
 For each test patient whose target in R_0 contains at least one positive and one negative voxel, calculate patient-specific ROC AUC for each score. The primary estimand is the equal-patient mean of the paired difference between the full hybrid AUC and the single comparator selected using MU only. Obtain its two-sided 95% percentile interval from 10,000 patient-level paired bootstrap resamples (seed 20261126). The added-value rule requires the interval lower bound to exceed 0.02 AUC; this project-set margin is not a clinically validated minimum important difference. The metadata maximum of 48 repeat-eligible GBM patients is not a power calculation, and no adequate-power claim is made before image- and endpoint-eligibility are known. Do not assign AUC to patients with no additions or no negatives; keep them in cohort flow and report separately. Report all arm-level patient-macro AUCs, evaluable n, interval-stratified descriptive differences, observed intervals, zero-addition pairs, additions outside R_0, and technical exclusions. No inferential tests are run on secondary arms.
 
-### 3.5 Source and interpretation limits
+### 4.5 Source and interpretation limits
 
 A positive result supports only ranking of changes in source-provided NETC+ET labels for this public cohort under the specified next-visit sampling rule. It does not show biological tumor growth, a clinically useful forecast, a fixed-day forecast, or superiority to all published methods. UCSD is public and includes BraTS challenge material; other methods may have used these same cases. Cross-cohort overlap with MU cannot be ruled out from a documented patient-level crosswalk. The external test is protocol-locked but is not an externally preregistered clinical validation study.
 
-### 3.6 Weakest point
+### 4.6 Weakest point
 
 Only 48 GBM patients have at least two visits in the v3 metadata before image completeness checks. Their observed intervals vary widely, and treatment, registration, contour changes, and source-label corrections can all contribute to target changes. The final event-positive, AUC-evaluable cohort may be small. The test can therefore be imprecise or inconclusive even if the code runs. A future study with an independent, prospectively specified cohort and repeated annotation would be needed to establish biological or clinical value.
-## 4. Track C: robust virtual treatment control
+## 5. Track C: robust virtual treatment control
 
-### 4.1 Simulator and scenario design
+### 5.1 Simulator and scenario design
 
 Use the two-population sensitive/resistant model
 \[
@@ -173,32 +206,32 @@ Create four separate 1,000-scenario misspecification suites at sigma_y=0.10, wit
 4. Waning treatment effect: after each completed course, multiply the next course's kappa by exp(-0.10 times the number of prior courses).
 Use common scenario parameters and policy-independent random streams within each suite. Do not adjust any policy after observing suite results.
 
-### 4.2 Particle filter and validation
+### 5.2 Particle filter and validation
 
 Represent the hidden state at each cycle by total burden B and resistant fraction fR=R/B, with static parameter particles for rho, kappa, fR,0, c, epsilon, and B0. Use 500 particles and the Gaussian observation likelihood at the known sigma_y for the in-distribution scenarios. Systematically resample when effective sample size falls below 250. Apply Liu–West regularization with shrinkage a=0.98 to standardized static-parameter particles, using kernel covariance (1-a^2) times the weighted covariance and reflecting proposals at prior bounds. After a parameter move, preserve the current B and fR state and reconstruct S=(1-fR)B and R=fRB; parameter jitter must not add or remove current burden.
 
 On the separate 200-scenario filter-validation set, check nominal 90% intervals for burden and resistant fraction; require empirical coverage from 80% to 97%. Across five filter seeds, require posterior probabilities P(fR>=b) to differ by no more than 0.10 at 90% or more of decision times. These gates validate the filter only under the stated simulator. If they fail, retain the policy results but make no reliable hidden-resistance estimation claim.
 
-### 4.3 Hybrid policy and training
+### 5.3 Hybrid policy and training
 
 At cycle zero, set the reference burden to the filter's posterior mean of B0. At each later cycle, compute the filtered burden ratio r_j=E[B(t_j)|observations]/E[B0|observations at cycle zero]. Tune a_on and a_off from {1.05, 1.10, 1.20, 1.30}, resistance threshold b from {0.05, 0.10, 0.20, 0.35, 0.50}, and resistance-mode threshold a_R from the same burden-threshold grid. Require a_off < min(a_on,a_R). When treatment is off, begin a five-day course if r_j reaches a_on, or if P(fR(t_j)>=b)>=0.80 use a_R in place of a_on and begin the course if r_j reaches a_R. When treatment is on, give the next five-day course only while r_j remains at or above a_off. Stop dosing after 12 courses or progression.
 
 Use five-fold cross-validation grouped by parameter-scenario ID within the 400 development scenarios. Fit each fold's learned component on four folds and evaluate threshold settings on the held-out fold. Average the two noise replicates within each scenario and noise level. Select policy thresholds by maximizing the minimum lower-decile mean time to progression across the three noise levels in pooled out-of-fold predictions. Train and select PPO seeds/checkpoints using training-only out-of-fold predictions, with no evaluation-scenario feedback. The separate 200-scenario filter-validation set tests calibration gates and does not select policy thresholds.
 
-### 4.4 Comparisons and outcome
+### 5.4 Comparisons and outcome
 
 Compare the full hybrid with: (1) filtered burden-only hysteresis; (2) raw-observation burden-only hysteresis; (3) resistance-only thresholding; (4) a point-estimate filter ablation; (5) threshold selection for mean time rather than lower-decile time; (6) a fixed front-loaded schedule; (7) an evenly paced schedule; (8) the best periodic schedule selected on development scenarios; and (9) PPO trained for the same lower-tail objective with the same observation, filter-summary, treatment-history, remaining-budget, and elapsed-cycle inputs. Use five PPO seeds and select each seed/checkpoint using training-only folds. A schedule optimized with access to true hidden parameters is an unattainable upper-bound illustration only, never a primary comparator.
 
 For each held-out scenario and noise level, average time to progression over its two replicates, capped at 1,456 days. The primary outcome is the minimum across the three noise levels of the lower-decile mean (CVaR at 10%) of these scenario-level times. Higher is better. Use paired scenario bootstrap intervals with max-T adjustment across the prespecified comparisons. Report each noise-level CVaR, capped fraction, median time, burden integral, final resistant fraction, and course count secondarily. Report each misspecification suite separately. Call the policy robust across the four tested departures only if its adjusted paired interval favors the strongest development-selected baseline in all four suites; otherwise name which departures change the ranking. Define strata fR,0<0.01 versus >=0.01 and c<0.125 versus >=0.125 before opening held-out outcomes. Report a ranking reversal only when paired intervals favor different methods in opposite directions in at least two strata.
 
-### 4.5 Weakest point
+### 5.5 Weakest point
 
 The treatment model and parameter ranges are assumed, not measured from patients or experiments. A filter may appear calibrated because its assumed likelihood and simulator agree, and all policies may inherit the same structural error. More simulations reduce Monte Carlo error but cannot show that a real drug works or that a policy would help a patient. Track C is an algorithm comparison inside one stated model family.
-## 5. Prior-art boundary
+## 6. Prior-art boundary
 
 Prior work already includes GBM Core/Periphery cell classification, donor-held-out single-cell annotation, graph and sparse-feature methods, reaction-diffusion tumor models, probabilistic mask forecasting, spatial uncertainty models, and model-informed adaptive therapy. In particular, Lopes and Vinga (2020) classify GBM Core versus Periphery cells with sparse logistic models; scTab and scANVI provide strong annotation references; Jung and Shin’s 2026 preprint forecasts a label-derived tumor-state proxy on the same MU collection; TaDiff and mechanistic/diffusion MRI-generation work are close to spatial tumor-mask prediction; and Zhang et al. (2017) and Liu et al. (2025) establish adaptive evolutionary treatment methods. The three proposed combinations remain hypotheses for testing, not established novelties. A limited literature scan cannot support a “first” or “beats all current methods” claim. Before such a claim, read the closest full papers, inspect available code, and run fair, input-matched comparisons on the same units and endpoints.
 
-## 6. References and source records
+## 7. References and source records
 
 ### Data and source records
 
