@@ -70,6 +70,50 @@ def test_history_only_hybrid_draws_preserve_sampled_volume_without_boundary_nois
     assert "no target mask used" in result["scope"]
 
 
+def test_repeated_parameter_draws_reuse_pde_solutions_and_keep_sample_order(monkeypatch):
+    mask = ball()
+    parameter_draws = np.asarray([
+        np.log([0.03, 0.05]),
+        np.log([0.05, 0.03]),
+        np.log([0.03, 0.05]),
+        np.log([0.03, 0.05]),
+    ])
+    monkeypatch.setattr(
+        hybrid, "infer_joint_log_parameter_posterior",
+        lambda *args, **kwargs: {"parameter_draws_log": parameter_draws},
+    )
+    calls = []
+
+    def counted_forward(mask0, domain, rho, diffusion, days, h):
+        calls.append((rho, diffusion))
+        coords = np.ogrid[tuple(slice(0, size) for size in mask0.shape)]
+        center_x = 5.0 if rho < 0.04 else 10.0
+        concentration = np.exp(-((coords[0] - center_x) ** 2
+                                  + (coords[1] - 8.0) ** 2
+                                  + (coords[2] - 8.0) ** 2) / 8.0)
+        return [concentration.astype(np.float32)]
+
+    monkeypatch.setattr(hybrid.fi, "forward_concentrations", counted_forward)
+    result = hybrid.hybrid_posterior_predictive_forecast(
+        [mask, mask], [0.0, 20.0], 40.0,
+        prior={"distribution": "log_uniform"}, h=1.0,
+        boundary_covariance={"sigma_b_mm": 0.0, "tau_b_mm": 0.0, "ell_mm": 5.0},
+        population_log_volume_slope_per_day=0.0, shrinkage_time_constant_days=90.0,
+        volume_variance_fit={"intercept": 0.0, "slope_per_day": 0.0},
+        n_draws=4, n_anchors=32, seed=17,
+    )
+
+    assert len(calls) == 2
+    assert np.array_equal(result["mask_draws"][0], result["mask_draws"][2])
+    assert np.array_equal(result["mask_draws"][0], result["mask_draws"][3])
+    assert not np.array_equal(result["mask_draws"][0], result["mask_draws"][1])
+    expected_probability = (
+        result["mask_draws"][0].astype(np.float32) * 0.75
+        + result["mask_draws"][1].astype(np.float32) * 0.25
+    )
+    assert np.array_equal(result["pre_boundary_probability"], expected_probability)
+
+
 def test_hybrid_forecast_seed_reproduces_volume_and_boundary_draws(monkeypatch):
     first = forecast(monkeypatch, seed=29, n_draws=4, uncertain=True)
     second = forecast(monkeypatch, seed=29, n_draws=4, uncertain=True)

@@ -157,33 +157,42 @@ def hybrid_posterior_predictive_forecast(masks, days, target_day, *, prior: dict
         raise ValueError("forecast volume reaches computational-domain capacity; enlarge the domain")
 
     seed_sequences = boundary_seed.spawn(n_draws)
-    parameter_draws = posterior["parameter_draws_log"]
-    masks_out = []
+    parameter_draws = np.asarray(posterior["parameter_draws_log"], dtype=float)
+    unique_parameter_draws, draw_to_parameter = np.unique(
+        parameter_draws, axis=0, return_inverse=True,
+    )
+    draw_indices_by_parameter = [
+        np.flatnonzero(draw_to_parameter == parameter_index)
+        for parameter_index in range(len(unique_parameter_draws))
+    ]
+    masks_out = [None] * n_draws
     hybrid_boundary_fallback_count = 0
-    pre_boundary_probability = np.zeros(masks[0].shape, dtype=np.float32)
-    for draw_index, (log_rho, log_D) in enumerate(parameter_draws):
+    pre_boundary_inclusion_counts = np.zeros(masks[0].shape, dtype=np.uint32)
+    for parameter_index, (log_rho, log_D) in enumerate(unique_parameter_draws):
         rho, diffusion = float(np.exp(log_rho)), float(np.exp(log_D))
         concentration = fi.forward_concentrations(
             masks[-1], domain, rho, diffusion, [float(days[-1]), target_day], h
         )[0]
-        sized_mask = volume_match_concentration(
-            concentration, domain, target_voxels=int(requested_voxels[draw_index])
-        )
-        if sized_mask.all() or not sized_mask.any():
-            raise ValueError("volume-matched forecast has no usable boundary")
-        pre_boundary_probability += sized_mask.astype(np.float32) / n_draws
-        boundary_draw, collapsed = _perturb_boundary_or_keep(
-            sized_mask,
-            boundary_covariance=boundary_covariance,
-            spacing_mm=h,
-            seed=int(seed_sequences[draw_index].generate_state(1)[0]),
-            n_anchors=n_anchors,
-        )
-        hybrid_boundary_fallback_count += int(collapsed)
-        boundary_draw &= domain
-        masks_out.append(boundary_draw)
+        for draw_index in draw_indices_by_parameter[parameter_index]:
+            sized_mask = volume_match_concentration(
+                concentration, domain, target_voxels=int(requested_voxels[draw_index])
+            )
+            if sized_mask.all() or not sized_mask.any():
+                raise ValueError("volume-matched forecast has no usable boundary")
+            pre_boundary_inclusion_counts += sized_mask
+            boundary_draw, collapsed = _perturb_boundary_or_keep(
+                sized_mask,
+                boundary_covariance=boundary_covariance,
+                spacing_mm=h,
+                seed=int(seed_sequences[draw_index].generate_state(1)[0]),
+                n_anchors=n_anchors,
+            )
+            hybrid_boundary_fallback_count += int(collapsed)
+            boundary_draw &= domain
+            masks_out[draw_index] = boundary_draw
 
     mask_draws = np.stack(masks_out, axis=0)
+    pre_boundary_probability = pre_boundary_inclusion_counts.astype(np.float32) / n_draws
     final_volumes = mask_draws.reshape(n_draws, -1).sum(axis=1)
     no_pde_seed, geometric_seed = boundary_seed.spawn(2)
     no_pde_ranker_draws, baseline_boundary_fallback_count = signed_distance_volume_baseline_draws(
