@@ -1,6 +1,38 @@
 # Research Plan — Track A: Core-vs-Edge Gene Programs in Labeled Glioblastoma Tissue
 
-## 1. Scope
+## Rationale
+
+**Background.** Glioblastoma (GBM) spreads into the brain beyond the visible tumor. Surgery removes the core but leaves infiltrating cells at the edge, where most recurrences begin. The Ivy GAP atlas (Puchalski et al., 2018) defined anatomic tumor regions by histology. Aubry et al. (2015) sampled tumor zones and the tumor–brain interface under MRI guidance. Both studies show that gene expression differs by region.
+
+**Specific gap.** Many reported core-vs-edge differences use regions or signatures defined from the same expression data. They also seldom adjust for two strong tissue gradients: low oxygen (hypoxia) in the core, and normal-brain content at the edge. So it stays unclear whether a given program shows tumor biology or only tissue mix. Senescence programs have been linked to GBM progression in mouse and bulk patient data (Salam et al., 2023), but they have not been tested on labeled patient edge vs core with these adjustments. The same is true for oxidative-phosphorylation programs.
+
+**Why it matters.** A careful, confound-adjusted test shows which core-vs-edge claims can be trusted. That helps future work target the residual tumor at the edge. Any benefit to patients would be indirect and in the future. This computational study will not establish clinical benefit.
+
+Glioblastoma research faces the problem that core and edge samples differ in cell mix and oxygen, not only in tumor biology. Existing approaches compare regions but often derive signatures from the same data and do not adjust for these gradients. This project will examine whether fixed external programs differ beyond those gradients through three separate computational studies: Track A (labeled core-vs-edge gene programs), Track B (MRI annotation change between adjacent scans) and Track C (treatment-policy simulation). The work may help clarify which regional expression differences reflect tumor-intrinsic biology, but it will not establish clinical benefit.
+
+## Research Question/Hypothesis
+
+- **Track A question:** In patient-matched, non-expression-labeled GBM edge and core samples, do the SenMayo senescence program and the Hallmark oxidative-phosphorylation program differ beyond expression-matched random gene sets, the hypoxia program, and normal-brain neuron content?
+- **Track A hypothesis:** I hypothesize that at least one of these fixed programs will show a patient-level edge-vs-core shift. The shift will be significant by an exact sign-flip test, have the same direction in both cohorts, and stay significant after confound adjustment.
+- **What would show it is wrong:** an unadjusted p-value above the alpha level, opposite signs between cohorts, or an adjusted p-value above the alpha level.
+- **Relation to my reasons for choosing the project:** Surgery leaves the tumor edge behind, so I want to know which edge-vs-core differences are real tumor biology and which only reflect oxygen level or normal brain. This question tests that directly, with fixed gene lists and labels that do not come from gene expression.
+
+## Materials
+
+- **Datasets:**
+  - Ivy GAP RNA-seq matrix (`gene_expression_matrix_2014-11-25.zip`, 37,770,060 bytes) and sample/tumor metadata. Source: http://glioblastoma.alleninstitute.org. Terms: Allen Institute Terms of Use, with citation of Puchalski et al. (2018).
+  - E-MTAB-5092 raw arrays (`E-MTAB-5092.raw.1.zip`, 193,256,387 bytes; `E-MTAB-5092.raw.2.zip`, 123,796,105 bytes) and `E-MTAB-5092.sdrf.txt`. Source: https://www.ebi.ac.uk/biostudies/arrayexpress/studies/E-MTAB-5092. Terms: EMBL-EBI Terms of Use, with citation of Aubry et al. (2015).
+  - MSigDB gene sets listed in Section 1. Source: https://www.gsea-msigdb.org. Terms: MSigDB license terms.
+- **Computer:** Windows 11 Home laptop, Intel Core Ultra 9 288V (8 cores), 31.6 GB RAM. CPU only. No GPU and no cloud service.
+- **Software:** Python 3.14.4, NumPy 2.4.4, pandas 2.3.3, Python standard library (`zipfile`, `hashlib`, `itertools`). Git for version control and sealing.
+- **Storage:** Local disk only. Raw data stay in a Git-ignored folder and are not shared or uploaded.
+- **Chemicals, biological agents, bacteria:** none. This is a computational project only.
+
+## Procedures
+
+All steps are done by me on my own computer. The data are public datasets made by others (sources in Step 3); I do not collect any new data.
+
+### Study design
 
 - **Data sources:**
   - Ivy Glioblastoma Atlas Project (Ivy GAP), Allen Institute, RNA-seq gene expression matrix release `gene_expression_matrix_2014-11-25`, with sample metadata.
@@ -13,33 +45,7 @@
 - **Evidence for the hypothesis:** a significant patient-level shift that agrees in both cohorts and stays significant after confound adjustment. **Evidence against:** no significant shift, opposite signs between cohorts, or a shift that disappears after adjustment.
 - **What the method cannot show:** It cannot show which cell type carries the signal, because bulk tissue mixes tumor and normal cells. It cannot show cause, treatment response, or clinical benefit. It is separate from Tracks B and C. No patient-level link exists between the datasets.
 
-## 2. Rationale
 
-**Background.** Glioblastoma (GBM) spreads into the brain beyond the visible tumor. Surgery removes the core but leaves infiltrating cells at the edge, where most recurrences begin. The Ivy GAP atlas (Puchalski et al., 2018) defined anatomic tumor regions by histology. Aubry et al. (2015) sampled tumor zones and the tumor–brain interface under MRI guidance. Both studies show that gene expression differs by region.
-
-**Specific gap.** Many reported core-vs-edge differences use regions or signatures defined from the same expression data. They also seldom adjust for two strong tissue gradients: low oxygen (hypoxia) in the core, and normal-brain content at the edge. So it stays unclear whether a given program shows tumor biology or only tissue mix. Senescence programs have been linked to GBM progression in mouse and bulk patient data (Salam et al., 2023), but they have not been tested on labeled patient edge vs core with these adjustments. The same is true for oxidative-phosphorylation programs.
-
-**Why it matters.** A careful, confound-adjusted test shows which core-vs-edge claims can be trusted. That helps future work target the residual tumor at the edge. Any benefit to patients would be indirect and in the future. This computational study will not establish clinical benefit.
-
-Glioblastoma research faces the problem that core and edge samples differ in cell mix and oxygen, not only in tumor biology. Existing approaches compare regions but often derive signatures from the same data and do not adjust for these gradients. This project will examine whether fixed external programs differ beyond those gradients through three separate computational studies: Track A (labeled core-vs-edge gene programs), Track B (MRI annotation change between adjacent scans) and Track C (treatment-policy simulation). The work may help clarify which regional expression differences reflect tumor-intrinsic biology, but it will not establish clinical benefit.
-
-## 3. Research Question and Hypothesis
-
-- **Track A question:** In patient-matched, non-expression-labeled GBM edge and core samples, do the SenMayo senescence program and the Hallmark oxidative-phosphorylation program differ beyond expression-matched random gene sets, the hypoxia program, and normal-brain neuron content?
-- **Track A hypothesis:** I hypothesize that at least one of these fixed programs will show a patient-level edge-vs-core shift. The shift will be significant by an exact sign-flip test, have the same direction in both cohorts, and stay significant after confound adjustment.
-- **What would show it is wrong:** an unadjusted p-value above the alpha level, opposite signs between cohorts, or an adjusted p-value above the alpha level.
-
-## 4. Materials
-
-- **Datasets:**
-  - Ivy GAP RNA-seq matrix (`gene_expression_matrix_2014-11-25.zip`, 37,770,060 bytes) and sample/tumor metadata. Source: http://glioblastoma.alleninstitute.org. Terms: Allen Institute Terms of Use, with citation of Puchalski et al. (2018).
-  - E-MTAB-5092 raw arrays (`E-MTAB-5092.raw.1.zip`, 193,256,387 bytes; `E-MTAB-5092.raw.2.zip`, 123,796,105 bytes) and `E-MTAB-5092.sdrf.txt`. Source: https://www.ebi.ac.uk/biostudies/arrayexpress/studies/E-MTAB-5092. Terms: EMBL-EBI Terms of Use, with citation of Aubry et al. (2015).
-  - MSigDB gene sets listed in Section 1. Source: https://www.gsea-msigdb.org. Terms: MSigDB license terms.
-- **Computer:** Windows 11 Home laptop, Intel Core Ultra 9 288V (8 cores), 31.6 GB RAM. CPU only. No GPU and no cloud service.
-- **Software:** Python 3.14.4, NumPy 2.4.4, pandas 2.3.3, Python standard library (`zipfile`, `hashlib`, `itertools`). Git for version control and sealing.
-- **Storage:** Local disk only. Raw data stay in a Git-ignored folder and are not shared or uploaded.
-
-## 5. Procedure — Track A
 
 Each step is written so that another person can run the whole track from an empty folder. Only Python, NumPy and pandas are needed.
 
@@ -129,7 +135,7 @@ Each step is written so that another person can run the whole track from an empt
 2. Commit the analysis scripts and the result files. Record the Python, NumPy and pandas versions.
 3. Before reporting, check that each result file exists, is not empty and lists 15 patients.
 
-## 6. Risk Assessment
+## Risk Assessment
 
 - **Privacy:** The data are de-identified, public expression data. No images or identifiers are used. No attempt will be made to identify or contact any patient.
 - **Data use:** Follow the Allen Institute, EMBL-EBI and MSigDB terms, and cite each source.
@@ -138,7 +144,7 @@ Each step is written so that another person can run the whole track from an empt
 - **Misinterpretation:** The results are tissue-level associations in bulk samples. They are not medical advice and not treatment evidence.
 - **Materials:** No human participants, biological agents or chemicals are used. All work is computational. The fair's review rules for human-derived data will be followed.
 
-## 7. Data Analysis
+## Data Analysis
 
 - **Primary metric:** the mean scaled per-patient edge-minus-core value. Positive means higher at the edge. Negative means higher in the core.
 - **Unit:** the patient. Replicates are averaged within each zone.
@@ -154,8 +160,16 @@ Each step is written so that another person can run the whole track from an empt
   - Positive only before adjustment: the shift is explained by the confound.
   - Negative: no evidence of a shift.
   - A non-significant adjusted result means "not shown", not "absent".
+- **Formulas:**
+  - Gene z-score: z = (x − mean) / SD, within each cohort.
+  - Per-patient value: E = D − median(D_null), where D is the mean of (edge z − core z) over the list genes.
+  - Scaled value: E / sqrt(mean(E²)) within each cohort.
+  - Sign-flip p-value: p = (number of the 2^n sign patterns with |mean| ≥ observed |mean|) / 2^n.
+  - Adjustment: residuals of E = b·H (list 1) or E = b1·H + b2·N (list 2), least squares with no intercept.
+- **Tables:** one table per list, with the patient count, the genes found per cohort, the main p, the adjusted p, the direction and the per-cohort means.
+- **Graphs:** a paired dot plot of E per patient, colored by cohort; a scatter of E against the hypoxia (and neuron) score with the fitted line; a histogram of the 32,768 sign-flip statistics with the observed value marked.
 
-## 8. Bibliography
+## Bibliography
 
 Aubry, M., de Tayrac, M., Etcheverry, A., Clavreul, A., Saikali, S., Menei, P., & Mosser, J. (2015). From the core to beyond the margin: A genomic picture of glioblastoma intratumor heterogeneity. *Oncotarget, 6*(14), 12094–12109. https://doi.org/10.18632/oncotarget.3297
 
@@ -174,3 +188,8 @@ Subramanian, A., Tamayo, P., Mootha, V. K., et al. (2005). Gene set enrichment a
 Allen Institute for Brain Science. (2014). *Ivy Glioblastoma Atlas Project* [Data set]. http://glioblastoma.alleninstitute.org
 
 EMBL-EBI. (2016). *E-MTAB-5092: Multi-zone glioblastoma transcriptome* [Data set]. ArrayExpress. https://www.ebi.ac.uk/biostudies/arrayexpress/studies/E-MTAB-5092
+
+## Additional Project Information
+- **Human participants:** None. The project is a secondary analysis of publicly available, de-identified expression data (Ivy GAP, ArrayExpress E-MTAB-5092). I will not interact with any person, and I have no access to identifiers. Such projects are usually exempt from IRB review under ISEF rules. I will confirm this with my fair's Scientific Review Committee and attach any form it requires.
+- **Vertebrate animals, potentially hazardous biological agents, hazardous materials/activities/devices:** None.
+- **Continuation project:** [Answer yes or no truthfully. If yes, upload the earlier abstract and research plan.]
