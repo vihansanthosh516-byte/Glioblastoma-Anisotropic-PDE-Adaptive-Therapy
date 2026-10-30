@@ -41,38 +41,93 @@ Glioblastoma research faces the problem that core and edge samples differ in cel
 
 ## 5. Procedure — Track A
 
-1. **Data selection.**
-   - Ivy GAP: include the donors that have both an LE-reference-histology (edge) and a CT-reference-histology (core) sample. Exclude all samples selected by gene expression (CT-control, CTpan, CTmvp, CThbv, CTpnz and similar).
-   - Angers: include the GBM patients that have both an interface sample (edge) and a tumor-zone sample (core). The peripheral brain zone is used only in a secondary analysis. Exclude normal-brain controls and necrotic-zone samples.
-   - The patient count will be confirmed from the metadata before any analysis. The study needs 10 or more patients.
-2. **Gene-list selection and sealing.**
-   - Select each fixed external list before any expression data is read.
-   - Primary list: SenMayo (125 genes).
-   - Confound lists: Hallmark hypoxia (200 genes) and LEIN neuron markers (69 genes).
-   - Second list: Hallmark oxidative phosphorylation (200 genes). It will be tested only if the first list fails its success rule, at a stricter alpha of 0.025. No third list will be tested on this cohort.
-   - Run a literature search for prior work on each list before sealing.
-   - Write each protocol, hash it and the gene lists with SHA-256, and commit to Git before scoring. The analysis code will check the hashes and stop if any file has changed.
-3. **Data preparation.**
-   - Ivy GAP: log2(FPKM + 1). Map genes by symbol and average duplicate symbols.
-   - Angers: use the Agilent processed signal of non-control probes, average replicate spots, transform with log2(x + 1), quantile-normalize across all arrays, and average probes by gene name.
-   - Z-score each gene within each cohort. Drop genes with zero variance or missing from a platform, and report the count of genes kept.
-   - Average replicate samples within each patient zone.
-4. **Data split.** There is no training step. Each patient is one independent unit with one paired value. Samples from the same patient are never treated as independent.
-5. **Method.**
-   - Score = mean z-score of the list's genes.
-   - Per patient, the edge-minus-core score difference is corrected by subtracting the median difference over 1,000 random gene sets. The random sets match the list's size and its distribution over expression-level deciles (seed 20261029).
-   - The correction removes shifts shared by all genes of similar expression. Each patient's value is then divided by its cohort's root-mean-square value, so the two platforms are on one scale.
-6. **Comparators.** The comparators are the matched random gene sets, the hypoxia score and the neuron-marker score. Each is computed exactly like the main score.
-7. **Tuning.** None. All settings, lists, seeds and thresholds are fixed in the sealed protocol.
-8. **Evaluation.**
-   - Run an exact two-sided sign-flip test over all 2^n sign patterns. The statistic is the mean scaled patient value.
-   - Run the adjusted test on the residuals after a no-intercept least-squares fit on the confound scores: hypoxia for list 1, and hypoxia plus neurons for list 2.
-9. **Failure handling.**
-   - A patient missing either zone is excluded and counted.
-   - A missing gene is dropped and counted.
-   - If the hashes do not match, the run stops.
-   - If the result is positive before adjustment but not after, it is reported as explained by the confound, not as new biology.
-10. **Reproducibility.** Record the dataset file names and sizes, the package versions, the seed, the sealed protocol commits, the analysis scripts and the JSON result files.
+Each step is written so that another person can run the whole track from an empty folder. Only Python, NumPy and pandas are needed.
+
+### Step 1. Set up
+1. Make a project folder with the subfolders `data/external/ivygap/matrix`, `data/external/angers`, `paper/trackA_senmayo`, `paper/trackA_oxphos`, `src` and `output`.
+2. Make `data/` Git-ignored. Start a Git repository so that every sealed file gets a dated commit.
+
+### Step 2. Choose and seal the gene lists (before any expression data is downloaded)
+1. Run a prior-art search for each candidate list. Search for papers that test the list in labeled GBM edge vs core. Record the queries, the closest papers and what is different.
+2. Copy each list, one symbol per line, from its MSigDB gene-set page:
+   - `paper/trackA_senmayo/senmayo_genes.txt` — SAUL_SEN_MAYO, 125 symbols.
+   - `paper/trackA_senmayo/hallmark_hypoxia_genes.txt` — HALLMARK_HYPOXIA, 200 symbols.
+   - `paper/trackA_oxphos/oxphos_genes.txt` — HALLMARK_OXIDATIVE_PHOSPHORYLATION, 200 symbols.
+   - `paper/trackA_oxphos/neuron_genes.txt` — LEIN_NEURON_MARKERS, 69 symbols.
+   - `paper/trackA_oxphos/hallmark_hypoxia_genes.txt` — the same hypoxia file.
+3. Write `PROTOCOL.md` in each folder. It holds the question, the cohort, the method, the success rule and the known risks, exactly as in Steps 4–9 below.
+4. In each folder, write `SHA256SUMS` with the SHA-256 hash of every file. Compute each hash with line endings normalized to LF.
+5. Commit and push the list-1 folder (`trackA_senmayo`). The list-2 folder (`trackA_oxphos`) is sealed and committed only if list 1 fails its success rule, and before any list-2 score is computed.
+
+### Step 3. Download the data
+| File | Source | Size (bytes) |
+|---|---|---|
+| `gene_expression_matrix_2014-11-25.zip` | http://glioblastoma.alleninstitute.org/api/v2/well_known_file_download/305873915 | 37,770,060 |
+| `rna_seq_samples_details.csv`, `tumor_details.csv` | Ivy GAP download page, http://glioblastoma.alleninstitute.org | small |
+| `E-MTAB-5092.raw.1.zip` | https://ftp.ebi.ac.uk/pub/databases/microarray/data/experiment/MTAB/E-MTAB-5092/ | 193,256,387 |
+| `E-MTAB-5092.raw.2.zip` | same folder | 123,796,105 |
+| `E-MTAB-5092.sdrf.txt` | https://www.ebi.ac.uk/biostudies/files/E-MTAB-5092/E-MTAB-5092.sdrf.txt | 16,025 |
+
+1. Put the Ivy GAP files in `data/external/ivygap/` and unzip the matrix into `matrix/`. This gives `fpkm_table.csv`, `rows-genes.csv` and `columns-samples.csv`.
+2. Put the Angers files in `data/external/angers/`. Leave the zips packed.
+3. Check that each file size matches the table. If a size is wrong, download the file again.
+
+### Step 4. Select the patients
+1. **Ivy GAP.** In `rna_seq_samples_details.csv`, keep the rows where `structure_acronym` is `LE-reference-histology` (edge) or `CT-reference-histology` (core). Keep the donors (`donor_id`) that have both. The expected donors are 10865, 10926, 12108, 12109, 12110, 12112, 14734 and 292023109 (8). The `sample_id` column matches the column names in `fpkm_table.csv`. Do not use any other structure, such as CT-control-*, CTpan-*, CTmvp-*, CThbv-* or CTpnz-*.
+2. **Angers.** In the SDRF, the patient is column 5 (`Characteristics[individual]`) and the zone is column 6 (`Characteristics[sampling site]`). Keep the patients with both `interface` (edge) and `tumor zone` (core). The expected patients are FT02, FT04, FT05, FT06, FT08, FT09 and FT13 (7). `Array Data File` gives each array's file name inside `raw.1` or `raw.2`. Use `peripheral brain zone` only for the secondary test. Exclude the normal controls (N1–N4) and the `necrotic zone` samples.
+3. Confirm that the total is 15 patients, which is 10 or more. Record any patient that is excluded and why.
+
+### Step 5. Prepare the expression data
+1. **Ivy GAP.** Take the selected columns of `fpkm_table.csv`. Apply log2(FPKM + 1). Map `gene_id` to `gene_symbol` with `rows-genes.csv`. Average rows that share a symbol.
+2. **Angers.** For each array file:
+   - Read the table that starts at the line beginning with `FEATURES`.
+   - Keep the rows with `ControlType` = 0.
+   - Take `gProcessedSignal` and average the replicate spots of each `ProbeName`.
+3. Put all arrays in the SDRF side by side. Drop probes that are missing on any array. Clip negative values to 0 and apply log2(x + 1). Quantile-normalize across all arrays. Map each probe to `GeneName` and average probes per gene. Then keep only the selected samples.
+4. **In each cohort separately:** drop genes with zero variance, then z-score each gene across that cohort's selected samples.
+5. If a patient has more than one sample in a zone, average the z-scores within that zone.
+
+### Step 6. Score each list per patient
+1. For each patient, compute the per-gene difference d(g) = edge z-score minus core z-score.
+2. **List score difference D** = the mean of d(g) over the list genes found in that cohort. Record how many list genes were found.
+3. **Matched null.** Rank all genes by mean log expression in the cohort and cut them into 10 equal bins (deciles). Draw 1,000 random gene sets with a random generator seeded with 20261029. Each set has the same number of genes per decile as the list and excludes the list genes. Compute D for each set.
+4. **Per-patient value:** E = D minus the median of the 1,000 null D values.
+5. Compute E the same way for the hypoxia list (H) and, for list 2, for the neuron list (N).
+
+### Step 7. Run the main test
+1. Within each cohort, divide each patient's E by the root-mean-square of E in that cohort. Pool the 15 scaled values.
+2. Statistic = the mean of the pooled values.
+3. **Exact two-sided sign-flip test:** compute the statistic for all 2^15 = 32,768 patterns of +1/−1 signs. p = the fraction of patterns whose absolute mean is at least the observed absolute mean.
+4. Record the direction (edge > core if the mean is positive) and the mean E of each cohort.
+
+### Step 8. Run the confound-adjusted test
+1. **List 1:** fit E = b·H across the 15 patients by least squares with no intercept. Take the residuals.
+2. **List 2:** fit E = b1·H + b2·N the same way. Take the residuals.
+3. Scale the residuals within each cohort (Step 7.1) and run the same exact sign-flip test.
+
+### Step 9. Apply the success rule
+1. Success needs all three conditions:
+   - the main p is below alpha (0.05 for list 1, 0.025 for list 2);
+   - the Ivy GAP mean E and the Angers mean E have the same sign;
+   - the adjusted p is below alpha, with the same sign as the main test.
+2. If the main test passes but the adjusted test fails, record "explained by the confound".
+3. If list 1 does not succeed, seal list 2 (Step 2.5) and repeat Steps 6–9 with it, using the same data and code. After list 2, test no more lists on this cohort.
+
+### Step 10. Run the secondary tests (cannot change the main conclusion)
+1. Run the test for each cohort alone (Step 7 on that cohort's values only).
+2. Run the Angers test with the peripheral brain zone in place of the interface, for patients with both zones (list 1 only).
+
+### Step 11. Failure handling
+- **Hash mismatch** at the start of a run: stop. Do not change the sealed files.
+- **Missing zone** for a patient: exclude the patient and count the exclusion.
+- **Gene missing** from a platform: drop the gene and report the count kept per cohort.
+- **Download size mismatch:** download the file again before any analysis.
+- **Inconclusive result** (cohorts disagree, or p near alpha): report it as not supported. Do not re-run with new settings.
+
+### Step 12. Record for reproducibility
+1. Write one JSON result file per list: `output/trackA_senmayo/result.json` and `output/trackA_oxphos/result.json`. Each file holds the patient IDs, the genes found, every per-patient E, H and N value, all p-values, the coefficients, the seed and the protocol commit.
+2. Commit the analysis scripts and the result files. Record the Python, NumPy and pandas versions.
+3. Before reporting, check that each result file exists, is not empty and lists 15 patients.
 
 ## 6. Risk Assessment
 
