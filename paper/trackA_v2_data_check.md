@@ -1,16 +1,18 @@
 # Track A v2 data and label audit
 
-**Status:** metadata screening only. No patient expression values were downloaded, opened, or scored. HRA009021 is the strongest current candidate, but its run-to-donor-to-region crosswalk is still unverified. Evidence is in `output/trackA_v2_data_check/dataset_candidate_inventory.json` and `output/trackA_v2_data_check/hra009021_file_inventory.json`.
+**Status:** metadata screening only. No patient expression values were downloaded, opened, or scored. The user-provided HRA009021 workbook confirms donor/sample/experiment/run links, but does not label samples by region. Evidence is in `output/trackA_v2_data_check/dataset_candidate_inventory.json`, `output/trackA_v2_data_check/hra009021_file_inventory.json`, and `output/trackA_v2_data_check/hra009021_metadata_audit.json`.
 
 ## HRA009021: conditional main-test cohort
 
 The article reports 10 patients, 30 single-cell tissues, and 209,762 cells across LBI, HBI, and tumor core (`output/trackA_v2_data_check/dataset_candidate_inventory.json`). HBI/LBI regions were selected using preoperative MRI blood-flow maps, reviewed by radiologists and a neurosurgeon, sampled with image-guided surgery, and checked with histology. These labels do not come from gene expression.
 
-GSA-Human marks the accession Open access and exposes individual, sample, and run records. One public record links run HRR1993387 to sample GBM2301 and individual HRI1073636. The complete sample/run/region mapping still needs checking from the HRA009021 metadata workbook before any expression analysis.
+The user-supplied `HRA009021.xlsx` is 17,181 bytes (SHA-256 `0aabd48105df82ad705ac4ebfc5482e9233602b43616834c9bceb7a900bb7f03`). It contains 10 individual records, 30 sample records, 30 experiment records, and 30 run records. All 30 sample-to-donor-to-run links are complete. It has no region-label columns and no HBI/LBI/core label values (`output/trackA_v2_data_check/hra009021_metadata_audit.json`). Thus the region-to-sample map remains unverified.
 
-The archive lists 60 raw FASTQ files. Their measured total is 764,601,130,806 bytes. The exact name, URL, and size for each FASTQ and the checksum file are in `output/trackA_v2_data_check/hra009021_file_inventory.json`. The GSA page also lists `HRA009021.xlsx`, but its export endpoint does not report a file size. No raw reads or expression matrix have been downloaded.
+The workbook's `Download Read file2` link points to the first-read file for all 30 runs. Do not use those second-read links. The separate raw archive inventory lists distinct first- and second-read URLs (`output/trackA_v2_data_check/hra009021_file_inventory.json`).
 
-The main weak point is that the study reports exactly the minimum donor count, and the run-to-region map is not yet verified. The full raw FASTQ set is large. Check the metadata map first, then list only the HBI/LBI files needed for approval. Do not download any patient-expression file without the user's explicit OK.
+The archive lists 60 raw FASTQ files. Their measured total is 764,601,130,806 bytes. The exact name, URL, and size for each FASTQ and the checksum file are in `output/trackA_v2_data_check/hra009021_file_inventory.json`. No raw reads or expression matrix have been downloaded.
+
+The main weak point is that the study reports exactly the minimum donor count, and no workbook links GSA sample IDs to the paper's regions. The full raw FASTQ set is large. The next metadata check needs only the paper's Supplementary Information PDF (`41467_2024_55243_MOESM1_ESM.pdf`, 3,127,913 bytes; direct URL and size check in `output/trackA_v2_data_check/hra009021_supplement_manifest.json`). It has not been downloaded. Do not download any patient-expression file without the user's explicit OK.
 
 ## GBM-Space section audit
 
