@@ -1,6 +1,6 @@
 # Track A v2 data and label audit
 
-**Status:** metadata screening only. No patient expression values were downloaded, opened, or scored. The user-provided HRA009021 workbook confirms donor/sample/experiment/run links, but does not label samples by region. Evidence is in `output/trackA_v2_data_check/dataset_candidate_inventory.json`, `output/trackA_v2_data_check/hra009021_file_inventory.json`, and `output/trackA_v2_data_check/hra009021_metadata_audit.json`.
+**Status:** metadata screening only. No patient expression values were downloaded, opened, or scored. The GSA workbook confirms donor/sample/run links. The approved paper supplement gives HBI/LBI/Tumor labels for the same 10 donor codes, but not for each GSA sample name. Evidence is in `output/trackA_v2_data_check/hra009021_metadata_audit.json` and `output/trackA_v2_data_check/hra009021_supplement_audit.json`.
 
 ## HRA009021: conditional main-test cohort
 
@@ -8,11 +8,13 @@ The article reports 10 patients, 30 single-cell tissues, and 209,762 cells acros
 
 The user-supplied `HRA009021.xlsx` is 17,181 bytes (SHA-256 `0aabd48105df82ad705ac4ebfc5482e9233602b43616834c9bceb7a900bb7f03`). It contains 10 individual records, 30 sample records, 30 experiment records, and 30 run records. All 30 sample-to-donor-to-run links are complete. It has no region-label columns and no HBI/LBI/core label values (`output/trackA_v2_data_check/hra009021_metadata_audit.json`). Thus the region-to-sample map remains unverified.
 
+The approved Supplementary Information PDF is 3,127,913 bytes. Supplementary Table 4 lists 10 HBI, 10 LBI, and 10 Tumor sample labels. Its 10 donor codes match all 10 GSA donor codes. The PDF contains none of the GSA sample names `GBMxx01/02/03`, so it does not show which sample belongs to which region (`output/trackA_v2_data_check/hra009021_supplement_audit.json`).
+
 The workbook's `Download Read file2` link points to the first-read file for all 30 runs. Do not use those second-read links. The separate raw archive inventory lists distinct first- and second-read URLs (`output/trackA_v2_data_check/hra009021_file_inventory.json`).
 
 The archive lists 60 raw FASTQ files. Their measured total is 764,601,130,806 bytes. The exact name, URL, and size for each FASTQ and the checksum file are in `output/trackA_v2_data_check/hra009021_file_inventory.json`. No raw reads or expression matrix have been downloaded.
 
-The main weak point is that the study reports exactly the minimum donor count, and no workbook links GSA sample IDs to the paper's regions. The full raw FASTQ set is large. The next metadata check needs only the paper's Supplementary Information PDF (`41467_2024_55243_MOESM1_ESM.pdf`, 3,127,913 bytes; direct URL and size check in `output/trackA_v2_data_check/hra009021_supplement_manifest.json`). It has not been downloaded. Do not download any patient-expression file without the user's explicit OK.
+The main weak point is that the study reports exactly the minimum donor count, and no source links GSA sample IDs to regions. The full raw FASTQ set is large. One possible next file is the article Source Data workbook (`41467_2024_55243_MOESM4_ESM.xlsx`, 50,969,169 bytes; URL in `output/trackA_v2_data_check/hra009021_supplement_manifest.json`). It may not contain the crosswalk and may include expression-derived values. It has not been downloaded. Do not download any file without the user's explicit OK.
 
 ## GBM-Space section audit
 
@@ -34,4 +36,4 @@ Counts, source links, label descriptions, terms, and file sizes are in `output/t
 
 PubMed, Europe PMC, and Google Scholar screens found prior work on HBI/LBI cell composition and on hybrid GBM cell states. The proposed paired hybrid-state comparison is only a candidate, not a novelty claim. The three closest papers and differences are in `output/trackA_v2_data_check/prior_art_review.json` and `paper/trackA_v2_proposal.md`.
 
-Next gate: verify the HRA009021 metadata workbook's donor/sample/run/region crosswalk, then request approval using the exact HBI/LBI file list and sizes. Before scoring, freeze the full protocol, gene lists, settings, seeds, and failure rules; hash and commit them. Use `src/donor_cv.py` so each donor stays wholly in one fold. Do not join Track A donors with Track B or Track C.
+Next gate: resolve mapping from GSA sample names to HBI/LBI/Tumor labels. Before scoring, freeze the full protocol, gene lists, settings, seeds, and failure rules; hash and commit them. Use `src/donor_cv.py` so each donor stays wholly in one fold. Do not join Track A donors with Track B or Track C.
