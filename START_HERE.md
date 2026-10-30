@@ -1,5 +1,6 @@
 # START HERE
 
+- **Track A v2 latest (2026-10-30):** HRA009021 is the only conditional main-test candidate: the article reports 10 donors and independently labeled HBI/LBI/tumor regions, but its run-to-donor-to-region map is unverified. Its 60 raw FASTQ files total 764,601,130,806 bytes; do not download without user approval. No model was trained or expression scored. Evidence: `output/trackA_v2_data_check/dataset_candidate_inventory.json`, `output/trackA_v2_data_check/hra009021_file_inventory.json`, and `output/trackA_v2_data_check/prior_art_review.json`. See `paper/trackA_v2_proposal.md` and `paper/trackA_v2_data_check.md`.
 - **Track A v2 proposal:** `paper/trackA_v2_proposal.md` is provisional; dataset eligibility and prior-art searches remain open. The user approved the GBM-Space RNA download only.
 - **Track A v2 downloaded atlas check:** `paper/trackA_v2_data_check.md` and `output/trackA_v2_data_check/metadata_check.json`; donor IDs found, independent core/edge mapping and raw-count provenance remain unverified; no expression scored.
 - **Track A v2 region audit:** histology labels exist for Visium sections, but pooled nuclei lack individual coordinates; site-to-region mapping and eligible paired donors remain unverified. See `paper/trackA_v2_data_check.md`.
