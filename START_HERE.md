@@ -1,5 +1,7 @@
 # START HERE
 
+- **Track A v2 proposal:** `paper/trackA_v2_proposal.md` is provisional; dataset eligibility, prior-art searches and exact download inventory remain open. No download approved.
+
 Updated 2026-10-29. Read this file before continuing work. The main project is the existing GBM Tracks A, B, and C work for a local science fair. Track B's core is reaction-diffusion/PDE tumor-growth forecasting; UCSD and CFB annotation-change analyses are separate exploratory side studies.
 
 ## 1. Current goal
