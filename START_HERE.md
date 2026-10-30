@@ -2,6 +2,7 @@
 
 - **Track A v2 proposal:** `paper/trackA_v2_proposal.md` is provisional; dataset eligibility and prior-art searches remain open. The user approved the GBM-Space RNA download only.
 - **Track A v2 downloaded atlas check:** `paper/trackA_v2_data_check.md` and `output/trackA_v2_data_check/metadata_check.json`; donor IDs found, independent core/edge mapping and raw-count provenance remain unverified; no expression scored.
+- **Track A v2 region audit:** histology labels exist for Visium sections, but pooled nuclei lack individual coordinates; site-to-region mapping and eligible paired donors remain unverified. See `paper/trackA_v2_data_check.md`.
 
 Updated 2026-10-29. Read this file before continuing work. The main project is the existing GBM Tracks A, B, and C work for a local science fair. Track B's core is reaction-diffusion/PDE tumor-growth forecasting; UCSD and CFB annotation-change analyses are separate exploratory side studies.
 
