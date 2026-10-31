@@ -31,6 +31,7 @@ def load():
     ann = ann[ann.isin(["Core", "Inv"])]
     meta = pd.DataFrame({"patient": [s.split()[1].split("_")[0] for s in ann.index],
                          "zone": ann.map({"Core": "core", "Inv": "inv"}).values}, index=ann.index)
+    counts.index = counts.index.astype(str)          # Entrez gene IDs (amendment 1)
     c = counts[meta.index]
     x = np.log2(c / c.sum() * 1e6 + 1)
     return x, meta
@@ -43,6 +44,8 @@ def main():
         sys.exit(f"refusing to overwrite {fp}: the sealed test is scored once")
     tam, hyp, neu, mye = (s173.read_list(f) for f in ("tam_activation_genes.txt", "hallmark_hypoxia_genes.txt",
                                                       "neuron_genes.txt", "myeloid_genes.txt"))
+    ent = pd.read_csv(s173.SEAL / "symbol_to_entrez.tsv", sep="\t", dtype=str).set_index("symbol")["entrez"]
+    tam, hyp, neu, mye = ([ent[g] for g in gs] for gs in (tam, hyp, neu, mye))
     x, meta = load()
     assert meta.groupby("patient").zone.nunique().eq(2).all() and meta.patient.nunique() == 10
     rng = np.random.default_rng(SEED)

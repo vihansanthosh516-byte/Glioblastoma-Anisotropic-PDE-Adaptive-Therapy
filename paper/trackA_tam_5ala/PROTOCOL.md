@@ -51,3 +51,9 @@ If 1 fails: report negative. No other list will be tested as a rescue on this co
   periphery, Darmanis et al. 2017 Cell Rep). A positive result is a replication of a known pattern, not new biology.
   The authors of this dataset already compared core and invasive regions.
 - Bulk tissue, not single cells: "activation" cannot be separated from cell-type mix beyond the covariates.
+
+## Amendment 1 (2026-10-30, before any score was computed)
+The first sealed run stopped with an error before any statistic was produced: the matrix rows are Entrez gene IDs,
+not gene symbols, so no list gene was found. No expression value was summarized or shown. Fix: list symbols are
+mapped to Entrez IDs with `symbol_to_entrez.tsv` (MyGene.info v3 query, human, exact symbol match; 283 of 283 mapped).
+Lists, method, seed and success rule are unchanged.
