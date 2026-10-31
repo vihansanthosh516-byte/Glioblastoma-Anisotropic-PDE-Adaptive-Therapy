@@ -2,6 +2,17 @@
 
 **Status: proposal only.** No model has been trained and no patient expression has been scored. The GSA workbook maps samples to donors and runs. The paper supplement and Source Data workbook label HBI, LBI, and Tumor samples for the same 10 donor codes, but neither maps each GSA sample name to a region. No numeric Source Data values were read. Evidence: `output/trackA_v2_data_check/dataset_candidate_inventory.json`, `output/trackA_v2_data_check/hra009021_metadata_audit.json`, `output/trackA_v2_data_check/hra009021_supplement_audit.json`, and `output/trackA_v2_data_check/hra009021_source_data_audit.json`.
 
+### Expanded read-only cohort screen
+
+No replacement cohort now passes all four gates: at least 10 unique donors, single-cell or single-nucleus input, labels independent of gene expression, and a verified donor-to-label map. The new records are in `output/trackA_v2_data_check/alternate_cohort_screen_20261030.json`.
+
+- GSE125587 has 10 donors and invasive/nodular labels from H&E and patient-derived xenograft histology. Its paper already compares the cohort's single-cell profiles by invasion phenotype, and it has no paired core-edge labels. Do not reuse it for the proposed biology (`output/trackA_v2_data_check/alternate_cohort_screen_20261030.json`).
+- GSE237183 has 5 unique GBM donors across 13 Visium sections. Selected sample locations were annotated during navigation-guided surgery, but this is spatial spot data, and the paper already studies hypoxia-linked spatial organization. It fails the donor and topic gates (`output/trackA_v2_data_check/alternate_cohort_screen_20261030.json`).
+- GBM-Space still has 12 donors, but the conservative label screen finds only 1 possible paired donor. Its pooled nuclei lack a validated nucleus-to-region map (`output/trackA_v2_data_check/s14_metadata_check.json`, `output/trackA_v2_data_check/region_provenance.json`).
+- The other screened region datasets have 4 donors for EGAD50000000778 and 9 patients for GSE316917. Both are below the 10-donor gate (`output/trackA_v2_data_check/alternate_cohort_screen_20261030.json`).
+
+Do not download another expression file now. The only route to the current HBI/LBI test is an explicit HRA009021 sample-to-region crosswalk. If no crosswalk is available, pause this core-edge test and choose a different, independently labeled biology target before any download.
+
 ## Dataset shortlist
 
 | Candidate | Donors and labels | Terms and files | Decision and weakest point |

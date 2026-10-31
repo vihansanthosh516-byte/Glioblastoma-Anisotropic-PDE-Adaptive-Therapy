@@ -39,3 +39,14 @@ Counts, source links, label descriptions, terms, and file sizes are in `output/t
 PubMed, Europe PMC, and Google Scholar screens found prior work on HBI/LBI cell composition and on hybrid GBM cell states. The proposed paired hybrid-state comparison is only a candidate, not a novelty claim. The three closest papers and differences are in `output/trackA_v2_data_check/prior_art_review.json` and `paper/trackA_v2_proposal.md`.
 
 Next gate: obtain an explicit mapping from GSA sample names to HBI/LBI/Tumor labels, or replace this cohort. Before scoring, freeze the full protocol, gene lists, settings, seeds, and failure rules; hash and commit them. Use `src/donor_cv.py` so each donor stays wholly in one fold. Do not join Track A donors with Track B or Track C.
+
+## Expanded cohort screen (2026-10-30)
+
+A read-only search found no replacement that passes the donor, modality, independent-label, and sample-mapping gates. The detailed source URLs, terms, file names, exact sizes, decisions, and weakest points are in `output/trackA_v2_data_check/alternate_cohort_screen_20261030.json`.
+
+- GSE125587 has 10 donors, but its published study already tests single-cell profiles against histology-defined invasive versus nodular phenotype. It has no paired core-edge labels (`output/trackA_v2_data_check/alternate_cohort_screen_20261030.json`).
+- GSE237183 has 5 unique GBM donors across 13 Visium sections. Navigation-guided surgery supplied sample-location labels, but spots are not single cells and the paper studies the excluded hypoxia-linked organization (`output/trackA_v2_data_check/alternate_cohort_screen_20261030.json`).
+- GBM-Space has 12 donors, but only one possible paired donor in the conservative screen and no validated nucleus-to-region crosswalk (`output/trackA_v2_data_check/s14_metadata_check.json`, `output/trackA_v2_data_check/region_provenance.json`).
+- EGAD50000000778 has 4 donors. GSE316917 has 9 patients. Both are below the minimum (`output/trackA_v2_data_check/alternate_cohort_screen_20261030.json`).
+
+Do not download another expression file now. Continue only after an explicit HRA009021 sample-to-region map becomes available, or after choosing a new target with labels that meet the same independent-label rule.
