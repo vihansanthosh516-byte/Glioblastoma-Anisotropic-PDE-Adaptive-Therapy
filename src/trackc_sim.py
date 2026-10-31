@@ -73,6 +73,9 @@ def _deriv(S, R, p, u):
     dR = p["r"] * (1.0 - p["c"]) * R * (1.0 - (p["a_sr"] * S + R)) - p["eps"] * p["m"] * p["r"] * u * R
     if "mu" in p:                     # script 169: drug-induced switching S -> R at rate mu (truth only)
         dS, dR = dS - p["mu"] * u * S, dR + p["mu"] * u * S
+    if "nu" in p:                     # script 176: reversion R -> S while off drug at rate nu (truth only)
+        flux = p["nu"] * (1.0 - u) * R
+        dS, dR = dS + flux, dR - flux
     return dS, dR
 
 
@@ -391,6 +394,27 @@ class RiskContainment:
         self.pf.propagate(j, treat)
 
 
+class HolidayContainment(RiskContainment):
+    """Wide containment plus a forced drug holiday after `max_run` treated cycles in a row
+    (script 176; aimed at reversible drug-induced tolerance, where time off drug lets
+    tolerant cells revert). The run counter uses the courses actually given."""
+
+    def __init__(self, p_star, horizon=2, front=0, max_run=2, n_particles=500):
+        super().__init__(p_star, horizon, 0.0, True, n_particles, front=front)
+        self.max_run = max_run
+
+    def reset(self, scen, rng):
+        super().reset(scen, rng)
+        self.run = np.zeros(scen["r"].shape, int)
+
+    def act(self, j, y):
+        return super().act(j, y) & (self.run < self.max_run)
+
+    def advance(self, j, treat):
+        self.run = np.where(treat, self.run + 1, 0)
+        super().advance(j, treat)
+
+
 # ---------------------------------------------------------------- episode
 def simulate(scen, policy, seed, track_fr=False):
     """Run one noise replicate of every scenario under `policy` (shared course budget).
@@ -551,6 +575,9 @@ def make_policy(spec):
     if kind == "riskf":                     # script 171 hybrid: front-load K courses, then wide containment
         p_star, horizon, k = spec[1:]
         return RiskContainment(p_star, horizon, 0.0, True, front=k)
+    if kind == "riskh":                     # script 176: containment with forced holiday after max_run
+        p_star, horizon, k, max_run = spec[1:]
+        return HolidayContainment(p_star, horizon, front=k, max_run=max_run)
     raise ValueError(kind)
 
 

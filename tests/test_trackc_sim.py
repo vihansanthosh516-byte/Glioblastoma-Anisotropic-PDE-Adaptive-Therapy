@@ -341,3 +341,38 @@ def test_state_linked_missing_scans():
     # untreated burden only grows, so once a scan is lost every later scan is lost too
     lost = np.isnan(ys)
     assert (lost[1:] >= lost[:-1]).all()
+
+
+def test_reversion_nu_zero_matches_absent_and_reduces_resistance():
+    scen = dict(tc.draw_scenarios(30, seed=41, sigmas=(0.05,)), mu=np.full(30, 0.02))
+    for spec in (("periodic", 1, 0), ("risk", 0.1, 2, 0.0, True)):
+        a = tc.simulate(scen, tc.make_policy(spec), seed=42)
+        b = tc.simulate(dict(scen, nu=np.zeros(30)), tc.make_policy(spec), seed=42)
+        assert np.array_equal(a["ttp"], b["ttp"]) and np.array_equal(a["courses"], b["courses"])
+    p = {k: v for k, v in scen.items() if k != "sigma"}
+    S0, R0 = p["B0"] * (1 - p["f0"]), p["B0"] * p["f0"]
+    fr = []
+    for nu in (0.0, 0.01, 0.05):
+        S, R = S0.copy(), R0.copy()
+        for j in range(4):
+            S, R = tc.run_cycle(S, R, dict(p, nu=np.full(30, nu)), np.ones(30, bool), j * tc.CYCLE_DAYS)
+        assert (S >= 0).all() and (R >= 0).all()
+        fr.append(R / (S + R))
+    assert (fr[1] <= fr[0] + 1e-12).all() and (fr[2] <= fr[1] + 1e-12).all() and (fr[2] < fr[0]).any()
+
+
+def test_holiday_containment_caps_consecutive_courses():
+    class Spy(tc.HolidayContainment):
+        def advance(self, j, treat):
+            self.log.append(treat.copy())
+            super().advance(j, treat)
+    scen = tc.draw_scenarios(25, seed=43, sigmas=(0.05,))
+    pol = Spy(1e-6, 2, front=0, max_run=2)       # p* near 0: wants to treat every cycle
+    pol.log = []
+    tc.simulate(scen, pol, seed=44)
+    t = np.array(pol.log)
+    assert not (t[:-2] & t[1:-1] & t[2:]).any()       # never 3 courses in a row
+    assert (t[0] & t[1]).any()                        # but 2 in a row do happen
+    base = tc.simulate(scen, tc.make_policy(("riskf", 0.1, 2, 0)), seed=44)
+    same = tc.simulate(scen, tc.make_policy(("riskh", 0.1, 2, 0, 99)), seed=44)
+    assert np.array_equal(base["ttp"], same["ttp"])
