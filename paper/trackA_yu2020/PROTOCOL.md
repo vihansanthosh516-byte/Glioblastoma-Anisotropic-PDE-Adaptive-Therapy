@@ -1,6 +1,6 @@
 # Track A frozen protocol — Yu 2020 (GSE117891) Core vs Periphery, donor-held-out
 
-Status: frozen before any expression file will be downloaded. The hashes in `SHA256SUMS` will be checked at the start of every run. Any change after this commit will be a dated, labeled amendment.
+Status: frozen before any expression file is downloaded. Base freeze commit: `f4e592d`. Amendment A1 below further specifies the confound diagnostics before expression data are opened. The current protocol, donor list, and pinned analysis-plan appendix are hashed in `SHA256SUMS`; its paths are relative to this folder. Verify them before every run. Any later change requires a dated, labeled amendment committed before expression data are opened.
 
 ## 1. Question (unchanged from the appendix, section 2.1)
 Will a sparse, donor-balanced expression classifier improve donor-level Core-versus-Periphery prediction over ordinary logistic regression when every test donor is excluded from training?
@@ -33,8 +33,8 @@ With 6–8 eligible donors, the study will be **descriptive only**. It will not 
 - **Primary comparator:** ordinary L2 multinomial logistic regression, with C in {0.001, 0.01, 0.1, 1, 10}.
 - **Secondary baselines (appendix 2.3):** 15-NN vote, linear SVM, gradient-boosted trees. The three ablations will also run.
 - **Leakage diagnostics (not competitors):**
-  1. Cell-type-only model: logistic regression on one-hot GBmap `annotation_level_2` (6 classes), read from the GBmap obs table. It will be used only as a diagnostic and stratum. It will never be an input to the expression models.
-  2. Point-size model: number of cells in the cell's point.
+  1. Cell-type-only model: use only GBmap Core's `annotation_level_2` from the CELLxGENE collection `999f2a15-3d7e-440b-96ae-2c806799c08c`. Before the count-matrix download, save the metadata-only `obs` snapshot and record its release/version and SHA-256 in the run manifest; do not download the 8.1 GB expression object for this purpose. Join by exact cell barcode to the frozen GEO cell table; do not normalize, fuzzy-match, or infer barcodes. Fit an L2 logistic model on one-hot cell-type labels with `C=1` and balanced class weights, on outer-training donors only. Score it on cells with a unique cell-type match, and score each expression model on that same mapped subset for this comparison. Report unmapped and ambiguous cells by donor and region. This expression-derived annotation is a composition diagnostic only; it is never a feature or target for the expression models.
+  2. Point-size model: use only `log1p` of the number of cells in the cell's point, with an L2 logistic model (`C=1`, balanced class weights) fitted on outer-training donors. This is a diagnostic for sampling-depth leakage, not a biological predictor.
 - Every model will get the same outer folds and the same fixed inner tuning budget (full grid, no extra search).
 
 ## 6. Splits
@@ -55,7 +55,7 @@ With 6–8 eligible donors, the study will be **descriptive only**. It will not 
 
 ## 9. Pre-stated reading of results
 - "Candidate better than logistic regression (descriptive)" only if the candidate's donor-mean AURC is lower **and** it is lower in at least 5 of 6 primary donors.
-- If the cell-type-only diagnostic reaches balanced accuracy within 0.05 of the best expression model, the result will be reported as "explained by cell composition".
+- If the cell-type-only diagnostic reaches balanced accuracy within 0.05 of the best expression model on the same mapped cells, report that cell-type composition alone gives comparable prediction. Do not say it proves the expression result is explained by composition.
 - If no stratum passes the size rule in section 8, the within-cell-type check will be reported as not possible, and no region-biology claim will be made.
 - The lenient cohort cannot change the primary conclusion.
 - A negative or null result will be reported unchanged. Settings will not be retuned after scoring.
@@ -76,3 +76,14 @@ With 6–8 eligible donors, the study will be **descriptive only**. It will not 
 - Core is mostly neoplastic and Periphery mostly non-neoplastic (GBmap annotation), so composition is the main expected explanation.
 - The labels come from one surgical team's MRI-guided sampling. Core/periphery boundaries are not histology-confirmed per cell.
 - The method is not claimed as novel, and no new-biology claim will be made from a favorable score without a literature comparison.
+
+## Amendment A1 — composition and sampling-depth diagnostics (2026-10-31, pre-expression)
+
+This amendment makes these pre-expression changes:
+
+- Pins the cell-type diagnostic to GBmap Core `annotation_level_2` from CELLxGENE collection `999f2a15-3d7e-440b-96ae-2c806799c08c`; requires an exact barcode join and a hashed metadata-only snapshot before the count-matrix download.
+- Fixes the cell-type-only diagnostic as L2 logistic regression (`C=1`, balanced class weights), fitted on outer-training donors and scored on uniquely mapped cells. Expression models are also scored on that same mapped subset for this comparison.
+- Fixes the sampling-depth diagnostic as L2 logistic regression (`C=1`, balanced class weights) on `log1p` point cell count.
+- Changes the interpretation of a similar cell-type-only score to “comparable prediction from measured cell-type composition”; it does not prove the expression result is explained by composition.
+
+It does not change donor eligibility, labels, the expression candidate or comparator, splits, endpoints, or the descriptive-only rule. No expression count matrix has been downloaded or scored.

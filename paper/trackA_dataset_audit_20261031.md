@@ -1,6 +1,6 @@
 # Track A dataset audit — Core vs Periphery, donor-held-out (2026-10-31)
 
-## Decision (pass 3): GO for a descriptive-only analysis of Yu 2020 (GSE117891), with 6 strict / 8 lenient donors. Freeze the protocol before downloading the 39 MB matrix. No scoring yet.
+## Decision (pass 3): GO for a descriptive-only analysis of Yu 2020 (GSE117891), with 6 strict / 8 lenient donors. The protocol and pre-expression amendment A1 are frozen in `paper/trackA_yu2020/PROTOCOL.md`. The 39 MB matrix has not been downloaded; no expression has been scored.
 
 ## Decision (pass 2, superseded): CONDITIONAL GO for one cohort, Yu 2020 (GSE117891). Download nothing yet.
 Pass 1 (below) found no GEO cohort with 6 paired donors. Pass 2 searched CELLxGENE and found that the CC BY 4.0 GBmap atlas carries Core/Periphery `sector` labels for 17 donors in 3 studies. One study, Yu 2020, has **9 paired donors in one assay** (STRT-seq). That puts it in the appendix's 6–9 band: **descriptive nested evaluation only, no superiority claim.** One item must be confirmed before download (see "Remaining blocker").
@@ -61,10 +61,9 @@ Source: CELLxGENE collection 999f2a15-3d7e-440b-96ae-2c806799c08c, "Core GBmap" 
 - Either way: 6–9 band → **descriptive nested evaluation only.**
 - Label and MRI enhancement are nearly collinear (Tumoral mostly "+", Peritumoral "−"). The region label is MRI/surgical, not expression-derived.
 
-### Remaining items before any score
-1. Freeze the eligibility rule (strict 6 as primary, 8 as sensitivity) in a dated protocol, before download.
-2. Freeze the composition control (cell-type-only baseline, within-cell-type accuracy) and the failure rules.
-3. Then download the 39 MB count matrix.
+### Protocol and next data gate
+- **Complete:** eligibility rule is frozen (six strict donors primary, eight lenient donors sensitivity), as are the cell-type-only composition diagnostic and failure rules. Pre-expression Amendment A1 clarifies the exact metadata join and interpretation. The donor table, protocol, and analysis-plan appendix are hash-pinned in `paper/trackA_yu2020/SHA256SUMS`.
+- **Not done:** the 39 MB expression matrix has not been downloaded or scored. A later run must first verify the protocol hashes, exact cell-barcode joins, and metadata provenance. Results remain descriptive only; no superiority or tumor-cell biology claim is allowed with six to eight donors.
 
 ### Scientific risk (must be stated with any result)
 - Composition confound: Core points are mostly neoplastic and Periphery points mostly non-neoplastic (e.g. S13: 757/866 vs 2/112). A classifier can score well by learning cell type, not region. Required control: report accuracy within cell-type strata and against a cell-type-only baseline.
