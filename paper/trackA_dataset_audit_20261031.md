@@ -1,7 +1,54 @@
 # Track A dataset audit — Core vs Periphery, donor-held-out (2026-10-31)
 
-## Decision: NO-GO. Download nothing.
-No public, no-contact cohort has 6 or more eligible paired donors in one coherent assay and cell population. The appendix rule (fewer than 6 eligible donors: feasibility report only) applies. The Track A question stays unchanged. No amendment is proposed here.
+## Decision (updated, pass 2): CONDITIONAL GO for one cohort, Yu 2020 (GSE117891). Download nothing yet.
+Pass 1 (below) found no GEO cohort with 6 paired donors. Pass 2 searched CELLxGENE and found that the CC BY 4.0 GBmap atlas carries Core/Periphery `sector` labels for 17 donors in 3 studies. One study, Yu 2020, has **9 paired donors in one assay** (STRT-seq). That puts it in the appendix's 6–9 band: **descriptive nested evaluation only, no superiority claim.** One item must be confirmed before download (see "Remaining blocker").
+
+## Pass 2 — CELLxGENE / GBmap (read remotely; obs metadata only, no expression)
+Source: CELLxGENE collection 999f2a15-3d7e-440b-96ae-2c806799c08c, "Core GBmap" (bioRxiv 10.1101/2022.08.27.505439), H5AD 8,127,057,404 bytes, license CC BY 4.0 (CELLxGENE standard). Only the `obs` table was read through HTTP range requests.
+
+`sector` values: unknown 320,127 cells; Core 10,591; Periphery 7,846. Donors with both Core and Periphery:
+
+| Study (assay) | Donor | Core cells (neoplastic) | Periphery cells (neoplastic) |
+|---|---|---|---|
+| Yu2020 (STRT-seq) | S1 | 253 (231) | 124 (46) |
+| | S2 | 196 (121) | 62 (3) |
+| | S3 | 201 (127) | 55 (39) |
+| | S5 | 291 (260) | 35 (2) |
+| | S6 | 242 (192) | 113 (83) |
+| | S11 | 766 (723) | 244 (17) |
+| | S12 | 483 (158) | 150 (39) |
+| | S13 | 866 (757) | 112 (2) |
+| | S15 | 270 (0) | 230 (3) |
+| Wu2020 (BD Rhapsody) | LWZ, PXC, YCM, ZBY | 85–3,391 | 100–2,762 |
+| Darmanis2017 (Smart-seq2) | BT_S1, S2, S4, S6 | 203–957 | 55–550 |
+
+"Neoplastic" = GBmap `annotation_level_1`, an expression-derived annotation; used here only to show composition.
+
+### Yu 2020 provenance map
+- Paper: Yu K. et al., PMID 34692159. GEO GSE117891: 137 libraries, 13 glioma + 1 metastasis patients, 73 "surgery points".
+- GEO cell table `GSE117891_Sample_barcode_cell_information.xlsx` (231,046 bytes, SHA-256 2669c32aa678d941e60e19dd786cb581c9212bb9e088967cb2bf2af52aa016da, downloaded) maps every cell → patient → point (e.g. S1P1_SC1 → S1 → S1P1). **It has no core/periphery column.**
+- GBmap code (`github.com/ccruizm/GBmap`, notebook `01_data_import_and_preprocessing.ipynb`) assigns the region from an author file `clinical_info.xlsx`, sheet "Point and Cell information": "Tumoral" → Core, "Peritumoral" → Periphery. It excludes S4 (gliosarcoma), S7 (IDH-mutant), S8, S9 (OA), S14 (O). So the label is author-supplied per surgical point, not derived from expression.
+- Each point is one library. Region is a within-donor contrast, so library is nested in region inside each donor. That is unavoidable and must be reported.
+- Prior exposure in this project: none. GSE117891 is not used in any `src/`, `output/` or `paper/` file. Darmanis 2017 is only cited (in `paper/trackA_tam_5ala/PROTOCOL.md`).
+
+### Remaining blocker (no contact needed)
+- The original `clinical_info.xlsx` point → Tumoral/Peritumoral table has not been read from its primary public source (probably the Yu 2020 supplement or the CGGA site). The 9-donor count above rests on GBmap's copy. Resolve by finding that file on a public page, or by reading the GBmap Zenodo record 6962901.
+
+### Scientific risk (must be stated with any result)
+- Composition confound: Core points are mostly neoplastic and Periphery points mostly non-neoplastic (e.g. S13: 757/866 vs 2/112). A classifier can score well by learning cell type, not region. Required control: report accuracy within cell-type strata and against a cell-type-only baseline.
+- Few cells per point (35–866). STRT-seq is a low-throughput plate assay.
+- Pooling with Wu2020 and Darmanis2017 (17 donors) would mix 3 assays, with study fully confounded with platform. That needs a separate draft amendment and is exploratory only.
+
+### Smallest next download (after the blocker clears and the protocol is frozen)
+| File | Source | Size |
+|---|---|---|
+| GSE117891_all_6148.umi.count.matrix.tsv.gz | https://ftp.ncbi.nlm.nih.gov/geo/series/GSE117nnn/GSE117891/suppl/ | about 39 MB (FTP listing) |
+| Point → region table | primary source to be found | small |
+
+Not the 8.1 GB GBmap H5AD.
+
+## Pass 1 decision (superseded): NO-GO
+No GEO cohort checked in pass 1 had 6 or more eligible paired donors in one coherent assay and cell population. The Track A question stays unchanged. No amendment is proposed here.
 
 ## What was done
 - Read the appendix Track A section (eligibility rule: section 2, lines 41–49) and the prior audits `paper/trackA_v2_data_check.md` and `paper/trackA_v2_gate_report.md`.
@@ -38,7 +85,7 @@ No public, no-contact cohort has 6 or more eligible paired donors in one coheren
 - No descriptive nested evaluation is run. No superiority claim is possible.
 
 ## Gaps (not checked)
-- Not searched in this pass: CELLxGENE Census, HCA Data Portal, BioStudies/ArrayExpress single-cell, Zenodo/Figshare, HTAN, CPTAC, pathology image sets.
+- Pass 2 searched CELLxGENE collections (name/description match "glioma"/"glioblastoma"). Also seen: SL040/SL057 (2 donors, 5-ALA multisampling), Darmanis (4), a 60-donor glioma atlas (no region field checked). Still not searched: HCA Data Portal, BioStudies/ArrayExpress single-cell, Zenodo/Figshare, HTAN, CPTAC, pathology image sets.
 - GSE273274 and GSE318562 papers' supplementary tables were not read. GSE318562 has no linked paper yet.
 - GEO data are public; reuse follows NCBI GEO policy and citation of the source paper. No file-level license was found. Not legal advice.
 
