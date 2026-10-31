@@ -1,0 +1,9 @@
+patient	geo_patient	tier	tumoral_points	peritumoral_points
+GS1	S1	strict	P1,P4,P5,P6,P7	P2,P3
+GS2	S2	strict	P1,P2,P4	P3
+GS3	S3	strict	P2,P3,P4,P5,P6,P7	P1,P8
+GS5	S5	strict	P1,P2,P3,P4	P5
+GS6	S6	strict	P1,P2,P3,P4	P5
+GS13	S13	strict	P4,P5,P6	P1,P2,P3
+GS11	S11	lenient	P4,P5,P6	P2,P3
+GS12	S12	lenient	P1,P2,P3,P4	P5
