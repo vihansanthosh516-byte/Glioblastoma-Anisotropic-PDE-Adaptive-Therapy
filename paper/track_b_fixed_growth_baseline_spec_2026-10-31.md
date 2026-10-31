@@ -1,64 +1,65 @@
 # Track B fixed-growth baseline: draft protocol wording (2026-10-31)
 
-Status: **draft, not frozen**. No patient data was scored, no restricted file was accessed, no model was run. This file adds a baseline definition and a search update. It does not authorize scoring. Sources checked: `paper/trackABC_execution_plan_2026-10-31.md` (B2.4–B2.7, commit `5ab4e86`) and `paper/research_plan_complete_project_appendix.md` §3.2–3.5.
+Status: **candidate wording, resolved choices (revised 2026-10-31); not frozen until the support gate passes**. No patient data was scored, no restricted file was accessed, no model was run. This file adds a baseline definition and a search update. It does not authorize scoring. Sources checked: `paper/trackABC_execution_plan_2026-10-31.md` (B2.4–B2.7, commit `5ab4e86`) and `paper/research_plan_complete_project_appendix.md` §3.2–3.5.
 
-## 1. Proposed protocol wording
+## 1. Candidate protocol wording (supersedes the first draft)
 
-**B-FG. Fixed-growth comparator.** For a held-out patient with last history tumor-core mask C (origin space, physical voxel spacing h), valid support S, and declared horizon bin b, the forecast is
+Code: `src/fk_fixed_growth.py`. Synthetic tests: `tests/test_fk_fixed_growth.py` (12 passed, scratch copy, Python 3.14, 2026-10-31). No patient mask was read.
 
-F_r(b) = { v ∈ S : d_h(v, C) ≤ r(b) }
+**B-FG. Fixed-growth comparator.** For a held-out patient with last history tumor-core mask C on the forecast grid, approved valid-support mask S, and voxel spacing h (mm), the forecast is
 
-where d_h is the Euclidean distance in millimetres from voxel centre v to the nearest voxel of C, computed with the voxel spacing (C itself has d_h = 0). r(b) is one radius per horizon bin, chosen from the fixed grid R = {0, 1, 2, …, 15} mm.
+F_r = { v ∈ S : d_h(v, C) ≤ r }
 
-1. **Inputs allowed.** The last history mask, the origin brain support, the origin cavity mask, voxel spacing, and the declared horizon bin. Nothing from the target scan enters the forecast: no target mask, no target volume, no target-derived support.
-2. **Valid support S.** S = B_0 \ Q_0, where B_0 is the origin operational brain support (union of nonzero voxels in the origin MRI modalities and any nonzero origin label) and Q_0 is the origin resection cavity. The same S clips every mask comparator. Report target core voxels outside S as a count per patient. They count as misses for every method.
-3. **Radius selection.** Inside each outer fold, use outer-training patients only. Split them into K = 5 patient-grouped inner folds with a seed fixed before scoring (fewer patients than 10 → leave-one-patient-out). For bin b and each r ∈ R, compute plain patient-macro Dice on the inner-validation patients whose eligible pair falls in bin b. Pool across inner folds. Pick r(b) with the highest mean inner Dice. Apply r(b) once to the outer-test patients in bin b.
-4. **Tie rule.** If two radii are within 1e-6 of the best mean inner Dice, pick the **smaller** radius. So a tie with copy-last resolves to r = 0.
-5. **Shrinking and zero growth.** The grid has no negative radius. Fixed growth never erodes. r = 0 is allowed and makes F equal copy-last clipped to S. If r(b) = 0, report "fixed growth = copy-last in bin b"; do not count it as a separate win or loss.
-6. **Small bins.** If bin b has fewer than N_min = 5 outer-training patients, use the radius chosen on all outer-training patients pooled across bins, and flag bin b as "pooled radius".
-7. **Empty cases.** Patients with an empty last core are not eligible (appendix §4.3 requires a nonempty input core; adopt the same rule for §3). If the target core is empty and a forecast is empty, Dice = 1; if exactly one is empty, Dice = 0. Use the same convention for every method.
-8. **Reporting.** Report r(b) for each outer fold and bin, plus the spread of radii chosen within inner folds. Report plain Dice per patient, patient-macro Dice per bin, and paired patient-bootstrap differences against the candidate.
+d_h is the exact Euclidean distance (mm) from voxel v to the nearest voxel of C, computed with spacing h (`scipy.ndimage.distance_transform_edt(~C, sampling=h)`). C has d_h = 0. r = 0 gives C ∩ S, which is copy-last clipped to S.
 
-**Note on inner folds.** Fixed growth has no fitted parameter besides r. So pooled inner-fold Dice equals Dice over all outer-training patients in bin b, and the inner split does not change r(b). Keep it anyway: it makes every comparator use the same split, and the per-inner-fold radii show how stable the choice is.
+1. **Horizon.** One nominal day-90 window. Eligible pairs have an actual history-to-target interval of 76–104 days. Report each actual interval. The forecast is conditional on the pair falling in that window. It is not exact-day-90 validation. One window means one radius per outer fold.
+2. **Grid and spacing.** Use the existing protocol grid: 2 mm isotropic, nearest-neighbour resampling after the registration gate passes (`paper/track_b_pde_external_protocol_draft_2026-10-28.md` §3). All mask comparators use this grid.
+3. **Radius grid.** R = {0, 2, 4, …, 20} mm: steps equal one 2 mm voxel; finer steps would not change the mask. The cap is 20 mm, ten voxels. It is a search bound, not a biological claim. If the chosen radius equals 20 mm, record "boundary hit". Do not widen the grid after scoring starts.
+4. **Radius selection.** For each outer fold, pass only that fold's outer-training patients to `select_radius`. Score each r by plain patient-macro Dice of F_r against the training patients' full target cores. Pick the best mean. Ties within 1e-9 go to the smaller r. **No inner folds.** The comparator has one free choice and no fitted parameter, so inner folds would choose the same r and add nothing. Outer-test targets never enter selection; the forecast for a test patient is built before its target is read (`run_outer_fixed_growth`).
+5. **Nonnegative radius.** The grid has no negative radius. Fixed growth never erodes. If r = 0 is chosen, report "fixed growth = copy-last" for that fold. It is not a separate win or loss.
+6. **Empty history.** An empty last core is ineligible: the code raises an error. This matches the existing runner, which sends empty history to the persistence fallback, and appendix §4.3, which requires a nonempty input core. Count such patients in cohort flow.
+7. **Empty target and Dice.** Use `dice_with_empty_rule` from `src/fk_mu_scoring.py`: both empty = 1, one empty = 0. Score against the full target core. Target core outside S stays in the target and counts as a miss for every method; report its voxel count per patient.
+8. **Valid support S.** S is an input. This module does not define it. S must be a source-backed valid-acquisition-support mask mapped to the forecast-origin grid, with MRI-only registration QC that does not use GTVs. The earlier draft's rule ("union of nonzero MRI voxels and labels") is withdrawn: no source establishes it. **Until a source-backed S exists, patient scoring stays blocked.** The same S clips every mask comparator, including copy-last.
+9. **Cavity.** The cavity is not removed from S by default. Remove it only if the source label documentation says target tumor-core labels cannot occur in a prior cavity. Decide this from source documents only. Do not inspect target-mask voxels to decide it. If the meaning stays unclear, scoring stays blocked.
 
-**B-CMP. Comparator roles (same held-out patients, same origins, same targets, same bins, same S):**
+**B-CMP. Comparators (same held-out patients, same origins, same targets, same window, same S, same grid):**
 
 | Comparator | Role | Score |
 |---|---|---|
-| Copy-last (persistence) | required mask baseline | plain Dice by bin |
-| Fixed growth (B-FG) | required mask baseline | plain Dice by bin |
-| PDE-only | required mask baseline | plain Dice by bin |
-| U-Net trained within outer-training folds | required mask baseline | plain Dice by bin |
-| Training-only distance-shell rule | separate mask baseline, only if frozen before scoring; then required | plain Dice by bin |
-| Training-only count model | count model only | count metrics only (deviance, count MAE, calibration of P(count ≥ 1)) |
-| Volume-trend, geometric-rate | existing appendix §3.3 comparators | as in appendix |
-| Component ablations | existing appendix §3.3 comparators | as in appendix |
+| Copy-last (persistence), clipped to S | required mask baseline | plain Dice |
+| Fixed growth (B-FG) | required mask baseline | plain Dice |
+| PDE-only | required mask baseline | plain Dice |
+| U-Net trained on outer-training patients only | required mask baseline | plain Dice |
+| Training-only count model | count model, not a mask | count metrics only |
+| Volume-trend (matched-volume signed distance), geometric train-rate | existing comparators (§3.3) | plain Dice, as now |
+| Component ablations | existing comparators (§3.3) | plain Dice, as now |
 
-The candidate passes only if it beats every required mask baseline under the frozen margin rule (execution plan B2.6–B2.7).
+The distance-shell mask rule is **dropped** for now (see §3).
 
-## 2. Check against the current appendix
+**Pass rule.** The candidate passes only if its patient-macro plain Dice beats **every required mask baseline** under the frozen margin and interval rule. No model and no scorer receives future tumor size. Volume-matched comparators that draw sizes from training-only models stay allowed; oracle volume matching does not.
 
-| Item | Appendix now | Gap |
-|---|---|---|
-| Mask comparators | §3.3: persistence, volume-trend, geometric-rate, ablations | No U-Net, no fixed growth, no distance-shell rule. **Amendment needed.** |
-| Count model | not in §3 | Add as count-only secondary. **Amendment needed** (the execution plan already says this; the appendix does not). |
-| Horizon bins | §3.2: realized interval, conditional estimand; Duke candidate is one 76–104-day window; §4.1 uses ≤90, 91–180, >180 days for the side study | No bins are declared for §3. **Must be frozen.** Bins use scan dates only, so the estimand stays conditional on the realized interval. |
-| Valid support | §4.2 defines B_0 and Q_0 for the side study only | Adopt for §3 or define a §3 support. **Amendment needed.** |
-| Tuning on training patients | §3.2: tuned comparator settings use outer-training patients only | Consistent. Add the inner-fold rule and tie rule. |
-| Empty-core and Dice convention | §4.3 requires nonempty input core; §3 silent | **Amendment needed.** |
-| Primary endpoint | §3.3: patient-macro Dice of the tumor core | Consistent. Keep. |
-| Pass rule | §3.5: beat the strongest prespecified simple baseline | Execution plan B2.7 is stricter: beat every required mask baseline. **Reconcile in the amendment.** |
+## 2. Appendix reconciliation (done in this commit)
 
-**Amendment needed before scoring:** one dated Track B amendment that (a) adds U-Net, fixed growth and the optional distance-shell rule to §3.3, (b) adds the count model as count-only secondary, (c) declares §3 horizon bins and N_min, (d) declares S and the empty-case Dice rule, (e) sets the pass rule to "beat every required mask baseline", and (f) fixes seeds and inner K. Freeze it before any target mask is opened.
+`paper/research_plan_complete_project_appendix.md` §3.3 and §3.5 now list the four required mask baselines, the count model on count metrics, the dropped distance-shell rule, and the "beat every required mask baseline" pass rule. The volume-trend, geometric-rate and ablation comparisons are kept. This amendment is dated 2026-10-31, before any Track B target mask is opened.
 
-## 3. Unresolved choices (decide before freezing)
+## 3. Choices resolved
 
-1. **Horizon bins.** Duke-style single window (76–104 days) or three bins (≤90, 91–180, >180 days). A single window avoids tiny bins but tests one horizon only.
-2. **Cavity in S.** Excluding Q_0 assumes the tumor core does not grow into the cavity. If the source labels show core inside the later cavity, keep Q_0 in S and report it.
-3. **Radius grid.** 1 mm steps to 15 mm match the standard 15 mm margin used by PREDICT-GBM. A finer grid or a larger maximum would need a reason before scoring.
-4. **Erosion.** Allowing negative radii would let fixed growth model shrinkage. It also adds a free choice. The draft does not allow it.
-5. **Distance-shell rule.** Keep it or drop it. If kept, freeze its shell width, threshold grid and minimum addition count, and it becomes required.
-6. **Resampling.** All comparators must run at one frozen grid (native or 1 mm isotropic). Distances in mm follow the grid spacing.
+| # | Choice | Decision | Reason |
+|---|---|---|---|
+| 1 | Horizon | One 76–104-day window, nominal day 90; actual interval reported; conditional estimand | Matches the existing Duke and MU design; avoids tiny bins |
+| 2 | Cavity in S | Not removed by default; remove only if source label documents say core cannot occur in a prior cavity; never decided from target voxels | Avoids a rule that the data have not established |
+| 3 | Radius grid | 0–20 mm in 2 mm steps; boundary hit reported | One-voxel steps on the 2 mm grid; cap is a search bound, not a radiation margin |
+| 4 | Erosion | Not allowed | Removes a free choice; shrinkage is covered by the volume-trend comparators |
+| 5 | Distance-shell rule | Dropped | Its fitting and failure rules are not frozen; keeping it would add an untested required baseline |
+| 6 | Grid | 2 mm isotropic, nearest-neighbour | Same grid as the existing protocol |
+
+## Remaining blockers
+
+- Source-backed valid support S and MRI-only longitudinal registration QC (MU and Duke). Scoring is blocked until both exist.
+- Cavity meaning from source label documents.
+- Duke access and school-use approval.
+- `src/fk_fixed_growth.py` is not yet wired into `src/fk_mu_patient_runner.py`. Wiring it in is a code task. It does not authorize scoring.
+- U-Net and count model: no frozen training recipe yet.
 
 ## 4. Search update (continues `paper/track_b_prior_art_followup_2026-10-31.md`)
 
