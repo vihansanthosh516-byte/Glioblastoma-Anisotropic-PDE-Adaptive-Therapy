@@ -46,3 +46,5 @@ Follow-up searches needed before any gap statement:
 - TumorGrowthToolkit; the robustness sections of Subramanian/Biros (SIBIA); Scheufele; Jaroudi (BMCMC); Rockne PI uncertainty.
 - GitHub searches for repos and licenses (GliODIL, PredictGBM, deep-glioma-growth).
 - A persistence-Dice-by-horizon value for any public cohort.
+
+**Correction (2026-10-31):** see `paper/track_b_prior_art_followup_2026-10-31.md`. arXiv 2509.18998 is an in-vitro microfluidic study, not a patient study. PREDICT-GBM has 243 patients (no 255 found). SoC-DT (2510.03287) already reports a real-patient PDE-plus-neural-corrector baseline on UCSF-ALPTDG.
