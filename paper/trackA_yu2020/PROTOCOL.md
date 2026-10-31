@@ -1,13 +1,13 @@
 # Track A frozen protocol — Yu 2020 (GSE117891) Core vs Periphery, donor-held-out
 
-Status: frozen before any expression file is downloaded. Base freeze commit: `f4e592d`. Amendment A1 below further specifies the confound diagnostics before expression data are opened. The current protocol, donor list, and pinned analysis-plan appendix are hashed in `SHA256SUMS`; its paths are relative to this folder. Verify them before every run. Any later change requires a dated, labeled amendment committed before expression data are opened.
+Status: base protocol frozen before expression download. Base freeze commit: `f4e592d`. Amendment A1 below further specifies the confound diagnostics before expression data are opened. The count matrix was downloaded on 2026-10-31 and its SHA-256 matches the source record; no count values have been read or scored. Amendment A2 below freezes implementation details before the first expression read. The protocol, donor list, pinned analysis-plan appendix, runner, and four source inputs are hashed in `SHA256SUMS`; its paths are relative to this folder. Verify every entry before each run. Any later change requires a dated, labeled amendment committed before expression data are opened.
 
 ## 1. Question (unchanged from the appendix, section 2.1)
 Will a sparse, donor-balanced expression classifier improve donor-level Core-versus-Periphery prediction over ordinary logistic regression when every test donor is excluded from training?
 With 6–8 eligible donors, the study will be **descriptive only**. It will not make an inferential superiority claim.
 
 ## 2. Data
-- Expression: `GSE117891_all_6148.umi.count.matrix.tsv.gz` from https://ftp.ncbi.nlm.nih.gov/geo/series/GSE117nnn/GSE117891/suppl/ (about 39 MB, listed size). Its byte size and SHA-256 will be recorded on download.
+- Expression: `GSE117891_all_6148.umi.count.matrix.tsv.gz` from https://ftp.ncbi.nlm.nih.gov/geo/series/GSE117nnn/GSE117891/suppl/. It was downloaded on 2026-10-31 (40,989,643 bytes); the SHA-256 is recorded in `SHA256SUMS`. The file passed gzip integrity checking.
 - Cell → point map: `GSE117891_Sample_barcode_cell_information.xlsx`, sheet `Cell_information` (231,046 bytes, SHA-256 2669c32aa678d941e60e19dd786cb581c9212bb9e088967cb2bf2af52aa016da).
 - Point → label map: Yu et al. 2020, *Natl Sci Rev*, doi 10.1093/nsr/nwaa099, Table S1, sheet `Point and Cell information` (15,125 bytes, SHA-256 0676607ff4c57348fc043ab4bace1c3985617d0d90507742344ce19642cb772a). License CC BY 4.0.
 - Raw files will stay local under the git-ignored `data/external/`. Nothing will be uploaded to a cloud service.
@@ -86,4 +86,40 @@ This amendment makes these pre-expression changes:
 - Fixes the sampling-depth diagnostic as L2 logistic regression (`C=1`, balanced class weights) on `log1p` point cell count.
 - Changes the interpretation of a similar cell-type-only score to “comparable prediction from measured cell-type composition”; it does not prove the expression result is explained by composition.
 
-It does not change donor eligibility, labels, the expression candidate or comparator, splits, endpoints, or the descriptive-only rule. No expression count matrix has been downloaded or scored.
+It does not change donor eligibility, labels, the expression candidate or comparator, splits, endpoints, or the descriptive-only rule. At the A1 freeze time, no expression count matrix had been downloaded or scored.
+
+## Amendment A2 — frozen implementation choices (2026-10-31, before expression values are read)
+
+This amendment resolves implementation details left open by the appendix and Amendment A1. It does not change the target, donor eligibility, primary endpoint, candidate model, required comparisons, or descriptive-only interpretation.
+
+### A. Input and cell handling
+
+- Before loading expression values, verify every entry in this folder's `SHA256SUMS`, including `PROTOCOL.md`, `donors.tsv`, the pinned appendix, the runner, the count matrix, the GEO cell table, Table S1, and the GBmap metadata snapshot. Any missing file or hash mismatch stops the run.
+- Join matrix columns to the GEO cell table by exact cell barcode only. Join GEO points to Table S1 by exact patient and point identifiers only. Map `Tumoral` to Core and `Peritumoral` to Periphery. Exclude `Normal`, other diagnoses, and cells without a unique exact join; count each exclusion reason. Duplicate cell barcodes, duplicate gene identifiers, conflicting point labels, or a mismatch between Table S1 and `donors.tsv` stops the run.
+- Validate raw counts as finite, nonnegative integers. Apply the frozen QC rule on raw counts: at least 1,000 UMIs and at least 500 detected genes. Select the primary and sensitivity cohorts only from `donors.tsv`. Require at least 20 QC-passed cells in each class for every primary donor. If a lenient donor misses this threshold, omit the entire eight-donor sensitivity analysis and record why; do not alter the six-donor primary cohort.
+- In each inner and outer training split, filter genes detected in at least `ceil(0.05 × number of training cells)` cells, rank by variance on training cells only, and break variance ties by gene identifier. Keep the 2,000 highest-variance genes; stop if fewer than 2,000 remain. Normalize each cell to 10,000 counts, apply `log1p`, then fit feature means and standard deviations on training cells only. Replace a zero standard deviation with 1. Apply the same feature order and transform to validation or test cells.
+
+### B. Nested selection and candidate refit
+
+- Keep donor order from `donors.tsv`; use leave-one-donor-out outer folds and leave-one-training-donor-out inner folds. Use seed `20261031`. Assign each cell a deterministic tie rank by sorting SHA-256 digests of `20261031`, a null byte, and its exact cell ID. Reuse the same ranks for every model and fold, so ties do not favor one model or change across cohorts.
+- In each inner fit, early-stop the candidate and ablations on the lowest mean donor validation cross-entropy of the unblended classifier output. Use the appendix limit of 500 epochs and 25 epochs without improvement; on an exact tie, keep the earliest epoch. Select hyperparameters by mean inner-donor class-balanced AURC. Among inner-fold AURC values within `1e-12` of the minimum, select the first setting in the fixed ascending grid order for every tuned model.
+- Select candidate regularization and blend settings jointly from the 75 regularization combinations and 20 `(T, gamma)` combinations, using only inner-fold predictions. Blend uses probabilities from training cells only. For each outer refit, train the selected setting on all outer-training donors for the median best epoch of that setting across inner folds. Do not use the outer donor to select an epoch or any setting.
+- Tune each ablation independently on its remaining grid: ablation 1 fixes `lambda_1=0`; ablation 2 fixes `lambda_2=0` and `gamma=0`; ablation 3 uses mean donor cross-entropy instead of the smooth maximum. Keep `lambda_W` and any remaining blend settings on their appendix grids.
+
+### C. Comparator details
+
+- Logistic regression uses the appendix C grid, L2 penalty, `lbfgs`, no class weighting, and a fixed 1,000-iteration cap.
+- The 15-nearest-neighbor vote uses cosine distance, uniform voting, and the shared deterministic tie order.
+- Linear SVM uses `LinearSVC` with the appendix C grid, squared-hinge loss, no class weighting, and a fixed 10,000-iteration cap. For probability metrics, fit `LogisticRegression(C=1, solver='lbfgs', max_iter=1,000, class_weight=None)` to donor-held-out margins generated only within the current training donors. Give each calibration donor equal total weight. In inner folds, calibration is nested inside the inner-training donors. Use calibrated probabilities for Brier score and confidence ranking. A calibration fit failure stops the run; do not substitute a fixed sigmoid.
+- Gradient boosting uses `GradientBoostingClassifier` with `log_loss`, 100 estimators, depth-2 trees, `min_samples_leaf=10`, `subsample=1`, and learning rate in `{0.05, 0.1, 0.2}`. Disable internal early stopping and use seed `20261031`. No other tree settings are tuned.
+- The cell-type and point-size diagnostics remain fixed L2 logistic models with `C=1` and balanced class weights. Cell type joins remain exact and unique; score cell-type comparisons on the same uniquely mapped cells for all expression models. Point size is `log1p` of QC-passed cells in that source point. These diagnostics are not competitors.
+- For each eligible `annotation_level_2` stratum (at least 10 Core and 10 Periphery cells in at least four primary donors), report each expression model's held-out balanced accuracy, class-balanced AURC, Brier score, and class counts by donor. Also report donor-macro balanced accuracy across donors meeting that stratum rule. If no stratum meets it, report that the check was not possible.
+
+### D. Endpoint and runtime
+
+- For each held-out donor, sort cells by `max(p_core, p_periphery)` using the shared tie order. Compute class-specific error among retained cells. If a retained set has no cells from one class, assign error 1 to that class. Compute error as the mean of Core and Periphery errors.
+- Use every integer retained-cell count from `ceil(N/2)` through `N`. Record actual coverage `k/N`, and integrate the risk curve with the trapezoid rule over those actual coverages. Lower AURC is better. Balanced accuracy uses the 0.5 probability threshold. Brier score is the per-cell binary squared-probability error, averaged within donor. Report all donor values and the donor mean and range; do not calculate p-values or claim inferential superiority.
+- The timing pilot runs the first outer fold of the eight-donor sensitivity cohort when all eight donors pass the cell-count gate; otherwise it runs the first outer fold of the six-donor primary cohort. It includes inner tuning and final fits on outer-training donors, but never predicts, scores, or saves results for the held-out donor. It records timings only. Extrapolate the measured fold time to 14 outer folds when sensitivity is eligible, or 6 when sensitivity is omitted, and add the measured input-load time. If the estimate exceeds six hours on CPU, stop before full scoring and write a new amendment before changing any grid. If it passes, run the six-donor primary cohort first, then the eligible eight-donor sensitivity cohort.
+- Write the complete `result.json` only after every required fold finishes. Include all implementation choices, input and code hashes, package versions, cell-flow counts, per-donor metrics, runtime, and limitations. Refuse to overwrite an existing result. The pilot timing file contains no scores.
+
+Commit this amendment, the runner, and their checksum manifest before the first expression-value read. Keep the downloaded matrix local; never upload it.

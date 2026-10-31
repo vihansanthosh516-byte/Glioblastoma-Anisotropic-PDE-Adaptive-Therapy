@@ -1,6 +1,6 @@
 # Track A dataset audit — Core vs Periphery, donor-held-out (2026-10-31)
 
-## Decision (pass 3): GO for a descriptive-only analysis of Yu 2020 (GSE117891), with 6 strict / 8 lenient donors. The protocol and pre-expression amendment A1 are frozen in `paper/trackA_yu2020/PROTOCOL.md`. The 39 MB matrix has not been downloaded; no expression has been scored.
+## Decision (pass 3): GO for a descriptive-only analysis of Yu 2020 (GSE117891), with 6 strict / 8 lenient donors. The pre-expression protocol amendments and runner hash must be sealed in Git before opening expression values. The 40,989,643-byte matrix was downloaded on 2026-10-31 at 16:10 and its SHA-256 was verified; no expression values have been read or scored.
 
 ## Decision (pass 2, superseded): CONDITIONAL GO for one cohort, Yu 2020 (GSE117891). Download nothing yet.
 Pass 1 (below) found no GEO cohort with 6 paired donors. Pass 2 searched CELLxGENE and found that the CC BY 4.0 GBmap atlas carries Core/Periphery `sector` labels for 17 donors in 3 studies. One study, Yu 2020, has **9 paired donors in one assay** (STRT-seq). That puts it in the appendix's 6–9 band: **descriptive nested evaluation only, no superiority claim.** One item must be confirmed before download (see "Remaining blocker").
