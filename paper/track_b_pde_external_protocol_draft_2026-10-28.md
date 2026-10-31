@@ -1,6 +1,6 @@
 # Track B PDE external-test protocol draft (2026-10-28)
 
-**Status:** candidate protocol only. It defines a two-history next-scan PDE forecast at a nominal 90-day horizon. The user reports submitting a Duke access request on 2026-10-28; approval, school-use approval, and file access are not confirmed. No Duke files or outcomes have been accessed, and the patient-data model is not ready to score. This draft does not certify novelty or predict a positive result.
+**Status (updated 2026-10-31):** candidate protocol only; not frozen for scoring. It defines a two-history next-scan PDE forecast at a nominal 90-day horizon. Duke declined the initial access request because planned-use and academic-affiliation details were missing. The user reports resubmitting on 2026-10-29 with the requested information; access approval and school-use approval remain pending. No Duke files or outcomes have been accessed, and the patient-data model is not ready to score. The current checkout also lacks the sibling-worktree scorer change that matches the no-PDE point-mask volume to the hybrid point-mask volume. This draft does not certify novelty or predict a positive result.
 
 ## 1. Question and primary estimand
 
@@ -51,7 +51,7 @@ The MU scorer now records Dice for the matched-volume no-PDE primary comparator,
 
 ## 6. Required access decision and stop conditions
 
-The Zenodo record says Duke files are restricted (119.3 GB) and require an access request under CC BY-NC-ND 4.0 or a custom Duke license. The user reports that an access request was submitted; the response and school/fair sponsor approval of the selected license and derivative restrictions are not yet confirmed. Do not download files until access and permitted-use terms are confirmed.
+The Zenodo record says Duke files are restricted and require an access request under CC BY-NC-ND 4.0 or a custom Duke license. Duke declined the initial request for missing planned-use and academic-affiliation details. The user reports resubmitting on 2026-10-29; the response and school/fair approval of the selected license and derivative restrictions remain pending. Do not download files until access and permitted-use terms are confirmed.
 
 Do not download or score until permitted use, access, overlap, date quality, target support, longitudinal registration, and mask provenance are resolved. After access but before target-value use, run the metadata-only count and eligibility screen. If precision or eligible n is inadequate, report infeasibility; do not broaden the horizon post hoc.
 
