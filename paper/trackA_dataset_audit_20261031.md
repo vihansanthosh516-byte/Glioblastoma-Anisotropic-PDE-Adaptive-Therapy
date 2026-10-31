@@ -123,3 +123,7 @@ No GEO cohort checked in pass 1 had 6 or more eligible paired donors in one cohe
 ## What would change the decision (no contact needed)
 1. A published GSE318562 paper whose supplement maps all 22 sections to core or edge per patient. That would allow a Visium-based section-level amendment (9 patients, still below 10: descriptive only).
 2. A new public single-cell cohort with ≥6 paired core/periphery donors in one assay, found in the unsearched repositories above.
+
+## Pass 4 — pre-download steps (2026-10-31)
+- Amendment A1 snapshot saved before any count-matrix download: `data/external/gbmap_obs/gbmap_core_obs_Yu2020.tsv` (git-ignored), 383,303 bytes, SHA-256 af3918b2876d622ac2f6e5b34327a9b12b45620a83998528ba5b0c1056ffc29b. 4,693 Yu2020 rows. Source: CELLxGENE dataset c888b684-6c51-431f-972a-6c963044cef0, version 861acfd8-25f0-418b-a445-aa96da232827 (revised 2026-06-11), schema 7.1.0. Read with HTTP range requests; no expression values read. GBmap `obs_index` uses the same cell IDs as the GEO cell table (e.g. `S2P1_SC1`).
+- Count-matrix download **failed**. NCBI reports Content-Length 40,989,643 bytes, then closes every connection with 0 bytes (HTTPS, FTP, PowerShell, byte ranges). A GEO file that downloaded earlier today now fails the same way, so the block is on the NCBI side or on this connection, not in the file. No partial file was kept. No retry trick or mirror was used.
