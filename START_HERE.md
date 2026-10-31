@@ -1,5 +1,6 @@
 # START HERE
 
+- **Current Track A/B/C execution roadmap (2026-10-31):** `paper/trackABC_execution_plan_2026-10-31.md` records the selected next work, novelty paths, and stop/go gates for all three tracks. It does not replace frozen protocols or authorize scoring.
 - **Track A Yu 2020 update (2026-10-31):** Table S1 confirms independent MRI-marked Core/Periphery labels for Yu 2020 (GSE117891). A2 protocol and runner are sealed in commit `4d16e74`. The timing-only pilot read counts but stopped before outer held-out predictions or scores. Its conservative 14-fold runtime lower bound is 10.89 hours, above the six-hour gate; A3 blocks full scoring under the original grid. No `result.json` exists. See `paper/trackA_dataset_audit_20261031.md` and `paper/trackA_yu2020/PROTOCOL.md`.
 - **Track A v2 latest (2026-10-30):** HRA009021 remains the only conditional main-test candidate: it reports 10 donors and independent HBI/LBI/tumor labels, but sample-to-region mapping is missing. A new read-only screen found no replacement that passes donor, modality, independent-label, and mapping gates; no new expression data were downloaded or scored. Evidence: `output/trackA_v2_data_check/alternate_cohort_screen_20261030.json`, `output/trackA_v2_data_check/dataset_candidate_inventory.json`, and `output/trackA_v2_data_check/hra009021_file_inventory.json`. See `paper/trackA_v2_proposal.md` and `paper/trackA_v2_data_check.md`.
 - **Track A v2 HRA009021 metadata audit (2026-10-30):** workbook confirms donor/sample/run links but no region labels; all 30 second-read URL fields point to first-read files. Approved supplement now lists labels by donor code, but not by GSA sample name. Evidence: `output/trackA_v2_data_check/hra009021_metadata_audit.json` and `output/trackA_v2_data_check/hra009021_supplement_audit.json`.
@@ -16,7 +17,7 @@ Updated 2026-10-31. Read this file before continuing work. The main project is t
 
 Continue the existing GBM Tracks A, B, and C project from the final proposed plan. Track B's primary aim is PDE tumor-growth forecasting. Keep the three tracks equally important and separate; do not treat UCSD or CFB annotation-change work as Track B completion or combine tracks into one patient-level model.
 
-The current forward plan is `paper/research_plan_complete_project_form.md`, with details in `paper/research_plan_complete_project_appendix.md`. Tracks A, B, and C are equally important. The plan contains questions and procedures, not project outcomes. Each analysis remains conditional on its data, rights, and protocol gates.
+The current execution roadmap is `paper/trackABC_execution_plan_2026-10-31.md`. The scientific questions and base procedures remain in `paper/research_plan_complete_project_form.md`, with technical details in `paper/research_plan_complete_project_appendix.md`. Tracks A, B, and C are equally important. Each analysis remains conditional on its data, rights, and protocol gates.
 
 ## 2. Project shape
 
