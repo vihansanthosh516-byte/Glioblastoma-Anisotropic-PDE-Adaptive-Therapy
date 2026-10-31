@@ -1,7 +1,9 @@
 # Track B CFB-GBM source and label-provenance audit
 
-**Date:** 2026-10-31  
-**Scope:** Public-source and file-metadata audit only. No GTV or brain-mask voxel arrays were read. No patient forecast was scored.  
+**Date:** 2026-10-31
+
+**Scope:** Public-source and file-metadata audit only. No GTV or brain-mask voxel arrays were read. No patient forecast was scored.
+
 **Decision:** CFB-GBM remains a candidate cohort, not cleared for Track B patient scoring.
 
 ## What primary sources establish
