@@ -123,3 +123,108 @@ def test_target_outside_support_counts_as_miss():
     row = next(r for r in out["rows"] if r["patient_id"] == "p")
     assert row["target_voxels_outside_support"] == int((target & ~support).sum()) > 0
     assert row["dice"] < 1.0
+
+
+# ---- End-to-end wiring through the patient-fold CV wrapper (synthetic only) ----
+from src.fk_fixed_growth import add_fixed_growth_arm  # noqa: E402
+from src.fk_mu_scoring import make_first_third_score_callback  # noqa: E402
+from src.fk_patient_cv import ForecastFailure, PatientSeries, run_first_third_90day_patient_cv  # noqa: E402
+
+
+def _cohort(n=10, grow_mm=4.0, empty_history_ids=()):
+    records, folds, domains = [], {}, {}
+    for i in range(n):
+        pid = f"s{i:02d}"
+        last = np.zeros(SHAPE, bool) if pid in empty_history_ids else _ball(6.0)
+        records.append(PatientSeries(pid, [0.0, 30.0, 30.0 + 76 + (i % 29)],
+                                     [_ball(4.0), last, _ball(6.0 + grow_mm)]))
+        folds[pid] = i % 5
+        domains[pid] = np.ones(SHAPE, bool)
+    return records, folds, domains
+
+
+def _run(records, folds, domains, seen_forecasts=None):
+    def fit(training_records):
+        return {"n": len(training_records)}
+
+    def forecast(history, _nuisance):
+        if seen_forecasts is not None:
+            seen_forecasts.append((history.patient_id, history.forecast_day, len(history.masks)))
+        last = np.asarray(history.masks[-1], bool)
+        if not last.any():
+            raise ForecastFailure("empty history")
+        return {"fallback_masks": {"hybrid": last, "no_pde": last, "persistence": last}, "history_mask": last}
+
+    def fallback(history, _nuisance):
+        last = np.asarray(history.masks[-1], bool)
+        return {"fallback_masks": {"hybrid": last, "no_pde": last, "persistence": last}, "history_mask": last}
+
+    base_score = make_first_third_score_callback(spacing_mm=2.0, valid_support_by_patient=domains)
+    fit_w, fc_w, fb_w, sc_w = add_fixed_growth_arm(fit, forecast, fallback, base_score, domain_by_patient=domains,
+                                                   spacing_mm=(2.0, 2.0, 2.0), valid_support_by_patient=domains)
+    return run_first_third_90day_patient_cv(records, folds, fit_w, fc_w, sc_w, fallback_forecast=fb_w, n_folds=5)
+
+
+def test_runner_wiring_scores_fixed_growth_per_patient():
+    cv = _run(*_cohort())
+    assert len(cv["rows"]) == 10
+    for row in cv["rows"]:
+        assert row["scores"]["fixed_growth_radius_mm"] == 4.0
+        assert row["scores"]["dice_fixed_growth"] > row["scores"]["dice_persistence"]
+        assert "paired_delta_dice_hybrid_minus_fixed_growth" in row["scores"]
+
+
+def test_runner_horizon_is_nominal_day_90_and_target_day_only_in_scoring():
+    seen = []
+    records, folds, domains = _cohort()
+    cv = _run(records, folds, domains, seen_forecasts=seen)
+    for pid, forecast_day, n_masks in seen:
+        assert forecast_day == 30.0 + 90.0 and n_masks == 2
+    gaps = sorted(row["target_day"] - 30.0 for row in cv["rows"])
+    assert gaps[0] >= 76 and gaps[-1] <= 104
+
+
+def test_runner_outer_test_target_does_not_change_radius_or_forecast():
+    records, folds, domains = _cohort()
+    base = _run(records, folds, domains)
+    # Change only fold-0 test targets to a very different mask.
+    changed = [PatientSeries(r.patient_id, r.days, [r.masks[0], r.masks[1], _ball(20.0)])
+               if folds[r.patient_id] == 0 else r for r in records]
+    alt = _run(changed, folds, domains)
+    for a, b in zip(base["rows"], alt["rows"]):
+        if a["fold"] == 0:
+            assert a["scores"]["fixed_growth_radius_mm"] == b["scores"]["fixed_growth_radius_mm"]
+            assert a["scores"]["fixed_growth_status"] == b["scores"]["fixed_growth_status"]
+
+
+def test_runner_patient_grouped_folds_and_empty_history():
+    records, folds, domains = _cohort(empty_history_ids=("s03",))
+    cv = _run(records, folds, domains)
+    row = next(r for r in cv["rows"] if r["patient_id"] == "s03")
+    assert row["forecast_status"] == "fallback"
+    assert row["scores"]["fixed_growth_status"] == "empty_history_copy_last"
+    assert row["scores"]["dice_fixed_growth"] == 0.0
+    assert {r["patient_id"] for r in cv["rows"]} == set(folds)
+    assert all(a["n_test_patients"] == 2 and a["n_training_patients"] == 8 for a in cv["fold_audit"])
+
+
+def test_runner_support_clipping_and_out_of_support_rule():
+    records, folds, domains = _cohort()
+    clipped = {pid: d.copy() for pid, d in domains.items()}
+    for d in clipped.values():
+        d[CENTER[0] + 6:] = False  # removes part of the 10 mm target too
+    trimmed = [PatientSeries(r.patient_id, r.days, [m & clipped[r.patient_id] for m in r.masks]) for r in records]
+    cv = _run(trimmed, folds, clipped)
+    for row in cv["rows"]:
+        assert row["scores"]["dice_fixed_growth"] > 0.9
+    # A support that excludes forecast voxels but not the target must fail closed in scoring.
+    tight = {pid: (_ball(10.0) | _ball(6.0)) for pid in domains}
+    wide_domains = domains
+    from src.fk_fixed_growth import add_fixed_growth_arm as arm
+    fit_w, fc_w, fb_w, sc_w = arm(lambda t: {}, lambda h, n: {"fallback_masks": {"hybrid": h.masks[-1],
+                                  "no_pde": h.masks[-1]}, "history_mask": h.masks[-1]},
+                                  lambda h, n: h.masks[-1], lambda p, t: {"dice_hybrid": 1.0},
+                                  domain_by_patient=wide_domains, spacing_mm=(2, 2, 2),
+                                  valid_support_by_patient={pid: _ball(6.0) for pid in tight})
+    with pytest.raises(ValueError, match="outside validated target support"):
+        run_first_third_90day_patient_cv(records, folds, fit_w, fc_w, sc_w, fallback_forecast=fb_w, n_folds=5)

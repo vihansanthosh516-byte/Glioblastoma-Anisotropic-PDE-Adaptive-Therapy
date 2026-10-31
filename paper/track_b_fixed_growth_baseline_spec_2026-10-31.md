@@ -4,7 +4,7 @@ Status: **candidate wording, resolved choices (revised 2026-10-31); not frozen u
 
 ## 1. Candidate protocol wording (supersedes the first draft)
 
-Code: `src/fk_fixed_growth.py`. Synthetic tests: `tests/test_fk_fixed_growth.py` (12 passed, scratch copy, Python 3.14, 2026-10-31). No patient mask was read.
+Code: `src/fk_fixed_growth.py`, wired into `src/fk_mu_patient_runner.py`. Synthetic tests: `tests/test_fk_fixed_growth.py` (17 passed); with the MU runner, patient-CV and precision-gate suites, 65 passed (scratch copy, Python 3.14, 2026-10-31). No patient mask was read.
 
 **B-FG. Fixed-growth comparator.** For a held-out patient with last history tumor-core mask C on the forecast grid, approved valid-support mask S, and voxel spacing h (mm), the forecast is
 
@@ -53,13 +53,41 @@ The distance-shell mask rule is **dropped** for now (see §3).
 | 5 | Distance-shell rule | Dropped | Its fitting and failure rules are not frozen; keeping it would add an untested required baseline |
 | 6 | Grid | 2 mm isotropic, nearest-neighbour | Same grid as the existing protocol |
 
+## 3a. Runner integration (2026-10-31)
+
+- `src/fk_fixed_growth.py:add_fixed_growth_arm` wraps the patient-CV callbacks. `src/fk_mu_patient_runner.py` now calls it, so every MU development forecast also carries the fixed-growth mask, `dice_fixed_growth`, and `paired_delta_dice_hybrid_minus_fixed_growth`. The result adds `fixed_growth_paired_difference_bootstrap` (seed 20261101).
+- The radius is chosen inside the outer-fold nuisance fit, which `run_outer_patient_cv` calls with outer-training patients only. Training patients with an empty visit-2 core are left out of selection and counted.
+- The forecast is clipped to the loader's origin-only domain (`origin_domain_by_patient`), not to target support. Scoring then applies the same rule as the other arms: a forecast outside validated target support is an error.
+- The runner still refuses to run unless the loader records both source-backed gates (registration and target support) as passed. This change does not touch those gates. No gate is passed.
+
+## 5. Frozen fold-training recipes (candidate; freeze date 2026-10-31)
+
+Both recipes see outer-training patients only. Neither sees future tumor size. Neither is tuned on outer-test patients.
+
+**U-Net (required mask baseline).**
+- Inputs: visit-1 core, visit-2 core and origin-only domain on the 2 mm grid (three channels). These are the same inputs the PDE arm uses. An MRI-intensity variant is not part of the required comparison.
+- Model: 3D U-Net, 4 resolution levels, 16 base channels doubled per level, instance norm, LeakyReLU, one output logit.
+- Training: one visit-2 → visit-3 pair per outer-training patient. Augmentation: random flips on each axis and random 90° rotations in the axial plane. Loss: soft Dice + binary cross-entropy, equal weight. Adam, learning rate 1e-3, batch 1, 300 epochs, last epoch kept. No early stopping and no inner tuning: there are too few patients to tune without overfitting the selection.
+- Seeds: 20261102 + outer fold index, three seeds per fold. Average the three probability maps, threshold at 0.5, clip to origin-only domain.
+- Empty visit-2 core: copy-last (empty), as for the other arms.
+- Failure: a non-finite loss or an all-empty training output means "U-Net unavailable"; the novelty test is then **incomplete**, not passed.
+- Known limit: about 14 training patients per fold is small for a U-Net. Report this next to the result.
+
+**Training-only count model (count metrics only).**
+- Count: number of 26-connected components of visit-3 core minus the visit-2 core grown by 2 mm, keeping components of at least 2 voxels (16 mm³). This is a label-change count, not a biological lesion count.
+- Model: Poisson GLM, log link, predictor log(visit-2 core volume in mm³), offset log(actual interval in days). Fit on outer-training patients only. If the fit fails or does not converge, use the training mean rate per day times the interval.
+- Scores: Poisson deviance, count MAE, and Brier score for P(count ≥ 1). Compare against the training mean-rate model. **Never scored with Dice and never turned into a mask.**
+- Status: recipe only. Not coded yet.
+
+**Distance-shell spatial rule.** Dropped on 2026-10-31. It was never a required baseline: the roadmap listed it as optional "only if frozen before scoring", and it was not frozen. The roadmap now says dropped. No required baseline was removed.
+
 ## Remaining blockers
 
 - Source-backed valid support S and MRI-only longitudinal registration QC (MU and Duke). Scoring is blocked until both exist.
 - Cavity meaning from source label documents.
 - Duke access and school-use approval.
-- `src/fk_fixed_growth.py` is not yet wired into `src/fk_mu_patient_runner.py`. Wiring it in is a code task. It does not authorize scoring.
-- U-Net and count model: no frozen training recipe yet.
+- U-Net and count model: recipes frozen in §5 but not coded. Until the U-Net runs, the novelty test is incomplete.
+- Fixed growth is wired into the MU development runner only. The Duke runner does not exist.
 
 ## 4. Search update (continues `paper/track_b_prior_art_followup_2026-10-31.md`)
 

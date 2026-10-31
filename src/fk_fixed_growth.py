@@ -118,3 +118,72 @@ def run_outer_fixed_growth(cases: Sequence[FixedGrowthCase], fold_by_patient: Ma
                 row["target_voxels_outside_support"] = int(np.count_nonzero(target & ~valid))
             rows.append(row)
     return {"rows": rows, "selections": selections}
+
+
+def add_fixed_growth_arm(fit_nuisance, forecast, fallback_forecast, score, *, domain_by_patient: Mapping,
+                         spacing_mm, valid_support_by_patient: Mapping | None = None,
+                         radius_grid_mm=RADIUS_GRID_MM):
+    """Wrap patient-CV callbacks so every forecast also carries the fixed-growth comparator.
+
+    ``fit_nuisance`` receives outer-training records only (``run_outer_patient_cv`` contract). The radius is chosen
+    there from each training patient's last history mask (visit 2) and target (visit 3), clipped to that patient's
+    origin-only domain. Training patients with an empty last history core are ineligible for selection. Test
+    forecasts use only the test history and the origin-only domain. Empty test history gets copy-last (empty).
+    The score wrapper adds plain Dice for fixed growth after the base score is complete. If target support is
+    given, it applies the base scorer's rule: a forecast outside validated support is an error, not a clip.
+    """
+    spacing = _spacing(spacing_mm)
+
+    def fit(training_records):
+        training_records = tuple(training_records)
+        cases = []
+        for record in training_records:
+            last = _mask(record.masks[-2], name="training last history mask")
+            if not last.any():
+                continue
+            cases.append(FixedGrowthCase(str(record.patient_id), last, domain_by_patient[record.patient_id],
+                                         spacing, _mask(record.masks[-1], name="training target mask")))
+        selection = select_radius(cases, radius_grid_mm=radius_grid_mm)
+        selection["n_training_empty_history_excluded"] = len(training_records) - len(cases)
+        return {"base": fit_nuisance(training_records), "fixed_growth": selection}
+
+    def _with_fixed_growth(prediction, history, wrapped):
+        last = _mask(history.masks[-1], name="history last mask")
+        domain = _mask(domain_by_patient[history.patient_id], name="origin domain")
+        if last.any():
+            mask = fixed_growth_forecast(last, domain, spacing_mm=spacing,
+                                         radius_mm=wrapped["fixed_growth"]["radius_mm"])
+            status = "forecast" if wrapped["fixed_growth"]["radius_mm"] > 0 else "equals_copy_last"
+        else:
+            mask, status = last.copy(), "empty_history_copy_last"
+        if not isinstance(prediction, Mapping):
+            prediction = {"fallback_masks": {"hybrid": prediction, "no_pde": prediction}, "history_mask": last}
+        return {**prediction, "fixed_growth_mask": mask, "fixed_growth_status": status,
+                "fixed_growth_radius_mm": wrapped["fixed_growth"]["radius_mm"]}
+
+    def wrapped_forecast(history, wrapped):
+        return _with_fixed_growth(forecast(history, wrapped["base"]), history, wrapped)
+
+    def wrapped_fallback(history, wrapped):
+        return _with_fixed_growth(fallback_forecast(history, wrapped["base"]), history, wrapped)
+
+    def wrapped_score(prediction, target):
+        base = {k: v for k, v in prediction.items()
+                if k not in ("fixed_growth_mask", "fixed_growth_status", "fixed_growth_radius_mm")}
+        scores = dict(score(base, target))
+        target_mask = _mask(target.mask if hasattr(target, "mask") else target["mask"], name="target")
+        forecast_mask = _mask(prediction["fixed_growth_mask"], name="fixed-growth mask")
+        if valid_support_by_patient is not None:
+            support = _mask(valid_support_by_patient[target.patient_id], name="valid target support")
+            if np.any(forecast_mask & ~support):
+                raise ValueError("fixed-growth prediction falls outside validated target support")
+            target_mask = target_mask & support
+        dice = dice_with_empty_rule(forecast_mask, target_mask)
+        scores.update({"dice_fixed_growth": float(dice),
+                       "fixed_growth_status": prediction["fixed_growth_status"],
+                       "fixed_growth_radius_mm": float(prediction["fixed_growth_radius_mm"])})
+        if "dice_hybrid" in scores:
+            scores["paired_delta_dice_hybrid_minus_fixed_growth"] = float(scores["dice_hybrid"] - dice)
+        return scores
+
+    return fit, wrapped_forecast, wrapped_fallback, wrapped_score

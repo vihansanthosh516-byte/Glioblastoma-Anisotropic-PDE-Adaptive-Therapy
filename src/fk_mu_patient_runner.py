@@ -23,6 +23,7 @@ import torch
 
 from src.fk_boundary_calibration import run_cross_fitted_boundary_calibration
 from src.fk_mu_development_data import MUDevelopmentCohort, is_loader_issued_cohort
+from src.fk_fixed_growth import RADIUS_GRID_MM, add_fixed_growth_arm
 from src.fk_hybrid_forecast import hybrid_posterior_predictive_forecast
 from src.fk_mu_scoring import make_first_third_score_callback
 from src.fk_mu_training_nuisance import fit_mu_training_volume_nuisance
@@ -548,13 +549,19 @@ def run_mu_first_two_to_third_development_cv(
                                    "geometric_train_rate": last},
                 "history_mask": last}
 
-    cv = run_first_third_90day_patient_cv(
-        records, analysis_folds, fit_outer_nuisance, forecast,
+    # Fixed growth: radius chosen per outer fold from outer-training patients only; clipped to origin domain.
+    fg_fit, fg_forecast, fg_fallback, fg_score = add_fixed_growth_arm(
+        fit_outer_nuisance, forecast, persistence_fallback,
         make_first_third_score_callback(
             spacing_mm=2.0,
             valid_support_by_patient=analysis_support,
         ),
-        fallback_forecast=persistence_fallback,
+        domain_by_patient=analysis_domains, spacing_mm=(2.0, 2.0, 2.0),
+        valid_support_by_patient=analysis_support,
+    )
+    cv = run_first_third_90day_patient_cv(
+        records, analysis_folds, fg_fit, fg_forecast, fg_score,
+        fallback_forecast=fg_fallback,
         n_folds=5,
     )
     score_by_id = {row["patient_id"]: row["scores"] for row in cv["rows"]}
@@ -592,6 +599,12 @@ def run_mu_first_two_to_third_development_cv(
             "initial_boundary_covariance_role": "prespecified seed for nested training-only boundary calibration; not a fitted truth",
             "spatial_resolution_mm": 2.0,
             "ensemble_inclusion_threshold": 0.5,
+            "fixed_growth_comparator": {
+                "rule": "dilate last core by one radius, clip to origin-only domain; radius 0 = copy-last",
+                "radius_grid_mm": list(RADIUS_GRID_MM),
+                "selection": "outer-training patients only; best patient-macro Dice; ties to smaller radius",
+                "empty_history": "ineligible for selection; test forecast is copy-last (empty)",
+            },
             "empty_mask_dice_rule": "both_empty=1; one_empty=0",
             "forecast_settings": settings,
         },
@@ -600,6 +613,7 @@ def run_mu_first_two_to_third_development_cv(
             "boundary_calibration": int(boundary_calibration_seed),
             "mu_paired_difference_bootstrap": 20261030,
             "geometric_train_rate_bootstrap": 20261031,
+            "fixed_growth_bootstrap": 20261101,
             "external_precision_bootstrap": 20261028,
         },
         "cohort_audit": cohort.audit,
@@ -618,6 +632,10 @@ def run_mu_first_two_to_third_development_cv(
         "n_empty_targets": sum(bool(row["scores"]["target_empty"]) for row in cv["rows"]),
         "primary_paired_difference_bootstrap": _patient_bootstrap_mean_interval(
             primary_delta_values, seed=20261030,
+        ),
+        "fixed_growth_paired_difference_bootstrap": _patient_bootstrap_mean_interval(
+            [row["scores"]["paired_delta_dice_hybrid_minus_fixed_growth"] for row in cv["rows"]],
+            seed=20261101,
         ),
         "geometric_train_rate_paired_difference_bootstrap": _patient_bootstrap_mean_interval(
             [row["scores"]["paired_delta_dice_hybrid_minus_geometric_train_rate"] for row in cv["rows"]],
