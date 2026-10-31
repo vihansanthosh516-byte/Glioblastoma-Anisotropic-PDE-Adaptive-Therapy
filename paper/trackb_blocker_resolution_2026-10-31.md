@@ -41,6 +41,20 @@ The core MU run is **not cleared for confirmatory patient scoring**. The availab
 3. **The CFB review preparation is complete, but the review is not:** all 38 candidate sets have 5-mm navigation pages and a blank pair-level form. No independent full-resolution review has occurred, and the pages do not count as a registration pass.
 4. **No patient result is being manufactured:** no CFB GTV/brain-mask voxel values or new patient forecasts were accessed in this audit. Prior patient results retain their existing exploratory status.
 
+## Three workstreams completed without scoring
+
+### 1. MU-Glioma-Post readiness
+
+The data are present in the main checkout at `C:\Users\vihan\20206 science fair\data\tcia\MU-Glioma-Post`, not in this task worktree. A filename-only inventory found 2,978 compressed NIfTI files totaling 11,890,059,719 bytes. Readback of the existing metadata and MRI-only reports confirmed 18 selected 76–104-day candidates, 72 headers checked, 216/216 MRI sequence files present for the selected cohort, 54 T1n MRI volumes previously read for image-only QC, and zero tumor-mask files or voxel arrays opened by those two screens. The MRI-only report explicitly remains descriptive: registration and valid-support gates are not cleared. The JSON reports in this worktree are Git LFS pointers; the main checkout contains their full contents.
+
+### 2. CFB-GBM readiness
+
+The v4 package directory at `C:\Users\vihan\Downloads\PKG - CFB-GBM version 4\CFB-GBM` contains 3,976 `.nii.gz` files totaling 208,424,306,322 bytes. The separate `C:\Users\vihan\Downloads\CFB-GBM` directory has only 50 completed NIfTI files and contains `.partial`/Aspera checkpoint files; use the v4 package directory for the existing candidate work and do not restart the download. The pre-existing header audit read 342 headers for 38 candidates: 38/38 shared grids, zero header errors, and no GTV or brain-mask voxel reads. The 760-page MRI aid is complete, but no independent full-resolution reviewer has assessed it. TCIA's reported 3,981 images versus the local package's 3,976 NIfTI files remains an aggregate discrepancy; all selected candidate paths were present in the earlier filename-only check.
+
+### 3. Alternative-dataset disposition
+
+Local inventory confirms RHUH-GBM NIfTI is already present (720 files; 3,098,204,081 bytes), as are UCSD-PTGBM (4,047 files; 35,582,320,168 bytes) and the UCSD BraTS 2024 test package (1,322 files; 11,883,676,648 bytes). RHUH's three timepoints still do not fit smooth PDE fitting across the surgery-dominated preoperative-to-early-postoperative transition. UCSD has already been used for the separate annotation test. LUMIERE has already been examined in Track B. Duke, SAILOR, and Burdenko remain excluded under the no-request rule. Therefore no alternate package should be downloaded for this aim.
+
 ## Forward path without contacting data owners
 
 1. Preserve the locked Track B PDE question and the existing MU implementation. Report prior patient results as exploratory and keep the confirmatory claim closed because no untouched direct-public cohort passed the screen.
