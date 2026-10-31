@@ -1,6 +1,8 @@
 # Track A dataset audit — Core vs Periphery, donor-held-out (2026-10-31)
 
-## Decision (updated, pass 2): CONDITIONAL GO for one cohort, Yu 2020 (GSE117891). Download nothing yet.
+## Decision (pass 3): GO for a descriptive-only analysis of Yu 2020 (GSE117891), with 6 strict / 8 lenient donors. Freeze the protocol before downloading the 39 MB matrix. No scoring yet.
+
+## Decision (pass 2, superseded): CONDITIONAL GO for one cohort, Yu 2020 (GSE117891). Download nothing yet.
 Pass 1 (below) found no GEO cohort with 6 paired donors. Pass 2 searched CELLxGENE and found that the CC BY 4.0 GBmap atlas carries Core/Periphery `sector` labels for 17 donors in 3 studies. One study, Yu 2020, has **9 paired donors in one assay** (STRT-seq). That puts it in the appendix's 6–9 band: **descriptive nested evaluation only, no superiority claim.** One item must be confirmed before download (see "Remaining blocker").
 
 ## Pass 2 — CELLxGENE / GBmap (read remotely; obs metadata only, no expression)
@@ -31,8 +33,38 @@ Source: CELLxGENE collection 999f2a15-3d7e-440b-96ae-2c806799c08c, "Core GBmap" 
 - Each point is one library. Region is a within-donor contrast, so library is nested in region inside each donor. That is unavoidable and must be reported.
 - Prior exposure in this project: none. GSE117891 is not used in any `src/`, `output/` or `paper/` file. Darmanis 2017 is only cited (in `paper/trackA_tam_5ala/PROTOCOL.md`).
 
-### Remaining blocker (no contact needed)
-- The original `clinical_info.xlsx` point → Tumoral/Peritumoral table has not been read from its primary public source (probably the Yu 2020 supplement or the CGGA site). The 9-donor count above rests on GBmap's copy. Resolve by finding that file on a public page, or by reading the GBmap Zenodo record 6962901.
+### Pass 3 — label table found at the primary source (blocker resolved)
+- Source: Yu K. et al. 2020, *Natl Sci Rev* 7:1306, doi 10.1093/nsr/nwaa099, PMC8289159, license **CC BY 4.0** (Europe PMC record). Retrieved via the Europe PMC supplementaryFiles API.
+- Files (git-ignored, `data/external/yu2020_supp/`):
+  - `nwaa099_supplemental_files.zip`, 14,797,073 bytes, SHA-256 99428d35804417e9576ab28080804109f13ff9f4b8513157597efb8a9ef43db2
+  - `Table S1. ClinicalInformation.xlsx`, 15,125 bytes (inside the zip), SHA-256 0676607ff4c57348fc043ab4bace1c3985617d0d90507742344ce19642cb772a
+- Sheet "Point and Cell information" gives every sampling point a `Sample type` (Tumoral / Peritumoral / Normal) and an MRI `Contrast enhancement` flag. The paper text says the points were marked on MRI ("Red and yellow dots mark locations of tumoral and peritumoral sampling points"). Point numbers are **not** in region order (e.g. GS1: P1, P4–P7 tumoral; P2, P3 peritumoral), so suffix order must never be used.
+- GBmap's sector labels match this table for all 9 donors.
+
+### Donor eligibility from Table S1 (sheet "Clinical_Info")
+| Patient | Histology | IDH1 R132 | Tumoral points | Peritumoral points | Eligible |
+|---|---|---|---|---|---|
+| GS1 | GBM (O included) | − | P1,P4,P5,P6,P7 | P2,P3 | Yes |
+| GS2 | GBM | − | P1,P2,P4 | P3 | Yes |
+| GS3 | GBM | − | P2–P7 | P1,P8 | Yes |
+| GS5 | GBM | − | P1–P4 | P5 | Yes |
+| GS6 | GBM (O included) | − | P1–P4 | P5 | Yes |
+| GS13 | GBM (O included) | − | P4,P5,P6 | P1,P2 (P3: 0 cells) | Yes |
+| GS11 | GBM | not reported | P4,P5,P6 | P2,P3 | Conditional: IDH status missing |
+| GS12 | GBM | not reported | P1–P4 | P5 | Conditional: IDH status missing |
+| GS15 | **not reported**, grade not reported | not reported | P3,P4,P5 | P1,P2 | **No.** GEO says the cohort includes 1 brain metastasis; GS15 is the only patient with no histology. GBmap includes it; this audit does not. |
+| GS4 | Gliosarcoma | n/a | — | — | No |
+| GS7, GS8, GS9, GS14 | IDH-mutant or grade II–III | — | — | — | No |
+
+- **Strict count (IDH-wildtype confirmed): 6 donors.** This is exactly the appendix minimum. Leave-one-donor-out leaves 5 training donors and 4 in every inner split, so the inner-fold rule (≥4) holds.
+- **Lenient count (GBM histology, IDH not reported): 8 donors.**
+- Either way: 6–9 band → **descriptive nested evaluation only.**
+- Label and MRI enhancement are nearly collinear (Tumoral mostly "+", Peritumoral "−"). The region label is MRI/surgical, not expression-derived.
+
+### Remaining items before any score
+1. Freeze the eligibility rule (strict 6 as primary, 8 as sensitivity) in a dated protocol, before download.
+2. Freeze the composition control (cell-type-only baseline, within-cell-type accuracy) and the failure rules.
+3. Then download the 39 MB count matrix.
 
 ### Scientific risk (must be stated with any result)
 - Composition confound: Core points are mostly neoplastic and Periphery points mostly non-neoplastic (e.g. S13: 757/866 vs 2/112). A classifier can score well by learning cell type, not region. Required control: report accuracy within cell-type strata and against a cell-type-only baseline.
