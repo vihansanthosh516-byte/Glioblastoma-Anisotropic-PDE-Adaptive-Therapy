@@ -1,27 +1,30 @@
-# Track A finding: bulk core-vs-edge differences are explained by tissue composition (2026-10-30)
+# Track A finding: bulk core-vs-edge differences after gene-score adjustment (2026-10-30)
 
 Exploratory; three sealed tests; bulk tissue; no clinical claim. Every number below is from the cited result file.
 
 ## Result
-In three pre-registered, sealed tests on two independent cohort sets, a gene program differed between labelled
-tumour core and tumour edge within patients. In all three, the difference disappeared after the pre-set adjustment for
-tissue composition (hypoxia, normal-brain neuron content, and, in test 3, myeloid abundance).
+In three tests with protocols fixed before scoring, a gene program differed between labelled tumour core and tumour
+edge within patients. In all three, the adjusted test was not statistically significant after the prespecified
+adjustment for hypoxia, neuron-related scores and, in test 3, a myeloid-related score. The adjusted point estimates
+remained in the same direction. The tests did not meet their conjunctive success rules.
 
-| Test | Cohort | n | Raw within-patient test | After composition adjustment | Verdict | Source |
+| Test | Cohort | n | Raw within-patient test | After gene-score adjustment | Verdict | Source |
 |---|---|---|---|---|---|---|
-| 1. SenMayo senescence | Ivy GAP 8 + Angers E-MTAB-5092 7 | 15 | core > edge, p = 0.0035; both cohorts same sign | hypoxia-adjusted p = 0.37 | FAIL: explained by hypoxia | `output/trackA_senmayo/result.json` |
-| 2. Hallmark OXPHOS (alpha 0.025) | same 15 | 15 | edge > core, p = 0.0024; both cohorts same sign | hypoxia + neuron p = 0.67 | FAIL: explained by neuron / normal-brain content | `output/trackA_oxphos/result.json` |
-| 3. TAM activation (script-157 list) | E-MTAB-8743, 5-ALA-guided invasive vs core | 10 | core > invasive, p = 0.0039 | hypoxia + neuron + myeloid p = 0.44 (myeloid coefficient 0.72) | FAIL: explained by myeloid abundance | `output/trackA_tam_5ala/result.json` |
+| 1. SenMayo senescence | Ivy GAP 8 + Angers E-MTAB-5092 7 | 15 | core > edge, p = 0.0035; both cohorts same sign | hypoxia-adjusted p = 0.37 | FAIL: adjusted criterion not met | `output/trackA_senmayo/result.json` |
+| 2. Hallmark OXPHOS (alpha 0.025) | same 15 | 15 | edge > core, p = 0.0024; both cohorts same sign | hypoxia + neuron p = 0.67 | FAIL: adjusted criterion not met | `output/trackA_oxphos/result.json` |
+| 3. TAM activation (script-157 list) | E-MTAB-8743, 5-ALA-guided invasive vs core | 10 | core > invasive, p = 0.0039 | hypoxia + neuron + myeloid p = 0.44 (myeloid coefficient 0.72) | FAIL: adjusted criterion not met | `output/trackA_tam_5ala/result.json` |
 
 Tests: exact sign-flip over patients, with expression-matched random gene-set nulls; protocols were sealed by hash
 before scoring (`paper/trackA_senmayo/`, `paper/trackA_oxphos/`, `paper/trackA_tam_5ala/`).
 
 ## What this means
-- Raw core-vs-edge gene differences in bulk GBM tissue were strong and replicated in direction across cohorts, but
-  each was accounted for by differences in what the tissue is made of: more hypoxic tumour in the core, more normal
-  brain at the edge, more myeloid cells in the core.
-- A bulk core-vs-edge signature should not be read as a change inside tumour or immune cells unless it survives
-  composition adjustment.
+- Raw core-vs-edge differences had the prespecified direction and passed the unadjusted test in each analysis. For
+  tests 1 and 2, the two contributing cohorts had matching point-estimate directions.
+- None passed its adjusted success criterion. A nonsignificant adjusted test does not prove the difference vanished,
+  establish that a particular covariate explains it, or demonstrate no biological effect. With small samples and
+  correlated expression-derived covariates, loss of precision and model specification are alternative explanations.
+- Bulk expression alone does not identify a cell-intrinsic change. Adjustment by gene scores is an observational
+  sensitivity analysis, not a direct measurement of tissue composition or a causal decomposition.
 
 ## Limits (state these next to the result)
 - Small n: 15 and 10 patients. "Not separable" is not "no effect". Adjusted tests have low power, and the covariates
@@ -31,8 +34,11 @@ before scoring (`paper/trackA_senmayo/`, `paper/trackA_oxphos/`, `paper/trackA_t
 - Three tests were run; tests 1 and 2 shared one cohort (alpha split). No correction across the three is applied,
   because all three are reported as failures.
 - Prior art: composition confounding of bulk tumour profiles is well known (e.g. purity effects; Ivy GAP anatomic
-  structures). The contribution is a sealed, replicated demonstration in labelled GBM core/edge cohorts, not a new
-  concept. Novelty not claimed.
+  structures). These three tests involve different gene programs, so they do not replicate the same hypothesis.
+  Novelty is not established.
+- The frozen protocols' historical instructions to describe an adjusted nonsignificant result as “explained by” a
+  covariate are overstatements. This report corrects that interpretation without changing the sealed protocols or
+  recorded results.
 
 ## What would be needed for a cell-level claim
 Single-cell or single-nucleus data, or same-section spatial data, with region labels made without expression, in at
