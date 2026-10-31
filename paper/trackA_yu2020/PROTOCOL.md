@@ -1,6 +1,6 @@
 # Track A frozen protocol — Yu 2020 (GSE117891) Core vs Periphery, donor-held-out
 
-Status: base protocol frozen before expression download. Base freeze commit: `f4e592d`. Amendment A1 below further specifies the confound diagnostics before expression data are opened. The count matrix was downloaded on 2026-10-31 and its SHA-256 matches the source record; no count values have been read or scored. Amendment A2 below freezes implementation details before the first expression read. The protocol, donor list, pinned analysis-plan appendix, runner, and four source inputs are hashed in `SHA256SUMS`; its paths are relative to this folder. Verify every entry before each run. Any later change requires a dated, labeled amendment committed before expression data are opened.
+Status: base protocol freeze commit `f4e592d`; implementation seal commit `4d16e74`. The count matrix hash matches the source record. A timing-only pilot read the count matrix on 2026-10-31, then stopped before outer held-out predictions or scores. Amendment A3 records that the frozen six-hour runtime gate failed. The protocol, donor list, pinned appendix, runner, and four source inputs are hashed in `SHA256SUMS`; paths are relative to this folder. Verify every entry before each run. Any later change requires a dated, labeled amendment and matching code hash committed before the next expression read or outer held-out scoring.
 
 ## 1. Question (unchanged from the appendix, section 2.1)
 Will a sparse, donor-balanced expression classifier improve donor-level Core-versus-Periphery prediction over ordinary logistic regression when every test donor is excluded from training?
@@ -123,3 +123,11 @@ This amendment resolves implementation details left open by the appendix and Ame
 - Write the complete `result.json` only after every required fold finishes. Include all implementation choices, input and code hashes, package versions, cell-flow counts, per-donor metrics, runtime, and limitations. Refuse to overwrite an existing result. The pilot timing file contains no scores.
 
 Commit this amendment, the runner, and their checksum manifest before the first expression-value read. Keep the downloaded matrix local; never upload it.
+
+## Amendment A3 — runtime stop before outer-held-out scoring (2026-10-31)
+
+The A2 seal was committed and pushed as `4d16e74`. All eight entries in `SHA256SUMS` matched before the timing-only pilot. The pilot loaded the eight-donor sensitivity cohort and began the first outer fold with `GS1` held out. It remained in inner tuning and training-only refits; it produced no prediction or metric for `GS1`.
+
+At 48.68 minutes after process start, the fold was still running. The fold start message appeared within the first 70 seconds. To allow two full minutes for interpreter startup and input loading, use 46.68 minutes as a conservative lower bound for one fold. Multiplying that lower bound by the 14 planned outer folds gives 10.89 hours, before adding the input-load time required by Amendment A2. The six-hour gate therefore fails even though the fold timer did not complete. `output/trackA_yu2020/pilot_timing.json` records this as a lower bound, not as a completed fold measurement.
+
+Do not run full scoring under the A2 grid. No `result.json` was produced. Any reduced grid, removed model, or other runtime change requires a separate dated amendment, a new runner hash in `SHA256SUMS`, and a new timing pilot before outer-held-out scoring. Keep the A3 timing artifact; do not overwrite it.
