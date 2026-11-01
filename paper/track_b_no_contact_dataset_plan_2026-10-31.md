@@ -1,62 +1,100 @@
-# Track B no-contact dataset plan (2026-10-31, draft, NOT adopted)
+# Track B LUMIERE exploratory plan (2026-10-31, DRAFT, not adopted)
 
-**User rule (2026-10-31):** contact no one (no authors, Duke, TCIA helpdesk or school). Use only public data and published documents. MU may be dropped.
+**Working constraint for this step (2026-10-31):** no outreach to authors, Duke, TCIA or the school during this step. This is a temporary working constraint for this step, not a standing project rule. (Correction: an earlier version of this file called it a standing user rule. That was wrong.)
 
-No patient data was downloaded, read or scored for this plan. The no-scoring rule, the full-grid U-Net requirement and unadopted amendment A-2026-10-31-R are unchanged.
+**Status.** The user chose LUMIERE for **exploratory** Track B development, subject to a metadata-only cohort check. LUMIERE is not fresh confirmation: this project used it before (`src/91_lumiere_volume_forecast.py`, `src/130_h3v_frozen_lumiere.py`). LUMIERE does not raise novelty by itself.
 
-## 1. Search result: no fresh no-request cohort passes
+No target-label voxel, mask voxel or image voxel was read for this plan. Nothing was downloaded: the LUMIERE files in `data/external/lumiere/` were already on disk (dated 2026-10-04/05). No patient was scored. The no-scoring rule, the full-grid U-Net requirement and unadopted amendment A-2026-10-31-R are unchanged.
 
-Earlier screen (`paper/track_b_external_cohort_screen_2026-10-28.md`): UTSW-Glioma, UCSF-ALPTDG, SAILOR, MOTUM, UPENN-GBM, BrainMD, CPTAC-GBM, UCSD-BMETS fail at least one of these: three masked visits, GBM, no data-use agreement.
+## 1. Why LUMIERE
 
-New checks today:
+The fresh-cohort search found no untouched public GBM cohort with three or more masked visits and no access request (`paper/track_b_external_cohort_screen_2026-10-28.md`; new 2026-10-31 check: OpenNeuro ds007045 has one preoperative MRI per patient, PMC13498554). LUMIERE is public and many-visit. Any result is exploratory.
 
-| Candidate | Finding (source) | Result |
-|---|---|---|
-| OpenNeuro ds007045 (Sci Data 2026, PMC13498554) | 337 IDH-wildtype GBM; **one preoperative MRI per patient**. Labels 0–3 defined (0 = background). Atlas registration checked by a neuroradiologist. | Fails: not longitudinal. |
-| Duke (Zenodo 20548528) | Files restricted; needs a request. | Fails no-contact rule. |
-| CFB-GBM v2.0 (MELBA 2026:038) | Longitudinal RANO dataset; license and access not confirmed today; already a separate project side study. | Not fresh; not checked. |
-| UCSD-PTGBM held-out subset | Planned release in early 2026; already a project side study. | Not fresh; not checked. |
-| LUMIERE (Sci Data 2022, PMC9755255; figshare 10.6084/m9.figshare.c.5904905.v1) | 91 GBM patients, 638 study dates (about 7 per patient). Automated masks only (DeepBraTumIA, HD-GLIO-AUTO). Skull-stripped with HD-BET. Released images are **unregistered**; no visit-to-visit registration. Dates are in weeks from pre-op. Non-commercial use; no data-use agreement mentioned. | Public, no request. Already used in this project, so exploratory only. |
+## 2. License and reuse conditions (verified; conflict recorded, not resolved)
 
-**Conclusion:** no untouched public GBM cohort with three or more masked visits and no access request was found. Any patient result from now on is **exploratory, not confirmation**.
+| Source | Stated terms |
+|---|---|
+| Figshare API, collection 10.6084/m9.figshare.c.5904905 (v1, 2022-12-13) | Collection-level license field: none. |
+| Figshare items 21249516 (MRI and segmentations), 21195556 (expert rating), 21195559 (demographics), 21266241 (readme), 21195430, 21195562, 21187030, 21187033, 21251643 | Each item: **CC0**. |
+| `LUMIERE-readme.pdf` (local copy of item 21266241), last line | "This dataset is provided for non-commercial use." |
+| Data descriptor, Suter et al., *Sci Data* 9, 768 (2022), PMC9755255 | Article text CC BY 4.0. Usage note: "This dataset may only be used for non-commercial purposes." |
 
-## 2. What the no-contact rule means for the gates
+**Reading:** the item metadata says CC0, and both the readme and the paper add a non-commercial condition. This project is non-commercial, so it meets the stricter reading. **No source states rules for derived outputs** (trained weights, derived masks, figures). This plan does not infer any. Until a source states them, do not publish or share derived masks or images; report summary numbers only.
 
-The open gates needed written answers from data owners. With no contact, those answers cannot come. So the gates can only close if the protocol is amended to accept **published documentation plus our own history-only checks**. That is weaker evidence. It must be labelled "assumed from documentation" in every result.
+## 3. Segmentation tool and tumor-core label mapping
 
-## 3. Proposed plan (needs the user's approval before it applies)
+- **Tool for the target:** DeepBraTumIA (https://www.nitrc.org/projects/deepbratumia), atlas-space output `DeepBraTumIA-segmentation/atlas/segmentation/seg_mask.nii.gz` (readme). HD-GLIO-AUTO is not used for the target.
+- **Version:** **not stated** in the paper or readme. The only version given is PyRadiomics 3.0.1. Record this as a gap; do not guess.
+- **Label mapping** (from the published `LUMIERE-pyradiomics-deepbratumia-features.csv`, columns `Label`/`Label name`; no mask voxel read): 1 = Necrosis, 2 = Contrast-enhancing, 3 = Edema. HD-GLIO-AUTO: 1 = Non-enhancing, 2 = Contrast-enhancing.
+- **Tumor core (draft):** DeepBraTumIA labels 1 or 2. Edema (3) is not core. Label 0 is not defined in the sources; by the tool output, it is "no tumor label", not a reviewed negative.
+- **Resection cavity:** DeepBraTumIA has **no cavity label** in the published mapping. Cavity is therefore not separated from background. Record as a limitation.
 
-**Step 1. Choose one primary dataset: LUMIERE (recommended).**
-- Why: public, no request, many visits per patient (more triplets than MU's 18 in the development set), and its documentation is explicit that images are unregistered. That means we must do registration ourselves, and we can document it fully.
-- Weakest point: automated masks, not expert masks; week-level dates; already used in the project.
+**Automated-mask limitations (keep prominent in every result):**
+- The target is an automated DeepBraTumIA mask. There is no expert voxel mask. A forecast scored against it measures agreement with the tool, not with true tumor.
+- The tool was built for pre-operative scans; post-operative performance is not reported for LUMIERE.
+- No cavity label; cavity and blood products may be mislabelled as necrosis or enhancement.
+- The paper notes that segmentation outliers were deliberately kept.
 
-**Step 2. Define documentation-based gate rules (dated amendment, before any target mask is opened).**
+## 4. Valid support: origin-only rule (draft)
 
-| Gate | No-contact rule | Label in results |
-|---|---|---|
-| Label meaning | Use the label values in the segmentation tool's published documentation (DeepBraTumIA / HD-GLIO-AUTO). Read label values from file headers and documentation only, never from target voxels. | "Label meaning from tool documentation." |
-| Valid support | Use a brain mask made by HD-BET (the tool the source names) on the **history visits only**, at the forecast origin. Never use the target visit's labels. | "Support assumed: origin HD-BET mask." |
-| Registration | Register each target-visit MRI to the origin-visit MRI with a fixed rigid method, using MRI only (no masks). Score registration with an MRI-only metric. Freeze the pass threshold before any target mask is opened. Exclude failed cases and report the count. | "Registration done by us; MRI-only QC." |
-| Dates | Use week counts. Widen the eligible window to whole weeks (for example 11–15 weeks for a nominal 13-week forecast). Freeze it before scoring. | "Dates at week resolution." |
-| School approval | Not applicable while the project is personal research (`START_HERE.md` scope, 2026-10-20). If the project goes to a school or fair, this gate reopens. | — |
-| Access/licence | LUMIERE non-commercial terms. No sharing of data or derived images. | — |
+The released images were already skull-stripped with HD-BET, and the release includes the brain mask used (`DeepBraTumIA-segmentation/atlas/skull_strip/brain_mask.nii.gz`, readme). This plan does **not** rerun HD-BET and does **not** claim the mask is validated.
 
-**Step 3. Code work with no patient data (can start now).**
-- A LUMIERE loader that reads only metadata and history-visit MRI until the gates are frozen.
-- An MRI-only registration step and its QC metric, tested on synthetic volumes.
-- An HD-BET-style support rule, tested on synthetic volumes.
-- A reuse wiring for the U-Net behind the fingerprint check (stays off until amendment R is adopted).
+**Rule:** support S = the released atlas-space brain mask of the **origin visit (visit 2)**, plus any history-visit label voxel outside it (so a history core is never clipped). No target-visit file enters S. Code: `src/fk_longitudinal_prep.py:origin_support` (its signature has no target input; tested).
 
-**Step 4. Freeze, then score once.** Freeze the cohort list, folds, gates, window and code hash. Then open target masks and score all required baselines (copy-last, fixed growth, PDE-only, full-grid U-Net). Report the result unchanged, including a negative result.
+**Label in results:** "Support = released origin-visit skull-strip mask; not independently validated."
 
-**Compute (projection, synthetic timing only):** on the current frozen settings, about 399.5 CPU hours with U-Net reuse for four analyses on 18 patients (`paper/track_b_amendment_decision_2026-10-31.md`). LUMIERE has more patients, so the cost grows roughly with the number of training pairs. Recompute after the cohort is frozen.
+Target core outside S counts as a miss and is reported per patient.
 
-## 4. Alternative
+## 5. MRI-only registration and QC (draft, frozen before any target mask is opened)
 
-Keep MU (already coded) and apply the same documentation-based rules to it. Faster to run, but only 18 development patients, and MU was already scored in this project.
+- DeepBraTumIA already maps each visit to the atlas (readme; per-visit `.tfm`). Visits are not registered to each other.
+- **Step:** rigid refinement of the target-visit atlas-space CT1 onto the origin-visit atlas-space CT1, by NCC inside the origin support. Inputs are MRI only; no label map is an input. Code: `src/fk_longitudinal_prep.py:register_rigid_mri`.
+- **QC (frozen draft constants):** pass only if NCC after ≥ 0.80, maximum rotation ≤ 10°, and shift ≤ 10 mm.
+- **Failure handling:** a failed patient is excluded from scoring for all arms. Every exclusion and its reason is reported (`exclusion_report`). A failure is never retried with other settings.
+- **Weakest point:** the threshold 0.80 is set on synthetic phantoms only. It is not tuned on LUMIERE. A tumor change between visits lowers NCC, so true growth can cause exclusion. Report the excluded count beside every result.
 
-## 5. Not decided here
+## 6. Metadata-only inventory
 
-- Adoption of this plan (needs the user's approval).
-- Adoption of amendment A-2026-10-31-R.
-- The PDE runtime decision.
+Record: `output/track_b_lumiere_inventory_20261031/inventory.json`. Source: the central directory (file names) of `Imaging-v202211.zip`; no image or mask bytes read.
+
+| Item | Count |
+|---|---|
+| Patients in the zip | 91 |
+| Study dates | 638 |
+| Usable studies (CT1, T1, T2, FLAIR + DeepBraTumIA atlas seg + atlas brain mask) | 599 (matches the paper's 599 four-sequence study dates) |
+| Patients with ≥ 3 usable post-op visits | 62 |
+| All consecutive usable post-op triplets | 325 (not independent; not used) |
+| **Primary eligible: first triplet, v2→v3 gap 11–15 weeks** | **28 patients** |
+
+Window: nominal 13 weeks (about 91 days). Weeks blur dates by up to 6 days (paper), so 11–15 weeks covers about 77–111 days. The window is applied to each patient's **first** triplet only, never to a later one that happens to fit. Patients excluded by the window: 34.
+
+**Weakest point:** 28 patients is small. Fold sizes would be about 6, 6, 6, 5, 5. Inventory rules are draft; the file-name check does not prove a file opens or has the right content.
+
+## 7. Runtime projection (synthetic timing, eligible cohort)
+
+Assumptions: 28 patients, 5 outer folds, so 112 training pairs per analysis (each patient trains in 4 folds). U-Net 112 × 300 epochs × 3 seeds = 100,800 steps at the measured 5.340 s full-grid step (`crop_timing_record.json`). PDE 28 full + 112 calibration-only forecasts at 3,128.6 s and 1,808.7 s (`timing_record.json`); a lower bound.
+
+| Scenario | U-Net h | PDE h (lower bound) | Total CPU h, four analyses |
+|---|---|---|---|
+| Frozen, no reuse | 598.1 | 322.4 | 920.5 |
+| Frozen, with reuse (amendment R, not adopted) | 299.0 | 322.4 | 621.5 |
+
+**Weakest point:** the steps were timed on a synthetic 120×120×78 grid. The LUMIERE atlas grid at 2 mm may differ in size, so step time may differ. Re-time on a synthetic volume of the true grid shape before freezing. These are resource needs, not a deadline.
+
+## 8. Gates
+
+| Gate | Status |
+|---|---|
+| License | Recorded; CC0 items plus non-commercial condition; derived-output rules **not stated**. |
+| Label meaning | Mapping from published CSV; tool version **not stated**; label 0 and cavity undefined. |
+| Valid support | Draft origin-only rule; source mask not validated. |
+| Registration | Draft MRI-only rule and QC; synthetic tests only. |
+| Inventory | Done, metadata only (28 eligible). |
+| School-use approval | **Unresolved.** Personal-research scope does not by itself decide it. It stays open until the applicable project rules support a decision. |
+| Protocol freeze | Not done. |
+
+**No scoring** until the plan is adopted, the gates above are frozen by a dated amendment, and the code and cohort are hashed.
+
+## 9. Code done in this step (synthetic tests only)
+
+`src/fk_longitudinal_prep.py`: `Visit`, `primary_triplets`, `origin_support`, `register_rigid_mri`, `apply_rigid`, `registration_qc`, `exclusion_report`. Tests: `tests/test_fk_longitudinal_prep.py` (5 passed, scratch copy, Python 3.14). Not yet built: a LUMIERE file reader that opens NIfTI files (blocked until the plan is adopted).
