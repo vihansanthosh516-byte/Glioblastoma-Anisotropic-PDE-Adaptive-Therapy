@@ -57,7 +57,7 @@ The study is a close topic match: its preprint already analyzes cell states and 
 
 ## Current decision
 
-GSE318562 is not selected for the primary test. The metadata map is complete at the sample level, but the strict paired count is five, and public per-spot histology labels remain unverified. It does **not** pass the malignant-cell external-validation gate. GSE286419 has only four region-concordant Core/Margin donors. The strongest new alternative found is SNUH-GliomaAtlas, but public access to its six paired expression samples and file-level reuse terms remain unverified. See `trackA_alternate_dataset_plan_20261101.md`; until those gates pass, the primary confirmation remains **no-go**.
+GSE318562 is not selected for the primary test. The metadata map is complete at the sample level, but the strict paired count is five, and public per-spot histology labels remain unverified. It does **not** pass the malignant-cell external-validation gate. GSE286419 has only four region-concordant Core/Margin donors. The strongest current no-contact alternative is E-MTAB-8743 for a separate bulk-tissue regional replication, but it cannot validate a malignant-cell-only signature and its accession-level pairing and terms still need metadata checks. See `trackA_alternate_dataset_plan_20261101.md`; until the applicable gates pass, the primary malignant-cell confirmation remains **no-go**.
 
 ## Sources checked
 
