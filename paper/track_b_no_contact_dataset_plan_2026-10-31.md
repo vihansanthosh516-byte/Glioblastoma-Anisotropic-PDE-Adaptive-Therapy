@@ -1,4 +1,6 @@
-# Track B LUMIERE exploratory plan (2026-10-31, DRAFT, not adopted)
+# Track B LUMIERE exploratory plan (2026-10-31; ADOPTED 2026-11-01 for exploratory work only)
+
+**User decisions (2026-11-01):** (1) adopt this plan for exploratory Track B work only; (2) adopt amendment A-2026-10-31-R, U-Net reuse only, under the full-fingerprint match rule, with the central-gap refit separate; (3) keep the full-grid U-Net required; the crop is not adopted. These decisions do **not** authorize patient scoring, target-mask access or reading MRI/mask voxels. Ask the user before reading any patient MRI or mask voxel data. LUMIERE results stay exploratory, not fresh confirmation or proof of novelty.
 
 **Working constraint for this step (2026-10-31):** no outreach to authors, Duke, TCIA or the school during this step. This is a temporary working constraint for this step, not a standing project rule. (Correction: an earlier version of this file called it a standing user rule. That was wrong.)
 
@@ -70,7 +72,35 @@ Window: nominal 13 weeks (about 91 days). Weeks blur dates by up to 6 days (pape
 
 **Weakest point:** 28 patients is small. Fold sizes would be about 6, 6, 6, 5, 5. Inventory rules are draft; the file-name check does not prove a file opens or has the right content.
 
-## 7. Runtime projection (synthetic timing, eligible cohort)
+## 6a. Header check (2026-11-01)
+
+`src/fk_lumiere_headers.py` opens each NIfTI file inside the zip and reads only its 348-byte header. Record: `output/track_b_lumiere_inventory_20261031/header_check.json`. Files per visit: DeepBraTumIA atlas `seg_mask`, atlas `brain_mask`, and the four atlas skull-stripped images.
+- 28 eligible patients confirmed (63 excluded), 84 visits, 504 headers read, 0 problems.
+- Every file is on one grid: 182 × 218 × 182 at 1.0 mm (MNI atlas). At 2 mm: 91 × 109 × 91.
+- Tests: `tests/test_fk_lumiere_headers.py` (a spy confirms each read is exactly 348 bytes; synthetic zip).
+- Weak point: a header check does not prove the voxel content is valid.
+
+## 7a. Re-timed runtime at the LUMIERE grid (measured synthetic, 2026-11-01)
+
+Record: `output/track_b_timing_pilot_20261031/lumiere_timing_record.json`. Synthetic volumes on the 91 × 109 × 91 grid (padded 112 × 112 × 96), same PC, torch 2.14.0+cpu, 8 threads.
+
+| Measured (synthetic) | Value |
+|---|---|
+| Full-grid U-Net step | 7.973 s mean (6.948–10.492), 40 steps |
+| U-Net prediction, 3 seeds, 1 patient | 5.27 s |
+| PDE full forecast, 1 patient | 1,250.4 s |
+| PDE calibration-only, 1 patient | 1,544.3 s |
+
+| Projected (not measured) | CPU hours |
+|---|---|
+| U-Net, one analysis (112 pairs × 300 × 3) | 223.3 (max step 293.8) |
+| PDE, one analysis (28 full + 112 calibration-only), **lower bound** | 57.8 |
+| Four analyses, no reuse | 1,124.1 |
+| **Four analyses, amendment R reuse (adopted)** | **677.6** |
+
+Weak points: the PDE full forecast was faster than calibration-only here, the reverse of the first pilot; PDE time depends on the synthetic case, so one case is a weak estimate. The U-Net step was slower than in the earlier pilots (5.34–6.94 s). The central-gap U-Net is counted at full size. These are resource needs, not a deadline. **Section 7 below is superseded by this section.**
+
+## 7. Runtime projection (superseded; earlier scaling estimate)
 
 Assumptions: 28 patients, 5 outer folds, so 112 training pairs per analysis (each patient trains in 4 folds). U-Net 112 × 300 epochs × 3 seeds = 100,800 steps at the measured 5.340 s full-grid step (`crop_timing_record.json`). PDE 28 full + 112 calibration-only forecasts at 3,128.6 s and 1,808.7 s (`timing_record.json`); a lower bound.
 
@@ -88,8 +118,9 @@ Assumptions: 28 patients, 5 outer folds, so 112 training pairs per analysis (eac
 | License | Recorded; CC0 items plus non-commercial condition; derived-output rules **not stated**. |
 | Label meaning | Mapping from published CSV; tool version **not stated**; label 0 and cavity undefined. |
 | Valid support | Draft origin-only rule; source mask not validated. |
-| Registration | Draft MRI-only rule and QC; synthetic tests only. |
-| Inventory | Done, metadata only (28 eligible). |
+| Registration | Draft MRI-only rule and QC; synthetic tests only. **Not passed.** |
+| U-Net reuse (amendment R) | Adopted; wired with full-fingerprint match; central-gap separate. Synthetic tests only. |
+| Inventory | Done, metadata and headers only (28 eligible; one 182×218×182 grid). |
 | School-use approval | **User-reported approval (2026-10-31): the user says the school said this use is OK.** Not yet a pass under the written-evidence rule (`paper/track_b_source_gate_evidence_2026-10-31.md`): save the written approval (email or form, with date, approver and any conditions) in the project, then mark it passed. |
 | Protocol freeze | Not done. |
 
@@ -97,4 +128,4 @@ Assumptions: 28 patients, 5 outer folds, so 112 training pairs per analysis (eac
 
 ## 9. Code done in this step (synthetic tests only)
 
-`src/fk_longitudinal_prep.py`: `Visit`, `primary_triplets`, `origin_support`, `register_rigid_mri`, `apply_rigid`, `registration_qc`, `exclusion_report`. Tests: `tests/test_fk_longitudinal_prep.py` (5 passed, scratch copy, Python 3.14). Not yet built: a LUMIERE file reader that opens NIfTI files (blocked until the plan is adopted).
+`src/fk_longitudinal_prep.py`: `Visit`, `primary_triplets`, `origin_support`, `register_rigid_mri`, `apply_rigid`, `registration_qc`, `exclusion_report`. Tests: `tests/test_fk_longitudinal_prep.py` (5 passed, scratch copy, Python 3.14). `src/fk_lumiere_headers.py`: header-only reader (no voxel arrays). U-Net reuse wired in `src/fk_learned_baselines.py` and `src/fk_mu_patient_runner.py`. Not built: a voxel reader (needs the user's OK first). Protocol freeze and hashes: not done.

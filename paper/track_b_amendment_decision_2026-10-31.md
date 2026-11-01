@@ -1,6 +1,8 @@
 # Track B runtime amendment: decision memo (2026-10-31)
 
-**Status: draft for the user's decision. NOT ADOPTED.** No patient data was read or scored. The runner's active recipe is unchanged (`UNET_RECIPE`, `crop_voxels=None`). All timing below is synthetic and is not patient-result evidence.
+**Status: amendment A-2026-10-31-R ADOPTED by the user on 2026-11-01 (reuse only, full-fingerprint match, central-gap separate). The crop is NOT adopted. Adoption does not authorize scoring.** Wired: `add_learned_baselines_arm(unet_reuse_cache=...)`; the protocol wrapper shares one cache across the three prior runs and gives the central-gap refit its own. Earlier status line kept below for the record.
+
+~~Status: draft for the user's decision. NOT ADOPTED.~~ No patient data was read or scored. The runner's active recipe is unchanged (`UNET_RECIPE`, `crop_voxels=None`). All timing below is synthetic and is not patient-result evidence.
 
 Sources: `paper/track_b_runtime_pilot_2026-10-31.md`, `output/track_b_timing_pilot_20261031/timing_record.json`, `output/track_b_timing_pilot_20261031/crop_timing_record.json`.
 

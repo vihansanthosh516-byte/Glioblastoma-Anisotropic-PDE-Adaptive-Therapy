@@ -28,6 +28,12 @@ GRID_SHAPE = (120, 120, 78)  # SRI24 240x240x155 at 1 mm, resampled to 2 mm
 SPACING_MM = 2.0
 N_PATIENTS = 18              # frozen MU development cohort size
 FOLD_TRAIN_SIZES = (14, 14, 14, 15, 15)  # 18 patients in folds of 4,4,4,3,3
+# LUMIERE pilot: grid from header_check.json (182x218x182 at 1 mm -> 91x109x91 at 2 mm); 28 eligible patients
+# in folds of 6,6,6,5,5. Set by --lumiere-pilot through the environment so subprocess arms inherit it.
+if os.environ.get("TRACK_B_PILOT_COHORT") == "lumiere":
+    GRID_SHAPE = (91, 109, 91)
+    N_PATIENTS = 28
+    FOLD_TRAIN_SIZES = (22, 22, 22, 23, 23)
 UNET_TIMED_STEPS = 12
 SEED = 20261031
 
@@ -43,7 +49,9 @@ def synthetic_cohort(n=N_PATIENTS):
                   / (0.45 * GRID_SHAPE[i])) ** 2 for i in range(3)) <= 1.0
     patients = []
     for i in range(n):
-        c = (60 + int(rng.integers(-12, 13)), 60 + int(rng.integers(-12, 13)), 39 + int(rng.integers(-6, 7)))
+        mid = [s // 2 for s in GRID_SHAPE]
+        c = (mid[0] + int(rng.integers(-12, 13)), mid[1] + int(rng.integers(-12, 13)),
+             mid[2] + int(rng.integers(-6, 7)))
         r1 = float(rng.uniform(8, 14))
         r2 = r1 + float(rng.uniform(0, 4))
         r3 = r2 + float(rng.uniform(-2, 6))
@@ -212,6 +220,8 @@ def project(arms):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--arm", choices=sorted({**ARMS, **CROP_ARMS}))
+    parser.add_argument("--lumiere-pilot", action="store_true",
+                        help="time full-grid U-Net and PDE on synthetic volumes of the LUMIERE grid; separate record")
     parser.add_argument("--crop-pilot", action="store_true",
                         help="time the full grid and the proposed (not adopted) 64^3 crop; write a separate record")
     args = parser.parse_args()
@@ -224,6 +234,9 @@ def main():
         return
     if args.crop_pilot:
         crop_main()
+        return
+    if args.lumiere_pilot:
+        lumiere_main()
         return
     arms = {}
     for name in ARMS:
@@ -300,6 +313,57 @@ def crop_main():
     path.write_text(json.dumps(record, indent=2))
     print(json.dumps(record["projection"], indent=2))
 
+
+
+
+def lumiere_main():
+    """Synthetic volumes at the LUMIERE header grid. Full-grid U-Net (required) and PDE. No patient data."""
+    from src.fk_learned_baselines import UNET_RECIPE as r
+    path = OUTPUT_DIR / "lumiere_timing_record.json"
+    if path.exists():
+        raise FileExistsError(f"refusing to overwrite {path}")
+    env = dict(os.environ, TRACK_B_PILOT_COHORT="lumiere")
+    arms = {}
+    for name in ("unet_full_rerun", "pde_hybrid"):
+        proc = subprocess.run([sys.executable, "-m", "src.fk_track_b_timing_pilot", "--arm", name],
+                              cwd=PROJECT_ROOT, capture_output=True, text=True, check=True, env=env)
+        arms[name] = json.loads(proc.stdout.strip().splitlines()[-1])
+    sizes, n = (22, 22, 22, 23, 23), 28
+    steps = sum(sizes) * r.epochs * r.n_seeds
+    unet_h = steps * arms["unet_full_rerun"]["step_seconds_mean"] / 3600
+    pde = arms["pde_hybrid"]
+    pde_h = (n * pde["full_forecast_seconds_one_patient"] + sum(sizes) * pde["calibration_only_seconds_one_patient"]) / 3600
+    record = {
+        "schema_version": 1,
+        "created_utc": datetime.now(timezone.utc).isoformat(),
+        "evidence_scope": "synthetic-only runtime pilot at the LUMIERE header grid; no patient data read; "
+                          "not patient-result evidence",
+        "grid_shape": [91, 109, 91], "grid_source": "output/track_b_lumiere_inventory_20261031/header_check.json "
+                                                    "(182x218x182 at 1 mm, resampled to 2 mm)",
+        "spacing_mm": SPACING_MM, "n_patients": n, "fold_train_sizes": list(sizes),
+        "machine": {"platform": platform.platform(), "processor": platform.processor(),
+                    "cpu_count": os.cpu_count(), "python": platform.python_version()},
+        "arms": arms,
+        "projection": {
+            "assumptions": [
+                "U-Net steps per analysis = 112 pairs x 300 epochs x 3 seeds at the measured mean step; full grid",
+                "PDE = 28 full + 112 calibration-only forecasts per analysis at the measured one-patient times; "
+                "lower bound (inner cross-fitting may need more); PDE never reused",
+                "four analyses: three prior supports + central-gap refit",
+                "amendment R: one U-Net training shared by the three prior runs, one for the central-gap refit "
+                "counted at full size (upper figure)",
+                "one synthetic patient's PDE time stands for all; real tumors may differ",
+            ],
+            "unet_hours_one_analysis": unet_h,
+            "unet_hours_one_analysis_max_step": steps * arms["unet_full_rerun"]["step_seconds_max"] / 3600,
+            "pde_hours_one_analysis_lower_bound": pde_h,
+            "protocol_complete_hours_no_reuse": 4 * unet_h + 4 * pde_h,
+            "protocol_complete_hours_with_reuse_amendment_R": 2 * unet_h + 4 * pde_h,
+        },
+    }
+    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(record, indent=2))
+    print(json.dumps(record["projection"], indent=2))
 
 if __name__ == "__main__":
     main()

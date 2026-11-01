@@ -323,6 +323,7 @@ def run_mu_first_two_to_third_development_cv(
     rho_bounds=(1e-5, 1e-1), D_bounds=(1e-5, 10.0),
     n_coarse: int = 21, mass_fraction: float = 0.9, n_refine: int = 11,
     n_draws: int = 200, n_anchors: int = 256,
+    unet_reuse_cache: dict | None = None,
 ) -> dict:
     """Run one paired day-90 forecast per selected patient, with patient-level outer folds.
 
@@ -565,6 +566,7 @@ def run_mu_first_two_to_third_development_cv(
         fg_fit, fg_forecast, fg_fallback, fg_score,
         domain_by_patient=analysis_domains, spacing_mm=(2.0, 2.0, 2.0),
         valid_support_by_patient=analysis_support, recipe=UNET_RECIPE,
+        unet_reuse_cache=unet_reuse_cache,
     )
     cv = run_first_third_90day_patient_cv(
         records, analysis_folds, lb_fit, lb_forecast, lb_score,
@@ -706,6 +708,11 @@ def run_mu_first_two_to_third_with_prior_sensitivity(
         "one_decade_wider": ((1e-6, 1.0), (1e-6, 100.0)),
     }
     runs = {}
+    # Amendment A-2026-10-31-R: the three prior-support runs share one U-Net cache (reuse on full fingerprint
+    # match only); the central-gap refit gets its own cache, so it always trains its own models.
+    if "unet_reuse_cache" in runner_options:
+        raise ValueError("the protocol-complete wrapper owns U-Net reuse")
+    prior_unet_cache: dict = {}
     for name, (rho_bounds, D_bounds) in scenarios.items():
         runs[name] = run_mu_first_two_to_third_development_cv(
             cohort,
@@ -713,6 +720,7 @@ def run_mu_first_two_to_third_with_prior_sensitivity(
             external_eligibility=(external_eligibility if name == "primary" else None),
             rho_bounds=rho_bounds,
             D_bounds=D_bounds,
+            unet_reuse_cache=prior_unet_cache,
             **runner_options,
         )
 
@@ -723,6 +731,7 @@ def run_mu_first_two_to_third_with_prior_sensitivity(
         gap_sensitivity_only=True,
         rho_bounds=scenarios["primary"][0],
         D_bounds=scenarios["primary"][1],
+        unet_reuse_cache={},
         **runner_options,
     )
 

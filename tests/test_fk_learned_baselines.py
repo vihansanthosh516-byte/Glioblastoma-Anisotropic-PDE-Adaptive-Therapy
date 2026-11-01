@@ -319,3 +319,77 @@ def test_fingerprint_covers_runtime_environment():
                        ("deterministic_algorithms_during_training", False)):
         changed = dict(env, **{key: value})
         assert lb.unet_training_fingerprint(["p"], [(x, y)], fold=0, recipe=FAST, environment=changed) != base
+
+
+_REAL_TRAIN = lb.train_unet_models
+
+
+def _reuse_run(records, folds, domains, cache, monkeypatch, calls, env=None):
+    real = _REAL_TRAIN
+
+    def counting(pairs, *, fold, recipe):
+        calls.append(fold)
+        return real(pairs, fold=fold, recipe=recipe)
+    monkeypatch.setattr(lb, "train_unet_models", counting)
+    if env is not None:
+        monkeypatch.setattr(lb, "unet_runtime_environment", lambda: env)
+    fc = lambda h, _n: {"fallback_masks": {"hybrid": np.asarray(h.masks[-1], bool)},
+                        "history_mask": np.asarray(h.masks[-1], bool)}
+    f, c, b, s = lb.add_learned_baselines_arm(lambda t: {}, fc, fc, lambda p, t: {"dice_hybrid": 0.0},
+                                              domain_by_patient=domains, spacing_mm=(2, 2, 2), recipe=FAST,
+                                              unet_reuse_cache=cache)
+    masks = {}
+
+    def c2(h, n):
+        out = c(h, n)
+        masks[h.patient_id] = out["_unet_mask"]
+        return out
+    run_first_third_90day_patient_cv(records, folds, f, c2, s, fallback_forecast=b, n_folds=5)
+    return masks
+
+
+def test_unet_reuse_only_on_full_fingerprint_match(monkeypatch):
+    records, folds, domains = _big_cohort(far_piece=False)
+    cache, calls = {}, []
+    a = _reuse_run(records, folds, domains, cache, monkeypatch, calls)
+    n_first = len(calls)
+    b = _reuse_run(records, folds, domains, cache, monkeypatch, calls)
+    assert n_first > 0 and len(calls) == n_first  # second prior run trained nothing
+    for pid in a:
+        assert (a[pid] is None and b[pid] is None) or np.array_equal(a[pid], b[pid])
+    env = dict(lb.unet_runtime_environment(), num_threads=999)
+    _reuse_run(records, folds, domains, cache, monkeypatch, calls, env=env)
+    assert len(calls) == 2 * n_first  # environment mismatch -> retrain every fold
+
+
+def test_gap_subset_and_no_cache_always_train(monkeypatch):
+    records, folds, domains = _big_cohort(far_piece=False)
+    cache, calls = {}, []
+    _reuse_run(records, folds, domains, cache, monkeypatch, calls)
+    n = len(calls)
+    subset = [r for r in records if r.patient_id != "b00"]
+    _reuse_run(subset, {r.patient_id: folds[r.patient_id] for r in subset}, domains, cache, monkeypatch, calls)
+    assert len(calls) > n
+    m = len(calls)
+    _reuse_run(records, folds, domains, None, monkeypatch, calls)
+    assert len(calls) == m + n
+
+
+def test_protocol_wrapper_shares_cache_for_prior_runs_only(monkeypatch):
+    from src import fk_mu_patient_runner as runner
+    seen = []
+
+    def fake_run(cohort, **kw):
+        seen.append((kw.get("gap_sensitivity_only", False), kw["unet_reuse_cache"]))
+        if len(seen) == 4:
+            raise StopIteration
+        return {"rows": []}
+    monkeypatch.setattr(runner, "run_mu_first_two_to_third_development_cv", fake_run)
+    with pytest.raises(StopIteration):
+        runner.run_mu_first_two_to_third_with_prior_sensitivity(object())
+    prior = [c for gap, c in seen if not gap]
+    gap = [c for g, c in seen if g]
+    assert len(prior) == 3 and prior[0] is prior[1] is prior[2]
+    assert len(gap) == 1 and gap[0] is not prior[0] and gap[0] == {}
+    with pytest.raises(ValueError, match="owns U-Net reuse"):
+        runner.run_mu_first_two_to_third_with_prior_sensitivity(object(), unet_reuse_cache={})

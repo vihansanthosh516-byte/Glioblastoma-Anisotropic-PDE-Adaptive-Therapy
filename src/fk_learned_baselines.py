@@ -301,8 +301,12 @@ def count_metrics(mu: float, y: int) -> dict:
 
 def add_learned_baselines_arm(fit_nuisance, forecast, fallback_forecast, score, *, domain_by_patient: Mapping,
                               spacing_mm, valid_support_by_patient: Mapping | None = None,
-                              recipe: UNetRecipe = UNET_RECIPE):
+                              recipe: UNetRecipe = UNET_RECIPE, unet_reuse_cache: dict | None = None):
     """Wrap patient-CV callbacks to add the fold-trained U-Net mask arm and the count model.
+
+    ``unet_reuse_cache`` (amendment A-2026-10-31-R): maps training fingerprint -> trained fold models. A fold
+    reuses models only on an exact match of the full fingerprint (data, fold, recipe, runtime environment);
+    otherwise it trains and stores. Pass ``None`` to always train.
 
     ``fit_nuisance`` is called with outer-training records only. Training uses visits 1-2 as inputs and visit 3 as
     the target. Test forecasts use visits 1-2 and the origin-only domain only.
@@ -334,12 +338,18 @@ def add_learned_baselines_arm(fit_nuisance, forecast, fallback_forecast, score, 
                 x, v3 = x[(slice(None),) + box], v3[box]
             pairs.append((x, v3))
             pair_ids.append(r.patient_id)
-        unet = train_unet_models(pairs, fold=fold, recipe=recipe)
-        unet["n_training_empty_history_excluded"] = excluded
         env = unet_runtime_environment()
+        fingerprint = unet_training_fingerprint(pair_ids, pairs, fold=fold, recipe=recipe, environment=env)
+        if unet_reuse_cache is not None and fingerprint in unet_reuse_cache:
+            unet = dict(unet_reuse_cache[fingerprint], reused=True)
+        else:
+            unet = train_unet_models(pairs, fold=fold, recipe=recipe)
+            unet["reused"] = False
+            if unet_reuse_cache is not None:
+                unet_reuse_cache[fingerprint] = {k: v for k, v in unet.items() if k != "reused"}
+        unet["n_training_empty_history_excluded"] = excluded
         unet["runtime_environment"] = env
-        unet["training_fingerprint"] = unet_training_fingerprint(pair_ids, pairs, fold=fold, recipe=recipe,
-                                                                 environment=env)
+        unet["training_fingerprint"] = fingerprint
         unet["training_target_voxels_outside_crop"] = outside_crop
         return {"base": fit_nuisance(training_records), "unet": unet,
                 "count": fit_count_model(counts, log_vols, gaps)}
