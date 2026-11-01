@@ -199,10 +199,31 @@ def uncrop_mask(mask, box, shape) -> np.ndarray:
     return full
 
 
-def unet_training_fingerprint(patient_ids, pairs, *, fold: int, recipe: UNetRecipe) -> str:
-    """SHA-256 over everything that determines the trained U-Net models (inputs, targets, fold, recipe)."""
+def unet_runtime_environment() -> dict:
+    """Runtime settings that can change trained weights for identical data (torch build, device, threads)."""
+    return {
+        "torch_version": torch.__version__,
+        "torch_git_version": getattr(torch.version, "git_version", None),
+        "torch_cuda": torch.version.cuda,
+        "numpy_version": np.__version__,
+        "device": "cpu",  # train_unet_models never moves tensors off the CPU
+        "num_threads": int(torch.get_num_threads()),
+        "num_interop_threads": int(torch.get_num_interop_threads()),
+        "deterministic_algorithms_during_training": True,  # forced inside train_unet_models
+        "mkldnn_enabled": bool(torch.backends.mkldnn.is_available() and torch.backends.mkldnn.enabled),
+    }
+
+
+def unet_training_fingerprint(patient_ids, pairs, *, fold: int, recipe: UNetRecipe,
+                              environment: Mapping | None = None) -> str:
+    """SHA-256 over everything that determines the trained U-Net models.
+
+    Covers inputs, targets, fold, recipe and the runtime environment. Reuse a model only on a full match.
+    """
+    env = unet_runtime_environment() if environment is None else dict(environment)
     h = hashlib.sha256()
     h.update(repr((int(fold), sorted(asdict(recipe).items()))).encode())
+    h.update(repr(sorted(env.items())).encode())
     for pid, (x, y) in zip(patient_ids, pairs):
         h.update(str(pid).encode())
         h.update(np.ascontiguousarray(x, dtype=np.float32).tobytes())
@@ -315,7 +336,10 @@ def add_learned_baselines_arm(fit_nuisance, forecast, fallback_forecast, score, 
             pair_ids.append(r.patient_id)
         unet = train_unet_models(pairs, fold=fold, recipe=recipe)
         unet["n_training_empty_history_excluded"] = excluded
-        unet["training_fingerprint"] = unet_training_fingerprint(pair_ids, pairs, fold=fold, recipe=recipe)
+        env = unet_runtime_environment()
+        unet["runtime_environment"] = env
+        unet["training_fingerprint"] = unet_training_fingerprint(pair_ids, pairs, fold=fold, recipe=recipe,
+                                                                 environment=env)
         unet["training_target_voxels_outside_crop"] = outside_crop
         return {"base": fit_nuisance(training_records), "unet": unet,
                 "count": fit_count_model(counts, log_vols, gaps)}

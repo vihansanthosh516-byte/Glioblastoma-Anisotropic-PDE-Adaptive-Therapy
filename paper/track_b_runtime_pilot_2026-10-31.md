@@ -119,7 +119,9 @@ With crop and reuse, the U-Net share is 62.4 h. **The PDE lower bound (207.3 h o
 
 Track B has no fixed time cap. These figures are resource needs, not a pass or a fail.
 
-### Draft amendment wording (NOT ADOPTED; do not apply until the user approves)
+### Draft amendment wording (NOT ADOPTED; SUPERSEDED 2026-10-31)
+
+**Superseded by reuse-only draft A-2026-10-31-R in `paper/track_b_amendment_decision_2026-10-31.md`.** The crop part below favours the candidate, so it cannot be the required U-Net bar. It stays an unadopted secondary option only. Kept here for the record.
 
 > **Track B amendment A-2026-10-31-U (draft).**
 >

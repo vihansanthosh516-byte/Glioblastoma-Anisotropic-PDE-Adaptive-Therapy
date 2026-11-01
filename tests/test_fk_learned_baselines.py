@@ -305,3 +305,17 @@ def test_unet_identical_across_prior_runs_but_not_gap_subset():
     subset = [r for r in records if r.patient_id not in ("b00",)]
     c, _ = _capture_run(subset, {r.patient_id: folds[r.patient_id] for r in subset}, domains, FAST, "gap")
     assert any(c[pid][1] != a[pid][1] for pid in c)
+
+
+def test_fingerprint_covers_runtime_environment():
+    x = np.zeros((3, 4, 4, 4), np.float32)
+    y = np.zeros((4, 4, 4), bool)
+    env = lb.unet_runtime_environment()
+    for key in ("torch_version", "device", "num_threads", "deterministic_algorithms_during_training"):
+        assert key in env
+    base = lb.unet_training_fingerprint(["p"], [(x, y)], fold=0, recipe=FAST, environment=env)
+    assert base == lb.unet_training_fingerprint(["p"], [(x, y)], fold=0, recipe=FAST, environment=dict(env))
+    for key, value in (("torch_version", "0.0.0"), ("device", "cuda"), ("num_threads", env["num_threads"] + 1),
+                       ("deterministic_algorithms_during_training", False)):
+        changed = dict(env, **{key: value})
+        assert lb.unet_training_fingerprint(["p"], [(x, y)], fold=0, recipe=FAST, environment=changed) != base
