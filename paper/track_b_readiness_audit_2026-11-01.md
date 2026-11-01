@@ -81,3 +81,33 @@ No conflict found in `START_HERE.md`, the roadmap, or the LUMIERE plan after com
 - CT1 at visit 3 shows the target tumor. The preflight reads it but saves only QC numbers. It must not be used to tune anything.
 
 **Your decision needed before it can run:** written OK to read the 84 CT1 and brain-mask files listed above.
+
+## 5. Update 2026-11-01 (no voxels read)
+
+**Fixed since §3:**
+- Source-gate record: marked historical for the MU/Duke path; amendment R line corrected; school row reconciled with the user report (still OPEN). Points to the LUMIERE plan.
+- LUMIERE plan §5a: horizon rule = 11–15 **week-label difference**; no day claim; not the MU 90-day or 76–104-day window. The old "about 77–111 days" line is withdrawn.
+- LUMIERE plan §3: official DeepBraTumIA check. ARTORG page states no version and no label values. NITRC page refused connection; not checked. Version and label 0 stay OPEN.
+- LUMIERE plan §5b: registration QC settings frozen, with code SHA-256.
+- Still open: which document is the LUMIERE scoring protocol. The freeze amendment must name it.
+
+**Gate changes:** none to PASS. Registration settings are frozen; real-patient QC stays BLOCKED. School stays OPEN.
+
+### Exact proposed preflight (NOT RUN; needs your written OK)
+
+**Reads 84 files** from `data/external/lumiere/Imaging-v202211.zip`, for the 28 patients listed in `output/track_b_lumiere_inventory_20261031/header_check.json`, first-triplet visits 2 and 3 only. All paths are under `Imaging/<Patient-NNN>/week-<NNN>[-n]/DeepBraTumIA-segmentation/atlas/skull_strip/`:
+
+| Per patient | File | Voxel type | Count |
+|---|---|---|---|
+| Visit 2 (origin) | `ct1_skull_strip.nii.gz` | Contrast T1 MRI intensities | 28 |
+| Visit 2 (origin) | `brain_mask.nii.gz` | Binary brain mask (skull-strip support) | 28 |
+| Visit 3 (target visit) | `ct1_skull_strip.nii.gz` | Contrast T1 MRI intensities | 28 |
+| **Total** | | | **84** |
+
+**Never read:** any `seg_mask.nii.gz` (no tumor label, history or target); visit-1 files; T1, T2, FLAIR; native-space files.
+
+**Does:** the frozen §5b registration and QC, once per patient, plus the sanity checks.
+
+**Saves** `output/track_b_lumiere_mri_qc_preflight_<date>/qc.json` (refuses to overwrite): per patient NCC before/after, max angle, shift norm, PASS/FAIL, reasons, sanity flags; totals; SHA-256 of code, zip and the 84 members; runtime environment. **No voxel arrays, images, figures or warped volumes are saved.**
+
+**Not done by it:** no scoring, no target label read, no tuning. The visit-3 CT1 shows tumor; only QC numbers come out of it.

@@ -27,6 +27,7 @@ The fresh-cohort search found no untouched public GBM cohort with three or more 
 
 - **Tool for the target:** DeepBraTumIA (https://www.nitrc.org/projects/deepbratumia), atlas-space output `DeepBraTumIA-segmentation/atlas/segmentation/seg_mask.nii.gz` (readme). HD-GLIO-AUTO is not used for the target.
 - **Version:** **not stated** in the paper or readme. The only version given is PyRadiomics 3.0.1. Record this as a gap; do not guess.
+- **Official-documentation check (2026-11-01):** ARTORG MIA software page (https://www.artorg.unibe.ch/research/mia/software/index_eng.html) names the sub-compartments "necrotic, contrast-enhancing, and edema" but states **no version and no label values** (no label 0, background or cavity). The NITRC project page (https://www.nitrc.org/projects/deepbratumia) refused the connection twice on 2026-11-01, so it is **not checked**. Version and label-0 meaning stay **OPEN**. Nothing is inferred.
 - **Label mapping** (from the published `LUMIERE-pyradiomics-deepbratumia-features.csv`, columns `Label`/`Label name`; no mask voxel read): 1 = Necrosis, 2 = Contrast-enhancing, 3 = Edema. HD-GLIO-AUTO: 1 = Non-enhancing, 2 = Contrast-enhancing.
 - **Tumor core (draft):** DeepBraTumIA labels 1 or 2. Edema (3) is not core. Label 0 is not defined in the sources; by the tool output, it is "no tumor label", not a reviewed negative.
 - **Resection cavity:** DeepBraTumIA has **no cavity label** in the published mapping. Cavity is therefore not separated from background. Record as a limitation.
@@ -55,6 +56,35 @@ Target core outside S counts as a miss and is reported per patient.
 - **Failure handling:** a failed patient is excluded from scoring for all arms. Every exclusion and its reason is reported (`exclusion_report`). A failure is never retried with other settings.
 - **Weakest point:** the threshold 0.80 is set on synthetic phantoms only. It is not tuned on LUMIERE. A tumor change between visits lowers NCC, so true growth can cause exclusion. Report the excluded count beside every result.
 
+## 5a. LUMIERE horizon rule (2026-11-01)
+
+- The gap is the **difference in published week labels**: week(v3) − week(v2), from the `week-NNN` folder names.
+- Primary window: 11 ≤ week(v3) − week(v2) ≤ 15 (week labels). First usable post-op triplet only.
+- LUMIERE dates are released only as week bins. The exact day gap is **unknown**. This rule does **not** claim exact days.
+- This rule is **not** the same as the MU/Duke 90-day nominal horizon or any 76–104-day window (`paper/track_b_pde_external_protocol_draft_2026-10-28.md`). Do not convert between them. Results from the two rules are not pooled.
+- **Proposed for the protocol freeze (not yet wired or frozen):** the PDE and fixed-growth arms use 7 × (week difference) days as the model time step. This is a **modelling convention**, not a measured gap. All arms would use the same value.
+
+## 5b. Registration QC: frozen settings (frozen 2026-11-01, before any MRI voxel read)
+
+Code: `src/fk_longitudinal_prep.py`, SHA-256 `6588f511d9e9fcc88e26591aea19db38c5673acc6d618188c0b24791ea45d4bf` (working-tree file at commit time). Change only by a dated amendment, before the preflight runs.
+
+| Setting | Frozen value |
+|---|---|
+| Fixed image | Visit-2 (origin) atlas `skull_strip/ct1_skull_strip.nii.gz` |
+| Moving image | Visit-3 atlas `skull_strip/ct1_skull_strip.nii.gz` |
+| Fit region | Visit-2 atlas `skull_strip/brain_mask.nii.gz` > 0. History label voxels are not added for QC (no `seg_mask` is read). |
+| Grid | Released 1 mm atlas grid, 182 × 218 × 182 (from headers). No resampling before QC. |
+| Intensity | Raw values, no normalisation (NCC is invariant to linear intensity change). |
+| Transform | Rigid, 6 parameters: 3 Euler angles (deg, x-y-z order, R = Rz·Ry·Rx) about the grid centre, 3 shifts (mm). Start at zero. |
+| Interpolation | Linear (`scipy.ndimage.affine_transform`, order 1, constant 0 outside). |
+| Optimiser | Powell. Stage 1 on every 2nd voxel (`downsample=2`): xtol 1e-2, ftol 1e-4, maxiter 2000. Stage 2 full grid from stage 1: xtol 1e-3, ftol 1e-5, maxiter 2000. |
+| Metric | NCC inside the fit region. |
+| Pass rule | NCC after ≥ 0.80 **and** max |angle| ≤ 10° **and** shift norm ≤ 10 mm. |
+| Failure | Excluded from all arms. Reason reported. No retry, no other settings. |
+| Sanity checks | Shape equals header; all values finite; brain mask non-empty. A failed check is an exclusion with that reason. |
+
+Gate status: settings **frozen**; real-patient QC **BLOCKED** until the user approves the exact preflight (`paper/track_b_readiness_audit_2026-11-01.md` §5).
+
 ## 6. Metadata-only inventory
 
 Record: `output/track_b_lumiere_inventory_20261031/inventory.json`. Source: the central directory (file names) of `Imaging-v202211.zip`; no image or mask bytes read.
@@ -68,7 +98,7 @@ Record: `output/track_b_lumiere_inventory_20261031/inventory.json`. Source: the 
 | All consecutive usable post-op triplets | 325 (not independent; not used) |
 | **Primary eligible: first triplet, v2→v3 gap 11–15 weeks** | **28 patients** |
 
-Window: nominal 13 weeks (about 91 days). Weeks blur dates by up to 6 days (paper), so 11–15 weeks covers about 77–111 days. The window is applied to each patient's **first** triplet only, never to a later one that happens to fit. Patients excluded by the window: 34.
+Window: 11–15 in published week labels (see §5a). The exact day gap is unknown because dates are week-binned; an earlier version of this line gave a day range, which is withdrawn. The window is applied to each patient's **first** triplet only, never to a later one that happens to fit. Patients excluded by the window: 34.
 
 **Weakest point:** 28 patients is small. Fold sizes would be about 6, 6, 6, 5, 5. Inventory rules are draft; the file-name check does not prove a file opens or has the right content.
 
@@ -116,9 +146,10 @@ Assumptions: 28 patients, 5 outer folds, so 112 training pairs per analysis (eac
 | Gate | Status |
 |---|---|
 | License | Recorded; CC0 items plus non-commercial condition; derived-output rules **not stated**. |
-| Label meaning | Mapping from published CSV; tool version **not stated**; label 0 and cavity undefined. |
+| Label meaning | Mapping from published CSV; tool version **not stated**; label 0 and cavity undefined. Official-doc check 2026-11-01: still open (§3). |
 | Valid support | Draft origin-only rule; source mask not validated. |
-| Registration | Draft MRI-only rule and QC; synthetic tests only. **Not passed.** |
+| Horizon | §5a: 11–15 week-label difference; not a day window. |
+| Registration | Settings frozen (§5b); synthetic tests only. Real-patient QC **BLOCKED** until the user approves the preflight. **Not passed.** |
 | U-Net reuse (amendment R) | Adopted; wired with full-fingerprint match; central-gap separate. Synthetic tests only. |
 | Inventory | Done, metadata and headers only (28 eligible; one 182×218×182 grid). |
 | School-use approval | **User-reported approval (2026-10-31): the user says the school said this use is OK.** Not yet a pass under the written-evidence rule (`paper/track_b_source_gate_evidence_2026-10-31.md`): save the written approval (email or form, with date, approver and any conditions) in the project, then mark it passed. |

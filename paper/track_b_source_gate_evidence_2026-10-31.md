@@ -1,6 +1,8 @@
 # Track B source-gate evidence record (2026-10-31)
 
-**Metadata and published documents only.** No target-mask voxel was read. No restricted file was downloaded. No author or school was contacted. No patient mask was scored. Amendment A-2026-10-31-R is still **not adopted**. The 64³ crop stays out of the required U-Net comparison.
+> **HISTORICAL for the MU/Duke path (updated 2026-11-01).** The gates below apply to MU-Glioma-Post and Duke only. They are not the LUMIERE gates. Current Track B work uses LUMIERE (exploratory only); its gates are in `paper/track_b_no_contact_dataset_plan_2026-10-31.md` §8 and `paper/track_b_readiness_audit_2026-11-01.md`.
+
+**Metadata and published documents only.** No target-mask voxel was read. No restricted file was downloaded. No author or school was contacted. No patient mask was scored. Amendment A-2026-10-31-R was a draft when this record was written; the user adopted it on 2026-11-01 (reuse only; `paper/track_b_amendment_decision_2026-10-31.md`). The 64³ crop stays out of the required U-Net comparison.
 
 ## Sources checked
 
@@ -20,7 +22,7 @@
 | **Valid target support (MU)** | No brain or support mask is released (S2). S1 describes skull-stripping only; no extraction mask or QC is listed. | **Open.** Nonzero-MRI support stays withdrawn: no source establishes it. |
 | **MRI-only registration evidence (MU)** | S1: each image was resampled to 1 mm³ and "co-registered to … SRI24 via rigid-body transformation using the CapTK/Greedy registration tool". S2 does not say whether timepoints were registered to each other. No per-case transform, QC metric or acceptance record is released. | **Open.** Atlas alignment per timepoint is documented. Visit-to-visit alignment and its QC are not. |
 | **Duke access** | S3. No local approval record found (`paper/`, `data/manifests/`, `vault/` checked by file search). The user reports a resubmission on 2026-10-29. | **Open (pending).** |
-| **School-use approval** | No local record found. | **Open (pending).** |
+| **School-use approval** | No written record on file. User report (2026-10-31, contact log below): the school said this use is OK. | **Open** until the written approval (date, approver, conditions) is saved in the project. |
 
 **New fact, not a gate:** the S1 article text is CC BY-NC-ND 4.0. The data on TCIA are CC BY 4.0 (S2). Do not copy article figures or text into project outputs.
 
