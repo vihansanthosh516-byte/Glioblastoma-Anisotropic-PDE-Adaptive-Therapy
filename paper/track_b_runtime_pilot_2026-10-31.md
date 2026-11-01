@@ -1,5 +1,7 @@
 # Track B runtime pilot (synthetic only, 2026-10-31)
 
+> **HISTORICAL — not a current LUMIERE estimate.** This is a historical synthetic timing report for the 18-patient MU development setup. Its 707.1-hour protocol estimate and its crop/reuse projections are not current LUMIERE estimates. Current LUMIERE synthetic projections: 677.6 CPU hours with amendment R reuse and 1,124.1 without; the PDE estimate is still a lower bound (see [`paper/track_b_no_contact_dataset_plan_2026-10-31.md`](track_b_no_contact_dataset_plan_2026-10-31.md) §7a; record `output/track_b_timing_pilot_20261031/lumiere_timing_record.json`). The measurements and assumptions below are kept unchanged.
+
 **Synthetic timing only. No patient data was read. This is not patient-result evidence.** No epoch, grid, seed or model setting was changed because of this pilot.
 
 Record: `output/track_b_timing_pilot_20261031/timing_record.json` (created 2026-11-01T01:56 UTC). Code: `src/fk_track_b_timing_pilot.py`. Run in the scratch copy with Python 3.14.4, torch 2.14.0+cpu, 8 CPU threads, Windows 11, Intel64 Family 6 Model 189.
