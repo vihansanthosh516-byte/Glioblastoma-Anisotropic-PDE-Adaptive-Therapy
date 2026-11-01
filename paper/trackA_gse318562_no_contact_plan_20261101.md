@@ -57,7 +57,7 @@ The study is a close topic match: its preprint already analyzes cell states and 
 
 ## Current decision
 
-GSE318562 is not selected for the primary test. The metadata map is complete at the sample level, but the strict paired count is five, and public per-spot histology labels remain unverified. It does **not** pass the malignant-cell external-validation gate. GSE286419 has only four region-concordant Core/Margin donors. The strongest current no-contact alternative is E-MTAB-8743 for a separate bulk-tissue regional replication, but it cannot validate a malignant-cell-only signature and its accession-level pairing and terms still need metadata checks. See `trackA_alternate_dataset_plan_20261101.md`; until the applicable gates pass, the primary malignant-cell confirmation remains **no-go**.
+GSE318562 is not selected for the primary test. The metadata map is complete at the sample level, but the strict paired count is five, and public per-spot histology labels remain unverified. It does **not** pass the malignant-cell external-validation gate. GSE286419 has only four region-concordant Core/Margin donors. E-MTAB-8743 is already used in the Track A TAM exploration and cannot serve as independent confirmation. GSE317289 is a new public spatial lead with five IDH-wildtype GBM patients, below the six-donor floor; spatial spots also cannot validate a malignant-cell-only result. See `trackA_alternate_dataset_plan_20261101.md`; the primary malignant-cell confirmation remains **no-go**. No outside dataset was added to the current figure.
 
 ## Sources checked
 
