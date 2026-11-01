@@ -36,6 +36,10 @@
 
 The no-scoring rule stays. The runner still refuses to score until the loader records the registration and target-support gates as passed.
 
+## Contact log
+
+- 2026-10-31, user report: the user contacted the MU authors and Duke about one week earlier. No reply yet. No written evidence has arrived, so no gate changes. The school has not been contacted.
+
 ## Pass evidence per gate
 
 A gate passes only on written evidence that meets its rule. Record the date, sender and file of each reply. An informal or partial answer leaves the gate open.
