@@ -75,7 +75,7 @@ This is a distinct study from the Yu 2020 classifier. Use the atlas only after c
 ## Next actions
 
 - **Track A:** draft and seal the runtime amendment; run the amended timing pilot before any held-out scoring.
-- **Track B:** fixed growth, U-Net and count model are coded, wired into the MU runner and synthetically tested. Next: a synthetic U-Net timing pilot at full grid size; source-backed valid support and MRI-only registration QC; cavity meaning from source label documents; finish Scholar and dataset citation sweeps. No patient-mask scoring until the source/access gates pass.
+- **Track B:** fixed growth, U-Net and count model are coded, wired into the MU runner and synthetically tested. The synthetic runtime pilot projects about 707 CPU hours for the protocol-complete run (`paper/track_b_runtime_pilot_2026-10-31.md`); the run is stopped until the user decides on the proposed amendment there. Next: that decision; source-backed valid support and MRI-only registration QC; cavity meaning from source label documents; finish Scholar and dataset citation sweeps. No patient-mask scoring until the source/access gates pass.
 - **Track C:** finish the current negative/limited-results report; keep new model testing stopped until measured kinetics and independent review exist.
 
 Track these actions separately. A pass in one track does not clear another track's data or protocol gates.
