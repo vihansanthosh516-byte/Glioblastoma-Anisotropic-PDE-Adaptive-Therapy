@@ -38,6 +38,7 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 PROTOCOL_DIR = PROJECT_ROOT / "paper" / "trackA_yu2020"
 HASH_FILE = PROTOCOL_DIR / "SHA256SUMS"
 OUTPUT_DIR = PROJECT_ROOT / "output" / "trackA_yu2020"
+TIMING_PILOT_PATH = OUTPUT_DIR / "pilot_timing_A4_20261031.json"
 MATRIX_PATH = PROJECT_ROOT / "data" / "external" / "gse117891" / "GSE117891_all_6148.umi.count.matrix.tsv.gz"
 CELL_TABLE_PATH = PROJECT_ROOT / "data" / "external" / "trackA_audit_meta" / "GSE117891_Sample_barcode_cell_information.xlsx"
 TABLE_S1_PATH = PROJECT_ROOT / "data" / "external" / "yu2020_supp" / "Table S1. ClinicalInformation.xlsx"
@@ -445,6 +446,15 @@ def query_neighbors(x_query: np.ndarray, x_train: np.ndarray, train_tie: np.ndar
 
 def neighbor_probabilities(x_query: np.ndarray, x_train: np.ndarray, train_tie: np.ndarray, p_train: np.ndarray, temperatures: tuple[float, ...]) -> dict[float, np.ndarray]:
     indices, similarities = query_neighbors(x_query, x_train, train_tie)
+    return probabilities_from_neighbor_search(indices, similarities, p_train, temperatures)
+
+
+def probabilities_from_neighbor_search(
+    indices: np.ndarray,
+    similarities: np.ndarray,
+    p_train: np.ndarray,
+    temperatures: tuple[float, ...],
+) -> dict[float, np.ndarray]:
     output: dict[float, np.ndarray] = {}
     gathered = p_train[indices]
     for temperature in temperatures:
@@ -663,6 +673,9 @@ def tune_candidate(
         d_train = data.donors[inner_train]
         tie_train, tie_val = global_tie[inner_train], global_tie[inner_val]
         edges = graph_edges(x_train, tie_train) if ablation != "ablation_graph_and_blend" else np.empty((0, 2), dtype=np.int64)
+        neighbor_search = None
+        if any(gamma != 0.0 for _, gamma in blends):
+            neighbor_search = query_neighbors(x_val, x_train, tie_train)
         for config_index, (lambda_1, lambda_2, lambda_w, loss_kind) in enumerate(configs):
             model, best_epoch = train_hybrid(
                 x_train, y_train, d_train, edges, lambda_1, lambda_2, lambda_w, loss_kind,
@@ -674,7 +687,9 @@ def tune_candidate(
             if len(blends) == 1 and blends[0][1] == 0.0:
                 scores[config_index, 0] += class_balanced_aurc(y_val, p_val, tie_val)
                 continue
-            neighbor_by_t = neighbor_probabilities(x_val, x_train, tie_train, p_train, BLEND_T_GRID)
+            if neighbor_search is None:
+                raise StopRun("Candidate blend settings require a cached neighbor search")
+            neighbor_by_t = probabilities_from_neighbor_search(*neighbor_search, p_train, BLEND_T_GRID)
             for blend_index, (temperature, gamma) in enumerate(blends):
                 p = (1.0 - gamma) * p_val + gamma * neighbor_by_t[temperature]
                 scores[config_index, blend_index] += class_balanced_aurc(y_val, p, tie_val)
@@ -1139,8 +1154,8 @@ def run_pilot(
     hashes: dict[str, str],
     data_load_seconds: float,
 ) -> int:
-    if (OUTPUT_DIR / "pilot_timing.json").exists():
-        raise StopRun("Pilot timing file already exists; refusing to overwrite")
+    if TIMING_PILOT_PATH.exists():
+        raise StopRun(f"Pilot timing file already exists; refusing to overwrite: {TIMING_PILOT_PATH}")
     counts = dataset.flow["qc_by_donor_class"]
     sensitivity_ok = all(
         counts.get(donor, {}).get("core", 0) >= MIN_CELLS_PER_CLASS
@@ -1181,7 +1196,7 @@ def run_pilot(
         "created_utc": datetime.now(timezone.utc).isoformat(),
         "limitations": ["Projection assumes one timing fold represents the selected cohort; cell counts and fit times vary by donor."],
     }
-    atomic_json(OUTPUT_DIR / "pilot_timing.json", payload)
+    atomic_json(TIMING_PILOT_PATH, payload)
     print(f"Projected full run: {payload['projected_hours']:.2f} hours", flush=True)
     return 0 if payload["passes_runtime_gate"] else 3
 
@@ -1198,9 +1213,9 @@ def run_full(
     output_path = OUTPUT_DIR / "result.json"
     if output_path.exists():
         raise StopRun(f"Refusing to overwrite existing result: {output_path}")
-    if not (OUTPUT_DIR / "pilot_timing.json").is_file():
+    if not TIMING_PILOT_PATH.is_file():
         raise StopRun("Run and review timing pilot before full scoring")
-    pilot = json.loads((OUTPUT_DIR / "pilot_timing.json").read_text(encoding="utf-8"))
+    pilot = json.loads(TIMING_PILOT_PATH.read_text(encoding="utf-8"))
     if not pilot.get("passes_runtime_gate"):
         raise StopRun("Timing pilot projects more than six hours; write and commit an amendment before changing the grid")
     runner_key = str(Path(__file__).resolve().relative_to(PROJECT_ROOT))
@@ -1266,7 +1281,7 @@ def run_full(
         },
         "protocol": {
             "path": "paper/trackA_yu2020/PROTOCOL.md",
-            "amendment": "A2",
+            "amendment": "A4",
             "protocol_sha256": hashes[str((PROTOCOL_DIR / "PROTOCOL.md").relative_to(PROJECT_ROOT))],
             "donor_table_sha256": hashes[str((PROTOCOL_DIR / "donors.tsv").relative_to(PROJECT_ROOT))],
             "appendix_sha256": hashes[str((PROJECT_ROOT / "paper" / "research_plan_complete_project_appendix.md").relative_to(PROJECT_ROOT))],
@@ -1312,12 +1327,12 @@ def main() -> int:
     mode.add_argument("--run", action="store_true", help="Run primary and eligible sensitivity analyses after pilot passes")
     args = parser.parse_args()
     try:
-        if args.pilot and (OUTPUT_DIR / "pilot_timing.json").exists():
-            raise StopRun("Pilot timing file already exists; refusing to overwrite")
+        if args.pilot and TIMING_PILOT_PATH.exists():
+            raise StopRun(f"Pilot timing file already exists; refusing to overwrite: {TIMING_PILOT_PATH}")
         if args.run:
             if (OUTPUT_DIR / "result.json").exists():
                 raise StopRun(f"Refusing to overwrite existing result: {OUTPUT_DIR / 'result.json'}")
-            pilot_path = OUTPUT_DIR / "pilot_timing.json"
+            pilot_path = TIMING_PILOT_PATH
             if not pilot_path.is_file():
                 raise StopRun("Run and review timing pilot before full scoring")
             pilot_preflight = json.loads(pilot_path.read_text(encoding="utf-8"))
