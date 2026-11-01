@@ -38,7 +38,7 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 PROTOCOL_DIR = PROJECT_ROOT / "paper" / "trackA_yu2020"
 HASH_FILE = PROTOCOL_DIR / "SHA256SUMS"
 OUTPUT_DIR = PROJECT_ROOT / "output" / "trackA_yu2020"
-TIMING_PILOT_PATH = OUTPUT_DIR / "pilot_timing_A4_20261031.json"
+TIMING_PILOT_PATH = OUTPUT_DIR / "pilot_timing_A5_20261031.json"
 MATRIX_PATH = PROJECT_ROOT / "data" / "external" / "gse117891" / "GSE117891_all_6148.umi.count.matrix.tsv.gz"
 CELL_TABLE_PATH = PROJECT_ROOT / "data" / "external" / "trackA_audit_meta" / "GSE117891_Sample_barcode_cell_information.xlsx"
 TABLE_S1_PATH = PROJECT_ROOT / "data" / "external" / "yu2020_supp" / "Table S1. ClinicalInformation.xlsx"
@@ -1150,26 +1150,16 @@ def safe_commit_hash() -> str | None:
 def run_pilot(
     dataset: Dataset,
     strict: tuple[str, ...],
-    sensitivity: tuple[str, ...],
     hashes: dict[str, str],
     data_load_seconds: float,
 ) -> int:
     if TIMING_PILOT_PATH.exists():
         raise StopRun(f"Pilot timing file already exists; refusing to overwrite: {TIMING_PILOT_PATH}")
-    counts = dataset.flow["qc_by_donor_class"]
-    sensitivity_ok = all(
-        counts.get(donor, {}).get("core", 0) >= MIN_CELLS_PER_CLASS
-        and counts.get(donor, {}).get("periphery", 0) >= MIN_CELLS_PER_CLASS
-        for donor in sensitivity
-    )
-    if sensitivity_ok:
-        pilot_donors = sensitivity
-        cohort_name = "sensitivity_8_donor"
-        outer_fold_count = 14
-    else:
-        pilot_donors = strict
-        cohort_name = "primary_6_donor_sensitivity_omitted"
-        outer_fold_count = 6
+    if len(strict) != 6:
+        raise StopRun(f"A5 requires exactly six primary donors; found {len(strict)}")
+    pilot_donors = strict
+    cohort_name = "primary_6_donor_sensitivity_not_run_A5"
+    outer_fold_count = len(pilot_donors)
     pilot_data = dataset.subset(pilot_donors)
     pilot_tie = tie_ranks(pilot_data.cells)
     donor = pilot_donors[0]
@@ -1178,6 +1168,7 @@ def run_pilot(
     projected = fold_seconds * outer_fold_count + data_load_seconds
     payload = {
         "status": "timing_only",
+        "amendment": "A5",
         "pilot_cohort": cohort_name,
         "projected_outer_fold_count": outer_fold_count,
         "held_out_donor": donor,
@@ -1218,6 +1209,8 @@ def run_full(
     pilot = json.loads(TIMING_PILOT_PATH.read_text(encoding="utf-8"))
     if not pilot.get("passes_runtime_gate"):
         raise StopRun("Timing pilot projects more than six hours; write and commit an amendment before changing the grid")
+    if pilot.get("amendment") != "A5" or pilot.get("pilot_cohort") != "primary_6_donor_sensitivity_not_run_A5" or pilot.get("projected_outer_fold_count") != 6:
+        raise StopRun("A5 requires a passing six-donor primary-only timing pilot")
     runner_key = str(Path(__file__).resolve().relative_to(PROJECT_ROOT))
     if pilot.get("script_sha256") != hashes.get(runner_key) or pilot.get("input_hashes") != hashes:
         raise StopRun("Timing pilot was made with different sealed inputs or runner; repeat the pilot")
@@ -1226,18 +1219,12 @@ def run_full(
     primary_data = dataset.subset(strict)
     primary_summary, primary_sec = run_cohort(primary_data, strict, global_tie[np.isin(dataset.donors, strict)], score_test=True)
     sensitivity_counts = dataset.flow["qc_by_donor_class"]
-    sensitivity_ok = all(
-        sensitivity_counts.get(donor, {}).get("core", 0) >= MIN_CELLS_PER_CLASS
-        and sensitivity_counts.get(donor, {}).get("periphery", 0) >= MIN_CELLS_PER_CLASS
-        for donor in sensitivity
-    )
-    if sensitivity_ok:
-        sensitivity_data = dataset.subset(sensitivity)
-        sensitivity_tie = tie_ranks(sensitivity_data.cells)
-        sensitivity_summary, sensitivity_sec = run_cohort(sensitivity_data, sensitivity, sensitivity_tie, score_test=True)
-    else:
-        sensitivity_summary = {"status": "omitted: at least one lenient donor has fewer than 20 QC-passed cells in a class", "donor_class_counts": {d: sensitivity_counts.get(d, {}) for d in sensitivity}}
-        sensitivity_sec = 0.0
+    sensitivity_summary = {
+        "status": "not run per amendment A5 runtime scope",
+        "donors": list(sensitivity),
+        "donor_class_counts": {d: sensitivity_counts.get(d, {}) for d in sensitivity},
+    }
+    sensitivity_sec = 0.0
     type_strata = build_celltype_strata(primary_data, primary_summary, strict)
     result = {
         "schema_version": 1,
@@ -1281,7 +1268,7 @@ def run_full(
         },
         "protocol": {
             "path": "paper/trackA_yu2020/PROTOCOL.md",
-            "amendment": "A4",
+            "amendment": "A5",
             "protocol_sha256": hashes[str((PROTOCOL_DIR / "PROTOCOL.md").relative_to(PROJECT_ROOT))],
             "donor_table_sha256": hashes[str((PROTOCOL_DIR / "donors.tsv").relative_to(PROJECT_ROOT))],
             "appendix_sha256": hashes[str((PROJECT_ROOT / "paper" / "research_plan_complete_project_appendix.md").relative_to(PROJECT_ROOT))],
@@ -1324,7 +1311,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Frozen donor-held-out Track A Yu 2020 analysis")
     mode = parser.add_mutually_exclusive_group(required=True)
     mode.add_argument("--pilot", action="store_true", help="Run timing-only pilot; save no held-out predictions or scores")
-    mode.add_argument("--run", action="store_true", help="Run primary and eligible sensitivity analyses after pilot passes")
+    mode.add_argument("--run", action="store_true", help="Run the six-donor primary analysis after the A5 pilot passes")
     args = parser.parse_args()
     try:
         if args.pilot and TIMING_PILOT_PATH.exists():
@@ -1338,6 +1325,8 @@ def main() -> int:
             pilot_preflight = json.loads(pilot_path.read_text(encoding="utf-8"))
             if not pilot_preflight.get("passes_runtime_gate"):
                 raise StopRun("Timing pilot projects more than six hours; write and commit an amendment before changing the grid")
+            if pilot_preflight.get("amendment") != "A5" or pilot_preflight.get("pilot_cohort") != "primary_6_donor_sensitivity_not_run_A5" or pilot_preflight.get("projected_outer_fold_count") != 6:
+                raise StopRun("A5 requires a passing six-donor primary-only timing pilot")
         sealed_hashes = verify_hashes()
         if args.run:
             runner_key = str(Path(__file__).resolve().relative_to(PROJECT_ROOT))
@@ -1354,7 +1343,7 @@ def main() -> int:
         data_load_seconds = time.perf_counter() - load_started
         global_tie = tie_ranks(dataset.cells)
         if args.pilot:
-            return run_pilot(dataset, strict, sensitivity, hashes, data_load_seconds)
+            return run_pilot(dataset, strict, hashes, data_load_seconds)
         run_full(dataset, strict, sensitivity, global_tie, flow, hashes, data_load_seconds)
         return 0
     except StopRun as exc:
