@@ -1,0 +1,78 @@
+# Track B source-gate evidence record (2026-10-31)
+
+**Metadata and published documents only.** No target-mask voxel was read. No restricted file was downloaded. No author or school was contacted. No patient mask was scored. Amendment A-2026-10-31-R is still **not adopted**. The 64³ crop stays out of the required U-Net comparison.
+
+## Sources checked
+
+| ID | Source | Accessed |
+|---|---|---|
+| S1 | Mahmoud et al., "MU-Glioma Post: A comprehensive dataset of automated MR multi-sequence segmentation and clinical features", *Sci Data* 12, 1847 (2025), doi:10.1038/s41597-025-06011-7. Full text from Europe PMC, PMC12635165 (`fullTextXML`). | 2026-10-31 |
+| S2 | TCIA collection page, https://www.cancerimagingarchive.net/collection/mu-glioma-post/ (Version 1, updated 2025/03/21). | 2026-10-31 |
+| S3 | Duke Zenodo record https://zenodo.org/records/20548528 and the GBM-DIR-QA README (already in `paper/track_b_external_cohort_screen_2026-10-28.md`). Not re-fetched. | 2026-10-28 |
+| S4 | Local preflight record `output/fk_mu_pipeline_verification_20261029.json` (as cited in the cohort screen). | — |
+
+## Gate status
+
+| Gate | Evidence found | Status |
+|---|---|---|
+| **Cavity-label meaning (MU)** | S1 and S2: "Label 4: Resection Cavity (RC)". It covers post-surgical changes, including recent blood products and air foci and chronic CSF-isointense material. S1: automated labels were manually validated and refined by neuroradiologists, and cavity errors were corrected. | **Definition: source-backed (new).** The appendix rule (core = labels 1 or 3; cavity 4 excluded from the core) matches the source definitions. Limit: one released mask per visit, no inter-rater data; the cavity edge is not error-free truth. |
+| **MU label-zero meaning** | S1 and S2 define labels 1–4 only. Label 0 / background is not stated. Images are skull-stripped (S1: deep-learning brain extraction). | **Open.** No source says label 0 is a valid negative over the whole grid or inside the brain. |
+| **Valid target support (MU)** | No brain or support mask is released (S2). S1 describes skull-stripping only; no extraction mask or QC is listed. | **Open.** Nonzero-MRI support stays withdrawn: no source establishes it. |
+| **MRI-only registration evidence (MU)** | S1: each image was resampled to 1 mm³ and "co-registered to … SRI24 via rigid-body transformation using the CapTK/Greedy registration tool". S2 does not say whether timepoints were registered to each other. No per-case transform, QC metric or acceptance record is released. | **Open.** Atlas alignment per timepoint is documented. Visit-to-visit alignment and its QC are not. |
+| **Duke access** | S3. No local approval record found (`paper/`, `data/manifests/`, `vault/` checked by file search). The user reports a resubmission on 2026-10-29. | **Open (pending).** |
+| **School-use approval** | No local record found. | **Open (pending).** |
+
+**New fact, not a gate:** the S1 article text is CC BY-NC-ND 4.0. The data on TCIA are CC BY 4.0 (S2). Do not copy article figures or text into project outputs.
+
+**Source inconsistencies seen in S2 (for the record):** the 3T scan count appears as both n=318 and n=261 at 45.08%; the 2D/3D shares sum to 100.10%. These do not affect the gates.
+
+## Exact missing items
+
+1. MU: the meaning of label 0, and whether any region of the grid is unannotated or invalid.
+2. MU: a per-timepoint valid-region (brain/support) mask, or a written rule for one.
+3. MU: whether visits were registered to each other, or only to SRI24 one by one; and any per-case registration QC or acceptance record.
+4. Duke: written access approval and the license that applies.
+5. School: written approval for this use of the selected data and license.
+
+The no-scoring rule stays. The runner still refuses to score until the loader records the registration and target-support gates as passed.
+
+## Draft messages (for the user to review; NOT sent)
+
+### A. To the MU-Glioma-Post authors (updates the draft in the cohort screen)
+
+> **Subject:** MU-Glioma-Post: label 0, valid region and longitudinal registration
+>
+> Dear Dr. Mahmoud and colleagues,
+>
+> I am a student doing independent computational research with MU-Glioma-Post (TCIA, Version 1). Thank you for releasing it. The *Scientific Data* paper defines labels 1–4 clearly. I have three questions for a longitudinal tumor-growth evaluation:
+>
+> 1. What does label 0 mean? Is it a reviewed "no tumor" value everywhere inside the skull-stripped brain, or can it include regions that were not reviewed?
+> 2. Is the skull-stripping (brain) mask available for each timepoint? If not, is the nonzero region of the released images the intended valid region?
+> 3. Were the timepoints of each patient registered only to SRI24 one at a time, or also to each other? Are any per-case registration quality checks available?
+>
+> Short answers are enough. I do not need any identifying information.
+>
+> Thank you,
+> [name]
+
+### B. To the Duke dataset contact (status check only)
+
+> **Subject:** Access request status: Longitudinal GBM MRI dataset (Zenodo 20548528)
+>
+> Hello,
+>
+> I resubmitted my access request on 2026-10-29 with the research purpose and license details you asked for. Could you tell me its status, and which license (CC BY-NC-ND 4.0 or the custom Duke license) would apply? I will not download any file before approval.
+>
+> Thank you,
+> [name]
+
+### C. To the school (use approval)
+
+> **Subject:** Approval to use public and restricted MRI research datasets
+>
+> Hello,
+>
+> For independent computational research I want to use (1) MU-Glioma-Post from The Cancer Imaging Archive, a de-identified public dataset under CC BY 4.0, and (2) if access is granted, a de-identified Duke longitudinal GBM MRI dataset under CC BY-NC-ND 4.0 or a Duke license. I will only analyse the data on my own computer. I will not share the data or derived images. Could you confirm in writing whether this use is approved, and whether any review is needed first?
+>
+> Thank you,
+> [name]
