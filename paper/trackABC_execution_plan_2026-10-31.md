@@ -12,27 +12,23 @@ This roadmap adds execution order and stop rules. It does not replace a frozen p
 4. Treat 6/10 as earned only when a focused prior-art review identifies a narrow gap and a frozen test supports it against strong controls. Treat 7/10 as a stretch requiring stronger independent confirmation or a clear new scientific insight. Do not promise either score or claim “first.”
 5. A result that fails its frozen rule is still a completed result. Do not tune again after test outcomes are seen.
 
-## Track A — donor-held-out molecular prediction and external signature test
+## Track A — donor-held-out molecular prediction; external confirmation unavailable
 
-**Current status.** The Yu 2020 donor-held-out run has no scores or `result.json`. The sealed A2 runner's timing pilot stopped before held-out prediction. Its conservative lower bound for all 14 planned outer folds is 10.89 hours, above the six-hour gate. A3 blocks scoring under the A2 grid. See `paper/trackA_yu2020/PROTOCOL.md` and `output/trackA_yu2020/pilot_timing.json`.
+**Current status (2026-11-01).** The frozen A5 Yu 2020 analysis completed on its six primary donors: GS1, GS2, GS3, GS5, GS6, and GS13. The candidate's mean class-balanced AURC was lower than logistic regression (0.1479 vs. 0.1764), but it won in only four of six donors; the frozen success rule fails. Cell-type-only performance was within the frozen 0.05 margin of the best mapped-cell expression model. The eight-donor sensitivity analysis was not run. This is within-cohort donor-held-out validation, not independent external confirmation or a malignant-cell-only test. Results and limits: `output/trackA_yu2020/result.json` and `paper/trackA_execution_audit_20261031.md`.
 
-### A1. Complete the Yu 2020 analysis within the runtime gate
+The metadata-only screen found no new public, no-request cohort that clears all gates. SNUH has six pairs but prior project exposure; GSE286419 retains at most four source-validated regional pairs; GSE318564 has three explicit IDH-wildtype pairs and an unresolved annotation join; HRA009021 lacks a public sample-to-region crosswalk and verified reuse terms. Keep all outside data out of the current figure. Pause broad scouting until a specific new accession appears. Full comparison, novelty limits, controls, and stop rules: `paper/trackA_novelty_decision_20261101.md`.
 
-1. Prepare a dated protocol amendment and matching runner/checksum update before another expression-value read or any held-out scoring. First seek output-preserving runtime improvements. If these do not meet the gate, reduce the tuning grid or model scope in the amendment. Do not remove a model or change a setting silently.
-2. Preserve donor-held-out splits, training-only filtering and scaling, the class-balanced AURC primary endpoint, the logistic-regression comparator, and the frozen descriptive success rule where feasible. The candidate qualifies as “better (descriptive)” only if mean AURC is lower and candidate AURC is lower for at least five of six primary donors.
-3. Run a timing pilot for the exact amended scope. Include loading and overhead in the projection. Do not score held-out donors unless the projected full run fits the six-hour limit.
-4. Target all eligible primary and sensitivity donors if the amended design passes the runtime gate. If it still fails, amend the scope before scoring: retain the six-donor primary cohort and label the eight-donor sensitivity cohort “not run.” Pilot the revised scope again.
-5. Run once on the frozen design. Save `output/trackA_yu2020/result.json` only after all required folds finish. Read it back and verify hashes, donor list, cell flow, per-donor/per-cell-type metrics, runtime, and implementation choices. Report results unchanged, including a negative result.
+### A1. Report the frozen result without retuning
 
-### A2. Test a separate Core/Periphery signature for external transfer
+1. Preserve the completed A5 result and protocol. Report the candidate's failed donor-level success rule, all required baselines and ablations, cell-type composition diagnostic, point-size diagnostic, and within-cell-type limits as recorded. Make no additional post-score tests, tuning, or biological claims.
+2. Distinguish the six held-out donors inside the Yu cohort from an independent cohort. Do not describe A5 as malignant-cell-only validation or as external transfer.
+3. Keep the internal novelty estimate unchanged. Current evidence does not support a higher claim. See `paper/trackA_novelty_decision_20261101.md`.
 
-This is a distinct study from the Yu 2020 classifier. Use the atlas only after confirming source labels, donor mapping, malignant-cell labels, assay compatibility, and reuse terms. Stop if any of these gates fail.
+### A2. Reopen external validation only for a named lead
 
-1. Finish a focused prior-art review. State a narrow question: does a donor-stable, malignant-cell Core/Periphery signature transfer to independent anatomical-region samples beyond normal-brain contamination and established cell-state signals?
-2. Build the signature on atlas donors only. Use leave-one-donor-out checks; retain genes with the same direction in at least six of seven eligible donors, if seven pass source checks.
-3. Before accessing Ivy GAP expression values, freeze the signature, patient-level endpoint, comparators, scoring code, and pass rule. Check data terms and obtain the user's approval before any download.
-4. Score Ivy GAP once by patient. Compare with normal-brain contamination markers, Neftel cell-state scores, a prior Core/Periphery signature, and 1,000 size-matched random gene sets. Use patient-level bootstrap intervals. The candidate passes its stated rule only if it exceeds the contamination score with an interval above zero, exceeds the random-set 95th percentile, and remains associated after adjustment for contamination.
-5. If the rule fails, report no external transfer. A pass could support a narrow novelty claim near 6/10; small patient count limits precision. A 7/10 claim needs independent replication or stronger evidence.
+Require, before any download, scoring, or figure change: at least six IDH-wildtype patients with public metadata mapping both regions to the same donor; defensible cell-level malignant labels; clear no-request access and reuse terms; exact sample-ID checks against training and prior-use records; and verified independence from all previously used cohorts. Use donor as the unit, keep all samples/cells from each donor together, and freeze paired donor-level endpoints and controls before any expression read. Stop on any missing map, ambiguous label, unclear term, overlap, or donor count below six. Spatial spots alone do not satisfy the malignant-cell-label gate.
+
+Do not use Ivy GAP, SNUH, or another exposed cohort as untouched confirmation. Do not resume broad scouting. A specific public accession may be screened metadata-only against every gate; if none appears, report external confirmation as unavailable.
 
 ## Track B — patient-level PDE forecast with uncertainty and failure checks
 
