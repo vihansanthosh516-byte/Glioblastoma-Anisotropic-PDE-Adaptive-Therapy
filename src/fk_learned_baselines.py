@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from dataclasses import dataclass, asdict
+import hashlib
 
 import numpy as np
 import torch
@@ -31,6 +32,8 @@ class UNetRecipe:
     threshold: float = 0.5
     dice_smoothing: float = 1.0
     leaky_slope: float = 0.01
+    # None = frozen full-grid recipe. An integer is the PROPOSED, NOT ADOPTED history-centred cube crop.
+    crop_voxels: int | None = None
 
 
 UNET_RECIPE = UNetRecipe()
@@ -173,6 +176,41 @@ def predict_unet(trained: Mapping, inputs, *, domain) -> dict:
     return {"mask": mask, "probability": mean, "seed_probabilities": probs}
 
 
+def history_crop_box(history_core, shape, size: int) -> tuple[slice, ...]:
+    """Cube of ``size`` voxels centred on the history core's centroid, shifted to lie inside the grid.
+
+    Only the visit-2 (history) core sets the box. Axes shorter than ``size`` use the whole axis.
+    """
+    core = _mask(history_core, name="history core")
+    if not core.any():
+        raise ValueError("crop needs a nonempty history core")
+    centre = np.rint(np.argwhere(core).mean(axis=0)).astype(int)
+    box = []
+    for c, n in zip(centre, shape):
+        width = min(int(size), int(n))
+        start = int(np.clip(c - width // 2, 0, n - width))
+        box.append(slice(start, start + width))
+    return tuple(box)
+
+
+def uncrop_mask(mask, box, shape) -> np.ndarray:
+    full = np.zeros(shape, dtype=bool)
+    full[box] = mask
+    return full
+
+
+def unet_training_fingerprint(patient_ids, pairs, *, fold: int, recipe: UNetRecipe) -> str:
+    """SHA-256 over everything that determines the trained U-Net models (inputs, targets, fold, recipe)."""
+    h = hashlib.sha256()
+    h.update(repr((int(fold), sorted(asdict(recipe).items()))).encode())
+    for pid, (x, y) in zip(patient_ids, pairs):
+        h.update(str(pid).encode())
+        h.update(np.ascontiguousarray(x, dtype=np.float32).tobytes())
+        h.update(np.packbits(np.asarray(y, bool)).tobytes())
+        h.update(repr((tuple(x.shape), tuple(y.shape))).encode())
+    return h.hexdigest()
+
+
 # ---------------------------------------------------------------- count model
 
 def new_label_pieces(previous, current, *, spacing_mm, domain=None) -> int:
@@ -197,7 +235,8 @@ def fit_count_model(counts, log_volumes, intervals_days) -> dict:
     t = np.asarray(intervals_days, float)
     if y.size == 0 or np.any(t <= 0) or np.any(y < 0):
         raise ValueError("count model needs nonnegative counts and positive intervals")
-    mean_rate = float(y.sum() / t.sum())
+    # A zero training total would give rate 0 and infinite deviance for any new piece; add 0.5 to the count.
+    mean_rate = float((y.sum() if y.sum() > 0 else 0.5) / t.sum())
     out = {"mean_rate_per_day": mean_rate, "n_training": int(y.size)}
     lv = np.asarray(log_volumes, float)
     usable = np.isfinite(lv)
@@ -256,7 +295,7 @@ def add_learned_baselines_arm(fit_nuisance, forecast, fallback_forecast, score, 
         training_records = tuple(training_records)
         fold = fold_counter["next"]
         fold_counter["next"] += 1
-        pairs, counts, log_vols, gaps, excluded = [], [], [], [], 0
+        pairs, pair_ids, counts, log_vols, gaps, excluded, outside_crop = [], [], [], [], [], 0, 0
         for r in training_records:
             dom = _mask(domain_by_patient[r.patient_id], name="domain")
             v1, v2, v3 = (_mask(m, name="mask") & dom for m in r.masks[:3])
@@ -267,25 +306,42 @@ def add_learned_baselines_arm(fit_nuisance, forecast, fallback_forecast, score, 
             if not v2.any():
                 excluded += 1
                 continue
-            pairs.append((unet_inputs(v1, v2, dom), v3))
+            x = unet_inputs(v1, v2, dom)
+            if recipe.crop_voxels:
+                box = history_crop_box(v2, v2.shape, recipe.crop_voxels)
+                outside_crop += int(v3.sum() - v3[box].sum())
+                x, v3 = x[(slice(None),) + box], v3[box]
+            pairs.append((x, v3))
+            pair_ids.append(r.patient_id)
         unet = train_unet_models(pairs, fold=fold, recipe=recipe)
         unet["n_training_empty_history_excluded"] = excluded
+        unet["training_fingerprint"] = unet_training_fingerprint(pair_ids, pairs, fold=fold, recipe=recipe)
+        unet["training_target_voxels_outside_crop"] = outside_crop
         return {"base": fit_nuisance(training_records), "unet": unet,
                 "count": fit_count_model(counts, log_vols, gaps)}
 
     def _add(prediction, history, fitted):
         dom = _mask(domain_by_patient[history.patient_id], name="domain")
         v1, v2 = (_mask(m, name="history mask") & dom for m in history.masks[:2])
+        box = None
         if not v2.any():
             unet_mask, status = v2.copy(), "empty_history_copy_last"
         elif fitted["unet"]["status"] != "ok":
             unet_mask, status = None, "unavailable"
         else:
-            unet_mask, status = predict_unet(fitted["unet"], unet_inputs(v1, v2, dom), domain=dom)["mask"], "forecast"
+            x = unet_inputs(v1, v2, dom)
+            if recipe.crop_voxels:
+                box = history_crop_box(v2, v2.shape, recipe.crop_voxels)
+                cropped = predict_unet(fitted["unet"], x[(slice(None),) + box], domain=dom[box])["mask"]
+                unet_mask = uncrop_mask(cropped, box, v2.shape)
+            else:
+                unet_mask = predict_unet(fitted["unet"], x, domain=dom)["mask"]
+            status = "forecast"
         log_v = np.log(v2.sum() * voxel_mm3) if v2.any() else np.nan
         if not isinstance(prediction, Mapping):
             prediction = {"fallback_masks": {"hybrid": prediction, "no_pde": prediction}, "history_mask": v2}
-        return {**prediction, "_unet_mask": unet_mask, "_unet_status": status,
+        return {**prediction, "_unet_mask": unet_mask, "_unet_status": status, "_unet_crop_box": box,
+                "_unet_fingerprint": fitted["unet"].get("training_fingerprint"),
                 "_count_rate_per_day": count_rate_per_day(fitted["count"], log_v),
                 "_count_mean_rate_per_day": float(fitted["count"]["mean_rate_per_day"]),
                 "_count_status": fitted["count"]["status"], "_history_last_day": float(history.days[-1])}
@@ -304,6 +360,11 @@ def add_learned_baselines_arm(fit_nuisance, forecast, fallback_forecast, score, 
         target_mask = _mask(target.mask, name="target")
         support = None if valid_support_by_patient is None else _mask(valid_support_by_patient[pid], name="support")
         scores["unet_status"] = prediction["_unet_status"]
+        scores["unet_training_fingerprint"] = prediction["_unet_fingerprint"]
+        if prediction["_unet_crop_box"] is not None:
+            # Target core outside the history-only crop cannot be predicted; it stays in the target as a miss.
+            scores["unet_target_voxels_outside_crop"] = int(
+                target_mask.sum() - target_mask[prediction["_unet_crop_box"]].sum())
         if prediction["_unet_mask"] is not None:
             m = prediction["_unet_mask"]
             tm = target_mask

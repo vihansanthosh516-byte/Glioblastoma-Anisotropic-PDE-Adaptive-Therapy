@@ -216,3 +216,92 @@ def test_forecast_mask_identical_when_test_target_changes():
     for pid, f in folds.items():
         if f == 0:
             assert (a[pid] is None and b[pid] is None) or np.array_equal(a[pid], b[pid])
+
+
+# ---- Proposed (not adopted) history-centred crop, and U-Net reuse check ----
+CROP = dataclasses.replace(FAST, crop_voxels=16)
+BIG = (32, 32, 20)
+
+
+def test_frozen_recipe_has_no_crop():
+    assert lb.UNET_RECIPE.crop_voxels is None
+
+
+def test_crop_box_uses_history_only_and_stays_inside_grid():
+    v2 = _ball(4, c=(16, 16, 10), shape=BIG)
+    box = lb.history_crop_box(v2, BIG, 16)
+    assert [s.stop - s.start for s in box] == [16, 16, 16] and box[0] == slice(8, 24)
+    edge = _ball(2, c=(1, 30, 19), shape=BIG)
+    box = lb.history_crop_box(edge, BIG, 16)
+    assert box[0] == slice(0, 16) and box[1] == slice(16, 32) and box[2] == slice(4, 20)
+    assert lb.history_crop_box(v2, (32, 32, 5), 16)[2] == slice(0, 5)
+    with pytest.raises(ValueError):
+        lb.history_crop_box(np.zeros(BIG, bool), BIG, 16)
+
+
+def test_uncrop_maps_back_to_full_grid():
+    box = (slice(2, 6), slice(3, 7), slice(1, 5))
+    small = np.zeros((4, 4, 4), bool)
+    small[0, 0, 0] = small[3, 3, 3] = True
+    full = lb.uncrop_mask(small, box, BIG)
+    assert full.shape == BIG and full.sum() == 2 and full[2, 3, 1] and full[5, 6, 4]
+
+
+def _big_cohort(n=10, far_piece=True):
+    records, folds, domains = [], {}, {}
+    for i in range(n):
+        pid = f"b{i:02d}"
+        v3 = _ball(8, c=(16, 16, 10), shape=BIG)
+        if far_piece:
+            v3 = v3.copy()
+            v3[0:2, 0:2, 0:2] = True  # outside any 16-voxel box centred at the core
+        records.append(PatientSeries(pid, [0.0, 30.0, 30.0 + 80 + i],
+                                     [_ball(4, c=(16, 16, 10), shape=BIG), _ball(6, c=(16, 16, 10), shape=BIG), v3]))
+        folds[pid] = i % 5
+        domains[pid] = np.ones(BIG, bool)
+    return records, folds, domains
+
+
+def _capture_run(records, folds, domains, recipe, base_tag):
+    captured = {}
+
+    def fit(training):
+        return {"tag": base_tag}  # stands in for the prior-bound-dependent PDE nuisance
+
+    def fc(h, _n):
+        last = np.asarray(h.masks[-1], bool)
+        return {"fallback_masks": {"hybrid": last, "no_pde": last, "persistence": last}, "history_mask": last}
+
+    f, c, b, s = lb.add_learned_baselines_arm(fit, fc, fc, lambda p, t: {"dice_hybrid": 0.0},
+                                              domain_by_patient=domains, spacing_mm=(2, 2, 2), recipe=recipe)
+
+    def c2(h, n):
+        out = c(h, n)
+        captured[h.patient_id] = (out["_unet_mask"], out["_unet_fingerprint"], out["_unet_crop_box"])
+        return out
+    cv = run_first_third_90day_patient_cv(records, folds, f, c2, s, fallback_forecast=b, n_folds=5)
+    return captured, cv
+
+
+def test_cropped_prediction_is_zero_outside_box_and_outside_target_is_a_miss():
+    records, folds, domains = _big_cohort()
+    captured, cv = _capture_run(records, folds, domains, CROP, "primary")
+    for row in cv["rows"]:
+        assert row["scores"]["unet_target_voxels_outside_crop"] == 8
+    for mask, _fp, box in captured.values():
+        if mask is not None:
+            outside = mask.copy()
+            outside[box] = False
+            assert not outside.any() and mask.shape == BIG
+
+
+def test_unet_identical_across_prior_runs_but_not_gap_subset():
+    records, folds, domains = _big_cohort(far_piece=False)
+    a, _ = _capture_run(records, folds, domains, FAST, "primary_bounds")
+    b, _ = _capture_run(records, folds, domains, FAST, "narrower_bounds")
+    for pid in a:
+        assert a[pid][1] == b[pid][1]
+        assert (a[pid][0] is None and b[pid][0] is None) or np.array_equal(a[pid][0], b[pid][0])
+    subset = [r for r in records if r.patient_id not in ("b00",)]
+    c, _ = _capture_run(subset, {r.patient_id: folds[r.patient_id] for r in subset}, domains, FAST, "gap")
+    assert any(c[pid][1] != a[pid][1] for pid in c)

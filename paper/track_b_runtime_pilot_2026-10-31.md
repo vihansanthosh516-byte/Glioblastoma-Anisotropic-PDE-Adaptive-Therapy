@@ -58,3 +58,92 @@ PDE cost (about 52 hours per analysis, lower bound) is a separate problem. Optio
 - Synthetic balls are simpler than real masks. PDE time may depend on tumor size and posterior shape.
 - One U-Net process with 8 threads; the record does not capture other machine load.
 - The PDE count of forecasts per analysis is an assumption; the true number may be higher.
+
+---
+
+## Second pilot: U-Net reuse check and measured 64³ crop (2026-10-31)
+
+**Still synthetic only. No patient data was read. The crop and the reuse are PROPOSED, NOT ADOPTED. The frozen recipe is unchanged** (`UNET_RECIPE.crop_voxels = None`).
+
+Record: `output/track_b_timing_pilot_20261031/crop_timing_record.json` (created 2026-11-01T02:48 UTC). Same PC, same scratch copy and same torch build as above. Command: `python -m src.fk_track_b_timing_pilot --crop-pilot`.
+
+### U-Net reuse across the three prior-support runs: inputs verified identical
+
+`run_mu_first_two_to_third_with_prior_sensitivity` (`src/fk_mu_patient_runner.py`) calls the runner three times with the same `cohort` and the same `runner_options`. Only `rho_bounds` and `D_bounds` change between the calls.
+
+| Item | Same across the three prior runs? | Why |
+|---|---|---|
+| Training inputs (visit-1 core, visit-2 core, origin domain) | yes | same cohort records and `origin_domain_by_patient` |
+| Training targets (visit-3 core ∩ domain) | yes | same records |
+| Fold membership | yes | same `cohort.fold_by_patient`; folds run in order 0–4 |
+| Preprocessing (padding, crop if any) | yes | depends only on the masks |
+| Seeds | yes | each runner call builds a fresh wrapper, so the fold counter restarts at 0; seed = 20261102 + fold + offset |
+| Recipe | yes | `UNET_RECIPE`, not a runner option |
+| PDE prior bounds | **not used by the U-Net** | the U-Net fit never reads the base nuisance |
+
+The central-gap refit uses a smaller patient set, so its inputs are different. It stays separate.
+
+**Code check.** Each fold now records `unet_training_fingerprint`. This is a SHA-256 over the patient IDs, the input and target arrays, the fold and the recipe (`src/fk_learned_baselines.py:unet_training_fingerprint`). The test `test_unet_identical_across_prior_runs_but_not_gap_subset` runs the arm twice with different base nuisances. The fingerprints and the U-Net masks match exactly. A patient subset gives a different fingerprint.
+
+**Limit.** On real hardware, identical models also need the same torch build and thread count. The fingerprint does not prove that.
+
+Reuse is **not wired in**. If reuse is adopted, reuse a model only when its fingerprint matches.
+
+### Measured timing (40 timed steps each, same session)
+
+| Arm | Padded input | Step mean (min–max) | Predict, 3 seeds, 1 patient | Peak memory |
+|---|---|---|---|---|
+| Full grid, rerun | 120 × 120 × 80 | 5.340 s (5.081–6.881) | 2.88 s | 2.20 GB |
+| 64³ history crop | 64 × 64 × 64 | 1.735 s (1.545–2.920) | 1.24 s | 0.95 GB |
+
+**Measured crop speed-up: 5.340 / 1.735 = 3.08× per step.** This is lower than the 4.4× that voxel count alone suggested.
+
+The full-grid step in this rerun (5.34 s) was faster than in the first pilot (6.94 s). Step time varied by about 25% between runs.
+
+### Projection (not measured)
+
+Assumptions:
+- Each analysis has 72 training pairs × 300 epochs × 3 seeds = 64,800 U-Net steps, at the mean step time.
+- PDE hours are the first pilot's lower bound (51.8 h per analysis), times four. The PDE is never reused.
+- With reuse, the central-gap U-Net is counted at full size, so that figure is an upper figure.
+- Prediction time is not added.
+
+| Scenario | U-Net h per analysis | Protocol-complete CPU hours (4 analyses) |
+|---|---|---|
+| Frozen full grid, no reuse | 96.1 (max step 123.9) | 591.7 |
+| Frozen full grid, with reuse | 96.1 | 399.5 |
+| 64³ crop, no reuse | 31.2 (max step 52.6) | 332.2 |
+| 64³ crop, with reuse | 31.2 | 269.7 |
+
+With crop and reuse, the U-Net share is 62.4 h. **The PDE lower bound (207.3 h over four analyses) is now the main cost.**
+
+Track B has no fixed time cap. These figures are resource needs, not a pass or a fail.
+
+### Draft amendment wording (NOT ADOPTED; do not apply until the user approves)
+
+> **Track B amendment A-2026-10-31-U (draft).**
+>
+> (1) The fold-trained U-Net is trained once per outer fold for the primary cohort. It is reused unchanged in the one-decade-narrower and one-decade-wider prior-support analyses, but only if its recorded training fingerprint matches. The central-gap refit trains its own models.
+>
+> (2) U-Net inputs and training targets are cropped to a 64 × 64 × 64-voxel (128 mm) cube. The cube is centred on the rounded centroid of the visit-2 core and shifted to lie inside the grid. Only the visit-2 core sets the cube. Predictions are mapped back to the full grid, with zeros outside the cube. Target core outside the cube stays in the target and counts as a miss; its voxel count is reported per patient.
+>
+> All other U-Net settings stay as frozen: widths 16/32/64/128, Adam 1e-3, 300 epochs, three seeds, 0.5 threshold.
+>
+> Adopted on [date], before any Track B target mask is opened.
+
+**How the crop changes the estimand and fairness.**
+- **Estimand:** it does not change. It stays plain patient-macro Dice of the full-grid tumor core, with all arms scored on the same full target.
+- **U-Net handicap:** the U-Net loses the ability to predict tumor more than about 64 mm from the visit-2 centroid. Distant new tumor counts as a miss for the U-Net only. Fixed growth, PDE and persistence keep the full grid.
+- **Who it favours:** the crop can only lower the U-Net's Dice, which makes the U-Net an easier baseline to beat. So it favours the candidate.
+- **What to report:** per-patient target voxels outside the crop. If any patient has them, report the U-Net comparison with and without those patients as a sensitivity check. Do not claim a win over the U-Net that depends on those patients.
+- **Reuse:** it does not change any U-Net forecast, so it does not affect fairness.
+
+## Remaining gates (unchanged)
+
+These are all still open:
+- Source-backed valid support.
+- MRI-only registration QC.
+- Cavity meaning, from source documents.
+- Duke access and school approval.
+
+No patient mask has been read or scored. The PDE runtime (≥ 51.8 h per analysis) needs a separate decision.

@@ -59,13 +59,19 @@ def _peak_gb():
     return float(getattr(info, "peak_wset", info.rss)) / 1e9
 
 
-def arm_unet():
+def arm_unet(crop_voxels=None, timed_steps=UNET_TIMED_STEPS):
     import torch
     from src import fk_learned_baselines as lb
     patients, domain = synthetic_cohort()
     r = lb.UNET_RECIPE
-    pairs = [(lb.unet_inputs(p["masks"][0], p["masks"][1], domain), p["masks"][2]) for p in patients[:2]]
-    padded = lb._padded_shape(GRID_SHAPE, len(r.widths))
+    pairs = []
+    for p in patients[:2]:
+        x, y = lb.unet_inputs(p["masks"][0], p["masks"][1], domain), p["masks"][2]
+        if crop_voxels:
+            box = lb.history_crop_box(p["masks"][1], GRID_SHAPE, crop_voxels)
+            x, y = x[(slice(None),) + box], y[box]
+        pairs.append((x, y))
+    padded = lb._padded_shape(pairs[0][1].shape, len(r.widths))
     xs = [torch.from_numpy(np.stack([lb._pad(c, padded) for c in x]))[None] for x, _ in pairs]
     ys = [torch.from_numpy(lb._pad(y.astype(np.float32), padded))[None, None] for _, y in pairs]
     torch.use_deterministic_algorithms(True)
@@ -75,7 +81,7 @@ def arm_unet():
     opt = torch.optim.Adam(model.parameters(), lr=r.learning_rate, betas=r.betas, weight_decay=r.weight_decay)
     model.train()
     times = []
-    for step in range(UNET_TIMED_STEPS + 2):
+    for step in range(timed_steps + 2):
         x, y = xs[step % 2], ys[step % 2]
         for axis in (2, 3, 4):
             if gen.random() < 0.5:
@@ -95,7 +101,7 @@ def arm_unet():
         for _ in range(r.n_seeds):
             torch.sigmoid(model(xs[0]))
     predict_s = time.perf_counter() - t
-    return {"padded_shape": list(padded), "n_parameters": int(sum(p.numel() for p in model.parameters())),
+    return {"crop_voxels": crop_voxels, "padded_shape": list(padded), "n_parameters": int(sum(p.numel() for p in model.parameters())),
             "timed_steps": len(steady), "step_seconds_mean": float(np.mean(steady)),
             "step_seconds_min": float(np.min(steady)), "step_seconds_max": float(np.max(steady)),
             "warmup_step_seconds": [float(v) for v in times[:2]],
@@ -159,6 +165,15 @@ def arm_pde():
     return out
 
 
+def arm_unet_full_rerun():
+    return arm_unet(None, timed_steps=40)
+
+
+def arm_unet_crop64():
+    return arm_unet(64, timed_steps=40)
+
+
+CROP_ARMS = {"unet_full_rerun": arm_unet_full_rerun, "unet_crop64": arm_unet_crop64}
 ARMS = {"unet": arm_unet, "fixed_growth": arm_fixed_growth, "count": arm_count, "pde_hybrid": arm_pde}
 
 
@@ -196,14 +211,19 @@ def project(arms):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--arm", choices=sorted(ARMS))
+    parser.add_argument("--arm", choices=sorted({**ARMS, **CROP_ARMS}))
+    parser.add_argument("--crop-pilot", action="store_true",
+                        help="time the full grid and the proposed (not adopted) 64^3 crop; write a separate record")
     args = parser.parse_args()
     if args.arm:
         t = time.perf_counter()
-        result = ARMS[args.arm]()
+        result = {**ARMS, **CROP_ARMS}[args.arm]()
         result["arm_wall_seconds"] = time.perf_counter() - t
         result["peak_memory_gb"] = _peak_gb()
         print(json.dumps(result))
+        return
+    if args.crop_pilot:
+        crop_main()
         return
     arms = {}
     for name in ARMS:
@@ -223,6 +243,58 @@ def main():
     }
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     path = OUTPUT_DIR / "timing_record.json"
+    if path.exists():
+        raise FileExistsError(f"refusing to overwrite {path}")
+    path.write_text(json.dumps(record, indent=2))
+    print(json.dumps(record["projection"], indent=2))
+
+
+def _run_arm(name):
+    proc = subprocess.run([sys.executable, "-m", "src.fk_track_b_timing_pilot", "--arm", name],
+                          cwd=PROJECT_ROOT, capture_output=True, text=True, check=True)
+    return json.loads(proc.stdout.strip().splitlines()[-1])
+
+
+def crop_main():
+    """Second pilot: full grid rerun and 64^3 crop, same session, same machine. Proposal only, not adopted."""
+    from src.fk_learned_baselines import UNET_RECIPE as r
+    arms = {name: _run_arm(name) for name in CROP_ARMS}
+    first = json.loads((OUTPUT_DIR / "timing_record.json").read_text())
+    pde_h = first["projection"]["pde_hours_one_analysis_lower_bound"]
+    steps = sum(FOLD_TRAIN_SIZES) * r.epochs * r.n_seeds
+    gap_steps = steps  # central-gap subset is smaller; using the full count keeps this an upper figure
+    out = {}
+    for name, arm in arms.items():
+        unet_h = steps * arm["step_seconds_mean"] / 3600
+        out[name] = {
+            "unet_hours_one_analysis_mean_step": unet_h,
+            "unet_hours_one_analysis_max_step": steps * arm["step_seconds_max"] / 3600,
+            "protocol_complete_hours_no_reuse": 4 * unet_h + 4 * pde_h,
+            "protocol_complete_hours_with_reuse": unet_h + gap_steps * arm["step_seconds_mean"] / 3600 + 4 * pde_h,
+        }
+    record = {
+        "schema_version": 1,
+        "created_utc": datetime.now(timezone.utc).isoformat(),
+        "evidence_scope": "synthetic-only runtime pilot; no patient data read; not patient-result evidence",
+        "status": "crop and U-Net reuse are PROPOSED, NOT ADOPTED; frozen recipe unchanged",
+        "grid_shape": list(GRID_SHAPE), "spacing_mm": SPACING_MM, "n_synthetic_patients": N_PATIENTS,
+        "fold_train_sizes": list(FOLD_TRAIN_SIZES),
+        "machine": {"platform": platform.platform(), "processor": platform.processor(),
+                    "cpu_count": os.cpu_count(), "python": platform.python_version()},
+        "arms": arms,
+        "pde_hours_one_analysis_lower_bound_from_first_pilot": pde_h,
+        "projection": {
+            "assumptions": [
+                "U-Net steps per analysis = 72 pairs x 300 epochs x 3 seeds, constant step time",
+                "PDE hours are the first pilot's lower bound, times four analyses; PDE is not reused",
+                "with reuse: one U-Net training for the three prior-support runs plus one for the central-gap "
+                "refit, which is counted at full size (upper figure)",
+                "prediction time is small next to training and is not added",
+            ],
+            **out,
+        },
+    }
+    path = OUTPUT_DIR / "crop_timing_record.json"
     if path.exists():
         raise FileExistsError(f"refusing to overwrite {path}")
     path.write_text(json.dumps(record, indent=2))
