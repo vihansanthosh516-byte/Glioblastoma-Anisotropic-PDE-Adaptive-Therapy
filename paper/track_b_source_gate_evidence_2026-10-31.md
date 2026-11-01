@@ -36,43 +36,76 @@
 
 The no-scoring rule stays. The runner still refuses to score until the loader records the registration and target-support gates as passed.
 
-## Draft messages (for the user to review; NOT sent)
+## Pass evidence per gate
 
-### A. To the MU-Glioma-Post authors (updates the draft in the cohort screen)
+A gate passes only on written evidence that meets its rule. Record the date, sender and file of each reply. An informal or partial answer leaves the gate open.
 
-> **Subject:** MU-Glioma-Post: label 0, valid region and longitudinal registration
+| Gate | Pass evidence | Not enough |
+|---|---|---|
+| Cavity label meaning | Passed (S1, S2). Limit: one released mask per visit, refined by neuroradiologists, no inter-rater data, so the cavity edge is not error-free truth. | — |
+| MU label 0 | A written statement from the dataset authors or TCIA that defines label 0, and says where in the grid it is a reviewed "no tumor" value. | Our own reading of masks; BraTS convention by analogy. |
+| Valid target support | A released per-timepoint support/brain mask, or a written support rule from the authors or TCIA that we can apply without target labels. | Nonzero MRI voxels, image-intensity rules, atlas brain masks, or any rule we define ourselves. |
+| Registration evidence | A written statement of how the visits of one patient relate (only per-visit rigid to SRI24, or also visit-to-visit), plus per-case QC records or a documented accepted review procedure. | Header match, visual overlap, or a registration quality score we compute ourselves. |
+| Duke access | A written approval from Duke that names the license, the allowed use, and the rules for derived data. | A pending request; a Zenodo page alone. |
+| School approval | A written approval from the school for this secondary-data use, or a written statement that no review is needed, with any conditions. | Verbal approval. |
+
+## Draft messages (reviewed 2026-10-31; ready for the user to send; NOT sent)
+
+Corrections from the earlier draft:
+- MU question 2 no longer offers nonzero MRI voxels as a support rule. That rule is withdrawn and must not be suggested.
+- MU now asks for per-case QC records directly, and for a written rule if no mask exists.
+- Duke now asks for use and derived-data conditions.
+- School now asks what review is needed, not only for a yes or no.
+
+### A. To the MU-Glioma-Post authors (contact via the corresponding author of S1 or the TCIA helpdesk)
+
+> **Subject:** MU-Glioma-Post (TCIA, Version 1): label 0, valid region and longitudinal registration
 >
 > Dear Dr. Mahmoud and colleagues,
 >
-> I am a student doing independent computational research with MU-Glioma-Post (TCIA, Version 1). Thank you for releasing it. The *Scientific Data* paper defines labels 1–4 clearly. I have three questions for a longitudinal tumor-growth evaluation:
+> I am a student doing independent computational research with MU-Glioma-Post (TCIA, Version 1, updated 2025/03/21). Thank you for releasing it. Your *Scientific Data* paper (12, 1847, 2025) defines labels 1–4. I want to evaluate tumor-growth forecasts between visits, and I have three questions.
 >
-> 1. What does label 0 mean? Is it a reviewed "no tumor" value everywhere inside the skull-stripped brain, or can it include regions that were not reviewed?
-> 2. Is the skull-stripping (brain) mask available for each timepoint? If not, is the nonzero region of the released images the intended valid region?
-> 3. Were the timepoints of each patient registered only to SRI24 one at a time, or also to each other? Are any per-case registration quality checks available?
+> 1. **Label 0.** What does label 0 mean in the segmentation files? Is it a reviewed "no tumor" value everywhere in the image grid, only inside the brain, or can it include regions that were not reviewed?
+> 2. **Valid region.** Is a per-timepoint brain or valid-region mask available (for example, the skull-stripping mask)? If not, is there a rule you recommend for the region where the segmentations can be treated as complete?
+> 3. **Registration between visits.** The paper says each image was rigidly registered to SRI24 with CaPTk/Greedy. Was each timepoint registered to SRI24 on its own, or were a patient's timepoints also registered to each other? Are per-case registration quality checks or acceptance records available, or is there a documented review procedure?
 >
-> Short answers are enough. I do not need any identifying information.
->
-> Thank you,
-> [name]
-
-### B. To the Duke dataset contact (status check only)
-
-> **Subject:** Access request status: Longitudinal GBM MRI dataset (Zenodo 20548528)
->
-> Hello,
->
-> I resubmitted my access request on 2026-10-29 with the research purpose and license details you asked for. Could you tell me its status, and which license (CC BY-NC-ND 4.0 or the custom Duke license) would apply? I will not download any file before approval.
+> Short answers, or a pointer to documentation, are enough. I do not need any identifying information.
 >
 > Thank you,
 > [name]
 
-### C. To the school (use approval)
+### B. To the Duke dataset contact (via the Zenodo access-request thread for record 20548528)
 
-> **Subject:** Approval to use public and restricted MRI research datasets
+> **Subject:** Access request status and conditions: Longitudinal Glioblastoma MRI Dataset (Zenodo 20548528)
 >
 > Hello,
 >
-> For independent computational research I want to use (1) MU-Glioma-Post from The Cancer Imaging Archive, a de-identified public dataset under CC BY 4.0, and (2) if access is granted, a de-identified Duke longitudinal GBM MRI dataset under CC BY-NC-ND 4.0 or a Duke license. I will only analyse the data on my own computer. I will not share the data or derived images. Could you confirm in writing whether this use is approved, and whether any review is needed first?
+> I resubmitted my access request on 2026-10-29 with the research purpose and license information you asked for. Could you please tell me:
+>
+> 1. The current status of the request.
+> 2. Which license applies if it is approved: CC BY-NC-ND 4.0 or the custom Duke license.
+> 3. The conditions on use and on derived data. For example: may I report summary statistics and model results computed from the data? May I keep model weights trained on it? May I show derived images or masks in a written report?
+>
+> I will not download any file before written approval.
+>
+> Thank you,
+> [name]
+
+### C. To the school (research coordinator or the person who approves student research)
+
+> **Subject:** What review is needed for computational research on de-identified MRI datasets?
+>
+> Hello,
+>
+> I am doing independent computational research that uses existing, de-identified brain MRI datasets. No new data is collected and no people are contacted. The datasets are:
+>
+> 1. MU-Glioma-Post from The Cancer Imaging Archive, public under CC BY 4.0.
+> 2. If access is granted, a Duke longitudinal glioblastoma MRI dataset under CC BY-NC-ND 4.0 or a Duke license.
+>
+> I will analyse the data only on my own computer and will not share the data or derived images. Could you tell me:
+>
+> 1. What review this secondary use of de-identified data needs (for example, an IRB or school review), or whether none is needed.
+> 2. Whether you can give written approval, and any conditions on it.
 >
 > Thank you,
 > [name]
