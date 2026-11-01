@@ -1,0 +1,31 @@
+# Track A execution audit — 2026-10-31
+
+Track A keeps its Yu 2020 classifier and Ivy GAP signature study separate. No Track B or C files are part of this audit.
+
+## Workstream 1 — Yu 2020 donor-held-out analysis
+
+Amendment A5 limits the run to the six frozen primary donors. It records the eight-donor sensitivity cohort as **not run**. The A5 timing pilot measured a 2,565.57-second fold plus 35.22 seconds of input loading and projected 4.2857 hours for six folds, below the six-hour gate.
+
+`output/trackA_yu2020/result.json` records six completed outer folds and nine models, with per-donor class-balanced AURC, balanced accuracy, and Brier score. The run took 10,053.63 seconds (2.793 hours). All eight entries in `paper/trackA_yu2020/SHA256SUMS` match their files; the result’s source hashes and runner hash also match.
+
+The result has 4,139 matched target cells; all 4,139 pass the frozen raw-count QC and none fail. Exact point mapping produced 75 Table S1-labeled points, zero unmapped points, and zero unlisted target points. It excluded 54 Normal-point cells and 1,955 other-patient cells. Every primary donor has at least 20 cells in each class; the smallest class count is 35 Periphery cells in GS5. The loader checks for conflicting Table S1 labels, Table S1-to-donor-table disagreements, and cell patient/point conflicts; it completed without raising any of these stops. The result does not serialize separate conflict counts.
+
+The candidate has lower mean class-balanced AURC than logistic regression (0.1479 vs. 0.1764), but lower AURC in only four of six donors. The frozen rule therefore reports **candidate better (descriptive): false**. Candidate mean balanced accuracy is 0.6786 vs. 0.6621 for logistic; candidate mean Brier score is 0.2335 vs. 0.1944. No p-values or inferential superiority claim are used.
+
+Cell-type-only balanced accuracy is 0.6546. The best expression model on the same uniquely mapped cells has balanced accuracy 0.6789, a 0.0243 difference; the frozen protocol calls this comparable. Only the Myeloid stratum meets the within-cell-type minimum, with five eligible donors. Other stratum results are sparse and should not support a cell-intrinsic claim. Scikit-learn emitted single-class warnings during stratum diagnostics.
+
+The result originally recorded `c8cba2c` in `code_commit_before_run`. The A5 guard checks that the pilot commit equals HEAD before scoring; the pilot commit was `e7b7742`, and the completed run passed that guard. The result writer reads HEAD when it writes the final JSON. Track B commits landed between the run start and result write, so the field reflected write-time HEAD. The field is corrected to `e7b7742`; no score or metric changed. Original generated JSON SHA-256 before this one-field correction: `c1d74ddf76365a8d1d1df501ba58562cc43a8ab2147eb93586a35bef0563cc19`. The output runtime and creation time place the run start near 21:08 local time, before the later Track B commits. No Track A source or protocol change occurred during the run.
+
+## Workstream 2 — Ivy GAP signature preflight
+
+This was a metadata and source screen only. No Ivy GAP expression values were opened, and no Ivy GAP data were downloaded during this screen. An expression matrix already exists locally at `data/external/ivygap/matrix/fpkm_table.csv`; it remains unopened.
+
+**Exposure:** The local PREDICT-GBM split inventory lists 16 IVYGAP patients in its cohort. The project also has prior Ivy-based analyses in `output/trackA_senmayo/result.json` and `output/trackA_oxphos/result.json`; their confound-adjustment checks failed. Ivy GAP is therefore not untouched confirmation for this project. Any later Ivy analysis must be labeled exploratory, or use another eligible independent cohort. PREDICT-GBM also reports IvyGAP among sources for its additional training patients ([paper](https://pmc.ncbi.nlm.nih.gov/articles/PMC13558737/)).
+
+**Source, labels, and assay:** Local sample metadata identify eight donors with both `LE-reference-histology` and `CT-reference-histology` samples: 10865, 10926, 12108, 12109, 12110, 12112, 14734, and 292023109. Ivy GAP supplies bulk RNA-seq from laser-microdissected anatomical regions, not single-cell malignant-cell labels. Gene-level scoring across assays may be technically possible after gene-ID alignment, but would not establish transfer within malignant cells. The Ivy atlas reports 122 anatomic-region RNA samples across five histologic structures from ten tumors ([NCBI BioProject](https://www.ncbi.nlm.nih.gov/bioproject/PRJNA420740)).
+
+**Atlas donor and malignant-cell gate:** The metadata-only GBmap screen used `annotation_level_1 == Neoplastic` and a floor of 20 cells per region. Only three of six strict Yu donors pass in both Core and Periphery: S1 (231/46), S3 (127/39), and S6 (192/83). In the lenient eight-donor set, only four pass: S1, S3, S6, and S12 (158/39). These labels are expression-derived, not an independent malignant-cell reference. This falls below the planned donor support and malignant-cell requirements. Ivy LE and IT samples also include substantial normal-brain admixture; published analyses find LE signatures elevated in both tumor-edge and normal-brain samples ([Nature Communications study](https://www.nature.com/articles/s41467-020-18189-y)).
+
+**Prior art and reuse terms:** Core/periphery single-cell work already reported a shared infiltrating-cell signature across four patients ([Darmanis et al., 2017](https://pubmed.ncbi.nlm.nih.gov/29091775/)). Neftel-state signatures have already been compared across Ivy anatomical regions ([Neftel et al., 2020](https://pmc.ncbi.nlm.nih.gov/articles/PMC7362280/)). These findings narrow any defensible novelty claim; do not claim “first.” Allen Institute terms permit research and derivative works for noncommercial purposes and require proper attribution; commercial redistribution needs written permission ([Allen Institute Terms of Use](https://alleninstitute.org/terms-of-use/)).
+
+**Decision:** Stop before signature modeling and before opening the local Ivy expression matrix. The project’s prior exposure prevents an untouched-confirmation claim, and the atlas donor/malignant-cell gates fail. Do not freeze or tune a signature against Ivy. No Ivy download was requested or made.
