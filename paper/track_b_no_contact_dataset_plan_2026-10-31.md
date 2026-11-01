@@ -90,7 +90,7 @@ Assumptions: 28 patients, 5 outer folds, so 112 training pairs per analysis (eac
 | Valid support | Draft origin-only rule; source mask not validated. |
 | Registration | Draft MRI-only rule and QC; synthetic tests only. |
 | Inventory | Done, metadata only (28 eligible). |
-| School-use approval | **Unresolved.** Personal-research scope does not by itself decide it. It stays open until the applicable project rules support a decision. |
+| School-use approval | **User-reported approval (2026-10-31): the user says the school said this use is OK.** Not yet a pass under the written-evidence rule (`paper/track_b_source_gate_evidence_2026-10-31.md`): save the written approval (email or form, with date, approver and any conditions) in the project, then mark it passed. |
 | Protocol freeze | Not done. |
 
 **No scoring** until the plan is adopted, the gates above are frozen by a dated amendment, and the code and cohort are hashed.
