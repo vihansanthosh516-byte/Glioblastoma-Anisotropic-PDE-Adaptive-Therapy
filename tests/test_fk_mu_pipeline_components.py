@@ -27,6 +27,15 @@ from src.fk_patient_cv import ForecastFailure, PatientSeries, run_first_third_90
 from src.fk_mu_development_data import MUDevelopmentCohort, is_loader_issued_cohort
 
 
+@pytest.fixture(autouse=True)
+def _fast_unet_recipe(monkeypatch):
+    """Runner tests check wiring, not U-Net quality; use a tiny recipe so the frozen 300-epoch one is not trained."""
+    import dataclasses
+    from src.fk_learned_baselines import UNET_RECIPE
+    monkeypatch.setattr(fk_mu_patient_runner_module, "UNET_RECIPE",
+                        dataclasses.replace(UNET_RECIPE, widths=(2, 2, 2, 2), epochs=1, n_seeds=1))
+
+
 def _mask(edge: int, shape=(16, 16, 16)) -> np.ndarray:
     mask = np.zeros(shape, dtype=bool)
     mask[:edge, :edge, :edge] = True

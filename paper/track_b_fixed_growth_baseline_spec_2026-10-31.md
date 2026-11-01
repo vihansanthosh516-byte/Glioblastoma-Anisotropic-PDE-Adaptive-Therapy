@@ -77,7 +77,24 @@ Both recipes see outer-training patients only. Neither sees future tumor size. N
 - Count: number of 26-connected components of visit-3 core minus the visit-2 core grown by 2 mm, keeping components of at least 2 voxels (16 mm³). This is a label-change count, not a biological lesion count.
 - Model: Poisson GLM, log link, predictor log(visit-2 core volume in mm³), offset log(actual interval in days). Fit on outer-training patients only. If the fit fails or does not converge, use the training mean rate per day times the interval.
 - Scores: Poisson deviance, count MAE, and Brier score for P(count ≥ 1). Compare against the training mean-rate model. **Never scored with Dice and never turned into a mask.**
-- Status: recipe only. Not coded yet.
+- Status: coded in `src/fk_learned_baselines.py` and wired into the MU runner (2026-10-31).
+
+**U-Net fixed settings (added 2026-10-31, before coding; `src/fk_learned_baselines.py:UNET_RECIPE`).**
+- Preprocessing: three binary float channels (visit-1 core, visit-2 core, origin-only domain) on the 2 mm grid. No intensity data, no normalization. Zero-pad each axis to a multiple of 8, and pad the two in-plane axes (0, 1) to the same size so axial 90° rotations are defined. Crop the output back to the original shape.
+- Architecture: encoder widths 16, 32, 64, 128 (four levels). Each level has two 3×3×3 convolutions with padding 1, each followed by affine instance norm and LeakyReLU (slope 0.01). Down-sampling: 2×2×2 max pool. Up-sampling: 2×2×2 transposed convolution, then concatenation with the skip and two convolutions as above. Output: 1×1×1 convolution to one logit.
+- Loss: soft Dice (smoothing 1.0) + binary cross-entropy with logits, equal weight, over the whole padded volume. The target is the visit-3 core clipped to the origin-only domain.
+- Optimizer: Adam, learning rate 1e-3, betas (0.9, 0.999), weight decay 0. Batch 1. 300 epochs. Each epoch visits every outer-training pair once in an order shuffled by the seeded generator. Augmentation per step: flip each axis with p = 0.5, then rotate the axial plane by k × 90°, k uniform in {0, 1, 2, 3}. Same transform on inputs and target. Keep the last epoch.
+- Seeds: 20261102 + outer fold, + 1000, + 2000 (three models). Deterministic torch algorithms on; CPU float32.
+- Prediction: sigmoid of each model, mean of the three probability maps, threshold ≥ 0.5, clip to origin-only domain. Empty visit-2 core: copy-last (empty).
+- Unavailable: non-finite loss, or every training-pair prediction empty after training. Then the U-Net arm is "unavailable" for that fold, the rows record it, and the novelty test is incomplete.
+- Training patients with an empty visit-2 core are left out of training and counted.
+
+**Count model fixed settings (`src/fk_learned_baselines.py`).**
+- New label piece: a 26-connected component of (visit-3 core) \ (visit-2 core dilated by 2 mm), with at least 2 voxels. Both masks clipped to the origin-only domain first.
+- Model: Poisson GLM log μ = b0 + b1 log(visit-2 core volume, mm³) + log(interval days). Fit by Newton–IRLS, at most 50 iterations, tolerance 1e-8 on the coefficient change. Fallback to the training mean rate per day if fewer than 3 usable training patients, a singular step, non-convergence, or non-finite coefficients.
+- Blind forecast: the forecast step outputs a rate per day from history only. The scorer multiplies it by the actual interval. The forecast never sees the target day.
+- Empty visit-2 core: use the training mean rate.
+- Scores per patient: Poisson deviance, absolute count error, Brier score of P(count ≥ 1) = 1 − exp(−μ). The training mean-rate model is scored the same way as the reference. No mask and no Dice.
 
 **Distance-shell spatial rule.** Dropped on 2026-10-31. It was never a required baseline: the roadmap listed it as optional "only if frozen before scoring", and it was not frozen. The roadmap now says dropped. No required baseline was removed.
 
@@ -86,7 +103,7 @@ Both recipes see outer-training patients only. Neither sees future tumor size. N
 - Source-backed valid support S and MRI-only longitudinal registration QC (MU and Duke). Scoring is blocked until both exist.
 - Cavity meaning from source label documents.
 - Duke access and school-use approval.
-- U-Net and count model: recipes frozen in §5 but not coded. Until the U-Net runs, the novelty test is incomplete.
+- U-Net and count model: coded and wired into `src/fk_mu_patient_runner.py` (`src/fk_learned_baselines.py`); 13 synthetic tests passed, and 78 with the fixed-growth, MU runner, patient-CV and precision-gate suites (scratch copy, Python 3.14). Runner tests use a tiny U-Net recipe for speed; the runner itself always passes the frozen recipe. The frozen U-Net (300 epochs × 3 seeds × 5 folds, CPU) has **no timing pilot yet**; runtime is unknown. Until the U-Net runs on an eligible held-out cohort, the novelty test is incomplete.
 - Fixed growth is wired into the MU development runner only. The Duke runner does not exist.
 
 ## 4. Search update (continues `paper/track_b_prior_art_followup_2026-10-31.md`)

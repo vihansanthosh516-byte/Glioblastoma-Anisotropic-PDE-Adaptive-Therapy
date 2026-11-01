@@ -25,6 +25,7 @@ from src.fk_boundary_calibration import run_cross_fitted_boundary_calibration
 from src.fk_mu_development_data import MUDevelopmentCohort, is_loader_issued_cohort
 from src.fk_fixed_growth import RADIUS_GRID_MM, add_fixed_growth_arm
 from src.fk_hybrid_forecast import hybrid_posterior_predictive_forecast
+from src.fk_learned_baselines import UNET_RECIPE, add_learned_baselines_arm
 from src.fk_mu_scoring import make_first_third_score_callback
 from src.fk_mu_training_nuisance import fit_mu_training_volume_nuisance
 from src.fk_patient_cv import ForecastFailure, PatientHistory, run_first_third_90day_patient_cv
@@ -559,9 +560,15 @@ def run_mu_first_two_to_third_development_cv(
         domain_by_patient=analysis_domains, spacing_mm=(2.0, 2.0, 2.0),
         valid_support_by_patient=analysis_support,
     )
+    # Fold-trained U-Net (mask) and Poisson count model (count metrics only), outer-training patients only.
+    lb_fit, lb_forecast, lb_fallback, lb_score = add_learned_baselines_arm(
+        fg_fit, fg_forecast, fg_fallback, fg_score,
+        domain_by_patient=analysis_domains, spacing_mm=(2.0, 2.0, 2.0),
+        valid_support_by_patient=analysis_support, recipe=UNET_RECIPE,
+    )
     cv = run_first_third_90day_patient_cv(
-        records, analysis_folds, fg_fit, fg_forecast, fg_score,
-        fallback_forecast=fg_fallback,
+        records, analysis_folds, lb_fit, lb_forecast, lb_score,
+        fallback_forecast=lb_fallback,
         n_folds=5,
     )
     score_by_id = {row["patient_id"]: row["scores"] for row in cv["rows"]}
@@ -605,6 +612,9 @@ def run_mu_first_two_to_third_development_cv(
                 "selection": "outer-training patients only; best patient-macro Dice; ties to smaller radius",
                 "empty_history": "ineligible for selection; test forecast is copy-last (empty)",
             },
+            "unet_comparator": {"recipe": dict(UNET_RECIPE.__dict__),
+                                "inputs": "visit-1 core, visit-2 core, origin-only domain"},
+            "count_model": "Poisson GLM, log visit-2 volume, log interval offset; count metrics only, never Dice",
             "empty_mask_dice_rule": "both_empty=1; one_empty=0",
             "forecast_settings": settings,
         },
@@ -614,6 +624,8 @@ def run_mu_first_two_to_third_development_cv(
             "mu_paired_difference_bootstrap": 20261030,
             "geometric_train_rate_bootstrap": 20261031,
             "fixed_growth_bootstrap": 20261101,
+            "unet_bootstrap": 20261103,
+            "unet_training_base": UNET_RECIPE.base_seed,
             "external_precision_bootstrap": 20261028,
         },
         "cohort_audit": cohort.audit,
@@ -632,6 +644,13 @@ def run_mu_first_two_to_third_development_cv(
         "n_empty_targets": sum(bool(row["scores"]["target_empty"]) for row in cv["rows"]),
         "primary_paired_difference_bootstrap": _patient_bootstrap_mean_interval(
             primary_delta_values, seed=20261030,
+        ),
+        "n_unet_unavailable": sum(row["scores"]["unet_status"] == "unavailable" for row in cv["rows"]),
+        "unet_paired_difference_bootstrap": (
+            _patient_bootstrap_mean_interval(
+                [row["scores"]["paired_delta_dice_hybrid_minus_unet"] for row in cv["rows"]], seed=20261103,
+            ) if all("paired_delta_dice_hybrid_minus_unet" in row["scores"] for row in cv["rows"])
+            else "incomplete: U-Net unavailable for at least one patient; novelty test incomplete"
         ),
         "fixed_growth_paired_difference_bootstrap": _patient_bootstrap_mean_interval(
             [row["scores"]["paired_delta_dice_hybrid_minus_fixed_growth"] for row in cv["rows"]],
