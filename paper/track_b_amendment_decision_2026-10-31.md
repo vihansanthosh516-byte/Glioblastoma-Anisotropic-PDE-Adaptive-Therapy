@@ -33,11 +33,11 @@ Tests (scratch copy, Python 3.14, 50 passed across `tests/test_fk_learned_baseli
 
 **Rule:** reuse a fold model only when the complete fingerprint matches. On any mismatch, retrain that fold. The central-gap refit has a different patient set, so it always trains its own models.
 
-**Weakest point:** the fingerprint checks recorded settings. It does not prove bitwise-equal weights on other hardware (for example, a different CPU instruction set with the same torch build). Reuse inside one run on one machine avoids this. Reuse is still not wired into the runner.
+**Weakest point:** the fingerprint checks recorded settings. It does not prove bitwise-equal weights on other hardware (for example, a different CPU instruction set with the same torch build). Reuse inside one run on one machine avoids this. Reuse is now wired into the runner (2026-11-01).
 
 ## 2. The crop cannot be the U-Net novelty bar
 
-**Keep the full-grid U-Net as the required comparator.** The 64³ crop stays an unadopted secondary option.
+**Keep the full-grid U-Net as the required comparator.** The 64³ crop is not adopted (user decision 2026-11-01).
 
 Why:
 - The crop limits where the U-Net can predict. Fixed growth, PDE-only, copy-last and the candidate keep the full support. So the crop can only lower the U-Net's Dice. That makes the U-Net an easier baseline to beat. It favours the candidate.
@@ -46,7 +46,9 @@ Why:
 
 So a win over a cropped U-Net is not a win over the required U-Net baseline.
 
-## 3. CPU-hour needs (synthetic)
+## 3. CPU-hour needs (synthetic; HISTORICAL MU 18-patient cohort)
+
+**[Historical, MU 18-patient synthetic pilot on a 120×120×80 grid; superseded for LUMIERE by `paper/track_b_no_contact_dataset_plan_2026-10-31.md` §7a.]** Current LUMIERE projection: 677.6 CPU h with reuse, 1,124.1 h without; PDE 57.8 h per analysis is a lower bound (`output/track_b_timing_pilot_20261031/lumiere_timing_record.json`).
 
 **Measured** (synthetic cohort, this PC, `crop_timing_record.json` unless noted):
 
@@ -65,7 +67,7 @@ Step time varied by about 25% between the two pilots.
 | Scenario | Protocol-complete CPU hours |
 |---|---|
 | Frozen full grid, no reuse | 591.7 |
-| Frozen full grid, with reuse (**recommended**) | 399.5 |
+| Frozen full grid, with reuse (MU, historical) | 399.5 |
 | 64³ crop, no reuse (not recommended as primary) | 332.2 |
 | 64³ crop, with reuse (not recommended as primary) | 269.7 |
 
@@ -88,7 +90,7 @@ The mean rate is the fallback rate and the reference rate. The Poisson IRLS star
 
 **Weakest point:** 0.5 is a convention, not an estimate. If many folds have zero training events, count deviance will depend on it. Report the number of folds that used it.
 
-## 5. Draft amendment A-2026-10-31-R (reuse only; NOT ADOPTED)
+## 5. Amendment A-2026-10-31-R (reuse only; ADOPTED 2026-11-01)
 
 > **Track B amendment A-2026-10-31-R (draft).**
 >
@@ -98,22 +100,23 @@ The mean rate is the fallback rate and the reference rate. The Poisson IRLS star
 >
 > (3) Nothing else changes. The U-Net stays full-grid (no crop), 300 epochs, three seeds, widths 16/32/64/128, Adam 1e-3, threshold 0.5. All required mask baselines (copy-last, fixed growth, PDE-only, fold-trained U-Net), all endpoints (patient-macro plain Dice on the full-grid future core, paired differences, count metrics) and the pass rule stay as frozen.
 >
-> Adopted on [date], before any Track B target mask is opened.
+> Adopted on 2026-11-01, before any Track B target mask is opened.
 
-**Effect.** No forecast and no endpoint changes. Only CPU time changes (projected 591.7 → 399.5 h). Fairness is unchanged.
+**Effect.** No forecast and no endpoint changes. Only CPU time changes (MU historical 591.7 → 399.5 h; LUMIERE 1,124.1 → 677.6 h). Fairness is unchanged.
 
-**To make it active** (after approval only): wire reuse into the runner with the fingerprint check, add a test, and record the adoption date. The runner and frozen protocols are not edited now.
+**Active:** reuse is wired with the fingerprint check and tested (synthetic only). Adoption date recorded.
 
 ## 6. Gates still closed
 
 - Source-backed valid target support.
 - MRI-only longitudinal registration QC.
 - Cavity and label-zero meaning, from source documents (not from target voxels). Fail closed without it.
-- Duke access and school-use approval.
+- Protocol freeze and hashes.
+- School-use approval: user-reported; written copy not saved. (Duke access applies to the MU/Duke path only.)
 
 The runner still refuses to score until the loader records the registration and target-support gates as passed. No patient mask has been read or scored.
 
-## Decision needed
+## Decisions (2026-11-01)
 
-1. Adopt A-2026-10-31-R (reuse only)? Recommended: yes.
-2. PDE cost (≥ 207 h lower bound over four analyses) is a separate open decision.
+1. A-2026-10-31-R adopted (reuse only). Crop not adopted. Full-grid U-Net required.
+2. Patient voxel reads and scoring stay blocked until the protocol is frozen and the user approves.

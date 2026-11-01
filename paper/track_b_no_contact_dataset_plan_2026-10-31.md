@@ -6,7 +6,7 @@
 
 **Status.** The user chose LUMIERE for **exploratory** Track B development, subject to a metadata-only cohort check. LUMIERE is not fresh confirmation: this project used it before (`src/91_lumiere_volume_forecast.py`, `src/130_h3v_frozen_lumiere.py`). LUMIERE does not raise novelty by itself.
 
-No target-label voxel, mask voxel or image voxel was read for this plan. Nothing was downloaded: the LUMIERE files in `data/external/lumiere/` were already on disk (dated 2026-10-04/05). No patient was scored. The no-scoring rule, the full-grid U-Net requirement and unadopted amendment A-2026-10-31-R are unchanged.
+No target-label voxel, mask voxel or image voxel was read for this plan. Nothing was downloaded: the LUMIERE files in `data/external/lumiere/` were already on disk (dated 2026-10-04/05). No patient was scored. The no-scoring rule and the full-grid U-Net requirement are unchanged. Amendment A-2026-10-31-R was adopted 2026-11-01 (reuse only).
 
 ## 1. Why LUMIERE
 
@@ -82,7 +82,7 @@ Window: nominal 13 weeks (about 91 days). Weeks blur dates by up to 6 days (pape
 
 ## 7a. Re-timed runtime at the LUMIERE grid (measured synthetic, 2026-11-01)
 
-Record: `output/track_b_timing_pilot_20261031/lumiere_timing_record.json`. Synthetic volumes on the 91 × 109 × 91 grid (padded 112 × 112 × 96), same PC, torch 2.14.0+cpu, 8 threads.
+Record: `output/track_b_timing_pilot_20261031/lumiere_timing_record.json`. Synthetic volumes on the 2 mm protocol grid 91 × 109 × 91 (padded to 112 × 112 × 96 for the U-Net). Source headers are 182 × 218 × 182 at 1 mm, same PC, torch 2.14.0+cpu, 8 threads.
 
 | Measured (synthetic) | Value |
 |---|---|
@@ -100,14 +100,14 @@ Record: `output/track_b_timing_pilot_20261031/lumiere_timing_record.json`. Synth
 
 Weak points: the PDE full forecast was faster than calibration-only here, the reverse of the first pilot; PDE time depends on the synthetic case, so one case is a weak estimate. The U-Net step was slower than in the earlier pilots (5.34–6.94 s). The central-gap U-Net is counted at full size. These are resource needs, not a deadline. **Section 7 below is superseded by this section.**
 
-## 7. Runtime projection (superseded; earlier scaling estimate)
+## 7. Runtime projection (HISTORICAL; superseded by §7a — do not cite)
 
 Assumptions: 28 patients, 5 outer folds, so 112 training pairs per analysis (each patient trains in 4 folds). U-Net 112 × 300 epochs × 3 seeds = 100,800 steps at the measured 5.340 s full-grid step (`crop_timing_record.json`). PDE 28 full + 112 calibration-only forecasts at 3,128.6 s and 1,808.7 s (`timing_record.json`); a lower bound.
 
 | Scenario | U-Net h | PDE h (lower bound) | Total CPU h, four analyses |
 |---|---|---|---|
 | Frozen, no reuse | 598.1 | 322.4 | 920.5 |
-| Frozen, with reuse (amendment R, not adopted) | 299.0 | 322.4 | 621.5 |
+| Frozen, with reuse (amendment R; draft status at the time) | 299.0 | 322.4 | 621.5 |
 
 **Weakest point:** the steps were timed on a synthetic 120×120×78 grid. The LUMIERE atlas grid at 2 mm may differ in size, so step time may differ. Re-time on a synthetic volume of the true grid shape before freezing. These are resource needs, not a deadline.
 
@@ -122,9 +122,10 @@ Assumptions: 28 patients, 5 outer folds, so 112 training pairs per analysis (eac
 | U-Net reuse (amendment R) | Adopted; wired with full-fingerprint match; central-gap separate. Synthetic tests only. |
 | Inventory | Done, metadata and headers only (28 eligible; one 182×218×182 grid). |
 | School-use approval | **User-reported approval (2026-10-31): the user says the school said this use is OK.** Not yet a pass under the written-evidence rule (`paper/track_b_source_gate_evidence_2026-10-31.md`): save the written approval (email or form, with date, approver and any conditions) in the project, then mark it passed. |
-| Protocol freeze | Not done. |
+| Protocol freeze and hashes | **Not done. Open.** |
+| Patient voxel reads and scoring | **Blocked.** Ask the user first. |
 
-**No scoring** until the plan is adopted, the gates above are frozen by a dated amendment, and the code and cohort are hashed.
+**No scoring** until the gates above are frozen by a dated amendment, and the code and cohort are hashed.
 
 ## 9. Code done in this step (synthetic tests only)
 
