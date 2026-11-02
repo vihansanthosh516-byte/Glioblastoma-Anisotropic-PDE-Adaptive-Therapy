@@ -4,7 +4,7 @@
 
 **Working constraint for this step (2026-10-31):** no outreach to authors, Duke, TCIA or the school during this step. This is a temporary working constraint for this step, not a standing project rule. (Correction: an earlier version of this file called it a standing user rule. That was wrong.)
 
-**Status.** The user chose LUMIERE for **exploratory** Track B development, subject to a metadata-only cohort check. LUMIERE is not fresh confirmation: this project used it before (`src/91_lumiere_volume_forecast.py`, `src/130_h3v_frozen_lumiere.py`). LUMIERE does not raise novelty by itself.
+**Status.** The user chose LUMIERE for **exploratory** Track B development, subject to a metadata-only cohort check. LUMIERE is not fresh confirmation: this project used it before (`src/91_lumiere_volume_forecast.py`, `src/130_h3v_frozen_lumiere.py`). **Exposure list (added 2026-11-01 audit, `paper/trackAB_audit_and_gap_closure.md` B-G1):** LUMIERE was part of the spent H-2 test set (58 LUMIERE patients, pre-op inputs; `vault/PAPER_FINDINGS_LEDGER.md` 2ax); script 134 reused H-2 LUMIERE logits post hoc as development data; scripts 104 and 106 compared LUMIERE segmentations (ledger 2ab, 2aj); script 91 forecast LUMIERE volumes (ledger 2l). PREDICT-GBM also includes 61 LUMIERE patients (`paper/track_b_prior_art_followup_2026-10-31.md`). Any LUMIERE result here is an exploratory re-analysis of an exposed public cohort, not external or independent validation. LUMIERE does not raise novelty by itself.
 
 No target-label voxel, mask voxel or image voxel was read for this plan. Nothing was downloaded: the LUMIERE files in `data/external/lumiere/` were already on disk (dated 2026-10-04/05). No patient was scored. The no-scoring rule and the full-grid U-Net requirement are unchanged. Amendment A-2026-10-31-R was adopted 2026-11-01 (reuse only).
 
@@ -121,12 +121,14 @@ Record: `output/track_b_timing_pilot_20261031/lumiere_timing_record.json`. Synth
 | PDE full forecast, 1 patient | 1,250.4 s |
 | PDE calibration-only, 1 patient | 1,544.3 s |
 
-| Projected (not measured) | CPU hours |
+| Projected (not measured) | Wall-clock hours on this 8-thread PC |
 |---|---|
 | U-Net, one analysis (112 pairs × 300 × 3) | 223.3 (max step 293.8) |
 | PDE, one analysis (28 full + 112 calibration-only), **lower bound** | 57.8 |
 | Four analyses, no reuse | 1,124.1 |
 | **Four analyses, amendment R reuse (adopted)** | **677.6** |
+
+Unit note (2026-11-01 audit, B-G4): these are wall-clock hours with 8 Torch threads, not single-CPU hours. 677.6 h is about 28 days of continuous running; 1,124.1 h is about 47 days. The max-step figure gives about 819 h with reuse. Analyses proposed in the unadopted scoring draft (history-gap sensitivity, time-aware baselines) are not included.
 
 Weak points: the PDE full forecast was faster than calibration-only here, the reverse of the first pilot; PDE time depends on the synthetic case, so one case is a weak estimate. The U-Net step was slower than in the earlier pilots (5.34–6.94 s). The central-gap U-Net is counted at full size. These are resource needs, not a deadline. **Section 7 below is superseded by this section.**
 

@@ -41,7 +41,7 @@ The no-scoring rule stays. The runner still refuses to score until the loader re
 ## Contact log
 
 - 2026-10-31, user report: the school said this use is OK. No written copy is on file yet, so the school gate stays open until it is saved.
-- 2026-10-31, user report: the user contacted the MU authors and Duke about one week earlier. No reply yet. No written evidence has arrived, so no gate changes. The school has not been contacted.
+- 2026-10-31, user report: the user contacted the MU authors and Duke about one week earlier. No reply yet. No written evidence has arrived, so no gate changes. (Wording fixed 2026-11-01: the earlier phrase "the school has not been contacted" conflicted with the user report above. Only the user report exists; no written school record is on file, and it is not known whether the approval names LUMIERE.)
 
 ## Pass evidence per gate
 

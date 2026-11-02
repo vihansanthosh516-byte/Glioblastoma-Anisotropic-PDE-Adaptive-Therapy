@@ -1,5 +1,7 @@
 # Track B fixed-growth baseline: draft protocol wording (2026-10-31)
 
+> **Scope note (2026-11-01 audit, B-G13):** the 76–104-day window, day-90 horizon, actual-day count offset and "about 14 training patients per fold" below are MU-specific. They do not govern LUMIERE. LUMIERE interval rules are proposed only in the unadopted draft `paper/track_b_lumiere_scoring_amendment_draft_2026-11-01.md`. The "no timing pilot yet" blocker is stale: see `output/track_b_timing_pilot_20261031/`.
+
 Status: **candidate wording, resolved choices (revised 2026-10-31); not frozen until the support gate passes**. No patient data was scored, no restricted file was accessed, no model was run. This file adds a baseline definition and a search update. It does not authorize scoring. Sources checked: `paper/trackABC_execution_plan_2026-10-31.md` (B2.4–B2.7, commit `5ab4e86`) and `paper/research_plan_complete_project_appendix.md` §3.2–3.5.
 
 ## 1. Candidate protocol wording (supersedes the first draft)
