@@ -208,6 +208,8 @@ def test_result_writer_hashes_provenance_reopens_file_and_refuses_overwrite(tmp_
     assert saved["provenance"]["source_hashes"] == {"manifest": "a" * 64}
     assert "src/fk_spatial_uncertainty.py" in saved["provenance"]["code_sha256"]
     assert "run_improved_aniso.py" in saved["provenance"]["code_sha256"]
+    assert "src/fk_fixed_growth.py" in saved["provenance"]["code_sha256"]
+    assert "src/fk_learned_baselines.py" in saved["provenance"]["code_sha256"]
     assert saved["provenance"]["environment"]["scipy"]
     torch_environment = saved["provenance"]["environment"]["torch"]
     assert torch_environment["version"] == str(torch.__version__)

@@ -82,6 +82,8 @@ def write_mu_development_result(result: Mapping, output_path: str | Path) -> dic
         "src/fk_precision_gate.py",
         "src/fk_boundary_calibration.py",
         "src/fk_patient_cv.py",
+        "src/fk_fixed_growth.py",
+        "src/fk_learned_baselines.py",
         "run_improved_aniso.py",
     )
     code_hashes = {}
