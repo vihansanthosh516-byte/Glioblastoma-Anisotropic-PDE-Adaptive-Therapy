@@ -17,6 +17,8 @@ remained in the same direction. The tests did not meet their conjunctive success
 Tests: exact sign-flip over patients, with expression-matched random gene-set nulls; protocols were sealed by hash
 before scoring (`paper/trackA_senmayo/`, `paper/trackA_oxphos/`, `paper/trackA_tam_5ala/`).
 
+Gene-count note (2026-11-01 audit, A-G7): test 3 scored 5 of the 6 listed TAM genes and 6 of the 8 listed myeloid genes (`n_genes` in `output/trackA_tam_5ala/result.json`). The protocol keeps only genes present with non-zero variance in the 20 used samples. Which genes dropped is not recorded in the result file and was not checked here, because that needs the expression matrix.
+
 ## What this means
 - Raw core-vs-edge differences had the prespecified direction and passed the unadjusted test in each analysis. For
   tests 1 and 2, the two contributing cohorts had matching point-estimate directions.

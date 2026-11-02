@@ -18,7 +18,7 @@ The result originally recorded `c8cba2c` in `code_commit_before_run`. The A5 gua
 
 ## Workstream 2 — Ivy GAP signature preflight
 
-This was a metadata and source screen only. No Ivy GAP expression values were opened, and no Ivy GAP data were downloaded during this screen. An expression matrix already exists locally at `data/external/ivygap/matrix/fpkm_table.csv`; it remains unopened.
+This was a metadata and source screen only. No Ivy GAP expression values were opened, and no Ivy GAP data were downloaded during this screen. An expression matrix already exists locally at `data/external/ivygap/matrix/fpkm_table.csv`; it was not opened in this screen. (Clarified 2026-11-01 audit, A-G8: the same matrix was already scored by sealed tests 1 and 2, scripts 173 and 174.)
 
 **Exposure:** The local PREDICT-GBM split inventory lists 16 IVYGAP patients in its cohort. The project also has prior Ivy-based analyses in `output/trackA_senmayo/result.json` and `output/trackA_oxphos/result.json`; their confound-adjustment checks failed. Ivy GAP is therefore not untouched confirmation for this project. Any later Ivy analysis must be labeled exploratory, or use another eligible independent cohort. PREDICT-GBM also reports IvyGAP among sources for its additional training patients ([paper](https://pmc.ncbi.nlm.nih.gov/articles/PMC13558737/)).
 

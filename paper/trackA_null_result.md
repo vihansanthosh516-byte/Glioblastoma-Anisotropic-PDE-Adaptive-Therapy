@@ -2,6 +2,8 @@
 
 Status: final for this cohort (2026-10-29). Two pre-registered tests; both fail their own confound rule. No third test on this cohort.
 
+> **Correction (2026-11-01 audit, A-G5):** the title and the phrase "both shifts vanish" overstate the result. A nonsignificant adjusted test means the effect is **not shown** after adjustment; it does not show that hypoxia or composition explains it, and the adjusted point estimates kept their direction. A third sealed test on a different cohort (E-MTAB-8743, TAM activation) also failed its adjusted rule. Current wording: `paper/trackA_composition_finding.md`. The gene lists were chosen after the exploratory script-157 look, so these tests are hypothesis-informed, not blind.
+
 ## Question
 In patient-matched tumor core and edge samples, do fixed external gene programs differ beyond (a) expression-matched random gene sets, (b) the hypoxia gradient, and (c) normal-brain neuron content?
 
