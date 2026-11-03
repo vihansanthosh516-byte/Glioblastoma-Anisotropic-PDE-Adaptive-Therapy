@@ -167,6 +167,9 @@ def _inner_cv_fixture(n=20):
     return outer_ids, folds
 
 
+TEST_IDS = ("outer-test",)
+
+
 def test_inner_fold_plan_and_selector_are_training_only_with_frozen_ties():
     outer_ids, folds = _inner_cv_fixture()
     grid = {
@@ -181,8 +184,8 @@ def test_inner_fold_plan_and_selector_are_training_only_with_frozen_ties():
             "damped": {pid: 0.751 for pid in fold["validation_ids"]},
         }
 
-    plan = th.validate_inner_fold_plan(outer_ids, folds)
-    selected = th.select_two_history_settings(outer_ids, folds, grid)
+    plan = th.validate_inner_fold_plan(outer_ids, folds, outer_test_ids=TEST_IDS)
+    selected = th.select_two_history_settings(outer_ids, folds, grid, outer_test_ids=TEST_IDS)
     assert plan["n_outer_training_patients"] == 20
     assert plan["minimum_inner_training_patients"] == 10
     assert selected["selected_cell"] == "damped"
@@ -194,11 +197,11 @@ def test_inner_fold_plan_rejects_test_ids_and_small_training_splits():
     outer_ids, folds = _inner_cv_fixture()
     folds[0]["validation_ids"].append("outer-test")
     with pytest.raises(ValueError, match="outside the outer-training set"):
-        th.validate_inner_fold_plan(outer_ids, folds)
+        th.validate_inner_fold_plan(outer_ids, folds, outer_test_ids=TEST_IDS)
 
     outer_ids, folds = _inner_cv_fixture()
     with pytest.raises(ValueError, match="minimum inner-training size"):
-        th.validate_inner_fold_plan(outer_ids, folds, minimum_inner_training_patients=17)
+        th.validate_inner_fold_plan(outer_ids, folds, outer_test_ids=TEST_IDS, minimum_inner_training_patients=17)
 
     outer_ids, folds = _inner_cv_fixture()
     grid = {"f0": None, "damped": th.TwoHistoryShapeSettings(max_factor=1.0, shrink_tau_days=28.0)}
@@ -209,11 +212,11 @@ def test_inner_fold_plan_rejects_test_ids_and_small_training_splits():
         }
     folds[0]["scores"]["f0"]["outer-test"] = 1.0
     with pytest.raises(ValueError, match="score validation patients only"):
-        th.select_two_history_settings(outer_ids, folds, grid)
+        th.select_two_history_settings(outer_ids, folds, grid, outer_test_ids=TEST_IDS)
 
     for fold in folds:
         fold["scores"]["f0"].pop("outer-test", None)
-    selected = th.select_two_history_settings(outer_ids, folds, grid)
+    selected = th.select_two_history_settings(outer_ids, folds, grid, outer_test_ids=TEST_IDS)
     assert selected["selected_cell"] == "f0"
 
 
@@ -255,3 +258,15 @@ def test_consensus_mask(setup):
     r = th.two_history_shape_draws(h1, h2, 30, 30, k, domain=dom, apply_boundary=False)
     m, p = th.consensus_mask(r["mask_draws"], dom)
     assert m.shape == SHAPE and p.max() <= 1.0 and not (m & ~dom).any()
+
+
+def test_selector_rejects_outer_test_ids_in_training_set_and_requires_them():
+    outer_ids, folds = _inner_cv_fixture()
+    with pytest.raises(ValueError, match="overlap the outer-training set"):
+        th.validate_inner_fold_plan(outer_ids, folds, outer_test_ids=[outer_ids[0]])
+    for bad in ([], ["x", "x"]):
+        with pytest.raises(ValueError, match="outer_test_ids must be nonempty"):
+            th.validate_inner_fold_plan(outer_ids, folds, outer_test_ids=bad)
+    with pytest.raises(TypeError):
+        th.validate_inner_fold_plan(outer_ids, folds)
+

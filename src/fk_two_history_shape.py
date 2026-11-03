@@ -199,15 +199,23 @@ def consensus_mask(draws, domain, threshold: float = 0.5):
     return (p >= threshold) & np.asarray(domain, dtype=bool), p
 
 
-def validate_inner_fold_plan(outer_training_ids, inner_folds, *, minimum_inner_training_patients: int = 10) -> dict:
+def validate_inner_fold_plan(outer_training_ids, inner_folds, *, outer_test_ids,
+                             minimum_inner_training_patients: int = 10) -> dict:
     """Validate patient-grouped inner folds before any target labels are opened.
 
     Each outer-training patient must occur in exactly one validation fold. Each training set must be the exact
-    complement of its validation set. Outer-test IDs therefore cannot enter this selector.
+    complement of its validation set. ``outer_test_ids`` (required, nonempty) must be disjoint from
+    ``outer_training_ids``, so an outer-test ID passed as training data is rejected. The check relies on the
+    caller passing the true outer-test IDs of that fold.
     """
     outer_ids = list(outer_training_ids)
     if not outer_ids or len(set(outer_ids)) != len(outer_ids):
         raise ValueError("outer_training_ids must be nonempty and unique")
+    test_ids = list(outer_test_ids)
+    if not test_ids or len(set(test_ids)) != len(test_ids):
+        raise ValueError("outer_test_ids must be nonempty and unique")
+    if set(test_ids) & set(outer_ids):
+        raise ValueError("outer-test IDs overlap the outer-training set")
     if (isinstance(minimum_inner_training_patients, (bool, np.bool_))
             or not isinstance(minimum_inner_training_patients, (int, np.integer))
             or minimum_inner_training_patients < 1):
@@ -268,7 +276,7 @@ def _choose_setting(scores_by_cell: Mapping[str, float], settings_grid: Mapping[
     return min(tied, key=lambda label: _setting_tie_key(label, settings_grid[label]))
 
 
-def select_two_history_settings(outer_training_ids, inner_folds, settings_grid, *,
+def select_two_history_settings(outer_training_ids, inner_folds, settings_grid, *, outer_test_ids,
                                 minimum_inner_training_patients: int = 10,
                                 tie_tolerance: float = 0.005) -> dict:
     """Select a control cell from inner-validation patient Dice within one outer-training set.
@@ -291,7 +299,7 @@ def select_two_history_settings(outer_training_ids, inner_folds, settings_grid, 
         raise ValueError("tie_tolerance must be finite and nonnegative")
 
     plan = validate_inner_fold_plan(
-        outer_training_ids, inner_folds,
+        outer_training_ids, inner_folds, outer_test_ids=outer_test_ids,
         minimum_inner_training_patients=minimum_inner_training_patients,
     )
     cell_scores = {label: [] for label in settings_grid}
