@@ -10,7 +10,7 @@ Scope: decision audit only, from `880afcb`. No patient voxels read. No preflight
 - Evidence: Figshare items are CC0 (`paper/track_b_no_contact_dataset_plan_2026-10-31.md` §2). The readme last line says "non-commercial use" (same file). Suter et al., *Sci Data* 9:768 (2022), PMC9755255, rechecked 2026-11-02: "This dataset may only be used for non-commercial purposes." The article (not the data) is CC BY 4.0. It states no terms for derived data, results or trained models.
 - New evidence 2026-11-02: the NITRC DeepBraTumIA page (https://www.nitrc.org/projects/deepbratumia) now loads. It gives the **tool** license as "Attribution Non-Commercial No Derivatives". No source says whether this license reaches the tool's output masks in LUMIERE. This is not inferred.
 - Unknown: may summary results be published; may weights be kept or shared; does the tool's "No Derivatives" term apply to masks derived from its output.
-- Endpoint effect: **none on the score.** It limits what can be shared: summary numbers only; no weights, masks or images shared.
+- Endpoint effect: **none on the score.** Pending clarification, this project would share summary numbers only and withhold weights, masks and images. That is a conservative project policy, not a stated license requirement for those outputs.
 - Close by: a written statement from the LUMIERE authors or the DeepBraTumIA authors. That needs contact, which is not authorized. Without it, the gate stays OPEN and the conservative rule stays.
 
 ### 1b. DeepBraTumIA version — OPEN
@@ -22,7 +22,7 @@ Scope: decision audit only, from `880afcb`. No patient voxels read. No preflight
 ### 1c. Label 0 — OPEN
 - Evidence: published CSV map 1 Necrosis, 2 Contrast-enhancing, 3 Edema (`paper/track_b_no_contact_dataset_plan_2026-10-31.md` §3). NITRC page and *Sci Data* paper (2026-11-02) name the three compartments and give no numeric labels and no background meaning. No cavity label.
 - Unknown: is label 0 a reviewed "no tumor" value, or only "the tool gave no label". Where cavity falls.
-- Endpoint effect: **yes, direct.** The endpoint is Dice of labels 1|2 inside support S. Every 0 voxel counts as a true negative. If cavity or missed tumor sits in label 0, false positives and false negatives are mislabelled for all arms. Arms that grow into the cavity are penalized more.
+- Endpoint effect: **yes, on interpretation.** The reference positive class is labels 1|2 inside support S; label 0 is treated as reference negative. Dice uses true positives, false positives and false negatives, not true negatives. A predicted-positive voxel at label 0 is a false positive against the released annotation, even if the unobserved biology differs. A cavity hidden in label 0 may penalize arms that grow into it. The score remains well-defined as agreement with the automated mask, not true tumor.
 - Close by: a published definition (none found) or author contact (not authorized). Otherwise a stated limit: "agreement with automated DeepBraTumIA labels 1|2, label 0 treated as negative, cavity not separated".
 
 ## 2. Scientific payoff of the four-analysis run
@@ -32,7 +32,7 @@ Facts that cap the payoff:
 - **Automated masks.** The target is DeepBraTumIA output, not expert truth (§1).
 - **At most 28 patients** (`output/track_b_lumiere_inventory_20261031/header_check.json`). The primary minimum is 25; QC loss of 4 stops the run.
 - **Gates.** Three source gates stay OPEN (§1); label 0 directly affects the endpoint.
-- **Cost.** 556.7–699.5 h (S1) or 788.3–931.1 h (S2) wall-clock hours on this PC, a projection, not a bound; the PDE part excludes inner cross-fitting (`paper/track_b_lumiere_time_aware_amendment_draft_2026-11-02.md`; timing records in `output/track_b_timing_pilot_20261031/`). That is about 23–39+ days of this PC.
+- **Cost.** 556.7–699.5 h (S1) or 788.3–931.1 h (S2) wall-clock hours on this PC, a projection, not a bound. The PDE part counts inner cross-fitting but relies on sparse synthetic timings; the central-gap refit is counted at full cohort size (`paper/track_b_lumiere_time_aware_amendment_draft_2026-11-02.md`; timing records in `output/track_b_timing_pilot_20261031/`). These scenarios correspond to about 23–39 days of serial PC time; actual cost is uncertain.
 
 A positive result (every max-T adjusted lower bound > 0) **could support**: "On LUMIERE (exploratory; ≤28 patients; automated DeepBraTumIA masks; label 0 treated as negative), the PDE candidate outperformed the four specified comparators on patient-macro Dice, and this held across the three prior scenarios and the central-gap refit."
 

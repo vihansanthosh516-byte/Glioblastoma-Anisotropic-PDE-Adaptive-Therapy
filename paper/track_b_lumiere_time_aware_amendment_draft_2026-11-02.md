@@ -71,7 +71,7 @@ Sources: `film_unet_timing_record.json` (FiLM 4.141 s, frozen 3.989 s same sessi
 - **Neither range is a bound.** Both are projections.
 - The absolute U-Net step time varied about 2× between sessions on this PC (3.989 s vs 7.973 s for the same frozen model).
 - Time-aware fixed growth rate selection (20 rates), **measured (synthetic)** at 91 × 109 × 91: 19.4, 20.9 and 23.7 s for 22, 23 and 22 training cases (`output/track_b_timing_pilot_20261031/timed_fixed_growth_timing_record.json`). **Extrapolated:** about 5 folds × 21 s ≈ 105 s per analysis, about 0.12 h over four analyses. Negligible next to the ranges above; not added to them.
-- PDE inner cross-fitting is **excluded**; the real PDE cost can be higher.
+- The PDE projection includes 112 inner cross-fitted calibration-only forecasts per full 28-patient analysis. It remains uncertain because only one synthetic case per gap was timed and overhead was not fully measured.
 - The central-gap training set is counted at full size.
 
 ## 5a. Empty visit-2 core rule (draft, 2026-11-02)
@@ -201,12 +201,12 @@ Weak points: these are MU defaults, not tuned or validated on LUMIERE. The centr
 | Part | Measured (synthetic) | Extrapolated |
 |---|---|---|
 | FiLM U-Net | 4.141 s per step this session; 1.038 × the frozen step (`film_unet_timing_record.json`) | 2 training sets × 100,800 steps: 232.0 h (S1) or 463.6 h (S2, from the earlier 7.973 s frozen step) |
-| PDE | 642–19,549 s per forecast by history gap (`lumiere_history_gap_stress.json`); one 30-day case 1,250 / 1,544 s | 323.4–466.2 h (scenario projection; inner cross-fitting excluded) |
+| PDE | 642–19,549 s per forecast by history gap (`lumiere_history_gap_stress.json`); one 30-day case 1,250 / 1,544 s | 323.4–466.2 h (scenario projection; 112 inner calibration forecasts counted per full analysis) |
 | Time-aware fixed growth | 19.4–23.7 s per rate selection (`timed_fixed_growth_timing_record.json`) | about 0.12 h |
 | PDE-only cutoff grid | 0.038 s per raw field (`track_b_pde_only_grid_timing_20261103.json`) | up to about 1.2 h |
 | **Total** | — | **about 556.7–699.5 h (S1) or 788.3–931.1 h (S2)** |
 
-Not a bound: the U-Net step varied about 2× between sessions, the PDE part excludes inner cross-fitting, and the central-gap run is counted at full size (it has 22 of 28 metadata-eligible patients, so the real refit is smaller). A full four-analysis timing run was **not** launched.
+Not a bound: the U-Net step varied about 2× between sessions, PDE timing used one synthetic case per gap, and the central-gap run is counted at full size (it has 22 of 28 metadata-eligible patients, so that refit's patient count is smaller). A full four-analysis timing run was **not** launched.
 
 ## 5h. Code status vs open gates (2026-11-03)
 

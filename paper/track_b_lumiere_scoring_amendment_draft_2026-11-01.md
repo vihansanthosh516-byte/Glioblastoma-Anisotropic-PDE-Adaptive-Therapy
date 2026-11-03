@@ -115,7 +115,7 @@ Run time is **not monotone** in the gap (4 weeks is slower than 6). The 155-week
 | Old estimate (all patients = 30-day case) | 57.8 | 231.2 | 677.6 | 1,124.1 |
 
 - Patient-086 (155 weeks) alone: about 26.2 PDE h per analysis.
-- The PDE figures stay a **lower bound** for inner cross-fitting (same counting rule as before).
+- The 112 calibration-only calls per analysis already count one inner cross-fitted forecast for each patient in the four folds where that patient trains. These are scenario projections, not bounds; patient geometry and overhead remain uncertain.
 - U-Net hours are unchanged (223.3 h per analysis, measured step × projected step count). The §6 option B time-aware U-Net would add about 447 h more.
 
 Weak points: one synthetic case per gap; real tumor shapes may change solver cost; mid-gap patients are bracketed, not measured; the cause of the non-monotone timing is not found. Resource needs only, not a deadline.
@@ -132,7 +132,7 @@ Weak points: one synthetic case per gap; real tumor shapes may change solver cos
 
 **Superseded (r2):** option B ("add time-aware baselines in addition", six required comparators, a 5-channel broadcast U-Net, and "+447 h on top of 677.6 h"). It is withdrawn. A broadcast constant channel is removed by InstanceNorm, and the "rules out time input alone" wording overclaimed.
 
-**Run time (wall-clock hours on this PC; projections, not bounds):** 555.4–698.2 h or 787.0–929.8 h for the four analyses, depending on the U-Net step basis. Time-aware fixed growth is not timed; PDE inner cross-fitting is excluded. Details in `paper/track_b_lumiere_time_aware_amendment_draft_2026-11-02.md` §5.
+**Run time (wall-clock hours on this PC; projections, not bounds):** 555.4–698.2 h or 787.0–929.8 h for the four analyses, depending on the U-Net step basis. The 112 calibration-only calls per analysis include inner cross-fitting. Details in `paper/track_b_lumiere_time_aware_amendment_draft_2026-11-02.md` §5.
 
 **Limit:** 22–23 training pairs per fold is little data for the U-Net to learn a time effect.
 
