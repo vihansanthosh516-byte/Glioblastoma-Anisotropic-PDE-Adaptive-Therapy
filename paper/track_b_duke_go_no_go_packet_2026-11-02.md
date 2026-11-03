@@ -11,7 +11,7 @@ Source: `paper/track_b_duke_source_ledger_2026-11-02.md`.
 |---|---|
 | Duke written access | Not granted. Pending. No written reply on file. Duke declined the first request; a resubmission on 2026-10-29 is user-reported only. |
 | Dataset (Zenodo record 20548528) | 61 patients, 503 sessions, 3 to 18 sessions each, 136.3 GB. Files are restricted. |
-| License | CC BY-NC-ND 4.0, or a custom Duke license. The custom text has not been seen. Whether forecasts or masks count as "derivatives" is unknown. Which license applies is unknown. |
+| License | CC BY-NC-ND 4.0, or a custom Duke license. The CC license allows producing/reproducing adaptations for noncommercial use but does not authorize sharing adaptations. Whether forecasts, masks or models are adaptations, and which license applies, are unknown; the custom text has not been seen. |
 | School approval | User says the school said OK on 2026-10-31. No written copy. No date, approver or conditions. Not passed. |
 | Prior use of Duke data here | No evidence of any. Patient overlap with MU, UCSD-PTGBM, CFB-GBM, PREDICT-GBM or LUMIERE is unknown. |
 | Registration | Atlas alignment versus session-to-session registration is unresolved. |
@@ -61,7 +61,7 @@ Weak points: the PDE time was timed with reduced settings and scaled 20x. Timing
 ## 6. Stop rules
 
 - Stop if access is not granted in writing.
-- Stop if the license forbids derived outputs, or if that is unclear.
+- Stop before sharing any forecast, mask or model until the applicable license and whether the output is an adaptation are resolved. Keep restricted access blocked until Duke grants access in writing.
 - Stop if the school approval is not saved in writing.
 - Stop if the eligible triplet count is too small. The minimum is not set; it must be written in the amendment first.
 - Stop if the seal check fails. Do not edit the seal to pass.

@@ -22,7 +22,7 @@ What the Zenodo page says (read 2026-11-02):
 - Label map: 1 necrotic core, 2 non-enhancing T2/FLAIR, 3 enhancing tumor, 4 resection cavity.
 - Metadata: per-patient landmark CSVs; patient CSVs with scan dates, demographics and treatment timelines (dates relative to first scan); a mask per session.
 - File names and sizes: not listed. The page does not say which files are public. All files appear under "Restricted". So **public vs restricted per file: unknown**; treat all as restricted.
-- Derived-output terms: **CC BY-NC-ND means no derivatives under that license.** Whether forecasts, masks or models count as derivatives is **unknown**. The custom license text is **not seen**. Which license applies to this project is **unknown**.
+- Derived-output terms: the official CC BY-NC-ND 4.0 legal code permits producing and reproducing Adapted Material for noncommercial purposes, but does not grant permission to share Adapted Material. It does **not** categorically forbid creating derivatives. Whether forecasts, masks, trained models or summary results are Adapted Material, and how the separately offered Duke custom license treats them, is **unknown**. The custom license text is **not seen**. Which license applies to this project is **unknown**. Source: https://creativecommons.org/licenses/by-nc-nd/4.0/legalcode.en (Sections 1 and 2(a)(1)).
 
 What the GitHub README says (https://github.com/deshanyang/GBM-DIR-QA, read 2026-11-02):
 - No license stated. No registration step stated. Calls the Zenodo repository "publicly available" with a blank link. This conflicts with the Zenodo "Restricted" label. Zenodo is the authority.
