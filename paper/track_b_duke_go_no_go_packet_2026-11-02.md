@@ -56,7 +56,7 @@ Weak points: the PDE time was timed with reduced settings and scaled 20x. Timing
 6. Compute budget approved by the user (open).
 7. Cohort-specific amendment: endpoint, support, interval rule, folds, control, comparator family, failure rules. Signed and hashed before target masks (not written).
 8. Control sensitivity grid on development cases (not run).
-9. Sealed run: pre-run seal with git state, package versions, eligibility manifest (`src/fk_track_b_run_guard.py`; not yet used on real data).
+9. Sealed run: pre-run seal with git state, package versions, eligibility manifest (`src/fk_track_b_run_guard.py`; not yet used on real data). The current git commit must equal the sealed commit exactly. "Clean" means the sealed code and protocol files have no uncommitted change; the rest of the repository is not checked. This is a reproducibility check, not protection against a determined editor.
 
 ## 6. Stop rules
 

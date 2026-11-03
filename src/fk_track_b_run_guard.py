@@ -3,7 +3,9 @@
 A seal is a JSON file written BEFORE any real-data run. It records the PDE provider (class and per-scenario
 settings), the full FiLM/U-Net recipe, the bootstrap count, a fold-manifest hash, an eligibility/QC manifest hash
 (patient id, qc_passed, interval weeks, spacing; no voxel data), SHA-256 of every execution code file and of the
-protocol documents, git HEAD with a clean-tree flag, and python/numpy/scipy/torch versions.
+protocol documents, git HEAD with a clean flag (clean = the sealed code and protocol files have no uncommitted
+change; the rest of the repository is not checked), and python/numpy/scipy/torch versions. The current HEAD must
+equal the sealed HEAD exactly.
 
 ``run_sealed_protocol`` is the only real-data entry. Real (synthetic=False) cases are refused by
 ``run_lumiere_cv`` and ``run_lumiere_protocol`` unless they carry the private ``_SEALED_TOKEN`` that only this
@@ -12,8 +14,9 @@ case target is read if the seal is missing, its SHA-256 differs from the caller'
 state is unknown or dirty, versions differ, or anything else differs. It reads no patient data itself.
 
 The injectable synthetic path (``fk_lumiere_protocol.run_lumiere_protocol`` with synthetic cases) is unchanged.
-Limits: the seal does not hash patient input files; a caller who edits this module could still bypass it (the
-token blocks accidents and casual misuse, not a determined editor; the code hash and git check expose the edit).
+This is a reproducibility check, not protection against a determined editor. Limits: the seal does not hash
+patient input files; a caller who edits this module could still bypass it (the token blocks accidents and casual
+misuse; the code hash and git check expose the edit only if the checks themselves are run unchanged).
 """
 from __future__ import annotations
 
@@ -62,7 +65,8 @@ def _check_n_bootstrap(n_bootstrap) -> int:
 
 
 def _git_probe(project_root, files) -> dict:
-    """HEAD and clean-tree flag for the given files. 'unknown' if git is missing or fails."""
+    """HEAD and a clean flag. 'clean' means only the given (sealed code and protocol) files have no uncommitted
+    or untracked change; other repository files are not checked. 'unknown' if git is missing or fails."""
     def run(*args):
         return subprocess.run(["git", "-C", str(project_root), *args], capture_output=True, text=True,
                               timeout=60, check=True).stdout
@@ -194,7 +198,9 @@ def verify_seal(seal: Mapping, current: Mapping) -> list[str]:
         problems.append(f"package versions differ from the seal: sealed {seal['versions']}, now {current['versions']}")
     for label, git in (("seal", seal["git"]), ("current tree", current["git"])):
         if git.get("head") in (None, "unknown") or git.get("clean") is not True:
-            problems.append(f"{label}: git HEAD unknown or sealed files not clean ({git})")
+            problems.append(f"{label}: git HEAD unknown or sealed code/protocol files not clean ({git})")
+    if seal["git"].get("head") != current["git"].get("head"):
+        problems.append(f"git commit {current['git'].get('head')} differs from sealed {seal['git'].get('head')}")
     problems += _diff_hashes("code", seal["code_sha256"], current["code_sha256"])
     problems += _diff_hashes("protocol", seal["protocol_sha256"], current["protocol_sha256"])
     return problems
@@ -207,8 +213,8 @@ def run_sealed_protocol(cases: Sequence[lr.LumiereCase], fold_by_patient: Mappin
     """Real-data entry. Verifies the seal first; no case target is read before it passes.
 
     Requires every case synthetic=False (``allow_synthetic=True`` exists only to test the guard itself), every
-    LUMIERE gate True, the seal file's SHA-256 to equal ``expected_seal_sha256`` (recorded out of band), a clean
-    git tree with known HEAD, and matching package versions. The optional overrides exist only so a caller can
+    LUMIERE gate True, the seal file's SHA-256 to equal ``expected_seal_sha256`` (recorded out of band), the
+    sealed git HEAD exactly, clean sealed code/protocol files, and matching package versions. The optional overrides exist only so a caller can
     prove they equal the sealed values; any difference raises. There is no ``minimum`` argument.
     """
     if not cases:

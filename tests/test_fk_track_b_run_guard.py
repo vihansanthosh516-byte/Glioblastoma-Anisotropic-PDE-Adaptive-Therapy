@@ -260,8 +260,17 @@ def test_unknown_or_dirty_git_refused_at_entry(setup, monkeypatch):
     cases, folds, _, path = setup
     for state in ({"head": "unknown", "clean": "unknown"}, {"head": "a" * 40, "clean": False}):
         monkeypatch.setattr(g, "_git_probe", lambda root, files, st=state: st)
-        with pytest.raises(g.SealMismatch, match="git HEAD unknown or sealed files not clean"):
+        with pytest.raises(g.SealMismatch, match="git HEAD unknown or sealed code/protocol files not clean"):
             _call(cases, folds, path)
+
+
+def test_changed_git_commit_refused_before_any_target_read(setup, monkeypatch):
+    _, folds, _, path = setup
+    real, reads = _real(_spread_cases())
+    monkeypatch.setattr(g, "_git_probe", lambda root, files: {"head": "b" * 40, "clean": True})
+    with pytest.raises(g.SealMismatch, match="git commit b{40} differs from sealed a{40}"):
+        _call(real, folds, path, allow_synthetic=False, gates=ALL_GATES)
+    assert reads == []
 
 
 def test_seal_built_on_dirty_tree_refused_at_entry(setup):
