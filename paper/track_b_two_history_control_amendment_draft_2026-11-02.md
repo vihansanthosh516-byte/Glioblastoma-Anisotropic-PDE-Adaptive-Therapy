@@ -2,6 +2,8 @@
 
 **Status: PROPOSED. Not adopted.** This draft authorizes no job, no test, no patient-data read and no scoring. It changes no code or protocol file. Duke stays NO-GO (`paper/track_b_duke_go_no_go_packet_2026-11-02.md`). LUMIERE patient scoring stays paused.
 
+**Superseded for future consideration by r2:** [`track_b_two_history_control_amendment_r2_draft_2026-11-02.md`](track_b_two_history_control_amendment_r2_draft_2026-11-02.md). The original §4 uses a cross-outer-fold fallback that can leak held-out outcomes; its volume fallback is undefined; and it mixes Duke label rules with the LUMIERE runner. Do not adopt the original text.
+
 Sources: rule and constants `src/fk_two_history_shape.py`; spec and screen `paper/track_b_two_history_control_spec_2026-11-02.md`; screen output `output/track_b_two_history_screen_20261102/screen.json`.
 
 ## 1. The question the primary contrast answers
