@@ -35,6 +35,14 @@ def test_missing_arm_is_incomplete_not_pass():
     assert max_t_pass_test(d2, COMPS)["status"] == "incomplete"
 
 
+def test_non_finite_scores_fail_closed():
+    for bad in (float("nan"), float("inf")):
+        d = _dice(28, (0.1, 0.1, 0.1, 0.1))
+        d["b"]["p5"] = bad
+        r = max_t_pass_test(d, COMPS)
+        assert r["status"] == "incomplete" and r["reason"] == "non-finite patient score"
+
+
 def test_max_t_is_wider_than_unadjusted_and_seeded():
     d = _dice(28, (0.05, 0.05, 0.05, 0.05), noise=0.05)
     r1, r2 = max_t_pass_test(d, COMPS, n_bootstrap=2000), max_t_pass_test(d, COMPS, n_bootstrap=2000)

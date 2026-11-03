@@ -26,6 +26,8 @@ def max_t_pass_test(dice: Mapping[str, Mapping[str, float | None]], comparators:
     if len(ids) < 2:
         return {"status": "incomplete", "reason": "fewer than two patients"}
     d = np.array([[dice[candidate][p] - dice[k][p] for k in comparators] for p in ids], float)
+    if not np.isfinite(d).all():
+        return {"status": "incomplete", "reason": "non-finite patient score"}
     means = d.mean(axis=0)
     rng = np.random.default_rng(int(seed))
     idx = rng.integers(0, len(ids), size=(int(n_bootstrap), len(ids)))

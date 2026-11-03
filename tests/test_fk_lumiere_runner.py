@@ -134,6 +134,20 @@ def test_empty_pde_only_stays_empty_and_failures_use_recorded_fallback():
         assert res["dice"][arm]["s04"] == res["dice"]["copy_last"]["s04"]
 
 
+def test_available_empty_film_mask_is_scored_but_unavailable_model_is_missing(monkeypatch):
+    monkeypatch.setattr(ta, "train_film_models", lambda pairs, intervals, fold, recipe: {"status": "ok"})
+    monkeypatch.setattr(ta, "predict_film", lambda trained, x, iv, domain: np.zeros(SHAPE, bool))
+    res = _run(_cases())
+    assert all(v == 0.0 for v in res["dice"]["film_unet"].values())  # empty mask vs non-empty target
+    # fake candidate == copy-last gives a zero-SE contrast; the point is that no arm is reported missing
+    assert res["pass_test"].get("reason") != "missing arm for at least one scored patient"
+    monkeypatch.setattr(ta, "train_film_models",
+                        lambda pairs, intervals, fold, recipe: {"status": "unavailable" if fold == 3 else "ok"})
+    res = _run(_cases())
+    assert {p for p, v in res["dice"]["film_unet"].items() if v is None} == {p for p in FOLDS if FOLDS[p] == 3}
+    assert res["pass_test"]["status"] == "incomplete" and res["folds"][3]["film_status"] == "unavailable"
+
+
 def test_cutoff_selection_uses_training_dice_and_ties_go_larger():
     sup = np.ones(SHAPE, bool)
     tgt = _ball(6)
