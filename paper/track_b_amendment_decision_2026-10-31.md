@@ -46,9 +46,9 @@ Why:
 
 So a win over a cropped U-Net is not a win over the required U-Net baseline.
 
-## 3. CPU-hour needs (synthetic; HISTORICAL MU 18-patient cohort)
+## 3. Run-time needs (synthetic; HISTORICAL MU 18-patient cohort; wall-clock hours on this PC)
 
-**[Historical, MU 18-patient synthetic pilot on a 120×120×80 grid; superseded for LUMIERE by `paper/track_b_no_contact_dataset_plan_2026-10-31.md` §7a.]** Current LUMIERE projection: 677.6 CPU h with reuse, 1,124.1 h without; PDE 57.8 h per analysis is a lower bound (`output/track_b_timing_pilot_20261031/lumiere_timing_record.json`).
+**[Historical, MU 18-patient synthetic pilot on a 120×120×80 grid; superseded for LUMIERE by `paper/track_b_no_contact_dataset_plan_2026-10-31.md` §7a.]** Later LUMIERE projection (2026-11-01, itself superseded by the history-gap and FiLM timing in `paper/track_b_lumiere_time_aware_amendment_draft_2026-11-02.md` §5): 677.6 wall-clock h on this PC with reuse, 1,124.1 h without; PDE 57.8 h per analysis is a lower bound (`output/track_b_timing_pilot_20261031/lumiere_timing_record.json`).
 
 **Measured** (synthetic cohort, this PC, `crop_timing_record.json` unless noted):
 
@@ -64,7 +64,7 @@ Step time varied by about 25% between the two pilots.
 
 **Projected** (not measured; 64,800 U-Net steps per analysis at the mean step; four analyses; PDE never reused):
 
-| Scenario | Protocol-complete CPU hours |
+| Scenario | Protocol-complete wall-clock hours on this PC |
 |---|---|
 | Frozen full grid, no reuse | 591.7 |
 | Frozen full grid, with reuse (MU, historical) | 399.5 |
@@ -102,7 +102,7 @@ The mean rate is the fallback rate and the reference rate. The Poisson IRLS star
 >
 > Adopted on 2026-11-01, before any Track B target mask is opened.
 
-**Effect.** No forecast and no endpoint changes. Only CPU time changes (MU historical 591.7 → 399.5 h; LUMIERE 1,124.1 → 677.6 h). Fairness is unchanged.
+**Effect.** No forecast and no endpoint changes. Only run time changes (wall-clock hours on this PC; MU historical 591.7 → 399.5 h; LUMIERE 1,124.1 → 677.6 h). Fairness is unchanged.
 
 **Active:** reuse is wired with the fingerprint check and tested (synthetic only). Adoption date recorded.
 

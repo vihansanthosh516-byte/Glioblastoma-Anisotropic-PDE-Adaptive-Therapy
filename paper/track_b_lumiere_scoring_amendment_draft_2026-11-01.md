@@ -1,4 +1,4 @@
-# Track B LUMIERE scoring amendment (DRAFT r2 for review, 2026-11-01)
+# Track B LUMIERE scoring amendment (DRAFT r3 for review; r1 2026-11-01, r3 2026-11-02)
 
 **Status: DRAFT. Not adopted. Not frozen.** It does not authorize the MRI-QC preflight, voxel reads or scoring. The preflight stays **blocked** until the user explicitly approves its exact read scope: visit-2 and visit-3 atlas CT1 voxels and visit-2 atlas brain-mask voxels, 84 files (`paper/track_b_readiness_audit_2026-11-01.md` §5). LUMIERE results are exploratory, not fresh confirmation. Status documents (`START_HERE.md`, roadmap) are not changed until the user adopts this draft.
 
@@ -27,7 +27,7 @@ History gap v1→v2 (same file, week labels): range 1 to 155; 25 of 28 are 6–2
 | Item | Applies to LUMIERE? | Note |
 |---|---|---|
 | Primary score: patient-macro plain Dice of the full-grid future core, `dice_with_empty_rule` | Yes | Core = DeepBraTumIA labels 1\|2. Agreement with an automated tool, not truth. |
-| Required mask baselines: copy-last, fixed growth, PDE-only, full-grid U-Net | Yes, all four | Same patients, origins, targets, support, 2 mm grid. See §6 for the time mismatch. |
+| Required mask baselines | **Proposed (r3):** copy-last, time-aware fixed growth, PDE-only, FiLM time-aware U-Net (`paper/track_b_lumiere_time_aware_amendment_draft_2026-11-02.md`) | Replaces the gap-blind fixed growth and U-Net. Same patients, origins, targets, support, 2 mm grid. See §6. |
 | Count model (Poisson, offset log interval) | Yes, count metrics only | Offset log(7 × Δw), approximate (L2). |
 | Volume-trend, geometric train-rate, ablations | Yes, secondary | Rates × nominal days (L2). |
 | Pass rule | Yes, verbatim (§3a) | The appendix interval clause "one nominal day-90 window with eligible 76–104-day intervals" is **replaced** for LUMIERE by L1–L3. |
@@ -52,6 +52,8 @@ Source: `paper/research_plan_complete_project_appendix.md`.
 > If the PDE does not beat every required mask baseline (§3.3 amendment) on plain patient-macro Dice under the frozen margin rule, report no demonstrated added value.
 
 **Reading.** The appendix has **no numeric margin**. The "frozen margin rule" is the §1.3 rule: every max-T-adjusted paired 95% patient-bootstrap interval (Dice is higher-is-better, so improvement = hybrid − baseline) must lie strictly above zero. For LUMIERE the interval clause of §3.3 is replaced by L1–L3; the rest applies unchanged. **Open for review:** confirm this reading.
+
+**Proposed LUMIERE pass-rule wording (r3, not adopted):** the PDE candidate passes only if, on patient-macro plain Dice, every max-T-adjusted paired 95% patient-bootstrap interval for the candidate versus each of the four required comparators — copy-last, time-aware fixed growth, PDE-only and the FiLM time-aware U-Net — lies strictly above zero. The claim is limited to performance against these four specified comparators (`paper/track_b_lumiere_time_aware_amendment_draft_2026-11-02.md` §4).
 
 ### 3b. Fold assignment (deterministic, patient-grouped, balanced by Δw)
 
@@ -80,11 +82,11 @@ Each Δw group spreads over at least three folds. Training sizes 22, 22, 22, 23,
 | Arm | Uses time? | Rule |
 |---|---|---|
 | Copy-last | No | — |
-| Fixed growth (frozen) | No | One radius per outer fold. Ignores Δw. See §6. |
+| Time-aware fixed growth (proposed) | Yes | r = k × 7 × Δw(v2,v3); one k per outer fold from training patients; 20 mm cap. See §6. |
 | PDE-only and PDE candidate | Yes | Calibrate on v1→v2 with 7 × Δw(v1,v2); forecast v2→v3 with 7 × Δw(v2,v3). Both approximate. |
 | Count model | Yes | Offset log(7 × Δw). |
 | Geometric train-rate / volume-trend | Yes | Training rate × 7 × Δw. |
-| U-Net (frozen) | No | See §6. |
+| FiLM time-aware U-Net (proposed) | Yes | z = log(Δw/13) for forecast and history intervals, via FiLM. See §6. |
 
 ### 5a. PDE runtime stress over history gaps (synthetic only)
 
@@ -122,24 +124,17 @@ Weak points: one synthetic case per gap; real tumor shapes may change solver cos
 
 **Recommendation:** keep Patient-086 (155 weeks), Patient-070 (1 week) and Patient-078 (4 weeks) in the **primary** cohort. Flag them in every per-patient table. Predeclare one **sensitivity analysis** now: the same comparison without patients whose v1→v2 Δw is outside 6–23 weeks (n = 25 before QC). The bounds 6–23 are set now from metadata only. Never exclude any patient based on outcome, Dice or forecast quality. If the primary and sensitivity results disagree in direction, report both and claim neither.
 
-## 6. Time-information mismatch (PDE gets Δw; frozen U-Net and fixed growth do not)
+## 6. Time-information mismatch (revised r3, 2026-11-02)
 
-**The problem.** The PDE arms see each patient's Δw. The frozen U-Net (three channels: visit-1 core, visit-2 core, origin domain) and the frozen fixed-growth radius do not. A win over gap-blind baselines can come from the time input alone, not from the PDE.
+**The problem.** The PDE arms see each patient's Δw. The frozen gap-blind U-Net and fixed growth do not, so a win over them could come from the time input.
 
-**Options:**
+**Proposed resolution (not adopted): replace, not add.** The required comparators become copy-last, time-aware fixed growth, PDE-only and the FiLM time-aware U-Net. The exact recipes, synthetic checks, pass-rule wording, run-time scenarios and gate list are in `paper/track_b_lumiere_time_aware_amendment_draft_2026-11-02.md`. Prototype code: commit `ff4b9f0`, not wired into any runner.
 
-| Option | What | Effect |
-|---|---|---|
-| A. Keep frozen baselines; limit the claim | No recipe change | A win **cannot establish superiority**. It is reported only as "beats gap-blind baselines". |
-| B. Add time-aware baselines **in addition** (recommended) | Keep the frozen U-Net and fixed growth. Add two required baselines: (1) **time-aware U-Net**: same recipe plus a fourth constant channel = 7 × Δw(v2,v3) / 91 and a fifth = 7 × Δw(v1,v2) / 91; (2) **training-only time-aware fixed growth**: radius r = k × 7 × Δw, with one k per outer fold chosen from training patients on a predeclared grid, ties to smaller k. | The candidate must beat all six. A pass then rules out "time input alone". |
+**Superseded (r2):** option B ("add time-aware baselines in addition", six required comparators, a 5-channel broadcast U-Net, and "+447 h on top of 677.6 h"). It is withdrawn. A broadcast constant channel is removed by InstanceNorm, and the "rules out time input alone" wording overclaimed.
 
-**Recommendation: B.** It keeps the frozen comparators unchanged and adds fair ones. It needs:
-- A **separate dated amendment** for the two new baselines (recipes, k grid, channel scaling).
-- New code and synthetic tests.
-- **New synthetic timing.** The time-aware U-Net adds about one more full U-Net training per analysis (with Amendment R reuse, two more trainings over the protocol). From the measured 223.3 h per analysis (`output/track_b_timing_pilot_20261031/lumiere_timing_record.json`), this would add about 447 h on top of 677.6 h. This is a **rough projection, not measured**; re-time before adoption.
-- Limit: 22–23 training pairs per fold over five Δw levels is little data for the U-Net to learn a time effect. A time-aware U-Net that does not use time well still leaves part of the mismatch.
+**Run time (wall-clock hours on this PC; projections, not bounds):** 555.4–698.2 h or 787.0–929.8 h for the four analyses, depending on the U-Net step basis. Time-aware fixed growth is not timed; PDE inner cross-fitting is excluded. Details in `paper/track_b_lumiere_time_aware_amendment_draft_2026-11-02.md` §5.
 
-The frozen recipe is **not** changed by this draft.
+**Limit:** 22–23 training pairs per fold is little data for the U-Net to learn a time effect.
 
 ## 7. Registration failures and minimum count
 
@@ -177,7 +172,7 @@ Limits: the angle is the largest single Euler angle, not the total rotation angl
 |---|---|---|
 | 1 | Pass rule reading (§3a): no numeric margin; max-T adjusted intervals strictly above zero | Confirm |
 | 2 | Fold rule (§3b): sorted by Δw, round-robin | Adopt |
-| 3 | Time mismatch (§6): A (limit claim) or B (add time-aware baselines by separate amendment) | B |
+| 3 | Time mismatch (§6): replace the gap-blind U-Net and fixed growth with time-aware versions (`paper/track_b_lumiere_time_aware_amendment_draft_2026-11-02.md`), or keep gap-blind baselines and limit the claim | Replace |
 | 4 | Outliers (§5b): keep, flag, predeclared 6–23-week sensitivity | Adopt |
 | 5 | Minimum 25 QC passes, stop rule, no re-folding (§7) | Adopt |
 | 6 | Preflight read scope (84 files) | Your explicit approval needed; still blocked |
