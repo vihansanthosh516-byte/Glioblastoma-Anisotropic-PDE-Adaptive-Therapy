@@ -83,3 +83,18 @@ Script `src/fk_two_history_sensitivity_screen.py`, test `tests/test_fk_two_histo
 **Limits.** Synthetic ellipsoids with smooth irregularity are far simpler than real GBM change; the truth process, the shrinkage radius floor, noise level and boundary covariance are my choices and drive the results. 3 seeds per cell; per-cell SEs are in screen.json and are large. The boundary covariance is fixed and synthetic, not the PDE-calibrated one. Plateau is nearly trivial. No resection, edema, treatment or MRI-segmentation noise. The screen shows the control is not a uniformly strong baseline (it can lose to the last-mask rule), nothing more.
 
 **Statement.** Synthetic results do not prove this control is a strong patient baseline. The settings are not tuned from this screen for any patient run. If a dated amendment adopted values taken from this screen (for example tau 28, cap 1, clip 10), those values would be post hoc relative to this screen, and that would have to be recorded; adopting the untouched defaults is not made safer by the screen, since they were shown not to be best. The primary/co-primary status of this control stays PROPOSED until a dated amendment defines it.
+
+### Interpretation correction (2026-11-02, after `0c08d70`)
+
+- **Oracle shape diagnostic, not a forecast gain.** The `-0.114` (growth) and `-0.153` (shrinkage) copy-last differences compare **unscaled** copy-last with `last_mask_sd` given the **target's true future volume**. They measure shape at an oracle volume. They are not end-to-end forecast gains, and no arm here forecasts volume.
+- **Noisy draws are target-centered.** The 3 log-normal draws (sd 0.15) are centered on the target volume. Call them **target-centered synthetic noise**. They are not realistic predicted volumes: a real history-only forecast has bias as well as variance.
+- **Boundary model.** The boundary-perturbed fields use a fixed synthetic covariance (sigma 2 mm, tau 0.5 mm, ell 8 mm). They do not show how the PDE-calibrated boundary model will behave on patients. Pre-boundary and boundary-perturbed comparisons stay separate and must not be pooled.
+- **Status.** The control stays PROPOSED. Its default was not stronger than `last_mask_sd` in growth (-0.007) or shrinkage (-0.036) pre-boundary. The best grid cell (tau 28, cap 1, clip 10) was selected on this same screen. It is **not adopted**, and it must not be carried into a patient test.
+
+**Before any future test, choose one path (decision for the user):**
+1. **Descriptive diagnostic (recommended).** Report the control next to the other arms. It is not a primary or co-primary contrast. This needs no settings choice and adds no post-hoc risk.
+2. **Development-fold selection.** A dated amendment fixes the settings grid and the selection rule first. Then settings are selected only on development training folds, never on test or target patients. Only after that may the control be a primary or co-primary contrast.
+
+**If another synthetic screen runs:** predeclare a history-only volume forecasting process with realistic bias and variance (not target-centered). Give every shape arm the identical volume draws. Report every setting. Do not select a winner for the patient test from it.
+
+No patient run is authorized. Duke remains NO-GO.

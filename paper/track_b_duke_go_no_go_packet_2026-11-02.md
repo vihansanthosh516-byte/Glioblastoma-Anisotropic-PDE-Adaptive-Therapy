@@ -28,7 +28,7 @@ Why: the metadata files are restricted and not on this PC. 61 patients and 503 s
 Both need a dated amendment signed before any target mask is opened (`paper/track_b_next_phase_plan_2026-11-02.md`).
 
 - **Proposed endpoint:** agreement (Dice) with the source's automated core labels, where core = labels 1 or 3. The cavity (label 4) is kept separate. This is not true tumor burden. The target is the next observed visit, conditional on its interval.
-- **Proposed primary contrast:** the PDE candidate versus a two-history matched-volume non-PDE control (`paper/track_b_two_history_control_spec_2026-11-02.md`). The deterministic pre-boundary contrast is proposed as primary or co-primary. Reason: the boundary noise model was calibrated on the PDE arm.
+- **Proposed primary contrast:** the PDE candidate versus a two-history matched-volume non-PDE control (`paper/track_b_two_history_control_spec_2026-11-02.md`). The deterministic pre-boundary contrast is proposed as primary or co-primary. Reason: the boundary noise model was calibrated on the PDE arm. **Update after the synthetic screen (`output/track_b_two_history_screen_20261102/screen.json`):** the control's default was not stronger than last-mask signed-distance in growth or shrinkage, and the best grid cell was selected on that same screen and is not adopted. So this contrast stays PROPOSED and is not ready to be primary. See the spec's "Interpretation correction" section.
 - Weakest point: the strength of the control is unverified. A development sensitivity grid is required first. A null or negative result is plausible and would be reported unchanged.
 - No learned residual exists. No positive result is promised.
 
@@ -74,6 +74,6 @@ Weak points: the PDE time was timed with reduced settings and scaled 20x. Timing
 2. Which Duke license applies, and do derived forecasts count under it?
 3. A compute budget in hours.
 4. Is the endpoint (labels 1|3, cavity separate, next observed visit conditional on interval) acceptable to draft?
-5. Is the pre-boundary contrast primary or co-primary?
+5. Two-history control: keep it as a descriptive diagnostic only (recommended), or select its settings on development-only training folds under a dated amendment before it can be primary or co-primary.
 6. Minimum eligible patients for the Duke amendment.
 7. Approve running the control sensitivity grid on development cases (synthetic or already-approved data only).
