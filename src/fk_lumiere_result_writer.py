@@ -1,11 +1,17 @@
-"""Result writer for the LUMIERE synthetic protocol implementation (draft amendment A-2026-11-02-T; not adopted).
+"""Post-run result writer for the LUMIERE synthetic protocol implementation (draft amendment A-2026-11-02-T; not
+adopted). This is a post-run result record, not a pre-run protocol freeze.
 
 Writes one JSON record of a `run_lumiere_protocol` result: code and protocol-document hashes, settings, cohort and
 fold identifiers, gate status, all four analyses, missing-arm reasons and fallback counts. It never loads patient
-data and stores no voxel arrays. It refuses to overwrite an existing file.
+data, hashes no image or mask file, and stores no voxel arrays. It refuses to overwrite an existing file and
+refuses to write if any code or protocol file is missing (no null hashes).
+
+Code hashes cover every project module reachable by import (module level or inside functions) from the entry
+modules, found by walking the source with `ast`, plus REQUIRED_CODE_FILES.
 """
 from __future__ import annotations
 
+import ast
 import hashlib
 import json
 import platform
@@ -17,13 +23,56 @@ from pathlib import Path
 import numpy as np
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
-CODE_FILES = (
+ENTRY_MODULES = ("src/fk_lumiere_protocol.py", "src/fk_lumiere_result_writer.py")
+# Required even if an import path changes; fk_longitudinal_prep holds the frozen registration QC used before scoring.
+REQUIRED_CODE_FILES = (
     "src/fk_lumiere_runner.py", "src/fk_lumiere_protocol.py", "src/fk_lumiere_pde_provider.py",
     "src/fk_lumiere_stats.py", "src/fk_lumiere_result_writer.py", "src/fk_time_aware_baselines.py",
     "src/fk_hybrid_forecast.py", "src/fk_learned_baselines.py", "src/fk_fixed_growth.py",
     "src/fk_mu_scoring.py", "src/fk_patient_cv.py", "src/fk_boundary_calibration.py",
     "src/fk_mu_training_nuisance.py", "src/fk_mu_patient_runner.py", "src/fk_longitudinal_prep.py",
+    "src/fk_grid_likelihood.py", "src/fk_volume_model.py", "src/fk_spatial_uncertainty.py",
+    "src/fk_mask_inverse.py", "run_improved_aniso.py",
 )
+CODE_FILES = REQUIRED_CODE_FILES  # backward name; the record uses execution_code_files()
+
+
+def _imported_project_files(path: Path, root: Path, seen: set) -> None:
+    rel = path.relative_to(root).as_posix()
+    if rel in seen:
+        return
+    seen.add(rel)
+    for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
+        if isinstance(node, ast.ImportFrom) and node.module:
+            mods = [f"src.{a.name}" for a in node.names] if node.module == "src" else [node.module]
+        elif isinstance(node, ast.Import):
+            mods = [a.name for a in node.names]
+        else:
+            continue
+        for m in mods:
+            candidate = root / (m.replace(".", "/") + ".py")
+            if candidate.exists():
+                _imported_project_files(candidate, root, seen)
+
+
+def execution_code_files(root: Path = PROJECT_ROOT) -> list[str]:
+    """Every project module reachable by import from the entry modules, plus REQUIRED_CODE_FILES."""
+    root = Path(root)
+    missing = [f for f in ENTRY_MODULES + REQUIRED_CODE_FILES if not (root / f).exists()]
+    if missing:
+        raise FileNotFoundError(f"required code files missing; refusing to write: {missing}")
+    seen: set = set()
+    for entry in ENTRY_MODULES:
+        _imported_project_files(root / entry, root, seen)
+    return sorted(seen | set(REQUIRED_CODE_FILES))
+
+
+def file_hashes(files, root: Path = PROJECT_ROOT) -> dict:
+    root = Path(root)
+    missing = [f for f in files if not (root / f).is_file()]
+    if missing:
+        raise FileNotFoundError(f"files missing; refusing to write: {missing}")
+    return {f: hashlib.sha256((root / f).read_bytes()).hexdigest() for f in files}
 PROTOCOL_FILES = (
     "paper/track_b_lumiere_time_aware_amendment_draft_2026-11-02.md",
     "paper/track_b_lumiere_scoring_amendment_draft_2026-11-01.md",
@@ -33,8 +82,12 @@ PROTOCOL_FILES = (
 ANALYSES = ("primary", "one_decade_narrower", "one_decade_wider", "central_gap")
 
 
-def _sha(path: Path) -> str | None:
-    return hashlib.sha256(path.read_bytes()).hexdigest() if path.exists() else None
+def _environment() -> dict:
+    import scipy
+    import torch
+    from src.fk_learned_baselines import unet_runtime_environment
+    return {"python": platform.python_version(), "platform": platform.platform(), "numpy": np.__version__,
+            "scipy": scipy.__version__, "torch": torch.__version__, "torch_runtime": unet_runtime_environment()}
 
 
 def _json_safe(x):
@@ -88,7 +141,7 @@ def _summarize_run(run: Mapping) -> dict:
 
 
 def write_lumiere_protocol_result(result: Mapping, path, *, cases: Sequence, fold_by_patient: Mapping[str, int],
-                                  gates: Mapping[str, bool] | None = None) -> dict:
+                                  gates: Mapping[str, bool] | None = None, project_root=PROJECT_ROOT) -> dict:
     from src import fk_lumiere_protocol as lp
     from src import fk_lumiere_runner as lr
     from src import fk_time_aware_baselines as ta
@@ -97,6 +150,8 @@ def write_lumiere_protocol_result(result: Mapping, path, *, cases: Sequence, fol
     path = Path(path)
     if path.exists():
         raise FileExistsError(f"refusing to overwrite {path}")
+    code_hashes = file_hashes(execution_code_files(project_root), project_root)
+    protocol_hashes = file_hashes(PROTOCOL_FILES, project_root)
     synthetic = all(c.synthetic for c in cases)
     ids = sorted(c.patient_id for c in cases)
     runs = dict(result.get("runs", {}))
@@ -107,9 +162,17 @@ def write_lumiere_protocol_result(result: Mapping, path, *, cases: Sequence, fol
         "created_utc": datetime.now(timezone.utc).isoformat(),
         "label": "synthetic protocol implementation" if synthetic else "LUMIERE protocol run",
         "amendment_status": "A-2026-11-02-T and the LUMIERE scoring draft are NOT adopted; patient scoring blocked",
+        "record_type": "post-run result record (not a pre-run protocol freeze)",
+        "seal_scope": {
+            "sealed": "project source modules reachable by import from the entry modules (ast walk) plus required "
+                      "files; four protocol documents",
+            "not_sealed": ["installed third-party packages (versions only in 'environment')",
+                           "patient image and mask input files (no input fingerprint; reading them is blocked)",
+                           "a pre-run protocol freeze record (not written)"],
+        },
         "overall_status": result.get("status"),
-        "code_sha256": {f: _sha(PROJECT_ROOT / f) for f in CODE_FILES},
-        "protocol_sha256": {f: _sha(PROJECT_ROOT / f) for f in PROTOCOL_FILES},
+        "code_sha256": code_hashes,
+        "protocol_sha256": protocol_hashes,
         "settings": {
             "prior_scenarios": lp.PRIOR_SCENARIOS, "central_gap_weeks": lp.CENTRAL_GAP_WEEKS,
             "calibration_minimum_patients": lp.CALIBRATION_MINIMUM_PATIENTS, "calibration_folds": lp.CALIBRATION_FOLDS,
@@ -124,9 +187,14 @@ def write_lumiere_protocol_result(result: Mapping, path, *, cases: Sequence, fol
         "cohort": {"synthetic": synthetic, "n_input": len(ids), "patient_ids": ids,
                    "patient_ids_sha256": hashlib.sha256("\0".join(ids).encode()).hexdigest(),
                    "fold_by_patient": {p: int(fold_by_patient[p]) for p in ids}},
+        "input_fingerprint": {
+            "status": "not computed (synthetic cases; patient image and mask files are not read)",
+            "requirement": "before any patient scoring, a pre-run freeze must record SHA-256 of every image and mask "
+                           "file read (or of the release archive and member list), after the user approves reads",
+        },
         "gates": {g: bool((gates or {}).get(g) is True) for g in lr.LUMIERE_GATES},
         "analyses": {name: (_summarize_run(runs[name]) if name in runs else {"status": "not run"}) for name in ANALYSES},
-        "environment": {"python": platform.python_version(), "numpy": np.__version__},
+        "environment": _environment(),
     }
     if "prior_support_sensitivity" in result:
         record["prior_support_sensitivity"] = result["prior_support_sensitivity"]
