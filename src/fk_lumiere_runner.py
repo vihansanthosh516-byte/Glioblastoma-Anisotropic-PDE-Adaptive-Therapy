@@ -72,6 +72,15 @@ def nominal_days(case: LumiereCase) -> dict:
             "forecast_nominal_days": DAYS_PER_WEEK * case.forecast_weeks, "history_nominal_days": d_h}
 
 
+def require_sealed_entry(cases: Sequence[LumiereCase], sealed_token) -> None:
+    """Real (synthetic=False) cases may only be scored via fk_track_b_run_guard.run_sealed_protocol."""
+    if all(c.synthetic for c in cases):
+        return
+    from src import fk_track_b_run_guard as guard  # lazy: the guard imports this module
+    if sealed_token is None or sealed_token is not guard._SEALED_TOKEN:
+        raise PermissionError("refused: real cases may only be scored through fk_track_b_run_guard.run_sealed_protocol")
+
+
 def check_gates(cases: Sequence[LumiereCase], gates: Mapping[str, bool]) -> None:
     if all(c.synthetic for c in cases):
         return
@@ -117,7 +126,7 @@ def run_lumiere_cv(cases: Sequence[LumiereCase], fold_by_patient: Mapping[str, i
                    pde_provider,
                    gates: Mapping[str, bool] | None = None, recipe=UNET_RECIPE,
                    film_reuse_cache: dict | None = None, minimum: int | None = None,
-                   n_bootstrap: int | None = None, analysis: str = "primary") -> dict:
+                   n_bootstrap: int | None = None, analysis: str = "primary", _sealed_token=None) -> dict:
     """Outer patient CV with the four proposed required comparators, the PDE candidate, a separately named
     matched-volume no-PDE ablation and the frozen Poisson count arm (count metrics only, never a mask).
 
@@ -135,6 +144,7 @@ def run_lumiere_cv(cases: Sequence[LumiereCase], fold_by_patient: Mapping[str, i
         minimum = REQUIRED_MINIMUM[analysis]
     if not all(c.synthetic for c in cases) and minimum != REQUIRED_MINIMUM[analysis]:
         raise PermissionError(f"real-data {analysis} runs must use the {REQUIRED_MINIMUM[analysis]}-patient minimum")
+    require_sealed_entry(cases, _sealed_token)  # before eligibility and any target read
     flow = eligibility(cases, minimum=minimum)
     result = {"flow": {k: v for k, v in flow.items() if k != "eligible"}, "comparators": COMPARATORS,
               "analysis": analysis}

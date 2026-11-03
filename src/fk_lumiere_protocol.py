@@ -38,7 +38,7 @@ def default_provider_factory(rho_bounds, D_bounds):
 def run_lumiere_protocol(cases: Sequence[lr.LumiereCase], fold_by_patient: Mapping[str, int], *,
                          provider_factory: Callable = default_provider_factory, gates=None, recipe=UNET_RECIPE,
                          n_bootstrap: int | None = None, minimum: int | None = None,
-                         central_gap_minimum: int | None = None) -> dict:
+                         central_gap_minimum: int | None = None, _sealed_token=None) -> dict:
     """Synthetic protocol implementation. ``minimum`` / ``central_gap_minimum`` may be lowered only for synthetic
     cases; the runner refuses non-default minimums for real data."""
     prior_cache: dict = {}
@@ -46,7 +46,8 @@ def run_lumiere_protocol(cases: Sequence[lr.LumiereCase], fold_by_patient: Mappi
     for name, (rho_b, d_b) in PRIOR_SCENARIOS.items():
         runs[name] = lr.run_lumiere_cv(cases, fold_by_patient, pde_provider=provider_factory(rho_b, d_b),
                                        gates=gates, recipe=recipe, film_reuse_cache=prior_cache,
-                                       minimum=minimum, n_bootstrap=n_bootstrap, analysis="primary")
+                                       minimum=minimum, n_bootstrap=n_bootstrap, analysis="primary",
+                                       _sealed_token=_sealed_token)
         if runs[name]["flow"]["stopped"]:
             return {"status": f"stopped in {name} run: {runs[name]['status']}", "runs": runs}
     sets = [set(r["dice"]["candidate"]) for r in runs.values()]
@@ -59,7 +60,7 @@ def run_lumiere_protocol(cases: Sequence[lr.LumiereCase], fold_by_patient: Mappi
     central = [c for c in cases if c.forecast_weeks in CENTRAL_GAP_WEEKS]
     gap_run = lr.run_lumiere_cv(central, fold_by_patient, pde_provider=provider_factory(*PRIOR_SCENARIOS["primary"]),
                                 gates=gates, recipe=recipe, film_reuse_cache={}, minimum=central_gap_minimum,
-                                n_bootstrap=n_bootstrap, analysis="central_gap")
+                                n_bootstrap=n_bootstrap, analysis="central_gap", _sealed_token=_sealed_token)
     if gap_run["flow"]["stopped"] or "dice" not in gap_run:
         return {"status": f"incomplete: central-gap refit did not score ({gap_run['status']})", "runs": runs,
                 "central_gap_run": gap_run, "central_gap_weeks": list(CENTRAL_GAP_WEEKS)}

@@ -32,7 +32,8 @@ REQUIRED_CODE_FILES = (
     "src/fk_mu_scoring.py", "src/fk_patient_cv.py", "src/fk_boundary_calibration.py",
     "src/fk_mu_training_nuisance.py", "src/fk_mu_patient_runner.py", "src/fk_longitudinal_prep.py",
     "src/fk_grid_likelihood.py", "src/fk_volume_model.py", "src/fk_spatial_uncertainty.py",
-    "src/fk_mask_inverse.py", "run_improved_aniso.py",
+    "src/fk_mask_inverse.py", "src/fk_track_b_run_guard.py", "src/fk_two_history_shape.py",
+    "run_improved_aniso.py",
 )
 CODE_FILES = REQUIRED_CODE_FILES  # backward name; the record uses execution_code_files()
 
