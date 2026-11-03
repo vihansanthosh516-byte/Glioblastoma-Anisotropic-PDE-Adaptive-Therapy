@@ -70,9 +70,27 @@ Sources: `film_unet_timing_record.json` (FiLM 4.141 s, frozen 3.989 s same sessi
 **Caveats:**
 - **Neither range is a bound.** Both are projections.
 - The absolute U-Net step time varied about 2× between sessions on this PC (3.989 s vs 7.973 s for the same frozen model).
-- Time-aware fixed growth (20 rates) has **not** been timed.
+- Time-aware fixed growth rate selection (20 rates), **measured (synthetic)** at 91 × 109 × 91: 19.4, 20.9 and 23.7 s for 22, 23 and 22 training cases (`output/track_b_timing_pilot_20261031/timed_fixed_growth_timing_record.json`). **Extrapolated:** about 5 folds × 21 s ≈ 105 s per analysis, about 0.12 h over four analyses. Negligible next to the ranges above; not added to them.
 - PDE inner cross-fitting is **excluded**; the real PDE cost can be higher.
 - The central-gap training set is counted at full size.
+
+## 5a. Empty visit-2 core rule (draft, 2026-11-02)
+
+- A patient whose visit-2 (origin) core is empty is **excluded from every arm**. This check uses the visit-2 history mask only.
+- Order: registration QC exclusions, then empty visit-2 exclusions, **before any target mask is read**. Both counts are reported.
+- If fewer than **25** patients remain after all frozen eligibility and QC rules: **stop**. No target is read, nothing is scored, no re-folding, no relaxed rule.
+- Remaining patients keep their fold (scoring draft §3b).
+- Code: `src/fk_lumiere_runner.py:eligibility` (synthetic tests only). This replaces the earlier gap note about the prototype raising on an empty last core: the runner excludes such patients before rate selection.
+
+## 5b. Integration status (synthetic only, 2026-11-02)
+
+- `src/fk_lumiere_runner.py:run_lumiere_cv`: guarded LUMIERE path with the four proposed comparators plus the PDE candidate; common eligible patients, folds, support and targets; time-aware fixed growth rate selected per outer fold on training patients only; FiLM U-Net trained per outer fold on training patients only; nominal days 7 × Δw passed to the PDE callables (`nominal_days`); lazy target reads after the stop check.
+- **Fail closed:** real cases are refused unless all 11 `LUMIERE_GATES` are recorded True; synthetic and real cases cannot be mixed.
+- **FiLM reuse fingerprint:** `film_training_fingerprint` = the frozen U-Net fingerprint (inputs, targets, fold, recipe, environment) + FiLM config + each patient's (forecast, history) weeks. Reuse only on a full match.
+- **Not defined here:** the PDE-only and PDE-candidate masks. They are injected callables; the LUMIERE PDE-only definition and the PDE wiring remain open.
+- MU/Duke runner unchanged.
+- Tests (scratch copy, Python 3.14): `tests/test_fk_lumiere_runner.py` 5 new; with `test_fk_time_aware_baselines.py`, `test_fk_learned_baselines.py` and `test_fk_mu_pipeline_components.py`: all passed (44 + 19 in two runs; 3 first-run failures were a missing `paper/` folder in the scratch copy, fixed and re-run).
+- Not added: bootstrap intervals and the max-T pass test in this runner.
 
 ## 6. Gates (all open or blocked; nothing passes by this draft)
 
@@ -96,11 +114,13 @@ Sources: `film_unet_timing_record.json` (FiLM 4.141 s, frozen 3.989 s same sessi
 
 **Protocol gates**
 - Pass-rule reading (no numeric margin; adjusted intervals strictly above zero): needs user confirmation.
-- FiLM U-Net and time-aware fixed growth are not wired into the runner.
-- The U-Net reuse fingerprint must include the FiLM recipe and the interval inputs before reuse applies to FiLM models. Not done.
-- Empty last core in rate selection: the frozen spec leaves such training patients out and counts them; the prototype raises an error instead. Must be aligned before wiring.
-- Nominal-day time step (7 × Δw) for PDE and count arms: proposed, not wired.
-- Time-aware fixed growth timing: not done.
+- FiLM U-Net and time-aware fixed growth: wired into the guarded LUMIERE runner (synthetic only, §5b). Not adopted.
+- FiLM reuse fingerprint: done (§5b).
+- Empty visit-2 core: rule written and coded (§5a); not adopted.
+- Nominal-day step (7 × Δw): passed to the PDE callables; the count arm is not wired in the LUMIERE runner.
+- LUMIERE PDE-only mask definition and real PDE wiring: OPEN.
+- Bootstrap intervals and max-T pass test in the LUMIERE runner: OPEN.
+- Time-aware fixed growth timing: done (§5).
 - Protocol freeze with SHA-256 of code, cohort, thresholds and records: not done.
 - **Patient scoring: BLOCKED.**
 

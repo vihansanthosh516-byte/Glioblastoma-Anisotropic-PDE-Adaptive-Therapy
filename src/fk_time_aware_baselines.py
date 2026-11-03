@@ -85,6 +85,85 @@ class FiLMUNet3D(torch.nn.Module):
         return net.head(x)
 
 
+FILM_CONFIG = {"film_hidden": FILM_HIDDEN, "interval_scale_weeks": INTERVAL_SCALE_WEEKS,
+               "interval_transform": "log(weeks/scale)", "film_per_norm_layer": True, "film_zero_init_last": True}
+
+
+def film_training_fingerprint(patient_ids, pairs, intervals, *, fold: int, recipe=UNET_RECIPE,
+                              environment: Mapping | None = None) -> str:
+    """Frozen U-Net fingerprint extended with the FiLM recipe and each patient's (forecast, history) weeks."""
+    from src.fk_learned_baselines import unet_training_fingerprint
+    import hashlib
+    base = unet_training_fingerprint(patient_ids, pairs, fold=fold, recipe=recipe, environment=environment)
+    h = hashlib.sha256(base.encode())
+    h.update(repr(sorted(FILM_CONFIG.items())).encode())
+    for pid, (f, hw) in zip(patient_ids, intervals):
+        h.update(repr((str(pid), float(f), float(hw))).encode())
+    return h.hexdigest()
+
+
+def train_film_models(pairs, intervals, *, fold: int, recipe=UNET_RECIPE) -> dict:
+    """Frozen U-Net training loop with FiLM; ``intervals`` are (forecast weeks, history weeks) per pair."""
+    from dataclasses import asdict
+    from src.fk_learned_baselines import _loss, _pad, _padded_shape
+    if not pairs:
+        return {"status": "unavailable", "reason": "no usable training pairs", "models": []}
+    shape = pairs[0][1].shape
+    padded = _padded_shape(shape, len(recipe.widths))
+    xs = [torch.from_numpy(np.stack([_pad(c, padded) for c in x]))[None] for x, _ in pairs]
+    ys = [torch.from_numpy(_pad(y.astype(np.float32), padded))[None, None] for _, y in pairs]
+    zs = [interval_features(f, h)[None] for f, h in intervals]
+    prior_det = torch.are_deterministic_algorithms_enabled()
+    torch.use_deterministic_algorithms(True)
+    models, seeds = [], []
+    try:
+        for offset in recipe.seed_offsets[:recipe.n_seeds]:
+            seed = recipe.base_seed + int(fold) + int(offset)
+            seeds.append(seed)
+            torch.manual_seed(seed)
+            gen = np.random.default_rng(seed)
+            model = FiLMUNet3D(recipe.widths, recipe.leaky_slope)
+            opt = torch.optim.Adam(model.parameters(), lr=recipe.learning_rate, betas=recipe.betas,
+                                   weight_decay=recipe.weight_decay)
+            model.train()
+            for _ in range(recipe.epochs):
+                for i in gen.permutation(len(xs)):
+                    x, y = xs[i], ys[i]
+                    for axis in (2, 3, 4):
+                        if gen.random() < 0.5:
+                            x, y = torch.flip(x, (axis,)), torch.flip(y, (axis,))
+                    k = int(gen.integers(4))
+                    x, y = torch.rot90(x, k, (2, 3)), torch.rot90(y, k, (2, 3))
+                    opt.zero_grad()
+                    loss = _loss(model(x, zs[i]), y, recipe.dice_smoothing)
+                    if not torch.isfinite(loss):
+                        return {"status": "unavailable", "reason": "non-finite loss", "models": [], "seeds": seeds}
+                    loss.backward()
+                    opt.step()
+            model.eval()
+            models.append(model)
+    finally:
+        torch.use_deterministic_algorithms(prior_det)
+    result = {"status": "ok", "models": models, "seeds": seeds, "padded_shape": padded, "shape": shape,
+              "recipe": asdict(recipe), "film_config": dict(FILM_CONFIG), "n_training_pairs": len(pairs)}
+    # Same unavailability rule as the frozen U-Net: every training-pair prediction empty -> unavailable.
+    if not any(predict_film(result, x, iv, domain=np.ones(shape, bool)).any() for (x, _), iv in zip(pairs, intervals)):
+        return {"status": "unavailable", "reason": "all training predictions empty", "models": [], "seeds": seeds}
+    return result
+
+
+def predict_film(trained: Mapping, inputs, interval, *, domain) -> np.ndarray:
+    from src.fk_learned_baselines import _pad
+    if trained.get("status") != "ok":
+        raise ValueError("FiLM U-Net is unavailable for this fold")
+    shape = tuple(trained["shape"])
+    x = torch.from_numpy(np.stack([_pad(c, trained["padded_shape"]) for c in inputs]))[None]
+    z = interval_features(*interval)[None]
+    with torch.no_grad():
+        probs = [torch.sigmoid(m(x, z))[0, 0].numpy()[tuple(slice(0, s) for s in shape)] for m in trained["models"]]
+    return (np.mean(probs, axis=0) >= trained["recipe"]["threshold"]) & np.asarray(domain, bool)
+
+
 # ---------------------------------------------------------------- time-aware fixed growth
 
 @dataclass(frozen=True)
