@@ -29,6 +29,9 @@ from src.fk_patient_cv import ForecastFailure
 from src import fk_time_aware_baselines as ta
 
 MIN_ELIGIBLE_PATIENTS = 25
+CENTRAL_GAP_MINIMUM_PATIENTS = 10  # draft §5i: at least 2 per outer fold on average
+# Real-data runs must use these minimums; only synthetic runs may pass a smaller ``minimum``.
+REQUIRED_MINIMUM = {"primary": MIN_ELIGIBLE_PATIENTS, "central_gap": CENTRAL_GAP_MINIMUM_PATIENTS}
 DAYS_PER_WEEK = ta.DAYS_PER_WEEK
 PDE_ONLY_CUTOFF_GRID = tuple(round(0.05 * i, 2) for i in range(1, 11))  # 0.05 ... 0.50
 CUTOFF_TIE_TOLERANCE = 1e-9
@@ -113,8 +116,8 @@ def select_pde_only_cutoff(training: Sequence[tuple], *, grid=PDE_ONLY_CUTOFF_GR
 def run_lumiere_cv(cases: Sequence[LumiereCase], fold_by_patient: Mapping[str, int], *,
                    pde_provider,
                    gates: Mapping[str, bool] | None = None, recipe=UNET_RECIPE,
-                   film_reuse_cache: dict | None = None, minimum: int = MIN_ELIGIBLE_PATIENTS,
-                   n_bootstrap: int | None = None) -> dict:
+                   film_reuse_cache: dict | None = None, minimum: int | None = None,
+                   n_bootstrap: int | None = None, analysis: str = "primary") -> dict:
     """Outer patient CV with the four proposed required comparators, the PDE candidate, a separately named
     matched-volume no-PDE ablation and the frozen Poisson count arm (count metrics only, never a mask).
 
@@ -126,8 +129,15 @@ def run_lumiere_cv(cases: Sequence[LumiereCase], fold_by_patient: Mapping[str, i
     from src.fk_learned_baselines import count_metrics, count_rate_per_day, fit_count_model, new_label_pieces
     from src.fk_lumiere_stats import N_BOOTSTRAP, max_t_pass_test
     check_gates(cases, gates or {})
+    if analysis not in REQUIRED_MINIMUM:
+        raise ValueError(f"analysis must be one of {sorted(REQUIRED_MINIMUM)}")
+    if minimum is None:
+        minimum = REQUIRED_MINIMUM[analysis]
+    if not all(c.synthetic for c in cases) and minimum != REQUIRED_MINIMUM[analysis]:
+        raise PermissionError(f"real-data {analysis} runs must use the {REQUIRED_MINIMUM[analysis]}-patient minimum")
     flow = eligibility(cases, minimum=minimum)
-    result = {"flow": {k: v for k, v in flow.items() if k != "eligible"}, "comparators": COMPARATORS}
+    result = {"flow": {k: v for k, v in flow.items() if k != "eligible"}, "comparators": COMPARATORS,
+              "analysis": analysis}
     if flow["stopped"]:
         result["status"] = f"stopped: {flow['n_eligible']} eligible < {minimum}; no target read, no scoring"
         return result

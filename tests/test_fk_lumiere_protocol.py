@@ -60,3 +60,33 @@ def test_frozen_settings_match_draft():
     assert lp.CENTRAL_GAP_WEEKS == (12, 13, 14)
     prov = lp.default_provider_factory(*lp.PRIOR_SCENARIOS["primary"])
     assert prov.seed == 20261028 and prov.calibration_minimum == 8 and prov.settings["n_draws"] == 200
+
+
+def test_too_few_central_gap_patients_is_incomplete_not_completed():
+    cases = _spread_cases()
+    # keep only 5 central-gap patients (below the 10-patient refit minimum); primary stays at 26 - 10 = 16 + 5
+    central = [c for c in cases if c.forecast_weeks in lp.CENTRAL_GAP_WEEKS]
+    drop = {c.patient_id for c in central[5:]}
+    kept = [replace(c, forecast_weeks=11) if c.patient_id in drop else c for c in cases]
+    out = lp.run_lumiere_protocol(kept, _folds(kept), provider_factory=_factory([]), recipe=TINY, n_bootstrap=200)
+    assert out["status"].startswith("incomplete: central-gap refit did not score")
+    assert out["central_gap_run"]["flow"]["n_eligible"] == 5 and out["central_gap_run"]["flow"]["stopped"]
+    assert "prior_support_sensitivity" not in out
+
+
+def test_real_data_cannot_lower_minimums():
+    import pytest
+    from src import fk_lumiere_runner as lr
+    real = [replace(c, synthetic=False) for c in _cases()]
+    gates = {g: True for g in lr.LUMIERE_GATES}
+    with pytest.raises(PermissionError, match="25-patient minimum"):
+        lr.run_lumiere_cv(real, _folds(real), pde_provider=FakeProvider(), gates=gates, minimum=10)
+    with pytest.raises(PermissionError, match="10-patient minimum"):
+        lr.run_lumiere_cv(real, _folds(real), pde_provider=FakeProvider(), gates=gates, minimum=5,
+                          analysis="central_gap")
+    with pytest.raises(PermissionError, match="25-patient minimum"):
+        lp.run_lumiere_protocol(real, _folds(real), provider_factory=_factory([]), gates=gates, minimum=1)
+    # synthetic runs may use a small minimum
+    res = lr.run_lumiere_cv(_cases()[:6], _folds(_cases()[:6]), pde_provider=FakeProvider(), recipe=TINY,
+                            minimum=5, n_bootstrap=50)
+    assert not res["flow"]["stopped"]

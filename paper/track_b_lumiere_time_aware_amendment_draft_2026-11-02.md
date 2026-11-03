@@ -179,6 +179,13 @@ These close the §5f ambiguities 1–3 and 5. They are set from the frozen MU ru
 
 Weak points: these are MU defaults, not tuned or validated on LUMIERE. The central-gap window is a judgment; Δw 12–14 holds 22 of 28 header-eligible patients.
 
+## 5i. Refit minimum and minimum guard (2026-11-03; draft, not adopted)
+
+- **Central-gap refit minimum: 10 eligible patients** (about 2 per outer fold). Chosen now, before any LUMIERE result. Below 10 the refit stops; the protocol wrapper then reports "incomplete: central-gap refit did not score", never "completed".
+- **Guard:** real-data runs must use the required minimum for their analysis (primary 25, central-gap 10). Any other `minimum` raises an error. Only synthetic runs may pass a smaller minimum.
+- Code: `src/fk_lumiere_runner.py` (`REQUIRED_MINIMUM`, `analysis=`), `src/fk_lumiere_protocol.py`. Tests: `tests/test_fk_lumiere_protocol.py` (too few central-gap patients; real data cannot lower minimums).
+- Weak point: 10 is a judgment, not a power calculation.
+
 ## 5h. Code status vs open gates (2026-11-03)
 
 **Completed code (synthetic tests only; none of it is a real-data pass):**
