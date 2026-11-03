@@ -133,6 +133,33 @@ Sources: `film_unet_timing_record.json` (FiLM 4.141 s, frozen 3.989 s same sessi
 
 **Verification (scratch copy, Python 3.14):** `tests/test_fk_lumiere_runner.py` 7 and `tests/test_fk_pde_only_cutoff.py` 6, with the hybrid forecast, full-hybrid gate, hybrid stress and MU pipeline-component suites: 44 passed. Covered: fold isolation of calibration and held-out calls, ties to the larger cutoff, empty PDE-only stays empty and scores 0 against a non-empty target, ForecastFailure fallback recorded, unchanged default candidate output.
 
+## 5e. Paired bootstrap and max-T intervals: implementation choices (frozen in this draft 2026-11-03, before coding; not adopted)
+
+Appendix §1.3 says: paired 95% cluster-bootstrap intervals, whole patients resampled, max-T adjustment across all required comparator contrasts. It does not give the statistic, the number of resamples or the seed. Chosen now, before any patient result exists:
+- **Contrasts:** k = 1..4, d_ik = Dice(candidate, i) − Dice(comparator k, i) for copy-last, time-aware fixed growth, PDE-only and FiLM U-Net, over the same scored patients.
+- **Resampling:** B = 10,000 resamples of patient indices with replacement, the **same** indices for all four contrasts (paired). Generator `numpy.random.default_rng(20261110)`.
+- **Statistic:** single-step max-T on studentized means. se_k = standard deviation (ddof = 1) of the B bootstrap means of contrast k. T_b = max_k |mean_b,k − mean_k| / se_k. c = 95th percentile of T_b (`numpy.quantile`, default linear method).
+- **Adjusted interval:** mean_k ± c × se_k.
+- **Pass:** every adjusted lower bound > 0 (strict). **Incomplete:** any required arm missing for any scored patient, fewer than 2 patients, or any se_k = 0 / non-finite. Incomplete is not a pass.
+- Weak points: percentile choice and B are conventions; with ≤ 28 patients the bootstrap distribution is coarse.
+
+Code: `src/fk_lumiere_stats.py` (synthetic tests only).
+
+## 5f. Runner completion on synthetic data (2026-11-03; not adopted)
+
+- **PDE provider** `src/fk_lumiere_pde_provider.py:LumierePDEProvider`. It follows the frozen MU outer-nuisance rules (the MU runner is unchanged): volume nuisance from outer-training patients only; inner patient-held-out boundary calibration on outer-training patients only; an inner fallback or fewer than two valid residuals makes the fold not ready, so every held-out forecast uses persistence; expected model failures and empty history masks raise `ForecastFailure`. LUMIERE days are nominal (0, 7 × history weeks, + 7 × forecast weeks), so the inner calibration forecasts each training patient at its own nominal horizon (`forecast_horizon_days=None`). Every call carries the PDE-only cutoff grid, so the inner calibration runs give the training rows for the cutoff selection.
+- **One shared solver call** per held-out patient gives the candidate (`mask_draws`), PDE-only (cutoff grid) and the separately named **matched-volume no-PDE ablation** (`no_pde_ranker_mask_draws`). The ablation is scored but is not a required comparator.
+- **Count arm** (frozen Poisson GLM, `fit_count_model`): fitted per outer fold on outer-training patients only; counts = `new_label_pieces(visit 2, visit 3)` inside support; offset log(7 × Δw); test μ = rate × 7 × Δw. Scored by Poisson deviance, absolute count error and Brier score of P(any new piece). It is never a Dice mask.
+- **Pass test:** §5e max-T on the four required contrasts; missing arms give "incomplete".
+- **Tests** (scratch copy, Python 3.14): `tests/test_fk_lumiere_runner.py` 9 and `tests/test_fk_lumiere_stats.py` 4, 13 passed. Covered: fold isolation (the held-out fold is absent from every fit view; each held-out patient is forecast once); identical patient sets for all arms; shared PDE call; empty PDE-only stays empty; fallback recorded with reason for candidate, PDE-only and ablation; count arm separate from Dice; pass, not passed and incomplete logic; seeded max-T. One test runs the real hybrid forecast on a 16³ grid: all 5 folds were model-ready, no fallbacks, chosen cutoff 0.10 in each fold; the pass test was "incomplete" because the 1-epoch tiny U-Net was unavailable.
+
+**Remaining ambiguities (recorded, not chosen):**
+1. `calibration_minimum_patients`: the MU runner requires at least 5 and uses 8 by default; the LUMIERE value is not set. With about 20–23 QC-passing training patients per fold, 8 is the MU default.
+2. Boundary-calibration settings for LUMIERE (inner folds 5, ℓ candidates 5/10/20 mm, initial covariance, seeds): copied from the MU runner; not separately frozen for LUMIERE.
+3. Count-arm voxel volume uses the 2 mm grid spacing; the "new piece" margin and minimum size are the frozen MU values (2 mm, 2 voxels).
+4. The count arm has no pass rule; it is reported only.
+5. Prior-sensitivity runs and the central-gap refit are not wired in the LUMIERE runner.
+
 ## 6. Gates (all open or blocked; nothing passes by this draft)
 
 **Source gates**
@@ -158,9 +185,10 @@ Sources: `film_unet_timing_record.json` (FiLM 4.141 s, frozen 3.989 s same sessi
 - FiLM U-Net and time-aware fixed growth: wired into the guarded LUMIERE runner (synthetic only, §5b). Not adopted.
 - FiLM reuse fingerprint: done (§5b).
 - Empty visit-2 core: rule written and coded (§5a); not adopted.
-- Nominal-day step (7 × Δw): passed to the PDE callables; the count arm is not wired in the LUMIERE runner.
-- LUMIERE PDE-only mask: 0.5 cutoff FAILED (§5c); training-selected cutoff rule proposed and wired in the guarded runner with synthetic tests (§5d); not adopted. Real PDE provider for the LUMIERE runner (calling the hybrid forecast with nuisances and the cutoff grid): OPEN.
-- Bootstrap intervals and max-T pass test in the LUMIERE runner: OPEN.
+- Nominal-day step (7 × Δw): passed to the PDE callables; the count arm uses the nominal offset (§5f).
+- LUMIERE PDE-only mask: 0.5 cutoff FAILED (§5c); training-selected cutoff rule proposed and wired in the guarded runner with synthetic tests (§5d); not adopted. Real PDE provider: wired (§5f).
+- Bootstrap intervals and max-T pass test: implemented with choices frozen in §5e (synthetic only); not adopted.
+- Real PDE provider and count arm: wired (§5f, synthetic only); remaining ambiguities listed in §5f.
 - Time-aware fixed growth timing: done (§5).
 - Protocol freeze with SHA-256 of code, cohort, thresholds and records: not done.
 - **Patient scoring: BLOCKED.**

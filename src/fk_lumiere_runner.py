@@ -111,16 +111,20 @@ def select_pde_only_cutoff(training: Sequence[tuple], *, grid=PDE_ONLY_CUTOFF_GR
 
 
 def run_lumiere_cv(cases: Sequence[LumiereCase], fold_by_patient: Mapping[str, int], *,
-                   pde_forecast: Callable,
+                   pde_provider,
                    gates: Mapping[str, bool] | None = None, recipe=UNET_RECIPE,
-                   film_reuse_cache: dict | None = None, minimum: int = MIN_ELIGIBLE_PATIENTS) -> dict:
-    """Outer patient CV with the four proposed required comparators and the PDE candidate.
+                   film_reuse_cache: dict | None = None, minimum: int = MIN_ELIGIBLE_PATIENTS,
+                   n_bootstrap: int | None = None) -> dict:
+    """Outer patient CV with the four proposed required comparators, the PDE candidate, a separately named
+    matched-volume no-PDE ablation and the frozen Poisson count arm (count metrics only, never a mask).
 
-    ``pde_forecast(case, timing, training_view, calibration_only)`` returns a hybrid-forecast dict computed with
-    ``pde_only_cutoff_grid=PDE_ONLY_CUTOFF_GRID`` (``mask_draws`` when not calibration-only, and
-    ``pde_only_inclusion_probability_by_cutoff``), or raises ForecastFailure. ``training_view`` holds the
-    outer-training patients (with loaded targets) only. Held-out targets never reach it.
+    ``pde_provider.fit_fold(training_view)`` sees outer-training patients (with targets) only and returns the
+    fold nuisance, including ``pde_only_training_rows`` {patient: probability_by_cutoff} from its inner
+    calibration runs. ``pde_provider.forecast(case, nuisance)`` returns one hybrid-forecast dict (candidate
+    draws, no-PDE draws and the PDE-only cutoff grid from one solver call) or raises ForecastFailure.
     """
+    from src.fk_learned_baselines import count_metrics, count_rate_per_day, fit_count_model, new_label_pieces
+    from src.fk_lumiere_stats import N_BOOTSTRAP, max_t_pass_test
     check_gates(cases, gates or {})
     flow = eligibility(cases, minimum=minimum)
     result = {"flow": {k: v for k, v in flow.items() if k != "eligible"}, "comparators": COMPARATORS}
@@ -136,7 +140,8 @@ def run_lumiere_cv(cases: Sequence[LumiereCase], fold_by_patient: Mapping[str, i
         if targets[c.patient_id].shape != np.asarray(c.support).shape:
             raise ValueError(f"{c.patient_id}: target and support grids differ")
     cache = {} if film_reuse_cache is None else film_reuse_cache
-    dice = {name: {} for name in COMPARATORS + ("candidate",)}
+    dice = {name: {} for name in COMPARATORS + ("candidate", "matched_volume_no_pde_ablation")}
+    count_rows = {}
     folds = {}
     for f in sorted({fold_by_patient[c.patient_id] for c in elig}):
         train = [c for c in elig if fold_by_patient[c.patient_id] != f]
@@ -156,38 +161,42 @@ def run_lumiere_cv(cases: Sequence[LumiereCase], fold_by_patient: Mapping[str, i
             cache[fp] = ta.train_film_models(pairs, intervals, fold=f, recipe=recipe)
         film = cache[fp]
         training_view = [dict(case=c, target=targets[c.patient_id]) for c in train]
-        cal_rows, cal_failed = [], []
-        for c in train:
-            others = [v for v in training_view if v["case"].patient_id != c.patient_id]
-            try:
-                cal = pde_forecast(c, nominal_days(c), others, True)
-                cal_rows.append((cal["pde_only_inclusion_probability_by_cutoff"], np.asarray(c.support, bool),
-                                 targets[c.patient_id]))
-            except ForecastFailure:
-                cal_failed.append(c.patient_id)
-        cut = select_pde_only_cutoff(cal_rows)
-        cut["calibration_failed_ids"] = cal_failed
+        nuisance = pde_provider.fit_fold(training_view)
+        raw_rows = nuisance.get("pde_only_training_rows", {})
+        cut = select_pde_only_cutoff([(raw_rows[c.patient_id], np.asarray(c.support, bool), targets[c.patient_id])
+                                      for c in train if c.patient_id in raw_rows])
+        cut["training_ids_without_raw_fields"] = [c.patient_id for c in train if c.patient_id not in raw_rows]
+        # Frozen Poisson count arm: outer-training patients only, nominal-interval offset; count metrics only.
+        vox_mm3 = float(np.prod(train[0].spacing_mm))
+        count_model = fit_count_model(
+            [new_label_pieces(c.visit2, targets[c.patient_id], spacing_mm=c.spacing_mm, domain=c.support)
+             for c in train],
+            [np.log(np.count_nonzero(np.asarray(c.visit2, bool) & np.asarray(c.support, bool)) * vox_mm3)
+             for c in train],
+            [DAYS_PER_WEEK * c.forecast_weeks for c in train])
         pde_info = {}
         for c in test:
             sup = np.asarray(c.support, bool)
             tgt = targets[c.patient_id]
-            timing = nominal_days(c)
+            last = np.asarray(c.visit2, bool) & sup
             try:
-                full = pde_forecast(c, timing, training_view, False)
+                full = pde_provider.forecast(c, nuisance)
                 cand = (np.asarray(full["mask_draws"]).mean(axis=0) >= 0.5) & sup
+                no_pde = (np.asarray(full["no_pde_ranker_mask_draws"]).mean(axis=0) >= 0.5) & sup
                 if cut["cutoff"] is None:
                     pde_only, empty_draws = None, None
                 else:
                     pde_only = (full["pde_only_inclusion_probability_by_cutoff"][cut["cutoff"]] >= 0.5) & sup
                     empty_draws = int(full["pde_only_empty_draws_by_cutoff"][cut["cutoff"]])
-                failed = False
-            except ForecastFailure:
-                cand = pde_only = np.asarray(c.visit2, bool) & sup  # frozen persistence fallback
-                empty_draws, failed = None, True
-            pde_info[c.patient_id] = {"forecast_failure_fallback": failed, "empty_draws_at_cutoff": empty_draws,
+                failed, reason = False, None
+            except ForecastFailure as exc:
+                cand, pde_only, no_pde = last.copy(), last.copy(), last.copy()  # frozen persistence fallback
+                empty_draws, failed, reason = None, True, str(exc)
+            pde_info[c.patient_id] = {"forecast_failure_fallback": failed, "failure_reason": reason,
+                                      "empty_draws_at_cutoff": empty_draws,
                                       "pde_only_mask_empty": None if pde_only is None else not pde_only.any()}
             preds = {
-                "copy_last": np.asarray(c.visit2, bool) & sup,
+                "copy_last": last,
                 "time_aware_fixed_growth": ta.fixed_growth_forecast(
                     c.visit2, sup, spacing_mm=c.spacing_mm,
                     radius_mm=ta.timed_radius_mm(sel["rate_mm_per_day"], c.forecast_weeks)),
@@ -196,18 +205,28 @@ def run_lumiere_cv(cases: Sequence[LumiereCase], fold_by_patient: Mapping[str, i
                                               (c.forecast_weeks, c.history_weeks), domain=sup)
                               if film.get("status") == "ok" else None),
                 "candidate": cand,
+                "matched_volume_no_pde_ablation": no_pde,
             }
             for name, p in preds.items():
                 dice[name][c.patient_id] = None if p is None else float(dice_with_empty_rule(p, tgt))
+            mu = count_rate_per_day(count_model, float(np.log(last.sum() * vox_mm3))) * DAYS_PER_WEEK * c.forecast_weeks
+            y = new_label_pieces(c.visit2, tgt, spacing_mm=c.spacing_mm, domain=sup)
+            count_rows[c.patient_id] = {"predicted_count": mu, "observed_count": int(y), **count_metrics(mu, y)}
         folds[f] = {"training_ids": ids, "test_ids": [c.patient_id for c in test], "rate": sel,
                     "film_fingerprint": fp, "film_reused": reused, "film_status": film.get("status"),
-                    "pde_only_cutoff": cut, "pde": pde_info}
-    complete = all(v is not None for name in ("film_unet", "pde_only") for v in dice[name].values())
+                    "pde_only_cutoff": cut, "pde": pde_info, "count_model_status": count_model["status"],
+                    "pde_model_ready": bool(nuisance.get("model_ready", False)),
+                    "pde_unavailable_reason": nuisance.get("unavailable_reason")}
+    stats = max_t_pass_test(dice, COMPARATORS, n_bootstrap=n_bootstrap or N_BOOTSTRAP)
     result.update({
         "status": "scored (synthetic)" if all(c.synthetic for c in cases) else "scored",
         "folds": folds, "dice": dice,
         "patient_macro_dice": {k: (float(np.mean(list(v.values()))) if v and all(x is not None for x in v.values())
                                    else None) for k, v in dice.items()},
-        "comparison_complete": complete,
+        "comparison_complete": stats["status"] != "incomplete",
+        "pass_test": stats,
+        "count_arm": {"rows": count_rows, "scope": "count metrics only; never a Dice mask",
+                      **{f"mean_{k}": float(np.mean([r[k] for r in count_rows.values()]))
+                         for k in ("poisson_deviance", "abs_error", "brier_any_new")}},
     })
     return result

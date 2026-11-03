@@ -3,6 +3,7 @@ from dataclasses import replace
 
 import numpy as np
 import pytest
+from scipy.ndimage import distance_transform_edt
 
 from src import fk_lumiere_runner as lr
 from src import fk_time_aware_baselines as ta
@@ -10,6 +11,7 @@ from src.fk_learned_baselines import UNetRecipe
 
 TINY = UNetRecipe(widths=(4, 8), epochs=1, n_seeds=1)
 SHAPE = (16, 16, 16)
+FOLDS = {f"s{i:02d}": i % 5 for i in range(26)}
 
 
 def _ball(r, c=(8, 8, 8)):
@@ -31,51 +33,55 @@ def _cases(n=26, loads=None, **kw):
 
 
 def _folds(cases):
-    return {c.patient_id: i % 5 for i, c in enumerate(cases)}
+    return {c.patient_id: FOLDS[c.patient_id] for c in cases}
 
 
-FOLDS = {f"s{i:02d}": i % 5 for i in range(26)}
-CALLS = []
-
-
-def _fake_result(c, calibration_only, empty=False):
-    from scipy.ndimage import distance_transform_edt
+def _grid(c, empty=False):
     d = distance_transform_edt(~np.asarray(c.visit2, bool), sampling=2.0)
     u = np.zeros(SHAPE, np.float32) if empty else np.exp(-d / 4.0).astype(np.float32)
-    out = {"pde_only_inclusion_probability_by_cutoff": {k: (u >= k).astype(np.float32) for k in lr.PDE_ONLY_CUTOFF_GRID},
-           "pde_only_empty_draws_by_cutoff": {k: int(not (u >= k).any()) for k in lr.PDE_ONLY_CUTOFF_GRID}}
-    if not calibration_only:
-        out["mask_draws"] = np.stack([np.asarray(c.visit2, bool)] * 2)
-    return out
+    return ({k: (u >= k).astype(np.float32) for k in lr.PDE_ONLY_CUTOFF_GRID},
+            {k: int(not (u >= k).any()) for k in lr.PDE_ONLY_CUTOFF_GRID})
 
 
-def _pde(c, timing, view, calibration_only, empty_ids=(), fail_ids=()):
-    ids = {v["case"].patient_id for v in view}
-    assert c.patient_id not in ids
-    assert timing["forecast_nominal_days"] == 7 * c.forecast_weeks
-    assert timing["target_day"] == 7 * (c.history_weeks + c.forecast_weeks)
-    present = {FOLDS[i] for i in ids}
-    if calibration_only:
-        present.add(FOLDS[c.patient_id])
-        assert len(present) <= 4  # one outer fold (the held-out one) is always absent
-    else:
-        assert FOLDS[c.patient_id] not in present
-    CALLS.append((c.patient_id, calibration_only))
-    if c.patient_id in fail_ids and not calibration_only:
-        raise lr.ForecastFailure("synthetic failure")
-    return _fake_result(c, calibration_only, empty=c.patient_id in empty_ids)
+class FakeProvider:
+    """Checks fold isolation on every call; one forecast call per held-out patient."""
+
+    def __init__(self, empty_ids=(), fail_ids=()):
+        self.empty_ids, self.fail_ids, self.fit_views, self.forecasts = set(empty_ids), set(fail_ids), [], []
+
+    def fit_fold(self, view):
+        ids = [v["case"].patient_id for v in view]
+        assert len({FOLDS[i] for i in ids}) == 4  # the held-out fold is absent
+        self.fit_views.append(ids)
+        return {"model_ready": True, "training_ids": set(ids),
+                "pde_only_training_rows": {v["case"].patient_id: _grid(v["case"], v["case"].patient_id in self.empty_ids)[0]
+                                           for v in view}}
+
+    def forecast(self, case, nuisance):
+        assert case.patient_id not in nuisance["training_ids"]
+        self.forecasts.append(case.patient_id)
+        if case.patient_id in self.fail_ids:
+            raise lr.ForecastFailure("synthetic failure")
+        prob, empty = _grid(case, case.patient_id in self.empty_ids)
+        v2 = np.asarray(case.visit2, bool)
+        return {"mask_draws": np.stack([v2] * 2), "no_pde_ranker_mask_draws": np.stack([_ball(7)] * 2),
+                "pde_only_inclusion_probability_by_cutoff": prob, "pde_only_empty_draws_by_cutoff": empty}
+
+
+def _run(cases, provider=None, **kw):
+    return lr.run_lumiere_cv(cases, _folds(cases), pde_provider=provider or FakeProvider(), recipe=TINY,
+                             n_bootstrap=200, **kw)
 
 
 def test_real_cases_refused_until_every_gate_passes():
     real = [replace(c, synthetic=False) for c in _cases()]
     with pytest.raises(PermissionError, match="gates not recorded"):
-        lr.run_lumiere_cv(real, _folds(real), pde_forecast=_pde)
+        _run(real)
     almost = {g: True for g in lr.LUMIERE_GATES[:-1]}
     with pytest.raises(PermissionError, match="scoring_authorized_by_user"):
-        lr.run_lumiere_cv(real, _folds(real), pde_forecast=_pde, gates=almost)
-    mixed = _cases()[:-1] + real[-1:]
+        _run(real, gates=almost)
     with pytest.raises(PermissionError, match="mixed"):
-        lr.run_lumiere_cv(mixed, _folds(mixed), pde_forecast=_pde)
+        _run(_cases()[:-1] + real[-1:])
 
 
 def test_empty_visit2_and_qc_failures_excluded_before_target_reads_and_stop_rule():
@@ -83,43 +89,49 @@ def test_empty_visit2_and_qc_failures_excluded_before_target_reads_and_stop_rule
     cases = _cases(loads=loads)
     cases[0] = replace(cases[0], visit2=np.zeros(SHAPE, bool))
     cases[1] = replace(cases[1], qc_passed=False)
-    res = lr.run_lumiere_cv(cases, _folds(cases), pde_forecast=_pde)
+    res = _run(cases)
     fl = res["flow"]
     assert fl["n_empty_visit2"] == 1 and fl["n_qc_failed"] == 1 and fl["n_eligible"] == 24 and fl["stopped"]
     assert res["status"].startswith("stopped") and loads == [] and "dice" not in res
 
 
-def test_full_synthetic_run_scores_all_arms_on_common_patients(monkeypatch):
+def test_common_patients_folds_shared_pde_call_count_arm_and_ablation():
     loads = []
     cases = _cases(loads=loads)
     cases[0] = replace(cases[0], visit2=np.zeros(SHAPE, bool))
-    res = lr.run_lumiere_cv(cases, _folds(cases), pde_forecast=_pde,
-                            recipe=TINY)
+    prov = FakeProvider()
+    res = _run(cases, prov)
     assert res["status"] == "scored (synthetic)" and res["flow"]["n_eligible"] == 25
     assert "s00" not in loads and sorted(loads) == sorted(c.patient_id for c in cases[1:])
     ids = {c.patient_id for c in cases[1:]}
-    for name in lr.COMPARATORS + ("candidate",):
+    for name in lr.COMPARATORS + ("candidate", "matched_volume_no_pde_ablation"):
         assert set(res["dice"][name]) == ids
+    assert sorted(prov.forecasts) == sorted(ids)  # exactly one PDE call per held-out patient
+    assert len(prov.fit_views) == 5
     for f, info in res["folds"].items():
         assert not set(info["training_ids"]) & set(info["test_ids"])
-        assert set(info["test_ids"]) == {p for p in ids if _folds(cases)[p] == f}
+        assert set(info["test_ids"]) == {p for p in ids if FOLDS[p] == f}
         assert info["rate"]["n_training"] == len(info["training_ids"])
-    assert res["dice"]["copy_last"] == res["dice"]["candidate"]  # fake candidate draws = visit-2 core
-    for info in res["folds"].values():
         assert info["pde_only_cutoff"]["cutoff"] in lr.PDE_ONLY_CUTOFF_GRID
         assert info["pde_only_cutoff"]["n_training"] == len(info["training_ids"])
+    assert res["dice"]["copy_last"] == res["dice"]["candidate"]  # fake candidate draws = visit-2 core
+    assert res["dice"]["matched_volume_no_pde_ablation"] != res["dice"]["pde_only"]
+    assert set(res["count_arm"]["rows"]) == ids and "count" not in " ".join(res["dice"])
+    row = next(iter(res["count_arm"]["rows"].values()))
+    assert {"poisson_deviance", "abs_error", "brier_any_new", "predicted_count"} <= set(row)
+    assert "pass_test" in res and res["pass_test"]["status"] in {"pass", "not passed", "incomplete"}
 
 
 def test_empty_pde_only_stays_empty_and_failures_use_recorded_fallback():
-    cases = _cases()
-    f = lambda c, t, v, cal: _pde(c, t, v, cal, empty_ids={"s03"}, fail_ids={"s04"})
-    res = lr.run_lumiere_cv(cases, _folds(cases), pde_forecast=f, recipe=TINY)
+    res = _run(_cases(), FakeProvider(empty_ids={"s03"}, fail_ids={"s04"}))
     p3 = res["folds"][FOLDS["s03"]]["pde"]["s03"]
     assert p3["pde_only_mask_empty"] and not p3["forecast_failure_fallback"]
     assert res["dice"]["pde_only"]["s03"] == 0.0  # frozen empty-mask rule against a non-empty target
     assert res["dice"]["copy_last"]["s03"] > 0.0
     p4 = res["folds"][FOLDS["s04"]]["pde"]["s04"]
-    assert p4["forecast_failure_fallback"] and res["dice"]["pde_only"]["s04"] == res["dice"]["copy_last"]["s04"]
+    assert p4["forecast_failure_fallback"] and p4["failure_reason"] == "synthetic failure"
+    for arm in ("pde_only", "candidate", "matched_volume_no_pde_ablation"):
+        assert res["dice"][arm]["s04"] == res["dice"]["copy_last"]["s04"]
 
 
 def test_cutoff_selection_uses_training_dice_and_ties_go_larger():
@@ -133,19 +145,24 @@ def test_cutoff_selection_uses_training_dice_and_ties_go_larger():
     assert lr.select_pde_only_cutoff([])["cutoff"] is None
 
 
+def test_missing_cutoff_makes_comparison_incomplete():
+    class NoRows(FakeProvider):
+        def fit_fold(self, view):
+            return {**super().fit_fold(view), "pde_only_training_rows": {}}
+    res = _run(_cases(), NoRows())
+    assert res["pass_test"]["status"] == "incomplete" and not res["comparison_complete"]
+
+
 def test_film_reuse_only_on_full_fingerprint_match():
     cases = _cases()
     cache = {}
-    first = lr.run_lumiere_cv(cases, _folds(cases), pde_forecast=_pde,
-                              recipe=TINY, film_reuse_cache=cache)
+    first = _run(cases, film_reuse_cache=cache)
     assert not any(f["film_reused"] for f in first["folds"].values())
-    second = lr.run_lumiere_cv(cases, _folds(cases), pde_forecast=_pde,
-                               recipe=TINY, film_reuse_cache=cache)
+    second = _run(cases, film_reuse_cache=cache)
     assert all(f["film_reused"] for f in second["folds"].values())
     assert second["dice"]["film_unet"] == first["dice"]["film_unet"]
     shifted = [replace(c, history_weeks=c.history_weeks + 1) for c in cases]
-    third = lr.run_lumiere_cv(shifted, _folds(shifted), pde_forecast=_pde,
-                              recipe=TINY, film_reuse_cache=cache)
+    third = _run(shifted, film_reuse_cache=cache)
     assert not any(f["film_reused"] for f in third["folds"].values())
 
 
@@ -160,3 +177,33 @@ def test_film_fingerprint_covers_recipe_config_and_intervals(monkeypatch):
                                                 recipe=replace(TINY, epochs=2), environment=env)
     monkeypatch.setitem(ta.FILM_CONFIG, "film_hidden", 32)
     assert base != ta.film_training_fingerprint(["a"], [(x, y)], [(13, 13)], fold=0, recipe=TINY, environment=env)
+
+
+def test_real_pde_provider_one_shared_call_per_heldout_patient_and_training_only_calibration():
+    from src.fk_lumiere_pde_provider import LumierePDEProvider
+    g = np.ogrid[tuple(slice(0, s) for s in SHAPE)]
+    r2 = sum(((g[i] - 8) * 2.0) ** 2 for i in range(3))
+    sup = r2 <= 15 ** 2
+    cases = []
+    for i in range(10):
+        fw, hw = 11 + i % 5, 6 + i % 3
+        r1, rr2 = 5.0 + 0.1 * i, 6.0 + 0.1 * i
+        cases.append(lr.LumiereCase(f"s{i:02d}", r2 <= r1 ** 2, r2 <= rr2 ** 2, sup, fw, hw, True,
+                                    lambda rr2=rr2: r2 <= (rr2 + 1.0) ** 2, synthetic=True))
+    prov = LumierePDEProvider(
+        settings={"rho_bounds": (1e-5, 1e-1), "D_bounds": (1e-5, 10.0), "n_coarse": 5, "mass_fraction": 0.9,
+                  "n_refine": 3, "n_draws": 6, "n_anchors": 16},
+        initial_covariance={"sigma_b_mm": 0.8, "tau_b_mm": 0.3, "ell_mm": 6.0},
+        cutoff_grid=lr.PDE_ONLY_CUTOFF_GRID, calibration_minimum_patients=5)
+    res = lr.run_lumiere_cv(cases, _folds(cases), pde_provider=prov, recipe=TINY, minimum=10, n_bootstrap=200)
+    full = [p for p, cal in prov.calls if not cal]
+    cal = [p for p, cal in prov.calls if cal]
+    ready = {f: info["pde_model_ready"] for f, info in res["folds"].items()}
+    for f, info in res["folds"].items():
+        for p, row in info["pde"].items():
+            assert row["forecast_failure_fallback"] or full.count(p) == 1
+    # each patient is calibrated only while it is an outer-training patient (4 of 5 folds), never when held out
+    for c in cases:
+        assert cal.count(c.patient_id) <= 4
+    assert len(full) == sum(1 for c in cases if ready[FOLDS[c.patient_id]])
+    assert set(res["dice"]["pde_only"]) == {c.patient_id for c in cases}
