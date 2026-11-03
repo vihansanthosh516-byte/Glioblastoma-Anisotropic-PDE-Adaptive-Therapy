@@ -71,8 +71,9 @@ Only after Stage 2 and a separate user-approved read scope:
 
 ### Stage 4 — Synthetic implementation and compute gate
 
-- Implement the parameterized two-history control and its nested patient-grouped selection only after the corrected proposal is settled.
-- Test outer-fold isolation, shared volume draws, exact support/volume matching, deterministic seeds, failure rules, and result-writer completeness on synthetic fixtures in a scratch copy.
+- **Done:** the synthetic control now has an explicit validated settings object in `src/fk_two_history_shape.py`; the previous defaults are retained. Its settings API and fallback math passed 21 focused synthetic tests in a scratch copy. This does not wire the control into a runner or select settings on any patient data.
+- **Next, only after the corrected proposal and cohort-specific protocol are settled:** build the fold-local selector and runner integration.
+- **Still required:** test outer-fold isolation, shared volume draws, exact support/volume matching, deterministic seeds, failure rules, and result-writer completeness on synthetic fixtures in a scratch copy.
 - Run no patient-derived timing job until source and access gates pass. Use synthetic shapes/gaps representative of the permitted cohort, including the longest interval, and count every PDE calibration, forecast, inner fit, U-Net training/refit, and prior run.
 - Set a practical wall-clock ceiling before the timing run. If the estimate exceeds it, stop and propose a scope amendment; do not weaken the strongest baseline after seeing outcomes.
 
@@ -95,7 +96,7 @@ It does not become independently confirmatory, clinically useful, causal, or hig
 - Full LUMIERE four-analysis run: **not recommended**.
 - Duke: **conditional future path; access not granted**.
 - Fresh no-request cohort: **none verified in the bounded screen**.
-- Two-history proposal: **corrected draft, not adopted and not wired**.
+- Two-history proposal: **corrected draft, not adopted; settings API is synthetic-only and no selector/runner is wired**.
 - Patient voxel reads, external contact, data downloads, and scoring: **not performed or authorized by this plan**.
 
 ## Sources checked

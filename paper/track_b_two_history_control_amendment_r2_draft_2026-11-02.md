@@ -56,7 +56,7 @@ This document defines only a candidate control concept. It does not define a run
 
 ## 6. Code and validation required before adoption
 
-1. Add explicit validated settings to the control API; the proposed grid cannot be nested-selected through current module-level constants.
+1. **Settings API:** implemented in the synthetic prototype as `TwoHistoryShapeSettings` with finite/range validation and JSON-friendly recording. The former defaults are preserved. Twenty-one focused synthetic tests pass in a scratch copy. This does not select settings on patient data or wire the control into a runner.
 2. Implement a fold-local selector that accepts only outer-training IDs and returns the selected cell plus inner results. Add a leakage test that changes outer-test targets and proves selection and forecasts do not change.
 3. Factor the shared history-only volume forecast so the candidate and control consume the exact same draws, including fallback cases.
 4. Implement the common failure rules above with typed expected failures. Test expected fallback and unexpected abort behavior separately.

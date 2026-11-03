@@ -86,6 +86,77 @@ def test_factor_cap_and_shrinkage():
         th.extrapolation_factor(10, 0)
 
 
+def test_explicit_settings_preserve_defaults_and_control_factor(setup):
+    default = th.TwoHistoryShapeSettings()
+    assert default.max_factor == th.MAX_FACTOR
+    assert default.min_history_gap_days == th.MIN_HISTORY_GAP_DAYS
+    assert default.shrink_tau_days == th.SHRINK_TAU_DAYS
+    assert default.max_sd_delta_mm == th.MAX_SD_DELTA_MM
+
+    h1, h2, dom, k = setup
+    custom = th.TwoHistoryShapeSettings(
+        max_factor=0.25,
+        min_history_gap_days=2.0,
+        shrink_tau_days=0.0,
+        max_sd_delta_mm=4.0,
+    )
+    assert th.extrapolation_factor(30.0, 60.0, settings=custom) == 0.25
+    assert th.extrapolation_factor(1.0, 60.0, settings=custom) == 0.0
+    tau_settings = th.TwoHistoryShapeSettings(
+        max_factor=10.0,
+        min_history_gap_days=0.0,
+        shrink_tau_days=30.0,
+    )
+    assert th.extrapolation_factor(30.0, 30.0, settings=tau_settings) == 0.5
+
+    result = th.two_history_shape_draws(
+        h1, h2, 30.0, 60.0, k, domain=dom, apply_boundary=False, settings=custom
+    )
+    assert result["factor"] == 0.25
+    assert result["settings"] == {
+        "max_factor": 0.25,
+        "min_history_gap_days": 2.0,
+        "shrink_tau_days": 0.0,
+        "max_sd_delta_mm": 4.0,
+    }
+
+
+def test_custom_distance_clip_changes_the_forecast():
+    h1, h2 = ball((8, 12, 12), 4), ball((12, 12, 12), 5)
+    low_clip = th.TwoHistoryShapeSettings(
+        min_history_gap_days=0.0, shrink_tau_days=0.0, max_sd_delta_mm=1.0
+    )
+    high_clip = th.TwoHistoryShapeSettings(
+        min_history_gap_days=0.0, shrink_tau_days=0.0, max_sd_delta_mm=20.0
+    )
+    low, _ = th.forecast_signed_distance(h1, h2, 30.0, 30.0, settings=low_clip)
+    high, _ = th.forecast_signed_distance(h1, h2, 30.0, 30.0, settings=high_clip)
+    assert not np.array_equal(low, high)
+
+
+@pytest.mark.parametrize(
+    "kwargs",
+    [
+        {"max_factor": 0.0},
+        {"max_factor": float("inf")},
+        {"min_history_gap_days": -1.0},
+        {"shrink_tau_days": -1.0},
+        {"max_sd_delta_mm": 0.0},
+        {"max_sd_delta_mm": float("nan")},
+    ],
+)
+def test_explicit_settings_reject_invalid_values(kwargs):
+    with pytest.raises(ValueError):
+        th.TwoHistoryShapeSettings(**kwargs)
+
+
+def test_zero_history_gap_is_last_mask_even_with_zero_threshold_and_tau():
+    settings = th.TwoHistoryShapeSettings(min_history_gap_days=0.0, shrink_tau_days=0.0)
+    assert th.extrapolation_factor(0.0, 30.0, settings=settings) == 0.0
+    with pytest.raises(ValueError):
+        th.extrapolation_factor(-1.0, 30.0, settings=settings)
+
+
 def test_empty_masks(setup):
     h1, h2, dom, k = setup
     z = np.zeros(SHAPE, bool)

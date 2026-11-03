@@ -16,17 +16,55 @@ before wiring. The boundary covariance used with apply_boundary=True was calibra
 """
 from __future__ import annotations
 
+from dataclasses import dataclass
 import numpy as np
 from scipy import ndimage
 
 from src.fk_grid_likelihood import volume_match_concentration
 from src.fk_hybrid_forecast import _perturb_boundary_or_keep
 
-# Proposed (not adopted) constants (documented in paper/track_b_two_history_control_spec_2026-11-02.md).
-MAX_FACTOR = 4.0            # cap on the extrapolation factor f (SD-delta multiples)
-MIN_HISTORY_GAP_DAYS = 1.0  # history gap below this: no extrapolation (f = 0, last-mask rule)
-SHRINK_TAU_DAYS = 7.0       # shrinkage time constant; w = gap / (gap + tau)
-MAX_SD_DELTA_MM = 30.0      # numerical cap on |SD_h2 - SD_h1| before scaling
+# Proposed (not adopted) development defaults. The explicit settings object lets a future
+# outer-training-only selector evaluate the proposed grid without changing module globals.
+MAX_FACTOR = 4.0
+MIN_HISTORY_GAP_DAYS = 1.0
+SHRINK_TAU_DAYS = 7.0
+MAX_SD_DELTA_MM = 30.0
+
+
+@dataclass(frozen=True)
+class TwoHistoryShapeSettings:
+    """Validated settings for the synthetic-only two-history shape prototype."""
+
+    max_factor: float = MAX_FACTOR
+    min_history_gap_days: float = MIN_HISTORY_GAP_DAYS
+    shrink_tau_days: float = SHRINK_TAU_DAYS
+    max_sd_delta_mm: float = MAX_SD_DELTA_MM
+
+    def __post_init__(self):
+        values = np.asarray(
+            [self.max_factor, self.min_history_gap_days, self.shrink_tau_days, self.max_sd_delta_mm],
+            dtype=float,
+        )
+        if not np.isfinite(values).all():
+            raise ValueError("two-history settings must be finite")
+        if self.max_factor <= 0:
+            raise ValueError("max_factor must be positive; use f=0 for the last-mask rule")
+        if self.min_history_gap_days < 0 or self.shrink_tau_days < 0:
+            raise ValueError("history-gap threshold and shrinkage time must be nonnegative")
+        if self.max_sd_delta_mm <= 0:
+            raise ValueError("max_sd_delta_mm must be positive")
+
+    def as_dict(self) -> dict[str, float]:
+        """Return a stable, JSON-friendly representation for result records."""
+        return {
+            "max_factor": float(self.max_factor),
+            "min_history_gap_days": float(self.min_history_gap_days),
+            "shrink_tau_days": float(self.shrink_tau_days),
+            "max_sd_delta_mm": float(self.max_sd_delta_mm),
+        }
+
+
+DEFAULT_SETTINGS = TwoHistoryShapeSettings()
 
 
 def _spacing3(spacing_mm) -> np.ndarray:
@@ -42,18 +80,33 @@ def signed_distance(mask, spacing_mm) -> np.ndarray:
     return ndimage.distance_transform_edt(mask, sampling=s) - ndimage.distance_transform_edt(~mask, sampling=s)
 
 
-def extrapolation_factor(gap_days: float, forecast_days: float) -> float:
-    """Proposed factor f = min(T / (g + 7), cap); 0 for a tiny history gap, capped at MAX_FACTOR."""
+def extrapolation_factor(
+    gap_days: float,
+    forecast_days: float,
+    *,
+    settings: TwoHistoryShapeSettings = DEFAULT_SETTINGS,
+) -> float:
+    """Proposed factor f = min(T / (g + tau), cap); zero for tiny history gaps."""
     gap_days, forecast_days = float(gap_days), float(forecast_days)
     if not np.isfinite(gap_days) or not np.isfinite(forecast_days) or forecast_days <= 0:
         raise ValueError("forecast interval must be positive and finite; history gap must be finite")
-    if gap_days < MIN_HISTORY_GAP_DAYS:
+    if gap_days < 0:
+        raise ValueError("history gap must be nonnegative")
+    if gap_days == 0 or gap_days < settings.min_history_gap_days:
         return 0.0
-    weight = gap_days / (gap_days + SHRINK_TAU_DAYS)
-    return float(min(weight * forecast_days / gap_days, MAX_FACTOR))
+    weight = gap_days / (gap_days + settings.shrink_tau_days)
+    return float(min(weight * forecast_days / gap_days, settings.max_factor))
 
 
-def forecast_signed_distance(h1, h2, gap_days, forecast_days, spacing_mm=1.0) -> tuple[np.ndarray, dict]:
+def forecast_signed_distance(
+    h1,
+    h2,
+    gap_days,
+    forecast_days,
+    spacing_mm=1.0,
+    *,
+    settings: TwoHistoryShapeSettings = DEFAULT_SETTINGS,
+) -> tuple[np.ndarray, dict]:
     """Return SD_f and details. Empty/full h1 falls back to the last-mask rule (f=0); empty/full h2 raises."""
     h1, h2 = np.asarray(h1, dtype=bool), np.asarray(h2, dtype=bool)
     if h2.ndim != 3 or h1.shape != h2.shape:
@@ -62,12 +115,23 @@ def forecast_signed_distance(h1, h2, gap_days, forecast_days, spacing_mm=1.0) ->
         raise ValueError("origin mask h2 must be nonempty and non-full")
     sd2 = signed_distance(h2, spacing_mm)
     h1_unusable = (not h1.any()) or bool(h1.all())
-    f = 0.0 if h1_unusable else extrapolation_factor(gap_days, forecast_days)
+    requested_factor = extrapolation_factor(gap_days, forecast_days, settings=settings)
+    f = 0.0 if h1_unusable else requested_factor
+    setting_record = settings.as_dict()
     if f == 0.0:
         return sd2, {"factor": 0.0, "h1_unusable_fallback": h1_unusable,
-                     "tiny_gap_fallback": (not h1_unusable)}
-    delta = np.clip(sd2 - signed_distance(h1, spacing_mm), -MAX_SD_DELTA_MM, MAX_SD_DELTA_MM)
-    return sd2 + f * delta, {"factor": f, "h1_unusable_fallback": False, "tiny_gap_fallback": False}
+                     "tiny_gap_fallback": (not h1_unusable), "settings": setting_record}
+    delta = np.clip(
+        sd2 - signed_distance(h1, spacing_mm),
+        -settings.max_sd_delta_mm,
+        settings.max_sd_delta_mm,
+    )
+    return sd2 + f * delta, {
+        "factor": f,
+        "h1_unusable_fallback": False,
+        "tiny_gap_fallback": False,
+        "settings": setting_record,
+    }
 
 
 def candidate_boundary_seeds(seed: int, n_draws: int) -> list[int]:
@@ -79,7 +143,8 @@ def candidate_boundary_seeds(seed: int, n_draws: int) -> list[int]:
 def two_history_shape_draws(h1, h2, gap_days, forecast_days, target_voxels, *, domain,
                             spacing_mm=1.0, boundary_covariance: dict | None = None,
                             boundary_seeds=None, seed: int = 0, n_anchors: int = 256,
-                            apply_boundary: bool = True) -> dict:
+                            apply_boundary: bool = True,
+                            settings: TwoHistoryShapeSettings = DEFAULT_SETTINGS) -> dict:
     """Matched-volume draws from the two-history rule inside ``domain`` (the shared support S).
 
     target_voxels: the candidate's requested_volume_draws_voxels (same draws). boundary_seeds: pass
@@ -95,7 +160,9 @@ def two_history_shape_draws(h1, h2, gap_days, forecast_days, target_voxels, *, d
             or np.any(targets < 1) or np.any(targets >= int(domain.sum()))):
         raise ValueError("target_voxels must be positive integer counts below domain capacity")
     spacing = _spacing3(spacing_mm)
-    sd_f, details = forecast_signed_distance(h1, h2, gap_days, forecast_days, spacing)
+    sd_f, details = forecast_signed_distance(
+        h1, h2, gap_days, forecast_days, spacing, settings=settings
+    )
     if apply_boundary:
         if boundary_covariance is None:
             raise ValueError("boundary_covariance is required when apply_boundary is True")
