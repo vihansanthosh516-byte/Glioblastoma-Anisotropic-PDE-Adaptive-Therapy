@@ -27,7 +27,7 @@ If no independent cohort becomes available, the defensible endpoint is a methods
 
 ## Corrections required before the two-history proposal can be implemented
 
-The first proposed amendment is **not safe to adopt as written**. A corrected proposal is in [`track_b_two_history_control_amendment_r2_draft_2026-11-02.md`](track_b_two_history_control_amendment_r2_draft_2026-11-02.md). It addresses:
+The first two proposed amendments are **not safe to adopt as written**. The current proposal is [`track_b_two_history_control_amendment_r3_draft_2026-11-02.md`](track_b_two_history_control_amendment_r3_draft_2026-11-02.md). It addresses:
 
 1. **Outer-fold leakage:** a global rule based on how many outer folds choose a setting lets each test patient affect other folds’ selections and then change that patient’s own prediction. Stability can be descriptive only, or computed entirely inside each outer-training set. It must never trigger a cross-fold fallback.
 2. **Undefined failures:** name the exact history-only fallback, the expected recoverable errors, what is counted, and which errors abort the run. Do not silently catch programming errors. Keep every eligible patient in the denominator and report fallbacks.
@@ -36,6 +36,8 @@ The first proposed amendment is **not safe to adopt as written**. A corrected pr
 5. **Development disclosure:** the settings grid was designed after a synthetic screen had been inspected. The revised text says this plainly. It does not carry forward the screen’s winning setting.
 6. **Eligibility before target access:** require valid, nonempty, non-full origin support for the shape comparison, or define a justified alternative before adoption. Count exclusions and apply the minimum before opening targets.
 7. **Claim boundary:** the endpoint is agreement with automated/source labels at the next observed visit conditional on interval, not truth, causal PDE effect, clinical value, or prospective fixed-day performance.
+8. **One candidate score:** the proposed max-T family uses the same pre-boundary candidate mask (`pre_boundary_probability >= 0.5` inside S) for every contrast; the current post-boundary candidate score is separate and secondary.
+9. **Feasibility:** a proposed minimum inner-training size of 10 is explicit, empty/full history handling is stated, and a patient-level precision check is required before adoption. The 10-patient floor is not a power claim.
 
 ## Ordered work and stop/go gates
 
@@ -71,9 +73,9 @@ Only after Stage 2 and a separate user-approved read scope:
 
 ### Stage 4 — Synthetic implementation and compute gate
 
-- **Done:** the synthetic control now has an explicit validated settings object in `src/fk_two_history_shape.py`; the previous defaults are retained. Its settings API and fallback math passed 21 focused synthetic tests in a scratch copy. This does not wire the control into a runner or select settings on any patient data.
-- **Next, only after the corrected proposal and cohort-specific protocol are settled:** build the fold-local selector and runner integration.
-- **Still required:** test outer-fold isolation, shared volume draws, exact support/volume matching, deterministic seeds, failure rules, and result-writer completeness on synthetic fixtures in a scratch copy.
+- **Done, synthetic utilities only:** `src/fk_two_history_shape.py` now has a validated settings object, an outer-training-only fold validator, and a nested selector that rejects IDs outside each validation fold. `src/fk_hybrid_forecast.py` now factors the history-only volume forecast and accepts its checked draws. Forecast-volume and unusable-boundary failures have typed errors; the LUMIERE provider converts only named expected failures.
+- **Scratch verification:** five focused hybrid forecast, LUMIERE-provider, two-history, MU pipeline-component, and patient-CV suites passed: 68 tests. They use synthetic fixtures. The selector and shared-volume helper are not wired into a patient runner, and no patient data or scores were used.
+- **Still required before any patient-run integration:** define common paired-arm fallbacks and pre-target eligibility in a cohort-specific protocol; add `candidate_pre_boundary` to a future result contract; reconcile the result writer; and test the full synthetic candidate-control path and outer-fold isolation.
 - Run no patient-derived timing job until source and access gates pass. Use synthetic shapes/gaps representative of the permitted cohort, including the longest interval, and count every PDE calibration, forecast, inner fit, U-Net training/refit, and prior run.
 - Set a practical wall-clock ceiling before the timing run. If the estimate exceeds it, stop and propose a scope amendment; do not weaken the strongest baseline after seeing outcomes.
 
@@ -96,7 +98,7 @@ It does not become independently confirmatory, clinically useful, causal, or hig
 - Full LUMIERE four-analysis run: **not recommended**.
 - Duke: **conditional future path; access not granted**.
 - Fresh no-request cohort: **none verified in the bounded screen**.
-- Two-history proposal: **corrected draft, not adopted; settings API is synthetic-only and no selector/runner is wired**.
+- Two-history proposal: **r3 draft, not adopted; selector, shared-volume helper, and typed failures are synthetic-only; no patient runner is wired**.
 - Patient voxel reads, external contact, data downloads, and scoring: **not performed or authorized by this plan**.
 
 ## Sources checked

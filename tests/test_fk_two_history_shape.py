@@ -157,6 +157,66 @@ def test_zero_history_gap_is_last_mask_even_with_zero_threshold_and_tau():
         th.extrapolation_factor(-1.0, 30.0, settings=settings)
 
 
+def _inner_cv_fixture(n=20):
+    outer_ids = [f"p{i:02d}" for i in range(n)]
+    folds = []
+    for fold in range(5):
+        validation = outer_ids[fold * 4:(fold + 1) * 4]
+        training = [pid for pid in outer_ids if pid not in validation]
+        folds.append({"train_ids": training, "validation_ids": validation})
+    return outer_ids, folds
+
+
+def test_inner_fold_plan_and_selector_are_training_only_with_frozen_ties():
+    outer_ids, folds = _inner_cv_fixture()
+    grid = {
+        "f0": None,
+        "loose": th.TwoHistoryShapeSettings(max_factor=4.0, shrink_tau_days=7.0),
+        "damped": th.TwoHistoryShapeSettings(max_factor=1.0, shrink_tau_days=28.0),
+    }
+    for fold in folds:
+        fold["scores"] = {
+            "f0": {pid: 0.72 for pid in fold["validation_ids"]},
+            "loose": {pid: 0.753 for pid in fold["validation_ids"]},
+            "damped": {pid: 0.751 for pid in fold["validation_ids"]},
+        }
+
+    plan = th.validate_inner_fold_plan(outer_ids, folds)
+    selected = th.select_two_history_settings(outer_ids, folds, grid)
+    assert plan["n_outer_training_patients"] == 20
+    assert plan["minimum_inner_training_patients"] == 10
+    assert selected["selected_cell"] == "damped"
+    assert selected["mean_inner_dice_by_cell"]["damped"] == pytest.approx(0.751)
+    assert selected["inner_fold_selected_cells"] == ["damped"] * 5
+
+
+def test_inner_fold_plan_rejects_test_ids_and_small_training_splits():
+    outer_ids, folds = _inner_cv_fixture()
+    folds[0]["validation_ids"].append("outer-test")
+    with pytest.raises(ValueError, match="outside the outer-training set"):
+        th.validate_inner_fold_plan(outer_ids, folds)
+
+    outer_ids, folds = _inner_cv_fixture()
+    with pytest.raises(ValueError, match="minimum inner-training size"):
+        th.validate_inner_fold_plan(outer_ids, folds, minimum_inner_training_patients=17)
+
+    outer_ids, folds = _inner_cv_fixture()
+    grid = {"f0": None, "damped": th.TwoHistoryShapeSettings(max_factor=1.0, shrink_tau_days=28.0)}
+    for fold in folds:
+        fold["scores"] = {
+            "f0": {pid: 0.7 for pid in fold["validation_ids"]},
+            "damped": {pid: 0.7 for pid in fold["validation_ids"]},
+        }
+    folds[0]["scores"]["f0"]["outer-test"] = 1.0
+    with pytest.raises(ValueError, match="score validation patients only"):
+        th.select_two_history_settings(outer_ids, folds, grid)
+
+    for fold in folds:
+        fold["scores"]["f0"].pop("outer-test", None)
+    selected = th.select_two_history_settings(outer_ids, folds, grid)
+    assert selected["selected_cell"] == "f0"
+
+
 def test_empty_masks(setup):
     h1, h2, dom, k = setup
     z = np.zeros(SHAPE, bool)

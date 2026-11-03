@@ -2,6 +2,8 @@
 
 **Status: PROPOSED, not adopted.** This is a technical correction to the first proposal. It authorizes no tests, jobs, patient-data reads, downloads, contacts, or scoring. It is not a cohort-specific protocol. The first draft [`track_b_two_history_control_amendment_draft_2026-11-02.md`](track_b_two_history_control_amendment_draft_2026-11-02.md) is superseded for future consideration because its cross-outer-fold stability fallback can leak held-out outcomes and its cohort-specific rules are mixed.
 
+**Superseded by r3 for future consideration:** [`track_b_two_history_control_amendment_r3_draft_2026-11-02.md`](track_b_two_history_control_amendment_r3_draft_2026-11-02.md). R2 did not identify the exact candidate score in the max-T family, set a minimum inner-training size, or define empty visit-1 handling and a precision gate.
+
 This revision is based on a code/science audit. The existing synthetic control remains unadopted and is not wired to a patient runner. Any future evaluation requires a dated amendment for the selected cohort, including its own label map, support, patient minimum, folds, comparator family, source gates, and authorization.
 
 ## 1. Question and claim

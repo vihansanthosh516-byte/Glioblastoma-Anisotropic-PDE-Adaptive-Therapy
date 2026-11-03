@@ -6,6 +6,8 @@ patients only. This module accepts only pre-target history and has no data I/O.
 """
 from __future__ import annotations
 
+import hashlib
+import json
 import numpy as np
 from scipy import ndimage
 
@@ -13,6 +15,22 @@ from src import fk_mask_inverse as fi
 from src.fk_grid_likelihood import infer_joint_log_parameter_posterior, volume_match_concentration
 from src.fk_spatial_uncertainty import correlated_boundary_perturbation
 from src.fk_volume_model import sample_positive_volumes, shrink_log_growth_slope
+
+
+class ExpectedForecastFailure(ValueError):
+    """A named numerical forecast failure that a predeclared fallback may handle."""
+
+
+class ForecastVolumeCapacityError(ExpectedForecastFailure):
+    """Requested history-only volume cannot fit inside the frozen support."""
+
+
+class ForecastInvalidVolumeError(ExpectedForecastFailure):
+    """History-only volume prediction is nonfinite, nonpositive, or malformed."""
+
+
+class ForecastNoUsableBoundaryError(ExpectedForecastFailure):
+    """A PDE draw cannot produce a valid boundary at its requested volume."""
 
 
 def estimate_log_volume_slope(volumes, days) -> float:
@@ -29,6 +47,156 @@ def estimate_log_volume_slope(volumes, days) -> float:
         raise ValueError("history scan days must span a positive interval")
     log_volumes = np.log(volumes)
     return float(centered_days @ (log_volumes - log_volumes.mean()) / denominator)
+
+
+def _volume_forecast_signature(masks, days, target_day, *, population_log_volume_slope_per_day,
+                               shrinkage_time_constant_days, volume_variance_fit, n_draws, seed,
+                               domain_voxels):
+    return {
+        "history_volumes_voxels": tuple(int(np.asarray(mask, dtype=bool).sum()) for mask in masks),
+        "history_days": tuple(float(day) for day in days),
+        "target_day": float(target_day),
+        "population_log_volume_slope_per_day": float(population_log_volume_slope_per_day),
+        "shrinkage_time_constant_days": float(shrinkage_time_constant_days),
+        "volume_variance_fit": {str(k): float(v) for k, v in volume_variance_fit.items()},
+        "n_draws": int(n_draws),
+        "seed": int(seed),
+        "domain_voxels": int(domain_voxels),
+    }
+
+
+def _volume_forecast_output_sha256(requested_volume_draws_voxels, geometric_target_voxels,
+                                  patient_log_volume_slope_per_day, shrunk_log_volume_slope_per_day,
+                                  horizon_days) -> str:
+    payload = {
+        "requested_volume_draws_voxels": [int(value) for value in requested_volume_draws_voxels],
+        "geometric_target_voxels": int(geometric_target_voxels),
+        "patient_log_volume_slope_per_day": float(patient_log_volume_slope_per_day),
+        "shrunk_log_volume_slope_per_day": float(shrunk_log_volume_slope_per_day),
+        "horizon_days": float(horizon_days),
+    }
+    encoded = json.dumps(payload, sort_keys=True, separators=(",", ":"), allow_nan=False).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
+
+
+def history_only_volume_forecast(masks, days, target_day, *,
+                                 population_log_volume_slope_per_day: float,
+                                 shrinkage_time_constant_days: float,
+                                 volume_variance_fit: dict, n_draws: int, seed: int,
+                                 domain=None) -> dict:
+    """Fit and sample the history-only volume forecast without fitting or running the PDE.
+
+    The seed derivation matches ``hybrid_posterior_predictive_forecast``. The returned object can be passed
+    back to that function so the PDE candidate and another shape arm use the identical requested volumes.
+    """
+    masks = [np.asarray(mask, dtype=bool) for mask in masks]
+    days = np.asarray(days, dtype=float)
+    target_day = float(target_day)
+    if len(masks) < 2 or days.shape != (len(masks),) or not np.isfinite(days).all():
+        raise ValueError("need at least two finite history masks and one day per mask")
+    if any(mask.ndim != 3 or mask.shape != masks[0].shape or not mask.any() for mask in masks):
+        raise ValueError("history masks must be nonempty 3D arrays with one common shape")
+    if np.any(np.diff(days) <= 0) or not np.isfinite(target_day) or target_day <= days[-1]:
+        raise ValueError("history days must increase and target_day must follow history")
+    if isinstance(n_draws, (bool, np.bool_)) or int(n_draws) != n_draws or n_draws < 2:
+        raise ValueError("n_draws must be an integer of at least two")
+    if isinstance(seed, (bool, np.bool_)) or int(seed) != seed:
+        raise ValueError("seed must be an integer")
+    n_draws, seed = int(n_draws), int(seed)
+    domain = np.ones(masks[0].shape, dtype=bool) if domain is None else np.asarray(domain, dtype=bool)
+    if domain.shape != masks[0].shape or any(np.any(mask & ~domain) for mask in masks):
+        raise ValueError("domain must match and contain every history mask")
+    if domain.sum() < 2:
+        raise ForecastVolumeCapacityError("valid support has insufficient capacity for a forecast mask")
+
+    history_volumes = np.asarray([mask.sum() for mask in masks], dtype=float)
+    patient_slope = estimate_log_volume_slope(history_volumes, days)
+    shrunk_slope = shrink_log_growth_slope(
+        patient_slope, population_log_volume_slope_per_day,
+        observation_gap_days=float(days[-1] - days[0]),
+        time_constant_days=shrinkage_time_constant_days,
+    )
+    horizon = target_day - float(days[-1])
+    volume_seed, _ = np.random.SeedSequence(seed).spawn(2)
+    raw_volume_draws = np.asarray(sample_positive_volumes(
+        history_volumes[-1], horizon_days=horizon, log_growth_slope=shrunk_slope,
+        variance_fit=volume_variance_fit, n_draws=n_draws,
+        seed=int(volume_seed.generate_state(1)[0]),
+    ), dtype=float)
+    if raw_volume_draws.shape != (n_draws,) or not np.isfinite(raw_volume_draws).all() or np.any(raw_volume_draws <= 0):
+        raise ForecastInvalidVolumeError("history-only volume forecast produced nonfinite or nonpositive draws")
+    domain_voxels = int(domain.sum())
+    if np.any(raw_volume_draws >= domain_voxels):
+        raise ForecastVolumeCapacityError("forecast volume reaches computational-domain capacity; enlarge the domain")
+    requested_voxels = np.maximum(1, np.rint(raw_volume_draws).astype(np.int64))
+    if np.any(requested_voxels >= domain_voxels):
+        raise ForecastVolumeCapacityError("forecast volume reaches computational-domain capacity; enlarge the domain")
+
+    geometric_volume = history_volumes[-1] * np.exp(float(population_log_volume_slope_per_day) * horizon)
+    if not np.isfinite(geometric_volume) or geometric_volume <= 0:
+        raise ForecastInvalidVolumeError("geometric train-rate baseline produced an invalid target volume")
+    geometric_target_voxels = int(np.rint(geometric_volume))
+    if geometric_target_voxels < 1:
+        raise ForecastInvalidVolumeError("geometric train-rate baseline produced an invalid target volume")
+    if geometric_target_voxels >= domain_voxels:
+        raise ForecastVolumeCapacityError("forecast volume reaches computational-domain capacity; enlarge the domain")
+    signature = _volume_forecast_signature(
+        masks, days, target_day,
+        population_log_volume_slope_per_day=population_log_volume_slope_per_day,
+        shrinkage_time_constant_days=shrinkage_time_constant_days,
+        volume_variance_fit=volume_variance_fit, n_draws=n_draws, seed=seed,
+        domain_voxels=domain_voxels,
+    )
+    signature["output_sha256"] = _volume_forecast_output_sha256(
+        requested_voxels, geometric_target_voxels, patient_slope, shrunk_slope, horizon
+    )
+    return {
+        "schema": "track_b_history_only_volume_forecast_v1",
+        "signature": signature,
+        "requested_volume_draws_voxels": requested_voxels,
+        "geometric_target_voxels": geometric_target_voxels,
+        "patient_log_volume_slope_per_day": patient_slope,
+        "shrunk_log_volume_slope_per_day": float(shrunk_slope),
+        "horizon_days": float(horizon),
+    }
+
+
+def _validated_precomputed_volume_forecast(volume_forecast, masks, days, target_day, *,
+                                           population_log_volume_slope_per_day,
+                                           shrinkage_time_constant_days, volume_variance_fit,
+                                           n_draws, seed, domain):
+    if not isinstance(volume_forecast, dict) or volume_forecast.get("schema") != "track_b_history_only_volume_forecast_v1":
+        raise ValueError("precomputed_volume_forecast must come from history_only_volume_forecast")
+    expected = _volume_forecast_signature(
+        masks, days, target_day,
+        population_log_volume_slope_per_day=population_log_volume_slope_per_day,
+        shrinkage_time_constant_days=shrinkage_time_constant_days,
+        volume_variance_fit=volume_variance_fit, n_draws=n_draws, seed=seed,
+        domain_voxels=int(np.asarray(domain, dtype=bool).sum()),
+    )
+    signature = volume_forecast.get("signature")
+    if not isinstance(signature, dict) or any(signature.get(key) != value for key, value in expected.items()):
+        raise ValueError("precomputed_volume_forecast inputs do not match this candidate forecast")
+    requested = np.asarray(volume_forecast.get("requested_volume_draws_voxels"))
+    geometric = volume_forecast.get("geometric_target_voxels")
+    capacity = int(np.asarray(domain, dtype=bool).sum())
+    if (requested.shape != (int(n_draws),) or not np.issubdtype(requested.dtype, np.integer)
+            or np.any(requested < 1) or np.any(requested >= capacity)
+            or isinstance(geometric, bool) or not isinstance(geometric, (int, np.integer))
+            or geometric < 1 or geometric >= capacity):
+        raise ValueError("precomputed_volume_forecast contains invalid voxel counts")
+    try:
+        observed_output_sha256 = _volume_forecast_output_sha256(
+            requested, geometric,
+            volume_forecast["patient_log_volume_slope_per_day"],
+            volume_forecast["shrunk_log_volume_slope_per_day"],
+            volume_forecast["horizon_days"],
+        )
+    except (KeyError, TypeError, ValueError, OverflowError) as exc:
+        raise ValueError("precomputed_volume_forecast contains invalid output fields") from exc
+    if signature.get("output_sha256") != observed_output_sha256:
+        raise ValueError("precomputed_volume_forecast output fingerprint does not match its draws")
+    return volume_forecast
 
 
 def _perturb_boundary_or_keep(mask, *, boundary_covariance, spacing_mm, seed, n_anchors,
@@ -146,7 +314,8 @@ def hybrid_posterior_predictive_forecast(masks, days, target_day, *, prior: dict
                                          n_anchors: int = 256, seed: int = 0,
                                          calibration_only: bool = False,
                                          pde_only_concentration_cutoff: float | None = None,
-                                         pde_only_cutoff_grid=None) -> dict:
+                                         pde_only_cutoff_grid=None,
+                                         precomputed_volume_forecast: dict | None = None) -> dict:
     """Draw joint PDE-shape, log-volume, and correlated-boundary forecasts from history only.
 
     A fixed prespecified prior or training-only prior is allowed; all fitted nuisance estimates must come from
@@ -161,6 +330,8 @@ def hybrid_posterior_predictive_forecast(masks, days, target_day, *, prior: dict
     ``pde_only_cutoff_grid`` (PROPOSED; default None = unchanged output): the same raw-field thresholding for
     every cutoff in the grid, in both full and calibration-only runs, so training patients' raw cutoff masks
     come from their existing solver runs. Output: inclusion probability and empty-draw count per cutoff.
+    ``precomputed_volume_forecast`` (optional): a history-only volume forecast from
+    ``history_only_volume_forecast``. Supplying it lets non-PDE shape arms use the exact same volume draws.
     """
     masks = [np.asarray(mask, dtype=bool) for mask in masks]
     days = np.asarray(days, dtype=float)
@@ -183,38 +354,34 @@ def hybrid_posterior_predictive_forecast(masks, days, target_day, *, prior: dict
     if domain.shape != masks[0].shape or any(np.any(mask & ~domain) for mask in masks):
         raise ValueError("domain must match and contain every history mask")
 
+    if precomputed_volume_forecast is None:
+        volume_forecast = history_only_volume_forecast(
+            masks, days, target_day,
+            population_log_volume_slope_per_day=population_log_volume_slope_per_day,
+            shrinkage_time_constant_days=shrinkage_time_constant_days,
+            volume_variance_fit=volume_variance_fit, n_draws=n_draws, seed=seed, domain=domain,
+        )
+    else:
+        volume_forecast = _validated_precomputed_volume_forecast(
+            precomputed_volume_forecast, masks, days, target_day,
+            population_log_volume_slope_per_day=population_log_volume_slope_per_day,
+            shrinkage_time_constant_days=shrinkage_time_constant_days,
+            volume_variance_fit=volume_variance_fit, n_draws=n_draws, seed=seed, domain=domain,
+        )
+
     posterior = infer_joint_log_parameter_posterior(
         masks, days, prior=prior, h=h, covariance_parameters=boundary_covariance, domain=domain,
         rho_bounds=rho_bounds, D_bounds=D_bounds, n_coarse=n_coarse,
         mass_fraction=mass_fraction, n_refine=n_refine, n_draws=n_draws,
         seed=seed, n_anchors=n_anchors,
     )
-    history_volumes = np.asarray([mask.sum() for mask in masks], dtype=float)
-    patient_slope = estimate_log_volume_slope(history_volumes, days)
-    shrunk_slope = shrink_log_growth_slope(
-        patient_slope, population_log_volume_slope_per_day,
-        observation_gap_days=float(days[-1] - days[0]),
-        time_constant_days=shrinkage_time_constant_days,
-    )
-    horizon = target_day - float(days[-1])
-    volume_seed, boundary_seed = np.random.SeedSequence(seed).spawn(2)
-    raw_volume_draws = sample_positive_volumes(
-        history_volumes[-1], horizon_days=horizon, log_growth_slope=shrunk_slope,
-        variance_fit=volume_variance_fit, n_draws=n_draws,
-        seed=int(volume_seed.generate_state(1)[0]),
-    )
-    requested_voxels = np.maximum(1, np.rint(raw_volume_draws).astype(np.int64))
+    requested_voxels = np.asarray(volume_forecast["requested_volume_draws_voxels"], dtype=np.int64)
+    geometric_target_voxels = int(volume_forecast["geometric_target_voxels"])
+    patient_slope = float(volume_forecast["patient_log_volume_slope_per_day"])
+    shrunk_slope = float(volume_forecast["shrunk_log_volume_slope_per_day"])
+    horizon = float(volume_forecast["horizon_days"])
     domain_voxels = int(domain.sum())
-    if np.any(requested_voxels >= domain_voxels):
-        raise ValueError("forecast volume reaches computational-domain capacity; enlarge the domain")
-    geometric_volume = history_volumes[-1] * np.exp(
-        float(population_log_volume_slope_per_day) * horizon
-    )
-    if not np.isfinite(geometric_volume) or geometric_volume <= 0:
-        raise ValueError("geometric train-rate baseline produced an invalid target volume")
-    geometric_target_voxels = int(np.rint(geometric_volume))
-    if geometric_target_voxels < 1 or geometric_target_voxels >= domain_voxels:
-        raise ValueError("forecast volume reaches computational-domain capacity; enlarge the domain")
+    _, boundary_seed = np.random.SeedSequence(seed).spawn(2)
 
     seed_sequences = None if calibration_only else boundary_seed.spawn(n_draws)
     parameter_draws_log = np.asarray(posterior["parameter_draws_log"], dtype=float)
@@ -267,7 +434,7 @@ def hybrid_posterior_predictive_forecast(masks, days, target_day, *, prior: dict
                     concentration, domain, target_voxels=int(requested_voxels[draw_index])
                 )
                 if sized_mask.all() or not sized_mask.any():
-                    raise ValueError("volume-matched forecast has no usable boundary")
+                    raise ForecastNoUsableBoundaryError("volume-matched forecast has no usable boundary")
                 pre_boundary_inclusion_counts += sized_mask
                 if calibration_only:
                     continue
@@ -294,6 +461,8 @@ def hybrid_posterior_predictive_forecast(masks, days, target_day, *, prior: dict
         return {
             **grid_out,
             "pre_boundary_probability": pre_boundary_probability,
+            "requested_volume_draws_voxels": requested_voxels,
+            "volume_forecast_signature": volume_forecast["signature"],
             "posterior": posterior,
             "calibration_only": True,
             "scope": "inner boundary calibration; volume-matched PDE marginals only; no final mask or comparator draws",
@@ -346,6 +515,7 @@ def hybrid_posterior_predictive_forecast(masks, days, target_day, *, prior: dict
         "geometric_train_rate_boundary_draw_fallback_count": int(geometric_boundary_fallback_count),
         "parameter_draws_log": parameter_draws,
         "requested_volume_draws_voxels": requested_voxels,
+        "volume_forecast_signature": volume_forecast["signature"],
         "final_volume_draws_voxels": final_volumes,
         "patient_log_volume_slope_per_day": patient_slope,
         "shrunk_log_volume_slope_per_day": shrunk_slope,

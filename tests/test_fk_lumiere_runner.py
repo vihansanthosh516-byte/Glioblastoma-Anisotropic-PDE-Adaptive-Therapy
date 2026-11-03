@@ -193,6 +193,38 @@ def test_film_fingerprint_covers_recipe_config_and_intervals(monkeypatch):
     assert base != ta.film_training_fingerprint(["a"], [(x, y)], [(13, 13)], fold=0, recipe=TINY, environment=env)
 
 
+def test_provider_wraps_only_typed_expected_model_failures():
+    from src.fk_hybrid_forecast import ForecastVolumeCapacityError
+    from src.fk_lumiere_pde_provider import LumierePDEProvider
+
+    settings = {"rho_bounds": (1e-5, 1e-1), "D_bounds": (1e-5, 10.0), "n_coarse": 5,
+                "mass_fraction": 0.9, "n_refine": 3, "n_draws": 2, "n_anchors": 8}
+    covariance = {"sigma_b_mm": 0.1, "tau_b_mm": 0.0, "ell_mm": 2.0}
+    nuisance = {"population_log_volume_slope_per_day": 0.0,
+                "shrinkage_time_constant_days": 90.0,
+                "volume_variance_fit": {"intercept": 0.0, "slope_per_day": 0.0}}
+    masks = [np.ones((4, 4, 4), dtype=bool), np.ones((4, 4, 4), dtype=bool)]
+    domain = np.ones((4, 4, 4), dtype=bool)
+
+    def capacity_failure(**_kwargs):
+        raise ForecastVolumeCapacityError("synthetic capacity failure")
+
+    provider = LumierePDEProvider(settings=settings, initial_covariance=covariance,
+                                  cutoff_grid=(0.1,), forecast_fn=capacity_failure)
+    with pytest.raises(lr.ForecastFailure, match="capacity failure"):
+        provider._call("p", masks, [0.0, 10.0], 20.0, domain, covariance, nuisance,
+                       calibration_only=False, seed=1)
+
+    def unexpected_error(**_kwargs):
+        raise ValueError("unexpected programming error")
+
+    provider = LumierePDEProvider(settings=settings, initial_covariance=covariance,
+                                  cutoff_grid=(0.1,), forecast_fn=unexpected_error)
+    with pytest.raises(ValueError, match="unexpected programming error"):
+        provider._call("p", masks, [0.0, 10.0], 20.0, domain, covariance, nuisance,
+                       calibration_only=False, seed=1)
+
+
 def test_real_pde_provider_one_shared_call_per_heldout_patient_and_training_only_calibration():
     from src.fk_lumiere_pde_provider import LumierePDEProvider
     g = np.ogrid[tuple(slice(0, s) for s in SHAPE)]

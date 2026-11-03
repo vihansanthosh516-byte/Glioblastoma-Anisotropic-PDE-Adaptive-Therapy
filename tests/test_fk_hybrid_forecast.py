@@ -4,6 +4,7 @@ import sys
 from pathlib import Path
 
 import numpy as np
+import pytest
 
 REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO))
@@ -31,7 +32,7 @@ def install_fixed_posterior(monkeypatch, n_draws):
 
 
 def forecast(monkeypatch, *, seed, n_draws=4, uncertain=False, population_slope=0.0,
-             calibration_only=False):
+             calibration_only=False, precomputed_volume_forecast=None):
     mask = ball()
     install_fixed_posterior(monkeypatch, n_draws)
     boundary_covariance = {
@@ -49,6 +50,7 @@ def forecast(monkeypatch, *, seed, n_draws=4, uncertain=False, population_slope=
         population_log_volume_slope_per_day=population_slope, shrinkage_time_constant_days=90.0,
         volume_variance_fit=variance_fit,
         n_draws=n_draws, n_anchors=32, seed=seed, calibration_only=calibration_only,
+        precomputed_volume_forecast=precomputed_volume_forecast,
     )
 
 
@@ -194,6 +196,125 @@ def test_log_volume_slope_recovers_linear_log_growth():
     volumes = np.exp(4.0 + 0.012 * days)
 
     assert np.isclose(hybrid.estimate_log_volume_slope(volumes, days), 0.012)
+
+
+def test_shared_history_only_volume_draws_reproduce_existing_candidate(monkeypatch):
+    mask = ball()
+    histories = [mask.copy(), mask.copy(), mask.copy()]
+    days = np.asarray([0.0, 20.0, 40.0])
+    domain = np.ones(mask.shape, dtype=bool)
+    kwargs = {
+        "population_log_volume_slope_per_day": 0.01,
+        "shrinkage_time_constant_days": 90.0,
+        "volume_variance_fit": {"intercept": 0.02, "slope_per_day": 0.0001},
+        "n_draws": 4,
+        "seed": 13,
+        "domain": domain,
+    }
+
+    def no_pde_call(*_args, **_kwargs):
+        raise AssertionError("the shared volume forecast must not call the PDE posterior")
+
+    monkeypatch.setattr(hybrid, "infer_joint_log_parameter_posterior", no_pde_call)
+    shared = hybrid.history_only_volume_forecast(histories, days, 60.0, **kwargs)
+    assert shared["requested_volume_draws_voxels"].shape == (4,)
+    volumes = np.asarray([mask.sum() for mask in histories], dtype=float)
+    slope = hybrid.estimate_log_volume_slope(volumes, days)
+    shrunk = hybrid.shrink_log_growth_slope(
+        slope, kwargs["population_log_volume_slope_per_day"],
+        observation_gap_days=float(days[-1] - days[0]),
+        time_constant_days=kwargs["shrinkage_time_constant_days"],
+    )
+    volume_seed, _ = np.random.SeedSequence(kwargs["seed"]).spawn(2)
+    legacy_raw = hybrid.sample_positive_volumes(
+        volumes[-1], horizon_days=20.0, log_growth_slope=shrunk,
+        variance_fit=kwargs["volume_variance_fit"], n_draws=kwargs["n_draws"],
+        seed=int(volume_seed.generate_state(1)[0]),
+    )
+    assert np.array_equal(shared["requested_volume_draws_voxels"], np.maximum(1, np.rint(legacy_raw).astype(np.int64)))
+
+    install_fixed_posterior(monkeypatch, 4)
+    baseline = hybrid.hybrid_posterior_predictive_forecast(
+        histories, days, 60.0,
+        prior={"distribution": "log_uniform"}, h=1.0,
+        boundary_covariance={"sigma_b_mm": 0.0, "tau_b_mm": 0.0, "ell_mm": 5.0},
+        **{k: v for k, v in kwargs.items() if k != "domain"}, domain=domain,
+    )
+    install_fixed_posterior(monkeypatch, 4)
+    reused = hybrid.hybrid_posterior_predictive_forecast(
+        histories, days, 60.0,
+        prior={"distribution": "log_uniform"}, h=1.0,
+        boundary_covariance={"sigma_b_mm": 0.0, "tau_b_mm": 0.0, "ell_mm": 5.0},
+        **{k: v for k, v in kwargs.items() if k != "domain"}, domain=domain,
+        precomputed_volume_forecast=shared,
+    )
+
+    for key in ("requested_volume_draws_voxels", "mask_draws", "pre_boundary_probability",
+                "no_pde_ranker_mask_draws"):
+        assert np.array_equal(baseline[key], reused[key])
+
+    wrong_seed = hybrid.history_only_volume_forecast(histories, days, 60.0, **{**kwargs, "seed": 14})
+    with pytest.raises(ValueError, match="do not match"):
+        hybrid.hybrid_posterior_predictive_forecast(
+            histories, days, 60.0,
+            prior={"distribution": "log_uniform"}, h=1.0,
+            boundary_covariance={"sigma_b_mm": 0.0, "tau_b_mm": 0.0, "ell_mm": 5.0},
+            **{k: v for k, v in kwargs.items() if k != "domain"}, domain=domain,
+            precomputed_volume_forecast=wrong_seed,
+        )
+
+    tampered = {**shared, "requested_volume_draws_voxels": shared["requested_volume_draws_voxels"].copy()}
+    tampered["requested_volume_draws_voxels"][0] += 1
+    with pytest.raises(ValueError, match="output fingerprint"):
+        hybrid.hybrid_posterior_predictive_forecast(
+            histories, days, 60.0,
+            prior={"distribution": "log_uniform"}, h=1.0,
+            boundary_covariance={"sigma_b_mm": 0.0, "tau_b_mm": 0.0, "ell_mm": 5.0},
+            **{k: v for k, v in kwargs.items() if k != "domain"}, domain=domain,
+            precomputed_volume_forecast=tampered,
+        )
+
+
+def test_volume_capacity_failure_has_a_typed_error(monkeypatch):
+    mask = ball()
+    monkeypatch.setattr(hybrid, "sample_positive_volumes", lambda *args, **kwargs: np.asarray([5000.0] * 4))
+
+    def unexpected_pde_call(*_args, **_kwargs):
+        raise AssertionError("PDE posterior must not run after capacity failure")
+
+    monkeypatch.setattr(hybrid, "infer_joint_log_parameter_posterior", unexpected_pde_call)
+    with pytest.raises(hybrid.ForecastVolumeCapacityError):
+        hybrid.history_only_volume_forecast(
+            [mask.copy(), mask.copy()], [0.0, 20.0], 40.0,
+            population_log_volume_slope_per_day=0.0,
+            shrinkage_time_constant_days=90.0,
+            volume_variance_fit={"intercept": 0.0, "slope_per_day": 0.0},
+            n_draws=4, seed=5,
+        )
+    with pytest.raises(hybrid.ForecastVolumeCapacityError):
+        hybrid.hybrid_posterior_predictive_forecast(
+            [mask.copy(), mask.copy()], [0.0, 20.0], 40.0,
+            prior={"distribution": "log_uniform"}, h=1.0,
+            boundary_covariance={"sigma_b_mm": 0.0, "tau_b_mm": 0.0, "ell_mm": 5.0},
+            population_log_volume_slope_per_day=0.0, shrinkage_time_constant_days=90.0,
+            volume_variance_fit={"intercept": 0.0, "slope_per_day": 0.0},
+            n_draws=4, n_anchors=16, seed=5,
+        )
+
+
+def test_unusable_boundary_failure_has_a_typed_error(monkeypatch):
+    mask = ball()
+    install_fixed_posterior(monkeypatch, 2)
+    monkeypatch.setattr(hybrid, "volume_match_concentration", lambda concentration, domain, **kwargs: np.zeros_like(domain))
+    with pytest.raises(hybrid.ForecastNoUsableBoundaryError):
+        hybrid.hybrid_posterior_predictive_forecast(
+            [mask.copy(), mask.copy()], [0.0, 20.0], 40.0,
+            prior={"distribution": "log_uniform"}, h=1.0,
+            boundary_covariance={"sigma_b_mm": 0.0, "tau_b_mm": 0.0, "ell_mm": 5.0},
+            population_log_volume_slope_per_day=0.0, shrinkage_time_constant_days=90.0,
+            volume_variance_fit={"intercept": 0.0, "slope_per_day": 0.0},
+            n_draws=2, n_anchors=16, seed=5,
+        )
 
 
 def test_small_synthetic_case_runs_full_pde_posterior_forecast():

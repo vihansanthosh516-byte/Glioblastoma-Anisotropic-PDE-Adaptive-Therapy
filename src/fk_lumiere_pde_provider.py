@@ -16,8 +16,8 @@ from collections.abc import Mapping, Sequence
 import numpy as np
 
 from src.fk_boundary_calibration import run_cross_fitted_boundary_calibration
-from src.fk_hybrid_forecast import hybrid_posterior_predictive_forecast
-from src.fk_mu_patient_runner import _EXPECTED_MODEL_FAILURES, _stable_seed
+from src.fk_hybrid_forecast import ExpectedForecastFailure, hybrid_posterior_predictive_forecast
+from src.fk_mu_patient_runner import _stable_seed
 from src.fk_mu_training_nuisance import fit_mu_training_volume_nuisance
 from src.fk_patient_cv import ForecastFailure, PatientSeries
 
@@ -56,10 +56,8 @@ class LumierePDEProvider:
                 mass_fraction=float(s["mass_fraction"]), n_refine=int(s["n_refine"]), n_draws=int(s["n_draws"]),
                 n_anchors=int(s["n_anchors"]), seed=_stable_seed(seed, patient_id),
                 calibration_only=calibration_only, pde_only_cutoff_grid=self.cutoff_grid)
-        except ValueError as exc:
-            if str(exc) in _EXPECTED_MODEL_FAILURES:
-                raise ForecastFailure(str(exc)) from exc
-            raise
+        except ExpectedForecastFailure as exc:
+            raise ForecastFailure(str(exc)) from exc
 
     def fit_fold(self, training_view) -> dict:
         """training_view: [{'case': LumiereCase, 'target': mask}] for outer-training patients only."""

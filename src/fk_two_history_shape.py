@@ -6,25 +6,29 @@ Rule: signed-distance (SD) maps of the earlier history mask h1 and the origin ma
 For each volume draw, the top-k voxels of SD_f inside the support S match that draw's volume exactly. Draws and
 boundary seeds can be shared with the PDE-hybrid candidate. No patient I/O; not wired into any runner.
 
-PROPOSED (not adopted): every constant is a development default, untuned, and the strength of this control is
-unverified. Before adoption a development sensitivity grid over tau, cap and clip, compared with copy-last and the
-last-mask signed-distance arm, is required. Note f = min(T / (g + 7), MAX_FACTOR) (g = history gap days, T = forecast
+PROPOSED (not adopted): every constant is a development default, untuned, and patient-data performance is
+unknown. A synthetic sensitivity screen compared tau, cap and clip settings with copy-last and the last-mask
+signed-distance arm; its winning cell is not carried into nested selection. Note f = min(T / (g + 7), MAX_FACTOR)
+(g = history gap days, T = forecast
 days): g cancels in w * T / g. Ties among equal SD_f values break by flat index (an arbitrary, grid-order
-dependent rule). The control is not in the max-T comparator family; an amendment must define that family. If the
-control fails for a patient (a ForecastFailure-style event), its fallback is not defined here and must be defined
-before wiring. The boundary covariance used with apply_boundary=True was calibrated on the PDE arm.
+dependent rule). The proposed r3 amendment places pre-boundary Dice in one max-T family; it is not adopted and
+this module is not wired into a patient runner. ``select_two_history_settings`` accepts only outer-training IDs
+and inner-validation scores. It does not load targets or fit models. The boundary covariance used with
+apply_boundary=True was calibrated on the PDE arm.
 """
 from __future__ import annotations
 
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
+import math
 import numpy as np
 from scipy import ndimage
 
 from src.fk_grid_likelihood import volume_match_concentration
 from src.fk_hybrid_forecast import _perturb_boundary_or_keep
 
-# Proposed (not adopted) development defaults. The explicit settings object lets a future
-# outer-training-only selector evaluate the proposed grid without changing module globals.
+# Proposed (not adopted) development defaults. The explicit settings object lets the
+# outer-training-only selector evaluate a proposed grid without changing module globals.
 MAX_FACTOR = 4.0
 MIN_HISTORY_GAP_DAYS = 1.0
 SHRINK_TAU_DAYS = 7.0
@@ -193,3 +197,133 @@ def consensus_mask(draws, domain, threshold: float = 0.5):
     """Inclusion probability >= threshold inside domain (the candidate scorer's combination rule)."""
     p = np.asarray(draws).mean(axis=0)
     return (p >= threshold) & np.asarray(domain, dtype=bool), p
+
+
+def validate_inner_fold_plan(outer_training_ids, inner_folds, *, minimum_inner_training_patients: int = 10) -> dict:
+    """Validate patient-grouped inner folds before any target labels are opened.
+
+    Each outer-training patient must occur in exactly one validation fold. Each training set must be the exact
+    complement of its validation set. Outer-test IDs therefore cannot enter this selector.
+    """
+    outer_ids = list(outer_training_ids)
+    if not outer_ids or len(set(outer_ids)) != len(outer_ids):
+        raise ValueError("outer_training_ids must be nonempty and unique")
+    if (isinstance(minimum_inner_training_patients, (bool, np.bool_))
+            or not isinstance(minimum_inner_training_patients, (int, np.integer))
+            or minimum_inner_training_patients < 1):
+        raise ValueError("minimum inner-training size must be a positive integer")
+    if not isinstance(inner_folds, Sequence) or isinstance(inner_folds, (str, bytes)) or len(inner_folds) < 2:
+        raise ValueError("at least two patient-grouped inner folds are required")
+
+    outer_set = set(outer_ids)
+    validation_counts = {patient_id: 0 for patient_id in outer_ids}
+    training_sizes = []
+    for fold_index, fold in enumerate(inner_folds):
+        if not isinstance(fold, Mapping) or "train_ids" not in fold or "validation_ids" not in fold:
+            raise ValueError(f"inner fold {fold_index} must define train_ids and validation_ids")
+        train_ids, validation_ids = list(fold["train_ids"]), list(fold["validation_ids"])
+        if not train_ids or not validation_ids:
+            raise ValueError(f"inner fold {fold_index} has an empty train or validation set")
+        if len(set(train_ids)) != len(train_ids) or len(set(validation_ids)) != len(validation_ids):
+            raise ValueError(f"inner fold {fold_index} contains duplicate patient IDs")
+        train_set, validation_set = set(train_ids), set(validation_ids)
+        if train_set & validation_set:
+            raise ValueError(f"inner fold {fold_index} train and validation IDs overlap")
+        if not train_set <= outer_set or not validation_set <= outer_set:
+            raise ValueError("inner fold contains patient IDs outside the outer-training set")
+        if train_set != outer_set - validation_set:
+            raise ValueError(f"inner fold {fold_index} training IDs must be the validation complement")
+        if len(train_set) < minimum_inner_training_patients:
+            raise ValueError(
+                f"inner fold {fold_index} has {len(train_set)} training patients; "
+                f"minimum inner-training size is {minimum_inner_training_patients}"
+            )
+        training_sizes.append(len(train_set))
+        for patient_id in validation_set:
+            validation_counts[patient_id] += 1
+
+    if any(count != 1 for count in validation_counts.values()):
+        raise ValueError("every outer-training patient must appear in exactly one inner validation fold")
+    return {
+        "n_outer_training_patients": len(outer_ids),
+        "minimum_inner_training_patients": int(minimum_inner_training_patients),
+        "inner_training_sizes": training_sizes,
+        "minimum_observed_inner_training_patients": min(training_sizes),
+        "n_inner_folds": len(inner_folds),
+    }
+
+
+def _setting_tie_key(label: str, setting: TwoHistoryShapeSettings | None) -> tuple:
+    """Order tied cells from most damped to least damped, then by stable label."""
+    if setting is None:
+        return (0, 0.0, 0.0, 0.0, str(label))
+    return (1, float(setting.max_factor), -float(setting.shrink_tau_days),
+            float(setting.max_sd_delta_mm), str(label))
+
+
+def _choose_setting(scores_by_cell: Mapping[str, float], settings_grid: Mapping[str, TwoHistoryShapeSettings | None],
+                    *, tie_tolerance: float) -> str:
+    best_score = max(scores_by_cell.values())
+    tied = [label for label, score in scores_by_cell.items() if best_score - score <= tie_tolerance]
+    return min(tied, key=lambda label: _setting_tie_key(label, settings_grid[label]))
+
+
+def select_two_history_settings(outer_training_ids, inner_folds, settings_grid, *,
+                                minimum_inner_training_patients: int = 10,
+                                tie_tolerance: float = 0.005) -> dict:
+    """Select a control cell from inner-validation patient Dice within one outer-training set.
+
+    Each fold must contain ``scores[cell][patient_id]`` for its validation patients only. Scores are patient
+    macro Dice values. No outer-test IDs or outcomes are accepted by this interface. Model and volume fits are
+    outside this pure selector and must be performed within the corresponding inner-training IDs.
+    """
+    if not isinstance(settings_grid, Mapping) or not settings_grid:
+        raise ValueError("settings_grid must be a nonempty mapping")
+    if any(not isinstance(label, str) or not label for label in settings_grid):
+        raise ValueError("settings-grid labels must be nonempty strings")
+    if any(setting is not None and not isinstance(setting, TwoHistoryShapeSettings)
+           for setting in settings_grid.values()):
+        raise ValueError("each setting-grid value must be TwoHistoryShapeSettings or None for f=0")
+    if isinstance(tie_tolerance, (bool, np.bool_)) or not np.isscalar(tie_tolerance):
+        raise ValueError("tie_tolerance must be finite and nonnegative")
+    tie_tolerance = float(tie_tolerance)
+    if not math.isfinite(tie_tolerance) or tie_tolerance < 0:
+        raise ValueError("tie_tolerance must be finite and nonnegative")
+
+    plan = validate_inner_fold_plan(
+        outer_training_ids, inner_folds,
+        minimum_inner_training_patients=minimum_inner_training_patients,
+    )
+    cell_scores = {label: [] for label in settings_grid}
+    fold_winners = []
+    for fold_index, fold in enumerate(inner_folds):
+        validation_ids = set(fold["validation_ids"])
+        scores = fold.get("scores")
+        if not isinstance(scores, Mapping) or set(scores) != set(settings_grid):
+            raise ValueError(f"inner fold {fold_index} must report every settings-grid cell exactly once")
+        fold_means = {}
+        for label in settings_grid:
+            patient_scores = scores[label]
+            if not isinstance(patient_scores, Mapping) or set(patient_scores) != validation_ids:
+                raise ValueError(
+                    f"inner fold {fold_index} cell {label!r} must score validation patients only"
+                )
+            values = np.asarray(list(patient_scores.values()), dtype=float)
+            if values.shape != (len(validation_ids),) or not np.isfinite(values).all() \
+                    or np.any(values < 0) or np.any(values > 1):
+                raise ValueError(f"inner fold {fold_index} cell {label!r} has invalid Dice scores")
+            fold_means[label] = float(values.mean())
+            cell_scores[label].extend(float(value) for value in values)
+        fold_winners.append(_choose_setting(fold_means, settings_grid, tie_tolerance=tie_tolerance))
+
+    means = {label: float(np.mean(values)) for label, values in cell_scores.items()}
+    selected = _choose_setting(means, settings_grid, tie_tolerance=tie_tolerance)
+    return {
+        **plan,
+        "selected_cell": selected,
+        "selected_settings": None if settings_grid[selected] is None else settings_grid[selected].as_dict(),
+        "mean_inner_dice_by_cell": means,
+        "inner_fold_selected_cells": fold_winners,
+        "tie_tolerance": tie_tolerance,
+        "selection_scope": "one outer-training set; inner-validation patients only",
+    }
