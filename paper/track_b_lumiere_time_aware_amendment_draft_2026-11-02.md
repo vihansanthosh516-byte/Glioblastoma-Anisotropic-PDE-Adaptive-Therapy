@@ -186,6 +186,24 @@ Weak points: these are MU defaults, not tuned or validated on LUMIERE. The centr
 - Code: `src/fk_lumiere_runner.py` (`REQUIRED_MINIMUM`, `analysis=`), `src/fk_lumiere_protocol.py`. Tests: `tests/test_fk_lumiere_protocol.py` (too few central-gap patients; real data cannot lower minimums).
 - Weak point: 10 is a judgment, not a power calculation.
 
+## 5j. Result writer and run-time projection (2026-11-03; synthetic protocol implementation)
+
+**Writer:** `src/fk_lumiere_result_writer.py:write_lumiere_protocol_result`. It records the SHA-256 of 15 code files and 4 protocol documents, all settings and seeds, the cohort IDs (with a hash) and folds, the 11 gate values, all four analyses (per-patient Dice, patient-macro Dice, pass test, missing-arm reasons, fallback counts, per-fold cutoff, rate, FiLM status and fingerprint, count arm), and the prior-support summary. It stores no arrays, does not load patient data, and refuses to overwrite. Tests: `tests/test_fk_lumiere_result_writer.py` (2 passed, scratch copy).
+
+**Synthetic read-back** (26 synthetic patients, fake PDE provider, tiny 1-epoch U-Net): label "synthetic protocol implementation"; 15/15 code and 4/4 protocol hashes present; 0 of 11 gates True; four analyses scored (26, 26, 26 and 15 patients); every pass test "incomplete", with the FiLM U-Net unavailable in 1 fold per analysis and that reason recorded; 0 PDE fallbacks. `overall_status` "completed" means all four analyses scored; it is **not** a pass. The pass result is per analysis.
+
+**Run-time projection (wall-clock hours on this PC, four analyses; nothing new was run):**
+
+| Part | Measured (synthetic) | Extrapolated |
+|---|---|---|
+| FiLM U-Net | 4.141 s per step this session; 1.038 × the frozen step (`film_unet_timing_record.json`) | 2 training sets × 100,800 steps: 232.0 h (S1) or 463.6 h (S2, from the earlier 7.973 s frozen step) |
+| PDE | 642–19,549 s per forecast by history gap (`lumiere_history_gap_stress.json`); one 30-day case 1,250 / 1,544 s | 323.4–466.2 h (scenario projection; inner cross-fitting excluded) |
+| Time-aware fixed growth | 19.4–23.7 s per rate selection (`timed_fixed_growth_timing_record.json`) | about 0.12 h |
+| PDE-only cutoff grid | 0.038 s per raw field (`track_b_pde_only_grid_timing_20261103.json`) | up to about 1.2 h |
+| **Total** | — | **about 556.7–699.5 h (S1) or 788.3–931.1 h (S2)** |
+
+Not a bound: the U-Net step varied about 2× between sessions, the PDE part excludes inner cross-fitting, and the central-gap run is counted at full size (it has 22 of 28 metadata-eligible patients, so the real refit is smaller). A full four-analysis timing run was **not** launched.
+
 ## 5h. Code status vs open gates (2026-11-03)
 
 **Completed code (synthetic tests only; none of it is a real-data pass):**
