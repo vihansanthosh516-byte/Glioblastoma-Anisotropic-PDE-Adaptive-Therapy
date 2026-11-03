@@ -38,3 +38,16 @@ def test_pde_only_fields_are_consistent():
 def test_cutoff_must_be_inside_unit_interval(bad):
     with pytest.raises(ValueError, match="cutoff"):
         _run(pde_only_concentration_cutoff=bad)
+
+
+def test_cutoff_grid_leaves_candidate_unchanged_in_both_modes():
+    grid = tuple(round(0.05 * i, 2) for i in range(1, 11))
+    base, with_grid = _run(), _run(pde_only_cutoff_grid=grid)
+    assert np.array_equal(base["mask_draws"], with_grid["mask_draws"])
+    assert set(with_grid["pde_only_inclusion_probability_by_cutoff"]) == set(grid)
+    cal = _run(calibration_only=True, pde_only_cutoff_grid=grid)
+    cal0 = _run(calibration_only=True)
+    assert np.array_equal(cal["pre_boundary_probability"], cal0["pre_boundary_probability"])
+    p05 = with_grid["pde_only_inclusion_probability_by_cutoff"][0.5]
+    single = _run(pde_only_concentration_cutoff=0.5)["pde_only_inclusion_probability"]
+    assert np.array_equal(p05, single)

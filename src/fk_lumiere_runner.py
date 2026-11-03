@@ -1,7 +1,12 @@
 """Guarded LUMIERE runner under DRAFT amendment A-2026-11-02-T (not adopted). Synthetic use only for now.
 
-Required comparators: copy-last, time-aware fixed growth, PDE-only and the FiLM time-aware U-Net. The PDE
-candidate and PDE-only forecasts are injected callables; this module does not define the PDE-only mask.
+Required comparators: copy-last, time-aware fixed growth, PDE-only and the FiLM time-aware U-Net. One injected
+PDE call per patient serves both the candidate and PDE-only (shared posterior draws and solver run).
+PDE-only = PDE posterior forecast with a training-selected concentration cutoff, without forecast-volume
+matching or boundary perturbation: per outer fold one cutoff from PDE_ONLY_CUTOFF_GRID is chosen on
+outer-training patients only (their calibration-only raw fields), ties to the larger cutoff, then applied to the
+held-out patient's raw draws with the candidate's 0.5 inclusion vote and the common support. An empty
+PDE-only forecast stays empty. A PDE ForecastFailure uses the frozen persistence fallback and is recorded.
 The MU/Duke runner (`src/fk_mu_patient_runner.py`) is not used or changed.
 
 Fail-closed rules:
@@ -20,10 +25,13 @@ import numpy as np
 
 from src.fk_learned_baselines import UNET_RECIPE, unet_inputs
 from src.fk_mu_scoring import dice_with_empty_rule
+from src.fk_patient_cv import ForecastFailure
 from src import fk_time_aware_baselines as ta
 
 MIN_ELIGIBLE_PATIENTS = 25
 DAYS_PER_WEEK = ta.DAYS_PER_WEEK
+PDE_ONLY_CUTOFF_GRID = tuple(round(0.05 * i, 2) for i in range(1, 11))  # 0.05 ... 0.50
+CUTOFF_TIE_TOLERANCE = 1e-9
 COMPARATORS = ("copy_last", "time_aware_fixed_growth", "pde_only", "film_unet")
 LUMIERE_GATES = (
     "license_derived_outputs_stated",
@@ -88,15 +96,30 @@ def eligibility(cases: Sequence[LumiereCase], *, minimum: int = MIN_ELIGIBLE_PAT
             "stopped": len(eligible) < minimum, "minimum": minimum}
 
 
+def select_pde_only_cutoff(training: Sequence[tuple], *, grid=PDE_ONLY_CUTOFF_GRID) -> dict:
+    """training: (probability_by_cutoff, support, target) per outer-training patient. Ties go to the larger cutoff."""
+    grid = sorted(float(c) for c in grid)
+    if not training:
+        return {"cutoff": None, "reason": "no training patient with usable raw PDE fields", "n_training": 0}
+    means = []
+    for c in grid:
+        means.append(float(np.mean([dice_with_empty_rule((prob[c] >= 0.5) & sup, tgt) for prob, sup, tgt in training])))
+    best = max(means)
+    chosen = max(c for c, m in zip(grid, means) if m >= best - CUTOFF_TIE_TOLERANCE)
+    return {"cutoff": chosen, "grid": grid, "training_mean_dice": means, "n_training": len(training),
+            "boundary_hit": chosen in (grid[0], grid[-1])}
+
+
 def run_lumiere_cv(cases: Sequence[LumiereCase], fold_by_patient: Mapping[str, int], *,
-                   pde_only_forecast: Callable, candidate_forecast: Callable,
+                   pde_forecast: Callable,
                    gates: Mapping[str, bool] | None = None, recipe=UNET_RECIPE,
                    film_reuse_cache: dict | None = None, minimum: int = MIN_ELIGIBLE_PATIENTS) -> dict:
     """Outer patient CV with the four proposed required comparators and the PDE candidate.
 
-    ``pde_only_forecast`` and ``candidate_forecast`` are called as f(case, timing, training_cases) and must
-    return a boolean mask on the case grid. ``training_cases`` carry loaded targets of outer-training patients
-    only, for any training-only nuisance fit.
+    ``pde_forecast(case, timing, training_view, calibration_only)`` returns a hybrid-forecast dict computed with
+    ``pde_only_cutoff_grid=PDE_ONLY_CUTOFF_GRID`` (``mask_draws`` when not calibration-only, and
+    ``pde_only_inclusion_probability_by_cutoff``), or raises ForecastFailure. ``training_view`` holds the
+    outer-training patients (with loaded targets) only. Held-out targets never reach it.
     """
     check_gates(cases, gates or {})
     flow = eligibility(cases, minimum=minimum)
@@ -133,26 +156,53 @@ def run_lumiere_cv(cases: Sequence[LumiereCase], fold_by_patient: Mapping[str, i
             cache[fp] = ta.train_film_models(pairs, intervals, fold=f, recipe=recipe)
         film = cache[fp]
         training_view = [dict(case=c, target=targets[c.patient_id]) for c in train]
+        cal_rows, cal_failed = [], []
+        for c in train:
+            others = [v for v in training_view if v["case"].patient_id != c.patient_id]
+            try:
+                cal = pde_forecast(c, nominal_days(c), others, True)
+                cal_rows.append((cal["pde_only_inclusion_probability_by_cutoff"], np.asarray(c.support, bool),
+                                 targets[c.patient_id]))
+            except ForecastFailure:
+                cal_failed.append(c.patient_id)
+        cut = select_pde_only_cutoff(cal_rows)
+        cut["calibration_failed_ids"] = cal_failed
+        pde_info = {}
         for c in test:
             sup = np.asarray(c.support, bool)
             tgt = targets[c.patient_id]
             timing = nominal_days(c)
+            try:
+                full = pde_forecast(c, timing, training_view, False)
+                cand = (np.asarray(full["mask_draws"]).mean(axis=0) >= 0.5) & sup
+                if cut["cutoff"] is None:
+                    pde_only, empty_draws = None, None
+                else:
+                    pde_only = (full["pde_only_inclusion_probability_by_cutoff"][cut["cutoff"]] >= 0.5) & sup
+                    empty_draws = int(full["pde_only_empty_draws_by_cutoff"][cut["cutoff"]])
+                failed = False
+            except ForecastFailure:
+                cand = pde_only = np.asarray(c.visit2, bool) & sup  # frozen persistence fallback
+                empty_draws, failed = None, True
+            pde_info[c.patient_id] = {"forecast_failure_fallback": failed, "empty_draws_at_cutoff": empty_draws,
+                                      "pde_only_mask_empty": None if pde_only is None else not pde_only.any()}
             preds = {
                 "copy_last": np.asarray(c.visit2, bool) & sup,
                 "time_aware_fixed_growth": ta.fixed_growth_forecast(
                     c.visit2, sup, spacing_mm=c.spacing_mm,
                     radius_mm=ta.timed_radius_mm(sel["rate_mm_per_day"], c.forecast_weeks)),
-                "pde_only": np.asarray(pde_only_forecast(c, timing, training_view), bool) & sup,
+                "pde_only": pde_only,
                 "film_unet": (ta.predict_film(film, unet_inputs(c.visit1, c.visit2, sup),
                                               (c.forecast_weeks, c.history_weeks), domain=sup)
                               if film.get("status") == "ok" else None),
-                "candidate": np.asarray(candidate_forecast(c, timing, training_view), bool) & sup,
+                "candidate": cand,
             }
             for name, p in preds.items():
                 dice[name][c.patient_id] = None if p is None else float(dice_with_empty_rule(p, tgt))
         folds[f] = {"training_ids": ids, "test_ids": [c.patient_id for c in test], "rate": sel,
-                    "film_fingerprint": fp, "film_reused": reused, "film_status": film.get("status")}
-    complete = all(v is not None for v in dice["film_unet"].values())
+                    "film_fingerprint": fp, "film_reused": reused, "film_status": film.get("status"),
+                    "pde_only_cutoff": cut, "pde": pde_info}
+    complete = all(v is not None for name in ("film_unet", "pde_only") for v in dice[name].values())
     result.update({
         "status": "scored (synthetic)" if all(c.synthetic for c in cases) else "scored",
         "folds": folds, "dice": dice,

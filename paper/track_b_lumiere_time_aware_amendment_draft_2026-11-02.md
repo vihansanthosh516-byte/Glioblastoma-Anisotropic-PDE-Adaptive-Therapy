@@ -103,15 +103,35 @@ Sources: `film_unet_timing_record.json` (FiLM 4.141 s, frozen 3.989 s same sessi
 - Reading: the joint posterior includes high-D, low-ρ draws on the ρ–D ridge, where the field spreads below 0.5. A fixed 0.5 cutoff then calls the tumor gone. 0.5 is not a meaningful cutoff for these draws.
 - Weak points: synthetic spheres; small grid; reduced posterior settings.
 
-**Not done (stopped as instructed):** wiring PDE-only into the runner, and any cutoff change. The cutoff is **not** silently changed.
+**Not done at the time of the check:** wiring PDE-only into the runner, and any cutoff change. The 0.5 cutoff was **not** silently changed.
 
-**Proposal for review (not adopted):** select c per outer fold from outer-training patients only.
-- Grid: c ∈ {0.05, 0.10, …, 0.50} (10 values).
-- Score: mean patient-macro plain Dice of the PDE-only mask against training targets.
-- Ties within 1e-9 go to the **larger** c (closest to the prespecified 0.5).
-- Cost: needs PDE-only masks for training patients. The inner calibration runs already compute their concentration fields, so masks for all 10 cutoffs could be recorded there without a new solver run; this is not implemented or timed.
-- Limit: draws whose peak concentration is below 0.05 stay empty at every c.
-- Alternative (not training-selected): a per-draw relative cutoff, u ≥ 0.5 × max(u). Needs its own decision.
+### 5d. Proposed rule after the failed check: training-selected cutoff (2026-11-03; not adopted)
+
+**Arm name and meaning.** PDE-only = a PDE posterior forecast with a training-selected concentration cutoff, **without** forecast-volume matching or boundary perturbation. It shares the candidate's posterior draws and solver run. The matched-volume no-PDE ranker stays a separately named ablation. No relative half-peak cutoff is used.
+
+**Rule.**
+- Grid: c ∈ {0.05, 0.10, …, 0.50} (`PDE_ONLY_CUTOFF_GRID`).
+- Per outer fold, choose one c from **outer-training patients only**: mean patient-macro plain Dice of their PDE-only masks ((inclusion probability at c ≥ 0.5) ∩ support) against their targets. Ties within 1e-9 go to the **larger** c.
+- Apply that c to each held-out patient's raw concentration draws; combine with the candidate's inclusion vote (≥ 0.5); clip to the common support.
+- A valid **empty** PDE-only forecast stays empty and is scored by the frozen empty-mask rule. It is not replaced by persistence.
+- A PDE `ForecastFailure` uses the frozen persistence fallback for the candidate and PDE-only, and is recorded per patient.
+- Recorded per fold: chosen c, grid-boundary hit (0.05 or 0.50), training Dice per c, training patients whose calibration run failed. Per held-out patient: empty draws at c, empty PDE-only mask, fallback flag.
+
+**Code path check and correction.** The earlier §5c sentence ("the inner calibration runs already compute their concentration fields, so masks for all 10 cutoffs could be recorded there") needed a correction. The saved calibration-only output (`pre_boundary_probability`) is **volume-matched**, so it does **not** give raw cutoff masks. But the calibration-only loop does compute the raw concentration field of every unique posterior draw before volume matching (`src/fk_hybrid_forecast.py`, `_batched_parameter_concentrations` loop). The new option `pde_only_cutoff_grid` thresholds that raw field at every grid cutoff inside the same loop, in both full and calibration-only runs. So **no extra solver run** is needed.
+
+**Is the reuse safe?**
+- No target and no held-out patient enters it: in `src/fk_lumiere_runner.py`, a training patient's calibration call receives only the other outer-training patients; held-out targets are never passed. A test checks that one outer fold is always absent from every calibration call.
+- **Mismatch (state with results):** in the frozen MU design the inner calibration runs use the initial boundary covariance and a fixed 90-day horizon. For LUMIERE, each training patient's calibration run must use its own 7 × Δw nominal horizon (`nominal_days`), which this runner passes. The posterior of a training patient's calibration run may use a different boundary covariance from the held-out forecast (the posterior takes the covariance as an input), so the cutoff is chosen on slightly different posteriors from the ones it is applied to.
+- Default output unchanged: with `pde_only_cutoff_grid=None` the output has no new keys; with the grid, candidate `mask_draws` and calibration `pre_boundary_probability` are identical (tests).
+
+**Cost (synthetic; `output/track_b_pde_only_grid_timing_20261103.json`).**
+- Measured: 0.038 s per unique raw field for all 10 cutoffs at the LUMIERE 91 × 109 × 91 grid.
+- End-to-end calibration-only runs (32³, 40 draws): 23.9 s and 16.6 s without the grid, 20.6 s and 15.9 s with it. The overhead is below run-to-run noise.
+- Extrapolated upper figure: ≤ 200 unique draws × 0.038 s ≈ 7.6 s per forecast; 140 forecasts per analysis ≈ 0.30 h; ≈ 1.2 h over four analyses.
+
+**Revised projection (wall-clock hours on this PC, four analyses; projections, not bounds).** S1 555.4–698.2 h, S2 787.0–929.8 h (§5), plus about 0.12 h time-aware fixed growth and up to about 1.2 h PDE-only cutoff bookkeeping: **about 556.7–699.5 h (S1) or 788.3–931.1 h (S2)**. The PDE part still excludes inner cross-fitting; the FiLM step time still varied about 2× between sessions.
+
+**Verification (scratch copy, Python 3.14):** `tests/test_fk_lumiere_runner.py` 7 and `tests/test_fk_pde_only_cutoff.py` 6, with the hybrid forecast, full-hybrid gate, hybrid stress and MU pipeline-component suites: 44 passed. Covered: fold isolation of calibration and held-out calls, ties to the larger cutoff, empty PDE-only stays empty and scores 0 against a non-empty target, ForecastFailure fallback recorded, unchanged default candidate output.
 
 ## 6. Gates (all open or blocked; nothing passes by this draft)
 
@@ -139,7 +159,7 @@ Sources: `film_unet_timing_record.json` (FiLM 4.141 s, frozen 3.989 s same sessi
 - FiLM reuse fingerprint: done (§5b).
 - Empty visit-2 core: rule written and coded (§5a); not adopted.
 - Nominal-day step (7 × Δw): passed to the PDE callables; the count arm is not wired in the LUMIERE runner.
-- LUMIERE PDE-only mask: definition proposed (§5c); 0.5 cutoff FAILED the synthetic check; cutoff rule OPEN; real PDE wiring OPEN.
+- LUMIERE PDE-only mask: 0.5 cutoff FAILED (§5c); training-selected cutoff rule proposed and wired in the guarded runner with synthetic tests (§5d); not adopted. Real PDE provider for the LUMIERE runner (calling the hybrid forecast with nuisances and the cutoff grid): OPEN.
 - Bootstrap intervals and max-T pass test in the LUMIERE runner: OPEN.
 - Time-aware fixed growth timing: done (§5).
 - Protocol freeze with SHA-256 of code, cohort, thresholds and records: not done.

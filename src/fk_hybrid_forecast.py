@@ -145,7 +145,8 @@ def hybrid_posterior_predictive_forecast(masks, days, target_day, *, prior: dict
                                          n_refine: int = 11, n_draws: int = 200,
                                          n_anchors: int = 256, seed: int = 0,
                                          calibration_only: bool = False,
-                                         pde_only_concentration_cutoff: float | None = None) -> dict:
+                                         pde_only_concentration_cutoff: float | None = None,
+                                         pde_only_cutoff_grid=None) -> dict:
     """Draw joint PDE-shape, log-volume, and correlated-boundary forecasts from history only.
 
     A fixed prespecified prior or training-only prior is allowed; all fitted nuisance estimates must come from
@@ -157,6 +158,9 @@ def hybrid_posterior_predictive_forecast(masks, days, target_day, *, prior: dict
     ``pde_only_concentration_cutoff`` (PROPOSED LUMIERE PDE-only comparator; default None = unchanged output):
     each raw PDE concentration draw is thresholded at the cutoff inside the domain, before volume matching and
     boundary perturbation, from the same posterior draws and solver run as the candidate.
+    ``pde_only_cutoff_grid`` (PROPOSED; default None = unchanged output): the same raw-field thresholding for
+    every cutoff in the grid, in both full and calibration-only runs, so training patients' raw cutoff masks
+    come from their existing solver runs. Output: inclusion probability and empty-draw count per cutoff.
     """
     masks = [np.asarray(mask, dtype=bool) for mask in masks]
     days = np.asarray(days, dtype=float)
@@ -235,6 +239,12 @@ def hybrid_posterior_predictive_forecast(masks, days, target_day, *, prior: dict
             raise ValueError("pde_only_concentration_cutoff must lie strictly between 0 and 1")
         pde_only_inclusion_counts = np.zeros(masks[0].shape, dtype=np.uint32)
         pde_only_empty_draws = pde_only_full_draws = 0
+    grid_cutoffs = None if pde_only_cutoff_grid is None else tuple(float(c) for c in pde_only_cutoff_grid)
+    if grid_cutoffs is not None:
+        if not grid_cutoffs or any(not 0.0 < c < 1.0 for c in grid_cutoffs) or len(set(grid_cutoffs)) != len(grid_cutoffs):
+            raise ValueError("pde_only_cutoff_grid must hold unique cutoffs strictly between 0 and 1")
+        grid_counts = {c: np.zeros(masks[0].shape, dtype=np.uint32) for c in grid_cutoffs}
+        grid_empty = {c: 0 for c in grid_cutoffs}
     for parameter_indices, concentration_batch in _batched_parameter_concentrations(
         masks[-1], domain, unique_parameter_draws, horizon_days=horizon, spacing_mm=h,
     ):
@@ -246,6 +256,12 @@ def hybrid_posterior_predictive_forecast(masks, days, target_day, *, prior: dict
                 pde_only_inclusion_counts += raw_mask.astype(np.uint32) * np.uint32(n_same)
                 pde_only_empty_draws += n_same * int(not raw_mask.any())
                 pde_only_full_draws += n_same * int(raw_mask.sum() == domain_voxels)
+            if grid_cutoffs is not None:
+                n_same = len(draw_indices_by_parameter[int(parameter_index)])
+                for c in grid_cutoffs:
+                    raw_c = (concentration >= c) & domain
+                    grid_counts[c] += raw_c.astype(np.uint32) * np.uint32(n_same)
+                    grid_empty[c] += n_same * int(not raw_c.any())
             for draw_index in draw_indices_by_parameter[int(parameter_index)]:
                 sized_mask = volume_match_concentration(
                     concentration, domain, target_voxels=int(requested_voxels[draw_index])
@@ -269,8 +285,14 @@ def hybrid_posterior_predictive_forecast(masks, days, target_day, *, prior: dict
                 masks_out[draw_index] = boundary_draw
 
     pre_boundary_probability = pre_boundary_inclusion_counts.astype(np.float32) / n_draws
+    grid_out = {} if grid_cutoffs is None else {
+        "pde_only_inclusion_probability_by_cutoff": {c: grid_counts[c].astype(np.float32) / n_draws for c in grid_cutoffs},
+        "pde_only_empty_draws_by_cutoff": dict(grid_empty),
+        "pde_only_horizon_days": float(horizon),
+    }
     if calibration_only:
         return {
+            **grid_out,
             "pre_boundary_probability": pre_boundary_probability,
             "posterior": posterior,
             "calibration_only": True,
@@ -311,6 +333,7 @@ def hybrid_posterior_predictive_forecast(masks, days, target_day, *, prior: dict
                     "pde_only_full_domain_draw_count": int(pde_only_full_draws)}
     return {
         **pde_only,
+        **grid_out,
         "mask_draws": mask_draws,
         "pre_boundary_probability": pre_boundary_probability,
         "no_pde_ranker_mask_draws": no_pde_ranker_draws,
