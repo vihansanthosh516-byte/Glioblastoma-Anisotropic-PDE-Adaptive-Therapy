@@ -26,7 +26,7 @@ H_MM = 2.0
 
 class LumierePDEProvider:
     def __init__(self, *, settings: Mapping, initial_covariance: Mapping, cutoff_grid: Sequence[float],
-                 seed: int = 20261102, boundary_calibration_seed: int = 20261029,
+                 seed: int = 20261028, boundary_calibration_seed: int = 20261029,
                  calibration_folds: int = 5, calibration_minimum_patients: int = 8,
                  forecast_fn=hybrid_posterior_predictive_forecast):
         self.settings = dict(settings)

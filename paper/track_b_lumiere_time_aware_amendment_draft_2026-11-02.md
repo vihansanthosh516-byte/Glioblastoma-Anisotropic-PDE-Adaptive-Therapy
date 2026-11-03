@@ -160,6 +160,44 @@ Code: `src/fk_lumiere_stats.py` (synthetic tests only).
 4. The count arm has no pass rule; it is reported only.
 5. Prior-sensitivity runs and the central-gap refit are not wired in the LUMIERE runner.
 
+## 5g. LUMIERE settings chosen before use (2026-11-03; draft, not adopted)
+
+These close the §5f ambiguities 1–3 and 5. They are set from the frozen MU runner defaults and metadata only, before any LUMIERE patient result exists. Code: `src/fk_lumiere_protocol.py` constants.
+
+| Setting | LUMIERE value | Source |
+|---|---|---|
+| Boundary-calibration minimum patients | 8 (MU floor 5) | MU runner default |
+| Inner calibration folds | 5 (or fewer if fewer calibration patients) | MU runner |
+| Boundary ℓ candidates | 5, 10, 20 mm | MU runner |
+| Initial boundary covariance | σ_b 0.8 mm, τ_b 0.3 mm, ℓ 6.0 mm | `LOCKED_MU_INITIAL_BOUNDARY_COVARIANCE` |
+| Seeds | forecast 20261028, boundary calibration 20261029 | MU runner defaults. Correction: the §5f provider default was 20261102; it is changed to 20261028 to match MU. |
+| Posterior settings | n_coarse 21, mass 0.9, n_refine 11, n_draws 200, n_anchors 256 | MU runner defaults |
+| Count "new piece" rule | 26-connected pieces of the visit-3 core outside the visit-2 core grown by 2 mm, ≥ 2 voxels, inside support, 2 mm grid | frozen `new_label_pieces` |
+| Prior-support runs | primary ρ 1e-5–1e-1 /day, D 1e-5–10 mm²/day; one decade narrower ρ 1e-4–1e-2, D 1e-4–1; one decade wider ρ 1e-6–1, D 1e-6–100 | MU protocol wrapper |
+| Central-gap refit | Δw(v2→v3) ∈ {12, 13, 14} week labels; Δw 11 and 15 patients excluded from every outer and inner fit and from scoring in that run; same folds; primary bounds; its own FiLM cache | LUMIERE analogue of the MU central-gap refit (chosen now) |
+| Stop rule | the 25-patient minimum applies to the primary cohort; if the primary run stops, every run stops. The central-gap refit has 22 metadata-eligible patients (before QC), so it is a labelled sensitivity run without its own 25 minimum | chosen now |
+
+Weak points: these are MU defaults, not tuned or validated on LUMIERE. The central-gap window is a judgment; Δw 12–14 holds 22 of 28 header-eligible patients.
+
+## 5h. Code status vs open gates (2026-11-03)
+
+**Completed code (synthetic tests only; none of it is a real-data pass):**
+
+| Part | Code | Tests (scratch copy, Python 3.14) |
+|---|---|---|
+| Eligibility, empty visit-2 rule, stop rule, gates | `src/fk_lumiere_runner.py` | `tests/test_fk_lumiere_runner.py` |
+| Time-aware fixed growth, FiLM U-Net, FiLM fingerprint | `src/fk_time_aware_baselines.py` | `tests/test_fk_time_aware_baselines.py`, runner tests |
+| PDE provider, shared call, PDE-only cutoff, no-PDE ablation | `src/fk_lumiere_pde_provider.py`, `src/fk_hybrid_forecast.py` | runner tests, `tests/test_fk_pde_only_cutoff.py` |
+| Count arm | `src/fk_lumiere_runner.py` | runner tests |
+| Max-T pass test (fails closed on missing or non-finite scores) | `src/fk_lumiere_stats.py` | `tests/test_fk_lumiere_stats.py` |
+| Three prior-support runs + central-gap refit (separate FiLM cache) | `src/fk_lumiere_protocol.py` | `tests/test_fk_lumiere_protocol.py` |
+
+Last run: `test_fk_lumiere_protocol.py` 3, `test_fk_lumiere_runner.py` 10, `test_fk_lumiere_stats.py` 5: 18 passed.
+
+**Finding recorded (2026-11-03):** in the small real-PDE test, fold 3's 1-epoch FiLM training was **unavailable** under the frozen rule "every training-pair prediction empty → unavailable". It was not an available empty mask scored as missing. A test now checks both cases: an available all-zero FiLM mask gets the frozen Dice (0 against a non-empty target); an unavailable fold gives `None` and an incomplete pass test.
+
+**Not built:** the patient voxel loader (needs the preflight approval), the result writer with file hashes, and a full-size synthetic end-to-end timing of the protocol wrapper.
+
 ## 6. Gates (all open or blocked; nothing passes by this draft)
 
 **Source gates**
