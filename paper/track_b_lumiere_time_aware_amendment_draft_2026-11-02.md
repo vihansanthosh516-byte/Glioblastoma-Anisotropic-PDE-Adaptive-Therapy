@@ -92,6 +92,27 @@ Sources: `film_unet_timing_record.json` (FiLM 4.141 s, frozen 3.989 s same sessi
 - Tests (scratch copy, Python 3.14): `tests/test_fk_lumiere_runner.py` 5 new; with `test_fk_time_aware_baselines.py`, `test_fk_learned_baselines.py` and `test_fk_mu_pipeline_components.py`: all passed (44 + 19 in two runs; 3 first-run failures were a missing `paper/` folder in the scratch copy, fixed and re-run).
 - Not added: bootstrap intervals and the max-T pass test in this runner.
 
+## 5c. PDE-only comparator: proposed definition and cutoff check (2026-11-03; STOPPED)
+
+**Proposed definition.** Same history-fitted joint posterior, parameter draws, forecast interval (7 × Δw nominal days), solver, domain and seeds as the candidate, from the **same solver run**. For each raw concentration draw u: mask = {u ≥ c} ∩ domain, **before** volume matching and boundary perturbation. Combine draws with the candidate's inclusion rule (mean inclusion ≥ 0.5, ties included). Clip to the same support. No test target or test volume is used. It shares the candidate's posterior calibration but **omits its forecast-volume model and boundary corrections**. The matched-volume no-PDE ranker stays a separately named ablation. Code: `src/fk_hybrid_forecast.py`, option `pde_only_concentration_cutoff` (default `None` leaves the output unchanged; tests `tests/test_fk_pde_only_cutoff.py`, 5 passed; existing hybrid and MU pipeline tests 31 passed, scratch copy). Not wired into the LUMIERE runner.
+
+**Cutoff check with c = 0.5: FAIL** (record `output/track_b_pde_only_cutoff_check_20261103.json`; synthetic only).
+- Predeclared rule: PASS if the concentration scale is [0, 1] (carrying capacity 1, initial core = 1) **and** in every synthetic posterior case ≥ 90% of draws give a non-empty, non-full 0.5 mask.
+- Scale: concentrations 0.0–1.0 over 16 (ρ, D) pairs × 3 horizons. The scale part passes. But 7 of 48 fields had **no voxel ≥ 0.5**: all at D = 1.0 mm²/day with ρ = 0.001–0.03/day (diffusion-dominated; peak u 0.08–0.51).
+- Posterior draws (32³ grid, 40 draws, reduced posterior settings): empty 0.5 masks in **11/40** (slow case), **7/40** (moderate) and **23/40 plus 3 full-domain** (fast) draws. In the fast case the combined PDE-only mask was **empty**.
+- Reading: the joint posterior includes high-D, low-ρ draws on the ρ–D ridge, where the field spreads below 0.5. A fixed 0.5 cutoff then calls the tumor gone. 0.5 is not a meaningful cutoff for these draws.
+- Weak points: synthetic spheres; small grid; reduced posterior settings.
+
+**Not done (stopped as instructed):** wiring PDE-only into the runner, and any cutoff change. The cutoff is **not** silently changed.
+
+**Proposal for review (not adopted):** select c per outer fold from outer-training patients only.
+- Grid: c ∈ {0.05, 0.10, …, 0.50} (10 values).
+- Score: mean patient-macro plain Dice of the PDE-only mask against training targets.
+- Ties within 1e-9 go to the **larger** c (closest to the prespecified 0.5).
+- Cost: needs PDE-only masks for training patients. The inner calibration runs already compute their concentration fields, so masks for all 10 cutoffs could be recorded there without a new solver run; this is not implemented or timed.
+- Limit: draws whose peak concentration is below 0.05 stay empty at every c.
+- Alternative (not training-selected): a per-draw relative cutoff, u ≥ 0.5 × max(u). Needs its own decision.
+
 ## 6. Gates (all open or blocked; nothing passes by this draft)
 
 **Source gates**
@@ -118,7 +139,7 @@ Sources: `film_unet_timing_record.json` (FiLM 4.141 s, frozen 3.989 s same sessi
 - FiLM reuse fingerprint: done (§5b).
 - Empty visit-2 core: rule written and coded (§5a); not adopted.
 - Nominal-day step (7 × Δw): passed to the PDE callables; the count arm is not wired in the LUMIERE runner.
-- LUMIERE PDE-only mask definition and real PDE wiring: OPEN.
+- LUMIERE PDE-only mask: definition proposed (§5c); 0.5 cutoff FAILED the synthetic check; cutoff rule OPEN; real PDE wiring OPEN.
 - Bootstrap intervals and max-T pass test in the LUMIERE runner: OPEN.
 - Time-aware fixed growth timing: done (§5).
 - Protocol freeze with SHA-256 of code, cohort, thresholds and records: not done.

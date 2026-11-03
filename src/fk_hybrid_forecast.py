@@ -144,7 +144,8 @@ def hybrid_posterior_predictive_forecast(masks, days, target_day, *, prior: dict
                                          n_coarse: int = 21, mass_fraction: float = 0.9,
                                          n_refine: int = 11, n_draws: int = 200,
                                          n_anchors: int = 256, seed: int = 0,
-                                         calibration_only: bool = False) -> dict:
+                                         calibration_only: bool = False,
+                                         pde_only_concentration_cutoff: float | None = None) -> dict:
     """Draw joint PDE-shape, log-volume, and correlated-boundary forecasts from history only.
 
     A fixed prespecified prior or training-only prior is allowed; all fitted nuisance estimates must come from
@@ -152,6 +153,10 @@ def hybrid_posterior_predictive_forecast(masks, days, target_day, *, prior: dict
     first-two-to-third forecast, but one spatial follow-up can
     leave a joint rho-D ridge, so integrate posterior uncertainty and do not interpret the two parameters
     separately. A forecast that reaches the computational-domain edge fails instead of being clipped.
+
+    ``pde_only_concentration_cutoff`` (PROPOSED LUMIERE PDE-only comparator; default None = unchanged output):
+    each raw PDE concentration draw is thresholded at the cutoff inside the domain, before volume matching and
+    boundary perturbation, from the same posterior draws and solver run as the candidate.
     """
     masks = [np.asarray(mask, dtype=bool) for mask in masks]
     days = np.asarray(days, dtype=float)
@@ -223,11 +228,24 @@ def hybrid_posterior_predictive_forecast(masks, days, target_day, *, prior: dict
     masks_out = None if calibration_only else [None] * n_draws
     hybrid_boundary_fallback_count = 0
     pre_boundary_inclusion_counts = np.zeros(masks[0].shape, dtype=np.uint32)
+    want_pde_only = pde_only_concentration_cutoff is not None and not calibration_only
+    if want_pde_only:
+        cutoff = float(pde_only_concentration_cutoff)
+        if not 0.0 < cutoff < 1.0:
+            raise ValueError("pde_only_concentration_cutoff must lie strictly between 0 and 1")
+        pde_only_inclusion_counts = np.zeros(masks[0].shape, dtype=np.uint32)
+        pde_only_empty_draws = pde_only_full_draws = 0
     for parameter_indices, concentration_batch in _batched_parameter_concentrations(
         masks[-1], domain, unique_parameter_draws, horizon_days=horizon, spacing_mm=h,
     ):
         for lane, parameter_index in enumerate(parameter_indices):
             concentration = concentration_batch[lane]
+            if want_pde_only:
+                raw_mask = (concentration >= cutoff) & domain
+                n_same = len(draw_indices_by_parameter[int(parameter_index)])
+                pde_only_inclusion_counts += raw_mask.astype(np.uint32) * np.uint32(n_same)
+                pde_only_empty_draws += n_same * int(not raw_mask.any())
+                pde_only_full_draws += n_same * int(raw_mask.sum() == domain_voxels)
             for draw_index in draw_indices_by_parameter[int(parameter_index)]:
                 sized_mask = volume_match_concentration(
                     concentration, domain, target_voxels=int(requested_voxels[draw_index])
@@ -283,7 +301,16 @@ def hybrid_posterior_predictive_forecast(masks, days, target_day, *, prior: dict
         raise RuntimeError("hybrid and matched-volume no-PDE draws must preserve every requested voxel count")
     if geometric_final_volume != geometric_target_voxels:
         raise RuntimeError("geometric train-rate draw did not preserve its requested voxel count")
+    pde_only = {}
+    if want_pde_only:
+        probability = pde_only_inclusion_counts.astype(np.float32) / n_draws
+        pde_only = {"pde_only_inclusion_probability": probability,
+                    "pde_only_mask": (probability >= 0.5) & domain,  # same 0.5 inclusion rule as the candidate scorer
+                    "pde_only_concentration_cutoff": cutoff,
+                    "pde_only_empty_draw_count": int(pde_only_empty_draws),
+                    "pde_only_full_domain_draw_count": int(pde_only_full_draws)}
     return {
+        **pde_only,
         "mask_draws": mask_draws,
         "pre_boundary_probability": pre_boundary_probability,
         "no_pde_ranker_mask_draws": no_pde_ranker_draws,
