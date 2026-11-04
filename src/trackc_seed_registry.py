@@ -97,9 +97,13 @@ ENTRIES = [
            [("output/trackc_stage2_C_calibration/results.json", "20261801")],
            note="Dev run 2026-11-04. Worlds: Latin hypercube seed 20261801. Patients: seed [20261802, world index]. "
                 "Noise key [1_810_000, chunk]; the open-loop arm ignores readings."),
-    _entry("restart", "Stage 2 dev runs (restart plan)", "reserved", [(20261803, 20262099)],
-           [(1800000, 1800000), (1800017, 1809999), (1810001, 1899999)], purpose="stage2_dev",
-           note="Reserved 2026-11-03; shrinks as dev seeds are spent (190, 192 so far). Dev runs only. Never a test."),
+    _entry("193", "Stage 2D negative controls on the kept worlds", "dev_used", [(20261803, 20261803)], [(1820000, 1820000)],
+           [("output/trackc_stage2_D_negative_controls/results.json", "20261803")],
+           note="Dev run 2026-11-04. Fresh patients for the worlds kept by script 192: seed [20261803, world index]; "
+                "noise key [1_820_000, world index]; the open-loop arms ignore readings."),
+    _entry("restart", "Stage 2 dev runs (restart plan)", "reserved", [(20261804, 20262099)],
+           [(1800000, 1800000), (1800017, 1809999), (1810001, 1819999), (1820001, 1899999)], purpose="stage2_dev",
+           note="Reserved 2026-11-03; shrinks as dev seeds are spent (190, 192, 193 so far). Dev runs only. Never a test."),
     _entry("restart", "Stage 3 sealed run (restart plan)", "reserved", [(20262300, 20262499)],
            [(2300000, 2399999)], purpose="stage3_sealed",
            note="Reserved 2026-11-03. Spend only after the Stage 3 gate and the user's OK."),
