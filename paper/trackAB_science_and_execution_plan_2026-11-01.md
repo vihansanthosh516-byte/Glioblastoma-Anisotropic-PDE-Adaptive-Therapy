@@ -1,13 +1,13 @@
 # Track A and Track B full research plan
 
-**Updated:** 2026-11-03
+**Updated:** 2026-11-04
 **Scope:** Tracks A and B only. Track C is outside this plan.
-**Status:** Track A is closed for its current scope. Track B has a conditional Duke path. Metadata inventory is the only authorized data step. This document is a research plan, not a protocol amendment or authorization for MRI/mask reads or patient scoring.
+**Status:** Track A is closed for its current scope. Track B is being reframed around a biology-first Duke study. The downloaded archive passed its expected size and MD5 checks and a metadata-only inventory was completed. No NIfTI member or landmark-coordinate table was opened; no MRI or mask voxel array was read; no patient scoring occurred. This document is a research plan, not an adopted protocol or scoring authorization.
 
 ## Executive decision
 
 - **Track A:** close current work with A5 as an exploratory within-cohort result. It failed its frozen success rule. No screened outside cohort passed all requirements for independent confirmation. Do not keep scouting or run a new A analysis without a new question and user-approved scope.
-- **Track B:** continue only through sequential Duke gates. Finish the archive download, verify integrity, and inventory approved metadata. Do not read MRI, mask, or landmark-coordinate contents or score patients at this stage.
+- **Track B:** make the three-visit Duke tissue-state transition question primary: compare next-visit core-label conversion in newly appearing versus persistent FLAIR regions at matched distance. Treat ADC as secondary and PDE forecasting as a secondary benchmark. Finish the research plan and protocol freeze before image/mask scoring; exact accepted data-use terms and school review remain open.
 - **No positivity target:** A null or negative result can be a valid study. Do not tune or choose research questions to obtain a positive score. Novelty and evidence cannot be promised as 7–8/10 before the required data and independent evaluation exist.
 
 ## Track A: closeout
@@ -33,15 +33,17 @@ Reopen Track A only if the user chooses a new question or a candidate cohort cle
 
 ## Track B: research question
 
-### Proposed narrow question
+### Primary biology question
 
-For a patient with at least two prior scans, does PDE-based spatial ranking improve prediction of the next observed automated tumor-core mask over a two-history non-PDE shape forecast, when both methods receive the same history-only volume forecast, interval, and support?
+Among patients whose released records identify glioblastoma and code IDH mutation status as Negative, are newly appearing nonenhancing FLAIR-labeled regions more likely than persistent regions at the same physical distance from the current core to receive a necrotic- or enhancing-core label at the next visit? Does local ADC trajectory add predictive information?
 
-This is a predictive comparison. It cannot isolate a causal effect of PDE biology. The target is agreement with the dataset's automated labels, not verified tumor truth. The horizon is the next observed visit conditional on its recorded interval, not a prospective fixed-day forecast.
+The primary outcome is a distance-standardized, patient-level difference in automated-label conversion. The ADC analysis is secondary. A patient-specific reaction-diffusion forecast and its controls are a separate secondary benchmark; forecast performance will not decide whether the primary transition question is supported. This is a radiographic tissue-state study, not a histology test or a claim that FLAIR marks malignant cells.
 
-This question and its comparator family remain **proposed**. No Duke scoring protocol is adopted. Do not copy LUMIERE's folds, timing, labels, cutoffs, or thresholds into Duke without a separate amendment.
+Prior work already maps future recurrence-prone versus stable peri-enhancing tissue and reports ADC differences, and serial FLAIR and ADC progression analyses exist. The candidate distinction is the three-visit classification of middle-visit FLAIR as newly appearing or persistent, compared at matched distance with patient-level next-visit core-label conversion. This remains a candidate extension, not a verified novelty claim. See the competition-form draft and its references for the complete rationale.
 
-### Minimum fairness requirements for a future Duke protocol
+This biology-first question and the detailed methods remain **proposed**. No Duke scoring protocol is adopted.
+
+### Fairness requirements for the secondary forecast benchmark
 
 - Use patient-grouped outer evaluation. Keep every patient and all visits in one fold.
 - Fit volume forecasts, preprocessing, and comparator settings on outer-training patients only. Nested selections stay inside each outer-training set.
@@ -59,31 +61,23 @@ The [Zenodo record](https://zenodo.org/records/20548528) describes 61 patients a
 
 The [author usage guide](https://github.com/deshanyang/GBM-DIR-QA) says scans are atlas-aligned but separate sessions are not registered to each other. It also says dates were automatically extracted and may be offset by days. A longitudinal study therefore needs a frozen per-patient registration and interval policy. Automated masks remain source labels, not ground truth.
 
-**Access and data status (2026-11-03):** The user reports download access and started downloading one `DATASET_FINAL.zip`. The local file was 76,144,640 bytes at the latest check, below the expected 17,043,569,844 bytes. The local Zenodo API snapshot gives MD5 `99580fb8ccb3daed186dc6afe5b5bf2f`. Download is incomplete. No ZIP member has been opened. No MRI, mask, landmark-coordinate, or patient-label voxel data has been read. No patient scoring has occurred.
+**Access and data status (metadata audit completed 2026-11-03; document updated 2026-11-04):** The user reports Duke download access. The local `DATASET_FINAL.zip` reached 17,043,569,844 bytes and matched the MD5 supplied with the authorized download (`99580fb8ccb3daed186dc6afe5b5bf2f`); a local SHA-256 was recorded. The restricted Zenodo API did not expose a file checksum for independent comparison. The ZIP central directory and permitted patient/session, relative-date, diagnosis/IDH, and treatment metadata were inspected. No NIfTI member, MRI or mask voxel array, or landmark-coordinate table was opened. The inventory remains outside the repository. No patient scoring occurred.
 
-The user authorized a metadata-only inventory covering filenames, anonymized patient/session identifiers, scan counts and dates, treatment/IDH metadata. This does not include MRI, mask, or landmark-coordinate contents. Exact accepted Duke license terms and written school approval are not saved. Zenodo lists CC BY-NC-ND 4.0 or a custom Duke agreement; the allowed use and sharing of derived masks, predictions, figures, and weights must be established from the accepted terms.
+The metadata-only inventory stage is complete. It covered filenames, anonymized patient/session joins, relative scan dates, diagnosis/IDH metadata, and treatment-event metadata; it did not include MRI, mask, or landmark-coordinate contents. Exact accepted Duke license terms and written school approval are not saved. The draft proposes to include only records coded as glioblastoma with IDH `Negative`, while excluding missing, indeterminate, or mixed diagnoses; this is not comprehensive IDH1/2 confirmation. Prior-use overlap is not reconciled, so independence is unestablished. Zenodo lists CC BY-NC-ND 4.0 or a custom Duke agreement; allowed analysis and sharing of derived masks, predictions, figures, and weights must be confirmed from the accepted terms.
 
-The prepared inventory is `src/fk_duke_archive_inventory.py`. It checks expected archive size and MD5, records SHA-256, lists central-directory metadata without opening members, and can read one explicit non-landmark CSV header. It writes locally under `output/track_b_duke_inventory_20261103/`; do not commit patient-level inventory outputs.
+The metadata-only inventory tool is `src/fk_duke_archive_inventory.py`. It checks expected archive size and the MD5 supplied with the authorized download, records SHA-256, lists central-directory metadata without opening members, and can read one explicitly named non-landmark CSV header. The inventory record is saved outside the repository; do not commit patient-level inventory contents.
 
 ## Ordered work plan and gates
 
-### Stage 1 — Complete and verify archive
+### Stage 1 — Archive verification (complete)
 
-1. Let the current download finish. Do not start a second copy or alter the partial file.
-2. Check exact size and Zenodo MD5. Stop if either differs. Record local SHA-256 only after the expected checks pass.
-3. List ZIP central-directory paths, sizes, and file types. Do not extract or open MRI, mask, or landmark members.
-
-**Exit condition:** complete archive passes both expected size and MD5. A failed check stops the run.
+The completed ZIP matched its expected byte size and the supplied MD5. The inventory tool also recorded a local SHA-256 and listed only ZIP central-directory metadata. The archive passed this gate. No file member was extracted or decompressed.
 
 ### Stage 2 — Metadata-only cohort audit
 
-1. Review the central-directory inventory and identify the dataset's metadata tables.
-2. Inspect metadata headers first. Then read only approved patient/session IDs, relative scan dates, treatment and surgery dates, and IDH fields needed for eligibility and interval rules.
-3. Do not read landmark coordinate tables, NIfTI files, brain masks, or segmentation masks in this stage.
-4. Build a local, access-controlled patient/session map. Report aggregate counts and exclusion reasons; avoid publishing identifiers.
-5. Determine the number of patients with usable three-visit sequences, valid intervals, eligible disease status, and no known project overlap. Do not call the cohort independent while overlap is unresolved.
+The authorized metadata tables were read and session keys were matched to archive paths. The draft now states how source-coded IDH and mixed diagnoses will be handled; those rules and the resulting eligible patient list have not been frozen. Prior-use overlap is not reconciled, and image QC has not been run. Keep patient-level metadata local and do not publish it.
 
-**Exit condition:** the patient count, sample map, IDH status, treatment/surgery timing, interval policy, and overlap status are documented from allowed metadata. Set the minimum eligible cohort before any target-mask read. If it fails, stop the patient branch.
+**Exit condition:** before image/mask reads, confirm and freeze the proposed IDH/diagnosis interpretation, date-sorted window rule, prior-use overlap status, and minimum-cohort/precision rule. If eligibility, independence, or rights fail, stop the patient branch.
 
 ### Stage 3 — Rights and school approval
 
@@ -97,11 +91,11 @@ The prepared inventory is `src/fk_duke_archive_inventory.py`. It checks expected
 
 Before any MRI or mask voxel read, write and adopt a dated Duke-specific amendment defining:
 
-- target labels and endpoint, including treatment of cavity and empty masks;
+- primary endpoint: next-visit conversion of newly appearing versus persistent nonenhancing FLAIR at matched distance; operational labels, cavity, and empty-mask rules;
 - scan-pair/triplet selection and next-visit interval rule;
 - origin-defined support and target-outside-support scoring;
 - image registration method, QC thresholds, retry and exclusion rules;
-- outer folds, inner selection, seeds, preprocessing, and patient-level estimand;
+- the primary patient-level transition estimand and bootstrap; separate outer folds, inner selection, seeds, and preprocessing for the secondary forecast and ADC prediction analyses;
 - candidate and every required baseline, including the two-history control if retained;
 - expected failures, common fallback, denominator, missing-arm rules, and incomplete outcomes;
 - primary metric, secondary metrics, bootstrap/interval method, multiplicity, pass rule, and precision requirement;
@@ -145,14 +139,15 @@ No fallback to LUMIERE as "independent confirmation." No post-outcome threshold 
 
 ## Claims and quality targets
 
-Track A's conclusion stays bounded: A5 completed within-cohort exploratory analysis and failed its frozen superiority rule. Track B, if completed, can support only a patient-level predictive comparison against source-provided automated masks in the eligible Duke cohort and observed intervals.
+Track A's conclusion stays bounded: A5 completed within-cohort exploratory analysis and failed its frozen superiority rule. Track B, if completed, can support a patient-level association between history-defined FLAIR states and next-visit automated core labels, a separate held-out ADC prediction result, and a distinct forecast-benchmark result in the eligible Duke cohort under observed intervals.
 
 Neither track can claim a causal PDE effect, true tumor forecast accuracy, clinical benefit, or broad novelty from this design alone. Rigor, clarity, and reproducibility can improve through the gates above. Novelty and evidence depend on the results and the prior-art check. Do not assign a 7–8/10 score as a target or claim a positive result in advance.
 
 ## Key files
 
 - Current Track A decision: `paper/trackA_novelty_decision_20261101.md`.
-- Track B direction: `paper/track_b_codex_direction_and_execution_plan_2026-11-02.md`.
-- Duke readiness: `paper/track_b_duke_readiness_2026-11-03.md`.
+- Track B current competition-form science plan: `paper/trackB_research_plan_draft_2026-11-03.md`.
+- Track B current readiness and gates: `paper/track_b_duke_readiness_2026-11-03.md`.
+- Historical PDE-first direction memo: `paper/track_b_codex_direction_and_execution_plan_2026-11-02.md`.
 - Duke inventory code: `src/fk_duke_archive_inventory.py`.
 - Historical LUMIERE go/no-go and control proposals remain historical or proposed; they do not authorize Duke scoring.

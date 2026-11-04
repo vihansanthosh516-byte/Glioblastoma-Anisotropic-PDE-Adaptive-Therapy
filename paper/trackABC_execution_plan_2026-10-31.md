@@ -1,6 +1,6 @@
 # Execution Plan for GBM Tracks A, B, and C
 
-**Status:** Current project execution roadmap, recorded 2026-10-31. This file records the user's selected next work for all three tracks.
+**Status:** Current project execution roadmap, updated 2026-11-04. Track B's current direction supersedes the earlier PDE-first and LUMIERE/MU plans below; those details are retained as historical record.
 
 This roadmap adds execution order and stop rules. It does not replace a frozen protocol, change an endpoint, grant data access, or authorize patient-data scoring. Commit any required protocol amendment and code/input hashes before the next analysis. Keep raw data local and follow each source's terms.
 
@@ -30,9 +30,26 @@ Require, before any download, scoring, or figure change: at least six IDH-wildty
 
 Do not use Ivy GAP, SNUH, or another exposed cohort as untouched confirmation. Do not resume broad scouting. A specific public accession may be screened metadata-only against every gate; if none appears, report external confirmation as unavailable.
 
-## Track B — patient-level PDE forecast with uncertainty and failure checks
+## Track B — Duke longitudinal MRI biology and modeling (current; 2026-11-04)
 
-**Current status.** No new patient-mask scoring is authorized. MU is previously examined and can support exploratory work only; source-backed case-level registration, label-zero meaning, and full-grid support evidence remain open. Duke is the strongest independent lead, but access and school-use approval remain pending. The preliminary B2.1 report and follow-up are committed as `44b25e5` and `0147183` in `paper/track_b_prior_art_2026-10-31.md` and `paper/track_b_prior_art_followup_2026-10-31.md`. SoC-DT already tests PDE plus neural correction on real UCSF patients, so that broad combination is not a novelty claim. The reports remain preliminary: direct PubMed/Scholar searches, citation sweeps, and several full-text/code checks remain open. The gap is unconfirmed.
+**Current status.** The user reports Duke download access. The local archive passed the expected byte-size check and matched the MD5 supplied with the authorized download; a local SHA-256 was recorded. Metadata-only inventory is complete. No NIfTI member, MRI or segmentation-mask voxels, or landmark-coordinate table has been read, and no patient scoring has occurred. Exact accepted use terms, written school/competition review, prior-cohort overlap, image QC, and a frozen protocol remain open. See `paper/track_b_duke_readiness_2026-11-03.md`.
+
+**Current proposed question.** In three consecutive visits, are middle-visit newly appearing nonenhancing FLAIR-labeled regions more likely than persistent regions at the same distance from the current core to receive a necrotic/enhancing-core label at the next visit? ADC prediction is secondary; reaction-diffusion forecasting is a separate secondary benchmark. This tests temporal transitions among automated MRI labels under observed care, not histologic infiltration, causation, clinical benefit, or a verified novelty claim. Full proposal: `paper/trackB_research_plan_draft_2026-11-03.md`.
+
+### Current ordered work and gates
+
+1. Save and review the written Duke grant and exact accepted terms for analysis, retention, and output sharing. Obtain written school/competition review.
+2. Freeze the source-coded diagnosis/IDH eligibility rule, date-sorted window rule, minimum cohort and precision requirement; reconcile patient overlap with prior project cohorts where permitted.
+3. Review and adopt a Duke-specific protocol. Keep the primary transition estimand separate from the secondary ADC and forecast comparisons. Freeze labels, support, registration, exclusions, folds, model settings, uncertainty, failure rules, and the runtime ceiling.
+4. Complete synthetic integration and full-pipeline timing. If the measured projection exceeds the adopted ceiling or the cohort cannot support the frozen precision target, amend the scope before target-label scoring or stop.
+5. After rights, school review, and a frozen protocol, perform the approved MRI-only registration/support QC with target segmentation labels closed. Freeze and hash the eligible cohort and QC list.
+6. Seal code, settings, cohort, folds, and allowed input fingerprints before a single locked evaluation. Report all outcomes, missing arms, exclusions, and failures unchanged.
+
+**Historical plans below.** The former PDE-first Duke proposal and earlier LUMIERE/MU work are not the current primary question and do not authorize any patient read or score. Their details remain below only as project history.
+
+## Historical Track B — PDE forecast and LUMIERE/MU plans (superseded 2026-11-03)
+
+**Historical status (2026-10-31 to 2026-11-02).** This paragraph records the former PDE-first question. Duke access is now reported by the user and the archive metadata inventory is complete; current gates and question are stated above. The older PDE prior-art screen remains preliminary and does not establish novelty for the current FLAIR-transition question.
 
 ### B1. Clear source and protocol gates before patient scoring
 
@@ -71,8 +88,9 @@ Do not use Ivy GAP, SNUH, or another exposed cohort as untouched confirmation. D
 ## Next actions
 
 - **Track A (updated 2026-11-01 audit):** A5 is complete and failed its frozen 5/6 donor rule (`output/trackA_yu2020/result.json`). Report external confirmation as unavailable. Reopen only for a named accession that passes every gate (`paper/trackA_novelty_decision_20261101.md`). The earlier "seal the runtime amendment and run the timing pilot" action is done.
-- **Track B (LUMIERE, adopted 2026-11-01, exploratory only):** plan and amendment R adopted (`paper/track_b_no_contact_dataset_plan_2026-10-31.md`); reuse wired; header check confirms 28 eligible patients on one grid; projected 677.6 wall-clock h with reuse on this 8-thread PC, about 28 days (synthetic timing; PDE lower bound). Next: freeze protocol and hashes, then ask the user before any voxel read. Registration, support, label, school-written-approval and protocol gates open. No scoring.
-- **Track B (historical MU status, 2026-10-31; superseded by the LUMIERE entry above):** fixed growth, U-Net and count model are coded, wired into the MU runner and synthetically tested. The synthetic runtime pilot projects about 707 CPU hours for the protocol-complete run (`paper/track_b_runtime_pilot_2026-10-31.md`); amendment A-2026-10-31-R was then a draft; it was adopted 2026-11-01 (`paper/track_b_amendment_decision_2026-10-31.md`). Measured (synthetic): full-grid U-Net step 5.340 s, 64³ crop step 1.735 s. Projected for the MU 18-patient cohort (historical): 591.7 h frozen, 399.5 h with reuse; PDE 207.3 h is a lower bound. The full-grid U-Net stays the required comparator: the crop limits only the U-Net, which favours the candidate, so it stays an unadopted secondary option. The U-Net fingerprint now includes the runtime environment. Next (historical list): source-backed valid support and MRI-only registration QC; cavity label meaning now source-backed, label-0 meaning still open (`paper/track_b_source_gate_evidence_2026-10-31.md`; messages drafted, not sent); finish Scholar and dataset citation sweeps. No patient-mask scoring until the source/access gates pass.
+- **Track B (current Duke path):** save and verify the accepted data-use agreement and written school/competition review; resolve permitted patient overlap and metadata eligibility; review and freeze the biology-first protocol; complete synthetic integration and runtime timing; then, only after rights and protocol gates, conduct approved MRI-only QC and freeze the cohort before target-label scoring. Current status: `paper/track_b_duke_readiness_2026-11-03.md`.
+- **Track B historical LUMIERE path (2026-11-01; superseded for the current question):** the exploratory plan and Amendment R are documented in `paper/track_b_no_contact_dataset_plan_2026-10-31.md`; no LUMIERE scoring occurred. Its 677.6 wall-clock-hour projection and open gates do not describe the current Duke path.
+- **Track B historical MU path (2026-10-31):** fixed-growth, U-Net, and count code and the historical runtime/gate record remain in `paper/track_b_runtime_pilot_2026-10-31.md` and `paper/track_b_amendment_decision_2026-10-31.md`. These MU settings and projections are not the current Duke protocol.
 - **Track C:** finish the current negative/limited-results report; keep new model testing stopped until measured kinetics and independent review exist.
 
 Track these actions separately. A pass in one track does not clear another track's data or protocol gates.

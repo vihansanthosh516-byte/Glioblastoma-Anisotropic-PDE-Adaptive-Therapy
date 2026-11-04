@@ -1,4 +1,6 @@
-# Track B direction and execution plan (Codex review, 2026-11-02)
+# Historical Track B PDE direction and execution plan (Codex review, 2026-11-02)
+
+> **Superseded for current work on 2026-11-03.** This memo records the former PDE-first Duke/LUMIERE direction. Track B's current proposed primary question is the Duke three-visit, distance-matched transition from newly appearing versus persistent FLAIR labels to next-visit automated core labels; ADC is secondary and PDE forecasting is a separate secondary benchmark. The archive metadata inventory is complete, but no MRI, mask, or landmark-coordinate content has been read and no patient scoring has occurred. Use `paper/trackB_research_plan_draft_2026-11-03.md`, `paper/track_b_duke_readiness_2026-11-03.md`, and `paper/trackABC_execution_plan_2026-10-31.md` for current status. Rights, written school review, cohort overlap/eligibility, and protocol adoption remain open.
 
 **Status: decision plan only.** This document does not adopt an amendment, authorize patient-data reads, authorize a run, or change a result. Track A and Track C are outside scope. No patient voxels were read for this review.
 
@@ -14,10 +16,10 @@ The claim is about prediction of source-provided labels. It is not a causal clai
 - The latest proposed narrow question is useful: at identical history-only volume draws, does PDE-based spatial ranking outperform a two-history non-PDE shape extrapolation? This tests two predictive systems; it does not isolate a causal PDE effect.
 - The primary target should be **next observed visit conditional on its realized interval** unless the cohort and visit schedule support a fixed, origin-known horizon. Call it retrospective horizon-conditioned evaluation, not a prospective fixed-day forecast.
 - The existing LUMIERE evidence is exploratory and exposed. The project previously used LUMIERE, and LUMIERE appears in [PREDICT-GBM](https://arxiv.org/html/2509.13360). Its automated labels, unresolved label-0 meaning, undocumented tool version, unresolved support/registration rules, and long runtime weaken the value of a large new patient run. Its public [Figshare record](https://springernature.figshare.com/articles/dataset/LUMIERE_dataset_-_MRI_data_and_automated_segmentations/21249516) also needs reconciliation with the project’s existing non-commercial/derived-output restrictions before any reuse or sharing.
-- Duke is the strongest structural match found so far: the [official record](https://zenodo.org/records/20548528) lists 61 patients and 3–18 sessions with masks. **Status update (2026-11-03):** the user reports that download access was granted and download started. At the latest local check, `C:\Users\vihan\DATASET_FINAL.zip` was 76,144,640 bytes, below the expected 17,043,569,844-byte archive size, and the file was growing. The public record still marks files restricted and describes two license paths, CC BY-NC-ND 4.0 or a custom Duke license; the accepted terms are not yet saved. The authors' [usage guide](https://github.com/deshanyang/GBM-DIR-QA) says visits are not registered to each other and relative dates may be offset by days. Triplet count, patient overlap, derived-output terms, school approval, and longitudinal MRI registration QC remain unresolved. The user authorized metadata-only local inventory after download completion; MRI, mask, and landmark-coordinate contents remain outside this scope. See [Duke readiness note](track_b_duke_readiness_2026-11-03.md). Duke remains **not ready for patient scoring**.
+- Duke is the strongest structural match found so far: the [official record](https://zenodo.org/records/20548528) lists 61 patients and 3–18 sessions with masks. **Historical status at memo writing (2026-11-02):** download had started but was not complete. The archive passed its supplied size/MD5 check and metadata-only inventory completed on 2026-11-03; see the current Duke readiness note. The public record still marks files restricted and describes two license paths, CC BY-NC-ND 4.0 or a custom Duke license; the accepted terms are not yet saved. The authors' [usage guide](https://github.com/deshanyang/GBM-DIR-QA) says visits are not registered to each other and relative dates may be offset by days. Triplet count, patient overlap, derived-output terms, school approval, and longitudinal MRI registration QC remain unresolved. The user authorized metadata-only local inventory after download completion; MRI, mask, and landmark-coordinate contents remain outside this scope. See [Duke readiness note](track_b_duke_readiness_2026-11-03.md). Duke remains **not ready for patient scoring**.
 - A separate public-record screen found no verified fresh, no-request cohort that passes the combined requirements for at least three masked visits, clear reuse terms, GBM eligibility, and project independence. [RHUH-GBM](https://www.cancerimagingarchive.net/collection/rhuh-gbm/) is structurally close but is already exposed through PREDICT-GBM. BraTS Longitudinal and WAW-Glioma remain unverified on access/terms, eligible GBM counts, longitudinal masks, or overlap. This was a bounded search, not proof that no such dataset exists.
 
-## Recommended direction
+## Historical recommendation (2026-11-02; superseded)
 
 **Do not run the full four-analysis LUMIERE design.** It would add an expensive, previously exposed, automated-label result while source and protocol gates remain open. The prior runtime figures are projections, not guarantees, and the long-gap PDE cases can dominate them.
 
@@ -92,7 +94,7 @@ Track B can count as a successful **bounded research study** if one lawful, elig
 
 It does not become independently confirmatory, clinically useful, causal, or highly novel just because it runs. Those are separate claims requiring separate evidence.
 
-## Current state
+## Historical state at 2026-11-02 (superseded)
 
 - Current LUMIERE and Duke patient scoring: **blocked**.
 - Full LUMIERE four-analysis run: **not recommended**.
