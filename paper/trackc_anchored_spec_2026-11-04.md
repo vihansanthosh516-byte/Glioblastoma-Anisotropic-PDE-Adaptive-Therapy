@@ -55,7 +55,7 @@ A "world" is one setting of the parameter ranges. Calibration means the standard
 | 198 | I: numerics (step 0.25 vs 0.1) | done for `single`, `single_rep` and `mixture`: no changed call, no flipped flag. Batch size and the old event mode were not tested |
 | 199 | J (added): how deep a response the controlled worlds predict | done for `single`, `single_rep` and `mixture`: no deep responders in the single family; 3.5% of patients with a fall of 65% or more (range over 11 worlds 0.1% to 11.0%) in the mixture family (interim) |
 | 200 | post hoc analysis of C and D from the saved files | done for `single`, `single_rep` and `mixture` |
-| 201 | K (added, section 5b): stratified MGMT anchor of the mixture family | done for `mixture` (interim): 5 of 110 kept worlds meet all three conditions, none of the 11 controlled worlds; `mixture_mix` pending |
+| 201 | K (added, section 5b): stratified MGMT anchor of the mixture family | done for `mixture` and `mixture_mix` (interim): 5 of 110 and 6 of 151 kept worlds meet all three conditions, none of the 11 and none of the 20 controlled worlds |
 
 Kill rules are in the restart plan. Every output folder gets a manifest (seed block from `src/trackc_seed_registry.py`, protocol hash, code hashes, git commit, clean-tree flag).
 
