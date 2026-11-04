@@ -123,7 +123,11 @@ def evaluate_world(w, n_eval, n_sel):
             pick = score.argmax(0)
             res["informed_family_max" if lam == 0 else f"informed{tag}"] = (ttp_ev[pick, cols], courses_ev[pick, cols])
         ref_ttp, ref_courses = res[REFERENCE]
+        inf_capped = np.minimum(res["informed_family_max"][0], 730.0)
         for name, (ttp, courses) in res.items():
+            # share of patients on whom this arm beats the informed family maximum (it should be near 0 if that
+            # maximum were a bound; a positive share means the family of 56 schedules is not exhaustive)
+            beats = float(np.mean(np.minimum(ttp, 730.0) > inf_capped + 1e-6))
             for tau in rg.TAUS:
                 st = rg.paired_stats(ttp, ref_ttp, tau)
                 rows.append({"world": world, "endpoint": ep_label, "arm": name, "tau": int(tau),
@@ -131,6 +135,7 @@ def evaluate_world(w, n_eval, n_sel):
                              "ci_hi": st["ci_hi"], "regret_cvar10": st["regret_cvar"], "frac_worse": st["frac_worse"],
                              "mean_courses": float(np.mean(courses)),
                              "courses_diff_vs_soc6": float(np.mean(courses) - np.mean(ref_courses)),
+                             "frac_beats_informed_730": beats,
                              "note": notes.get(name, "")})
     return rows
 
@@ -173,6 +178,7 @@ def analyse(rows, worlds):
                               "frac_worlds_clear_loss": float(np.mean([r["ci_hi"] < 0 for r in sel])),
                               "median_regret_cvar10": float(np.median([r["regret_cvar10"] for r in sel])),
                               "median_courses_diff": float(np.median([r["courses_diff_vs_soc6"] for r in sel])),
+                              "median_frac_patients_beating_informed_family_max": float(np.median([r["frac_beats_informed_730"] for r in sel])),
                               "median_mean_courses": float(np.median([r["mean_courses"] for r in sel]))}
             res["endpoints"][ep][str(tau)] = {"arms": block}
             # which axis decides the gain of the two upper-bound-style arms and of the best simple rule
