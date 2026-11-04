@@ -238,6 +238,14 @@ ENTRIES = [
            [(1892400, 1892400)], [("output/trackc_stage2_K_stratified_anchor_mixture_mix36/results.json", "20261847")],
            note="Dev run 2026-11-04. Mixed course cap. Fresh patients seed [20261847, world index], noise key [1_892_400, world "
                 "index]; the open-loop arms ignore readings."),
+    _entry("203", "Stage 2H value of knowing a patient-level quantity, mixture family", "dev_used", [(20261854, 20261855)], [],
+           [("output/trackc_stage2_H_value_of_information_mixture/results.json", "20261854")],
+           note="Dev run 2026-11-04. Selection patients seed [20261854, world index], evaluation patients seed [20261855, world "
+                "index]; open loop, no noise key. The other configurations use 20261850-20261853 and 20261858-20261859; not yet spent."),
+    _entry("203", "Stage 2H value of knowing a patient-level quantity, single_mix configuration", "dev_used", [(20261856, 20261857)], [],
+           [("output/trackc_stage2_H_value_of_information_mix36/results.json", "20261856")],
+           note="Dev run 2026-11-04. Mixed course cap in the worlds of the configuration. Selection patients seed [20261856, world "
+                "index], evaluation patients seed [20261857, world index]; open loop, no noise key."),
 ]
 ENTRIES.append(_reserved_stage2_dev(ENTRIES))
 ENTRIES.append(_entry("restart", "Stage 3 sealed run (restart plan)", "reserved", [(20262300, 20262499)],
