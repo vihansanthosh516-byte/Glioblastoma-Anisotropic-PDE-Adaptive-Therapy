@@ -52,7 +52,7 @@ A "world" is one setting of the parameter ranges. Calibration means the standard
 | 194 | E: regime map on all controlled worlds (simple rules, both endpoints, cost-aware arms, informed family maximum) | done for `single` (interim); `mixture` pending |
 | to write | F: cost-aware frontier and information-matched rules; G: oracle on a finer grid | F is partly covered by the cost-aware arms of 194; G by the share of patients who beat the informed family maximum (194) |
 | to write | H: how many washout durations and repeats place mu and nu in the right region with 90% probability | after the mixture result of 194 |
-| 198 | I: numerics (step 0.25 vs 0.1) | done for `single`, `single_rep` and `mixture`: no changed call, no flipped flag. Batch size and the old event mode were not tested |
+| 198 | I: numerics (step 0.25 vs 0.1) | done for `single`, `single_rep`, `mixture`, `single_mix` and `mixture_mix`: no changed call, no flipped flag. Batch size and the old event mode were not tested |
 | 199 | J (added): how deep a response the controlled worlds predict | done for `single`, `single_rep` and `mixture`: no deep responders in the single family; 3.5% of patients with a fall of 65% or more (range over 11 worlds 0.1% to 11.0%) in the mixture family (interim) |
 | 200 | post hoc analysis of C and D from the saved files | done for `single`, `single_rep` and `mixture` |
 | 201 | K (added, section 5b): stratified MGMT anchor of the mixture family | done for `mixture` and `mixture_mix` (interim): 5 of 110 and 6 of 151 kept worlds meet all three conditions, none of the 11 and none of the 20 controlled worlds |
