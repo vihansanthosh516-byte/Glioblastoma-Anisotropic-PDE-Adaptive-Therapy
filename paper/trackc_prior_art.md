@@ -41,3 +41,18 @@ Date: 2026-10-28 (Claude). Method: 7 web searches plus one arXiv abstract read. 
 - https://hal.inrae.fr/MIAT/hal-05054392v4
 - https://report-hub.scs.carleton.ca/projectPage/2864/
 - https://ar5iv.labs.arxiv.org/html/2211.17041
+
+## Addendum 2026-11-03 (14-expert audit; read from abstracts and search snippets, not full texts; verify in Stage 1 of `paper/trackc_restart_plan_2026-11-03.md`)
+
+Missed by the first pass:
+- Browning et al. 2026 (arXiv:2608.18387): the abstract also introduces a metastasis-risk metric, and adaptive therapy may be disadvantageous when sustained burden is counted. Relevant to the tail framing. Full text not read.
+- Corigliano et al. (bioRxiv 10.1101/2024.11.29.626082): recovery periods and sub-clinical doses can outperform continuous dosing (colorectal targeted therapy; validation not stated). Closest to forced holidays.
+- Segura-Collar et al. 2022, Neuro-Oncol Adv 4(1):vdac155 (PMC9616068): glioblastoma, longer temozolomide spacing, persister compartment; fixed schedules, proof of concept. Its rates sit in Supplementary Table S2 (not read).
+- Sun et al. 2025 (arXiv:2502.09392): success depends on the pause/resume threshold; no optimal strategy under some constraints.
+- Sargun et al. 2026 (arXiv:2606.10376): Bayes-filter belief with an entropy-triggered measurement rule (colorectal). Closest to a belief-based trigger.
+- Viossat & Noble 2021, Nat Ecol Evol 5(6):826-835 (PMC8967123, read by one expert): containment can beat maximum tolerated dose without a fitness cost; intermittent containment is slightly worse than continuous.
+- Gallagher et al. 2025 preprint authors: Gallagher, Strobl, Anderson, Maini (medRxiv 10.1101/2025.04.01.25325056).
+
+Searches for a worst-decile (CVaR) objective in adaptive therapy found none. That used 6 WebSearch queries; PubMed, Google Scholar and Europe PMC were not searched, so it is a gap in the search, not proof.
+Not opened: Zhang 2017 (login redirect), Hansen & Read 2017, Strobl 2022, Fischer 2015 full text, Wang 2024 full text, Kiram 2026.
+The uniqueness statement above still holds. No novelty claim is allowed.

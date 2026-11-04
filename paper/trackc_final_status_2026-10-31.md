@@ -87,3 +87,73 @@ policy would be tuning on seen outcomes. **No new simulation was run, and none i
    washout durations, ideally patient-derived GBM cells), and an outside reviewer agrees the rates bound the
    simulation before any outcome is seen. It would need fresh seeds, predeclared estimands and a power
    justification for the tail contrast.
+
+## 6. Addendum 2026-11-03: record corrections (no result changed)
+
+Source: read-only audit by 14 Haiku 5.5 experts on 2026-11-03, plus Claude re-checks. `[V]` = re-checked by
+Claude against the named file on 2026-11-03 (by `src/trackc_doc_check.py` or by hand). `[A]` = taken from an
+expert report or an earlier entry and not re-checked here. Old results, margins and endpoints are unchanged.
+Only wording and missing context are added. Restart plan: `paper/trackc_restart_plan_2026-11-03.md`.
+
+1. [A] Sealed H1 failed three times, not two. The 169 H1 (wide containment minus raw 0.6, mean TTP, lower
+   bound > -7 d in all 13 suites) failed at missed_sev: -4.7 [-16.6, 7.0]
+   (`output/trackc_sealed_new_axes/sealed_results.json`). The 171 and 173 H1 (worst decile vs front-loaded)
+   failed as shown in section 1. These are different tests. Script 170 was designed after the 169 failure
+   (`START_HERE.md`, script-170 entry), so its pass is not an independent confirmation. Section 5, item 2
+   lists only 171 and 173.
+2. [V] One tuning draw (seed 20261121, n 300, noise keys 1121001 and 1121002) is recorded in the protocols of
+   167, 169, 171 and 173. The tuning values for the 167 wide arm and the 171 arm are identical (700.503...),
+   and the 171 and 173 tuning values for the chosen arm are identical (699.417...). So 171 and 173 are
+   sequential looks at one arm (4 forced courses, then wide-prior containment, p* 0.05, horizon 2), as
+   section 1 says. They are not independent replications.
+3. [A] The 167 primary arm is narrow-prior containment (p* 0.05, horizon 2). In script 168 that narrow arm
+   lost to the comparator when the drug was weaker than its prior: weak_drug_mod -59.3, weak_drug_sev -81.7
+   (-98.1 to -65.5), combo_fast_weak -19.8 (`output/trackc_sealed_wrong_models/sealed_results.json`;
+   `START_HERE.md`, script-168 entry). The "no harm" statement for 168 applies to the wide arm only. The
+   171 and 173 hybrid uses the wide prior and was not an arm in 168, so its weak-drug behaviour is untested.
+4. [A] Holiday direction (section 2): forced holidays gave a higher mean in 8 of 9 cells and a lower (worse)
+   CVaR10 in 7 of 9 cells. The phrase "cut the worst-10% CVaR" in `paper/trackc_mechanism_review.md` meant
+   "lowered the score" (reworded there). Script 176 gave the same direction in all three suites.
+5. [V] CVaR10 of scenario means is biased low for feedback rules at few noise repeats. In the 167
+   per-scenario file (400 scenarios, 4 repeats), wide containment gives 171.1, 174.5 and 176.0 at 1, 2 and 4
+   repeats; raw single 121.1, 125.5 and 132.6; front-loaded 182.2 at every count, because it ignores
+   readings (open loop, identical repeats). Scripts 171 and 173 used 2 repeats (`protocol.n_rep = 2`). The
+   tail cost they report (1.6 to 4.2 d) is the same size as this bias, so the H1 contrast is not a clean
+   estimate of tail harm. The H1 results stay recorded as FAILED.
+   Source: `output/trackc_sealed_containment/sealed_ttp_by_scenario_replicate.csv`.
+6. [V] Paired view (same file, wide containment minus front-loaded, scenario means over 4 repeats): lower in
+   21.0% of scenarios; mean of the worst 10% of paired differences -42.1 d; mean difference +34.2 d.
+7. [V] Share of scenarios with no progression by the 1,456 d horizon (same file): 5.9% narrow containment,
+   6.1% wide, 3.4% raw single, 2.2% front-loaded. The mean-TTP contrast is a restricted-mean contrast and
+   includes this difference.
+8. [V] The comparator `raw 0.6` is the lowest value on its tuning grid (0.6 to 1.18): tuning mean TTP 683.1
+   at 0.6 and 682.1 at 0.7 (`output/trackc_sealed_containment/frozen_protocol.json`). The optimum may lie at
+   or below 0.6. The curve is flat near the edge, so the shift is probably small. This is untested.
+9. [V] The oracle docstring called the oracle an "upper reference" and also said its schedules are
+   achievable, a lower bound on the optimum. Corrected on 2026-11-03 in `src/trackc_oracle.py`. The headroom
+   numbers (mean 83.5 d; tail 3.4 d, CI 1.26 to 6.93 [A], `output/trackc_headroom/headroom_results.json`) are
+   lower bounds on the possible gain, not upper bounds.
+10. [V] Per-scenario outcome files exist only for script 167. Scripts 168, 169, 170, 171 and 173 saved summary
+    JSON and logs only, so their bootstrap CIs cannot be rebuilt from saved data.
+11. [V] The filter rules receive the true per-scenario noise sd (`src/trackc_sim.py` line 14: "sigma known to
+    the filter"; `ParticleFilter` is built from `scen["sigma"]` at lines 340 and 375) and, for narrow-prior
+    arms, a prior equal to the generator's ranges (line 42). The raw rules receive neither. Nominal sealed
+    suites are the best case for the filter rules.
+12. [V] Solver mode: the default is `EVENT_MODE = "refine"` (`src/trackc_sim.py` lines 91 to 95) and the 167
+    protocol records `"event_mode": "refine"`. Scripts 150 to 158 used "grid" [A] (`START_HERE.md`,
+    script-159 entry). The change is not stated in section 1.
+13. [V] Commit pins: the commits named in `START_HERE.md` (8762ff0, f2d16bf, 313017f) are freeze and result
+    commits. The `git_commit_at_run` field in each JSON is the HEAD at run time (for example d55dcb2,
+    60234ab, 2f7c373). They are different commits, not a conflict.
+14. [V] Scale: the 167 per-scenario arm means run from 596.0 to 701.9 d. The model uses 28 d scan spacing, 12
+    courses, a 1,456 d horizon and progression at 1.2 times the start burden (`src/trackc_sim.py` lines 31
+    to 36). Real median progression-free survival is about 7 months (not yet verified; Stage 1 target).
+15. [V] Superseded (banner added 2026-11-03): `Claude outputs/trackC_results_report_claude.md` (2026-10-25,
+    "first positive result", scripts 150 to 156, no sealed results; the file is untracked) and
+    `paper/research_plan_trackC_draft.md` (a draft that reports 169 and 170).
+16. [V] Seed registry (`src/trackc_seed_registry.py`, `output/trackc_seed_registry.json`). Script 176 says its
+    seeds were "unused before". That holds for its scenario seeds (20262100 and up). Its noise keys
+    `1_300_000 + 10k + rep` for k = 0 to 2 equal the keys sealed script 169 used for k = 0 to 2, on
+    different scenarios. No sealed outcome depends on this, and no result changed. Seeds 20261800 to
+    20262099 (dev) and 20262300 to 20262499 (sealed) were unused by any Track C script on 2026-11-03 and are
+    reserved in the registry for the restart plan.

@@ -1,6 +1,6 @@
 # Research Plan Draft — Track C: Robust Belief-Based Dose Timing in a Simulated GBM Model
 
-Status: DRAFT (2026-10-27, Claude; results of scripts 169-170 added 2026-10-28). Track C only. This file does not replace `paper/research_plan_complete_project_form.md`; the Track C section there is the earlier plan and is superseded only if the author accepts this draft. Every number below cites an output file. All results are computer simulation with assumed parameters. Nothing here is a patient, drug, or clinical result.
+Status: DRAFT (2026-10-27, Claude; results of scripts 169-170 added 2026-10-28). **SUPERSEDED for planning on 2026-11-03 by `paper/trackc_restart_plan_2026-11-03.md`; the results listed here stay as recorded, and must be read with the corrections in section 6 of `paper/trackc_final_status_2026-10-31.md`.** Track C only. This file does not replace `paper/research_plan_complete_project_form.md`; the Track C section there is the earlier plan and is superseded only if the author accepts this draft. Every number below cites an output file. All results are computer simulation with assumed parameters. Nothing here is a patient, drug, or clinical result.
 
 ## Rationale
 
