@@ -44,6 +44,18 @@ RANGES = {"r": (0.001, 0.05, "log"), "m": (6.0, 20.0, "log"), "f0": (0.001, 0.1,
 SIGMAS = (0.05, 0.10, 0.20)
 RANGES_WIDE_M = dict(RANGES, m=(3.0, 20.0, "log"))     # filter prior that can hold a weak drug
 
+# Stage 2 options (2026-11-04). All are off by default, so earlier outputs reproduce exactly.
+#   scen["scan_every"] (int array): the reading at cycle j is visible only if j % scan_every == 0;
+#       other cycles give NaN, which every policy already treats as a known missing scan (script 170).
+#   simulate(..., endpoint="rano"): progression is a RANO-like rule instead of 1.2 x baseline. At a scan
+#       cycle j > 0 the TRUE burden is at least RANO_FACTOR x max(nadir, RANO_FLOOR x baseline), where nadir
+#       is the smallest true burden at earlier scans (baseline included). Detected at the scan time j * 28.
+#       RANO_FACTOR 1.4 is the volume equivalent of +25% in the product of perpendicular diameters (the
+#       mRANO volumetric threshold is 40%). RANO_FLOOR stands in for the minimum measurable lesion size and
+#       is an ASSUMED fraction of baseline, not a measurement.
+RANO_FACTOR = 1.4
+RANO_FLOOR = 0.1
+
 
 # ---------------------------------------------------------------- scenarios
 def draw_scenarios(n, seed, ranges=RANGES, sigmas=SIGMAS, a_sr=1.0, a_rs=1.0):
@@ -416,9 +428,20 @@ class HolidayContainment(RiskContainment):
 
 
 # ---------------------------------------------------------------- episode
-def simulate(scen, policy, seed, track_fr=False):
+def simulate(scen, policy, seed, track_fr=False, endpoint="baseline", budget=None):
     """Run one noise replicate of every scenario under `policy` (shared course budget).
-    Returns capped TTP (days), courses used, and optional filter coverage records."""
+    Returns capped TTP (days), courses used, and optional filter coverage records.
+    endpoint "baseline": progression when true burden reaches prog_factor x baseline (default).
+    endpoint "rano": the RANO-like nadir rule at scan cycles (see RANO_FACTOR above).
+    budget: course budget (default BUDGET = 12).
+    scen["dose"] (float array, default 1): multiplies the drug term of the TRUE dynamics on treated
+    cycles. Policies and filters are not told, so use it only with policies that ignore readings."""
+    if endpoint not in ("baseline", "rano"):
+        raise ValueError(f"unknown endpoint {endpoint!r}")
+    rano = endpoint == "rano"
+    cap = BUDGET if budget is None else int(budget)
+    dose = scen.get("dose")
+    scan_every = scen.get("scan_every")
     rng = np.random.default_rng(seed)
     N = len(scen["r"])
     # wrong-model suites (script 155) may set: sigma_true (actual noise sd; policies still get
@@ -455,6 +478,15 @@ def simulate(scen, policy, seed, track_fr=False):
     policy.reset(scen, rng)
     y_prev = None
     for j in range(N_CYCLES):
+        scan = np.ones(N, bool) if scan_every is None else (j % scan_every == 0)
+        if rano:
+            B_true = S + R
+            if j == 0:
+                base0, nadir = B_true.copy(), B_true.copy()
+            else:
+                hit = scan & np.isnan(ttp) & (B_true >= RANO_FACTOR * np.maximum(nadir, RANO_FLOOR * base0))
+                ttp[hit] = j * CYCLE_DAYS
+                nadir = np.where(scan, np.minimum(nadir, B_true), nadir)
         B = S + R
         for d in delays:
             B = np.where(scen["delay"] == d, past[d], B)
@@ -466,7 +498,9 @@ def simulate(scen, policy, seed, track_fr=False):
                     q = np.where(S + R >= scen["B0"], scen["miss_p_hi"], q)
                 y = np.where(u_miss[:, j] < q, np.nan if "miss_visible" in scen else y_prev, y)
             y_prev = y
-        treat = policy.act(j, y) & (used < BUDGET)
+        if scan_every is not None:
+            y = np.where(scan, y, np.nan)       # not a scan cycle: the controller is told the reading is missing
+        treat = policy.act(j, y) & (used < cap)
         if track_fr and policy.uses_filter:
             lo, hi = policy.pf.fr_interval()
             fr_true = R / (S + R)
@@ -476,7 +510,8 @@ def simulate(scen, policy, seed, track_fr=False):
         treat = treat & np.isnan(ttp)           # nothing is given after progression
         used += treat
         snaps = {CYCLE_DAYS - d: None for d in delays} if delays else None
-        S, R = run_cycle(S, R, p, treat, j * CYCLE_DAYS, prog_level=level, ttp=ttp, snaps=snaps)
+        S, R = run_cycle(S, R, p, treat if dose is None else treat * dose, j * CYCLE_DAYS,
+                         prog_level=None if rano else level, ttp=ttp, snaps=snaps)
         for d in delays:
             past[d] = sum(snaps[CYCLE_DAYS - d])
         if "drift" in scen:
