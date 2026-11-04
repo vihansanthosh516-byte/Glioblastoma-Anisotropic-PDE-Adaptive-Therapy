@@ -53,7 +53,8 @@ def test_check_free_refuses_spent_and_dev_seeds():
     # Stage 2 dev seeds already spent (190, 192, 193, 194, 198): refused with or without the stage2_dev purpose
     for scen, noise in (((20261800, 20261800), (1800001, 1800016)), ((20261801, 20261802), (1810000, 1810000)),
                         ((20261803, 20261803), (1820000, 1820000)), ((20261804, 20261805), (1830000, 1830000)),
-                        ((20261806, 20261806), (1840000, 1840000)), ((20261810, 20261811), (1850000, 1850000))):
+                        ((20261806, 20261806), (1840000, 1840000)), ((20261810, 20261811), (1850000, 1850000)),
+                        ((20261820, 20261821), (1890000, 1890000))):
         assert reg.check_free(scenario=scen)
         assert reg.check_free(noise=noise)
         assert reg.check_free(scenario=scen, noise=noise, purpose="stage2_dev")
