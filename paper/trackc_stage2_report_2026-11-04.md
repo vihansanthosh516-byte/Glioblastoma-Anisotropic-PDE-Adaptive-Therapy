@@ -49,7 +49,28 @@ Files: `output/trackc_stage2_D_negative_controls/{manifest.json,controls.csv,con
 
 ## Test E (script 194): policy contrasts across the controlled worlds
 
-Status: running at the time of writing; no number exists yet.
+**INTERIM** (development seeds, one run, simple rules only). Files: `output/trackc_stage2_E_regime_map/{manifest.json,arms_by_world.csv,results.json}`. Read back on 2026-11-04: 3,276 rows (39 worlds x 2 endpoints x 21 arms x 2 horizons), no NaN or infinite values, every (world, endpoint, arm, horizon) key unique, the reference arm differs from itself by exactly 0. Runtime 2,785 s.
+
+- **Asked.** In the 39 controlled worlds (they match the published standard arm and both negative controls), how much can any dosing rule gain over the standard six courses, and which world axis decides it? Score: restricted mean time to progression up to 730 days, paired against the standard arm on the same simulated patients.
+- **Did it work.** Yes, the run is complete. Median over the 39 worlds of the paired difference to the standard arm, RANO-like endpoint, 730 days (`results.json`, `endpoints.3b_rano.730`; days, with the range over worlds and the mean number of courses):
+  - give all 12 courses at once (`front12`, also the best fixed schedule): +14.9 d (+7 to +27), 7.6 courses; the on/off rules on the raw reading (`raw_0.6_0.6`, `raw_zhang_1.0_0.5`): +14.8 d, 7.6 courses.
+  - rules that read the scans and hold the drug (`nadir_k6_on1.25`, `nadir_k3_on1.15`, `nadir_k3_on1.25`): +11.0, +8.7 and +4.1 d with 7.1, 6.8 and 6.1 courses. None beats `front12` in time.
+  - a controller that knows each patient's parameters (`informed_family_max`, the best of 56 schedules per patient): +15.9 d (+7 to +28) with 2.7 courses. It gains about 1 day more than `front12` in time and uses about a third of the drug.
+  - fewer courses lose time: `front3` -13.0 d, `paced3` -13.1 d, `paced2` -0.8 d, `front9` +8.8 d.
+  - cost view (an assumed cost per course of 5, 10 and 20 days of restricted time): the informed controller keeps +15.6 d (2.7 courses), +9.2 d (2.1 courses) and -6.3 d (0.7 courses). The best fixed schedule at 10 and 20 days per course is to give no drug (0.0 courses; -26.1 and -32.9 d), which shows how weak the drug is in these worlds: `front12` buys about 14.9 d for about 2.6 more courses than the standard arm, roughly 6 d per added course.
+  - old endpoint (true burden reaches 1.2 x baseline, `3a_baseline`): the same order. `front12`, the raw rules and the best fixed schedule +9.5 d, the informed controller +9.8 d, `nadir_k6_on1.25` +4.0 d, `nadir_k3_on1.15` +0.4 d.
+  - what decides the gain of `front12`/best fixed (RANO, 730 d; Spearman with the per-world difference, 39 worlds, descriptive): log r shift +0.41, log kill scale +0.39, log f0 shift -0.33, nu +0.25, B0 +0.16, c -0.10, mu -0.02; standardised linear fit R-squared 0.54. Under the old endpoint the kill scale dominates (+0.55; r +0.07).
+  - the share of simulated patients on whom an arm beats the informed family maximum is 0 in the median world for all arms; the largest share in any world is 0.9% (`nadir_k3_on1.15`, RANO) and 3.7% (`nadir_k3_on1.15`, old endpoint), so the family of 56 schedules is close to, but not exactly, exhaustive.
+- **What it shows (simulation, exploratory, interim).** In worlds that reproduce the published standard arm and both negative controls, the best simple rule is to give the most drug at once. The rules tried that read scans and hold the drug did not beat it in time. The only gain left for a feedback rule is saving drug, and the controller that achieves it here needs each patient's parameters, which no rule in this test has. This agrees with Test B (front-loading is optimal unless crowding, cost of resistance or switching matter) and with the weak kill that Test C forced.
+- **Weakest points.**
+  1. The 39 worlds have weak kill by construction (Test C), and the single-population family was the only one run. The planned mixture family may change the picture; this result is conditional on the family.
+  2. Only simple rules were run. The particle-filter rules of scripts 154 to 173 were not, so nothing here says they would fail.
+  3. The informed arm and the best fixed arm are maxima over a family of 56 schedules, a lower bound of the true optimum (a few patients beat the family, see above). The informed arm uses knowledge of the patient's parameters and is not a realisable rule.
+  4. The two endpoints order some rules differently (`nadir_k3_on1.15`: +8.7 d under RANO, +0.4 d under the old rule). The RANO-like rule is an assumed translation and uses the true burden without measurement error.
+  5. The cost per course (2 to 20 days) is an assumed grid, not a measurement. Toxicity, drop-out and death before progression are not modelled, and front-loading 12 courses would meet real limits that the model does not have.
+  6. Each world has 1,000 evaluation patients; a per-world difference carries a sampling error of a few days. The Spearman values come from 39 worlds and are not corrected for multiple comparisons.
+  7. Nothing here is a clinical or patient-specific claim.
+- **Next.** Run the same chain on the mixture family (`--config mixture`, see `START_HERE.md`), the integration-step check (script 198) and the response-depth check (script 199), then re-read this section against the mixture result.
 
 ## Internal review of tests C and D (three read-only Haiku checks, 2026-11-04)
 
