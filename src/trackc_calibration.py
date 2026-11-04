@@ -124,11 +124,12 @@ CONFIGS = {
     "mixture": dict(family="mixture", suffix="_mixture", extra_variants=True, world_seed=20261820,
                     patient_seed=20261821, noise_c=1_890_000, d_seed=20261822, noise_d=1_890_100,
                     e_eval_seed=20261823, e_sel_seed=20261824, noise_e=1_890_200, i_seed=20261825,
-                    noise_i=1_890_300, j_seed=20261826),
+                    noise_i=1_890_300, j_seed=20261826, k_seed=20261827, noise_k=1_890_400),
 }
 STAGE_DIRS = {"C": "trackc_stage2_C_calibration", "D": "trackc_stage2_D_negative_controls",
               "E": "trackc_stage2_E_regime_map", "I": "trackc_stage2_I_numerics",
-              "J": "trackc_stage2_J_response_depth", "CD": "trackc_stage2_CD_analysis"}
+              "J": "trackc_stage2_J_response_depth", "CD": "trackc_stage2_CD_analysis",
+              "K": "trackc_stage2_K_stratified_anchor"}
 
 
 def get_config(name):
@@ -141,6 +142,37 @@ def get_config(name):
 def stage_dir(stage, cfg, smoke=False):
     """Output folder of one stage ('C', 'D', 'E', 'I', 'J', 'CD') for one configuration."""
     return PROJECT_ROOT / "output" / (STAGE_DIRS[stage] + cfg["suffix"] + ("_smoke" if smoke else ""))
+
+
+# ---------------------------------------------------------------- stratified anchor (mixture family only)
+# RTOG 0525, both arms pooled, PFS from random assignment (Gilbert 2013, PMC3816958; page opened 2026-11-04):
+# tumours with a methylated MGMT promoter 8.7 months (95% CI 6.6 to 11.2), unmethylated 5.7 months (5.1 to 6.1);
+# 245 methylated and 517 unmethylated tumours among the 762 patients with a result. Script 201 asks whether a mixture
+# world gives these stratified medians when its responders are mapped to the methylated tumours. That mapping is an
+# ASSUMPTION of the check; no published data say that MGMT status is the response class of this model.
+MGMT_UNMETHYLATED_PFS_DAYS = (5.1 * DAYS_PER_MONTH, 6.1 * DAYS_PER_MONTH)
+MGMT_METHYLATED_PFS_DAYS = (6.6 * DAYS_PER_MONTH, 11.2 * DAYS_PER_MONTH)
+MGMT_COUNTS = (245, 762)                                              # methylated, with a result
+
+
+def wilson_interval(k, n, z=1.959964):
+    """Wilson score interval for a proportion k / n."""
+    p = k / n
+    den = 1.0 + z * z / n
+    centre = (p + z * z / (2 * n)) / den
+    half = z * np.sqrt(p * (1 - p) / n + z * z / (4 * n * n)) / den
+    return float(centre - half), float(centre + half)
+
+
+MGMT_METHYLATED_FRACTION_CI = wilson_interval(*MGMT_COUNTS)
+
+
+def responder_mask(scen, w):
+    """True for the patients of a mixture world that were drawn from the responder range (m in 6 to 20).
+    The non-responder range tops out at 20 * exp(log_m_scale_non), which is below 6 on the axis (scale below 0.3)."""
+    if "q" not in w:
+        raise ValueError("responder_mask needs a mixture world (a world with a responder fraction q)")
+    return scen["m"] > tc.RANGES["m"][1] * np.exp(w["log_m_scale_non"]) * (1.0 + 1e-12)
 
 
 # ---------------------------------------------------------------- arms
