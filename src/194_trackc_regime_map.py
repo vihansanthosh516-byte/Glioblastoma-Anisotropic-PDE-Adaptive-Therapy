@@ -15,6 +15,10 @@ Arms (all scan every 84 days; rules that read scans see one noisy reading per sc
     raw_zhang_1.0_0.5, raw_0.6_0.6   on/off rules on the raw reading against the first reading
     nadir_k3_on1.25, nadir_k3_on1.15, nadir_k6_on1.25   induction courses, then treat while the scan shows the burden
                           at least a_on times the smallest earlier reading (src/trackc_policies.py)
+    resp_k3_th0.5, resp_k3_th0.75, resp_k3_th1.0, resp_k6_th0.75   response-guided stopping (added 2026-11-04; the grid
+                          was fixed before any result with these arms): induction courses, then keep treating only
+                          while every scan shows at most theta x the first reading; the first failure stops the drug
+                          for good. The first run of this script (config single) did not have these four arms.
     best_fixed            the best open-loop schedule of a family of 56, chosen on separate patients
     informed_family_max   per patient, the best schedule of that family (a controller that knows the patient's
                           parameters; a family maximum, not a proven optimum, and chosen for 730-day restricted time;
@@ -86,6 +90,7 @@ WEAKEST = [
     "best_fixed and informed_family_max come from a family of 56 schedules; the maximum over a family is a lower bound on the true optimum",
     "the two endpoints disagree in places; 3b rests on an assumed translation of the RANO rule (factor 1.4, floor 0.1 x baseline) and uses the true burden without measurement error",
     "each world has 1,000 evaluation patients, so a per-world difference carries a sampling error of a few days",
+    "the response-guided arms are one small family of futility-stopping rules (two induction lengths, three thresholds, fixed before their results were seen); they are not the best possible response-adaptive rule, and the readings carry the assumed noise",
     "nothing here is a clinical or patient-specific claim",
 ]
 AXES = list(cal.WORLD_KEYS)                # default world columns ('single' family); other families pass their own

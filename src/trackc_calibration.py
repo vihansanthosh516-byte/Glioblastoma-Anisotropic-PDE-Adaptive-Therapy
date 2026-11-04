@@ -147,7 +147,7 @@ CONFIGS = {
 STAGE_DIRS = {"C": "trackc_stage2_C_calibration", "D": "trackc_stage2_D_negative_controls",
               "E": "trackc_stage2_E_regime_map", "I": "trackc_stage2_I_numerics",
               "J": "trackc_stage2_J_response_depth", "CD": "trackc_stage2_CD_analysis",
-              "K": "trackc_stage2_K_stratified_anchor"}
+              "K": "trackc_stage2_K_stratified_anchor", "F": "trackc_stage2_E_frontier"}
 
 
 def get_config(name):
@@ -167,7 +167,7 @@ def exposure_protocol(cfg, always=False):
 
 
 def stage_dir(stage, cfg, smoke=False):
-    """Output folder of one stage ('C', 'D', 'E', 'I', 'J', 'CD') for one configuration."""
+    """Output folder of one stage ('C', 'D', 'E', 'I', 'J', 'K', 'CD', 'F') for one configuration."""
     return PROJECT_ROOT / "output" / (STAGE_DIRS[stage] + cfg["suffix"] + ("_smoke" if smoke else ""))
 
 

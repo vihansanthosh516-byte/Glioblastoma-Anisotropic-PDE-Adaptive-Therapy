@@ -4,7 +4,7 @@
                           schedule and for the informed upper bound
     rmst, paired_stats    restricted mean time and paired differences between two arms on the same patients
     evaluate_schedules    outcome of every candidate schedule on every patient (open loop, so no noise)
-    policy_arms           the named rules compared in test E
+    policy_arms           the named rules compared in test E (fixed schedules, scan-reading rules, response-guided stopping)
 """
 from __future__ import annotations
 
@@ -82,6 +82,12 @@ def policy_arms():
         "nadir_k3_on1.25": (lambda: pol.NadirContainment(3, 1.25, 1.0), 12),
         "nadir_k3_on1.15": (lambda: pol.NadirContainment(3, 1.15, 1.0), 12),
         "nadir_k6_on1.25": (lambda: pol.NadirContainment(6, 1.25, 1.0), 12),
+        # response-guided stopping (added 2026-11-04, grid fixed before any result with these arms): induction courses,
+        # then continue only while every scan shows at most theta x the first reading; the first failure stops for good
+        "resp_k3_th0.5": (lambda: pol.ResponseGuided(3, 0.5), 12),
+        "resp_k3_th0.75": (lambda: pol.ResponseGuided(3, 0.75), 12),
+        "resp_k3_th1.0": (lambda: pol.ResponseGuided(3, 1.0), 12),
+        "resp_k6_th0.75": (lambda: pol.ResponseGuided(6, 0.75), 12),
     }
 
 

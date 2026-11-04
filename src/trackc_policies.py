@@ -7,6 +7,9 @@ and a class attribute uses_filter. NaN in y means no scan this cycle; every rule
     NadirContainment  induction courses, then treat while the scan shows the burden at least a_on times the smallest
                       earlier scan, and stop once it is back to a_off times that value or lower. The nadir is the
                       smallest noisy reading so far, so it is biased low and the rule fires early when readings are noisy.
+    ResponseGuided    induction courses, then keep treating only while every scan since the induction shows a burden of
+                      at most theta times the first scan; the first scan above that stops the drug for good (futility
+                      stopping). Both readings are noisy, so a patient near the line can be misclassified.
 """
 from __future__ import annotations
 
@@ -55,6 +58,38 @@ class NadirContainment:
         new_on = np.where(self.on, gap > self.log_off, gap >= self.log_on)
         self.on = np.where(seen, new_on, self.on)
         out = self.on.copy()
+        if j < self.induction:
+            out[:] = True
+        return out
+
+    def advance(self, j, treat):
+        pass
+
+
+class ResponseGuided:
+    """Futility stopping on the first scan: `induction` courses for everyone, then treat only while every scan taken
+    since the induction shows a (noisy) burden of at most `theta` times the first reading. Once a scan shows more, the
+    drug is stopped for good. Between scans the last decision stands (NaN in y means no scan this cycle)."""
+    uses_filter = False
+
+    def __init__(self, induction, theta):
+        if theta <= 0:
+            raise ValueError("theta must be positive")
+        self.induction, self.log_theta = int(induction), float(np.log(theta))
+
+    def reset(self, scen, rng):
+        self.base, self.go = None, None
+
+    def act(self, j, y):
+        seen = ~np.isnan(y)
+        if j == 0 or self.base is None:
+            self.base = np.where(seen, y, np.nan)
+            self.go = np.ones(y.shape, bool)
+        elif j >= self.induction:
+            # a patient with no usable first reading keeps going (nothing to compare with)
+            good = np.isnan(self.base) | ((y - self.base) <= self.log_theta)
+            self.go = np.where(seen, self.go & good, self.go)
+        out = self.go.copy()
         if j < self.induction:
             out[:] = True
         return out
