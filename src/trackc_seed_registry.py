@@ -151,6 +151,14 @@ ENTRIES = [
                 "LHS seed 20261820, patients seed [20261821, world index], noise key [1_890_000, chunk]. Later runs of "
                 "this config use 20261822 (193) with noise 1_890_100, 20261823-20261824 (194) with noise 1_890_200, "
                 "20261825 (198) with noise 1_890_300 and 20261826 (199); not yet spent."),
+    _entry("193", "Stage 2D negative controls of the single_rep replicate", "dev_used", [(20261812, 20261812)],
+           [(1860000, 1860000)], [("output/trackc_stage2_D_negative_controls_rep/results.json", "20261812")],
+           note="Dev run 2026-11-04. Fresh patients for the worlds kept by the single_rep calibration: seed "
+                "[20261812, world index], noise key [1_860_000, world index]; the open-loop arms ignore readings."),
+    _entry("193", "Stage 2D negative controls of the mixture family", "dev_used", [(20261822, 20261822)],
+           [(1890100, 1890100)], [("output/trackc_stage2_D_negative_controls_mixture/results.json", "20261822")],
+           note="Dev run 2026-11-04. Fresh patients for the worlds kept by the mixture calibration: seed "
+                "[20261822, world index], noise key [1_890_100, world index]; the open-loop arms ignore readings."),
 ]
 ENTRIES.append(_reserved_stage2_dev(ENTRIES))
 ENTRIES.append(_entry("restart", "Stage 3 sealed run (restart plan)", "reserved", [(20262300, 20262499)],
