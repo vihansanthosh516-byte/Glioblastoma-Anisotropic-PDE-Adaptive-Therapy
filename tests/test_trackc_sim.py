@@ -114,9 +114,10 @@ def test_budget_never_exceeded(spec):
 
 
 def test_paced_uses_twelve_courses_when_no_progression():
-    scen = tc.draw_scenarios(50, seed=7)
+    scen = tc.draw_scenarios(200, seed=7)
     out = tc.simulate(scen, tc.Periodic(4), seed=8)
     capped = out["capped"]
+    assert capped.any(), "the next check is empty unless some scenario never progresses"
     assert (out["courses"][capped] == tc.BUDGET).all()
 
 
@@ -142,8 +143,10 @@ def test_filter_tracks_burden_and_resamples():
     assert pol.pf.n_resample > 0
     hits, total = out["fr_cover"]
     assert total > 0 and 0.0 <= hits / total <= 1.0
-    # one more reading: posterior burden should sit near the truth on the log scale
-    assert np.isfinite(pol.pf.burden_mean()).all()
+    # the burden estimate must be finite and positive; closeness to the truth is tested in
+    # test_filter_posterior_concentrates_on_truth
+    burden = pol.pf.burden_mean()
+    assert np.isfinite(burden).all() and (burden > 0).all()
 
 
 def test_filter_posterior_concentrates_on_truth():
@@ -170,7 +173,10 @@ def test_risk_containment_waits_then_treats():
     lazy = tc.simulate(scen, tc.make_policy(("risk", 1.0, 1)), seed=14)
     assert lazy["courses"].sum() < out["courses"].sum()
     eager = tc.simulate(scen, tc.make_policy(("risk", 0.0, 1)), seed=14)
-    assert (eager["courses"] == np.minimum(tc.BUDGET, eager["courses"].max())).any()
+    # p_star = 0 fires every cycle: some scenario must use the whole budget, and it uses at least
+    # as many courses as the p_star = 0.1 rule in total
+    assert (eager["courses"] == tc.BUDGET).any()
+    assert eager["courses"].sum() >= out["courses"].sum()
 
 
 def test_weak_drug_guard_front_loads_weak_drugs():
@@ -323,7 +329,9 @@ def test_front_loaded_containment():
     assert np.array_equal(a["ttp"], b["ttp"]) and np.array_equal(a["courses"], b["courses"])
     out = tc.simulate(scen, tc.make_policy(("riskf", 1.01, 1, 3)), seed=35)   # risk rule never fires
     assert out["courses"].max() <= 3
-    assert (out["courses"][out["ttp"] > 3 * tc.CYCLE_DAYS] == 3).all()
+    survived = out["ttp"] > 3 * tc.CYCLE_DAYS
+    assert survived.any(), "the next check is empty unless a scenario outlives the forced front courses"
+    assert (out["courses"][survived] == 3).all()
 
 
 def test_state_linked_missing_scans():
@@ -341,6 +349,40 @@ def test_state_linked_missing_scans():
     # untreated burden only grows, so once a scan is lost every later scan is lost too
     lost = np.isnan(ys)
     assert (lost[1:] >= lost[:-1]).all()
+
+
+def test_switching_terms_conserve_burden():
+    # script 169/176 switching moves burden between S and R; it must not create or destroy any
+    scen = tc.draw_scenarios(40, seed=41)
+    S, R = (1 - scen["f0"]) * scen["B0"], scen["f0"] * scen["B0"]
+    switched = dict(scen, mu=np.full(40, 0.03), nu=np.full(40, 0.02))
+    for u in (1.0, 0.0):
+        dS0, dR0 = tc._deriv(S, R, scen, u)
+        dS1, dR1 = tc._deriv(S, R, switched, u)
+        assert np.allclose(dS1 + dR1, dS0 + dR0, rtol=0.0, atol=1e-14)
+    # direction: on drug mu moves burden S -> R; off drug nu moves it R -> S
+    dS_on, dR_on = tc._deriv(S, R, switched, 1.0)
+    dS_on0, dR_on0 = tc._deriv(S, R, scen, 1.0)
+    assert (dR_on > dR_on0).all() and (dS_on < dS_on0).all()
+    dS_off, dR_off = tc._deriv(S, R, switched, 0.0)
+    dS_off0, dR_off0 = tc._deriv(S, R, scen, 0.0)
+    assert (dR_off < dR_off0).all() and (dS_off > dS_off0).all()
+
+
+def test_kill_term_matches_closed_form_harvest_logistic():
+    # one population (no resistant cells): S' = a S - r S^2 with a = r - k u is a Bernoulli equation
+    # with an exact solution, so the kill term (k = m r) has an independent check
+    r, m, B0 = 0.03, 6.0, 0.2
+    p = one(r=r, m=m, f0=0.0, B0=B0)
+
+    def bernoulli(S0, a, t):
+        e = np.exp(a * t)
+        return a * S0 * e / (a + r * S0 * (e - 1.0))
+
+    S, R = tc.run_cycle(p["B0"].copy(), np.zeros(1), p, np.ones(1), 0.0)
+    on = bernoulli(B0, r * (1.0 - m), tc.COURSE_DAYS)          # drug on for the course
+    exact = bernoulli(on, r, tc.CYCLE_DAYS - tc.COURSE_DAYS)   # drug off for the rest of the cycle
+    assert R[0] == 0.0 and abs(S[0] - exact) < 1e-7
 
 
 def test_reversion_nu_zero_matches_absent_and_reduces_resistance():
