@@ -4,7 +4,7 @@
 
 The user reports that Duke granted download access. The exact accepted license and written grant are not saved in the project. Keep access and derived-output rights open until those terms are recorded.
 
-The local `C:\Users\vihan\DATASET_FINAL.zip` was 66,347,008 bytes at the latest check and is growing. The Zenodo record API snapshot in `C:\Users\vihan\Downloads\20548528.json` lists one `DATASET_FINAL.zip` file, size 17,043,569,844 bytes, MD5 `99580fb8ccb3daed186dc6afe5b5bf2f`. The download is incomplete. No archive member has been opened. No MRI, mask, landmark, or patient-label voxel data has been read. No patient scoring has occurred.
+The local `C:\Users\vihan\DATASET_FINAL.zip` was 76,144,640 bytes at the latest check and is growing. The Zenodo record API snapshot in `C:\Users\vihan\Downloads\20548528.json` lists one `DATASET_FINAL.zip` file, size 17,043,569,844 bytes, MD5 `99580fb8ccb3daed186dc6afe5b5bf2f`. The download is incomplete. No archive member has been opened. No MRI, mask, landmark, or patient-label voxel data has been read. No patient scoring has occurred.
 
 The user authorized metadata-only inventory: archive filenames, anonymized patient/session identifiers, scan counts and dates, treatment/IDH metadata. This scope excludes MRI, mask, and landmark-coordinate contents.
 
