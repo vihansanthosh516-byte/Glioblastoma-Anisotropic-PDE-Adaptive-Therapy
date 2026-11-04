@@ -140,6 +140,11 @@ ENTRIES = [
     _entry("199", "Stage 2J response-depth check on the controlled worlds", "dev_used", [(20261807, 20261807)], [],
            [("output/trackc_stage2_J_response_depth/results.json", "20261807")],
            note="Dev run 2026-11-04. Patients seed [20261807, world index]; open loop, no noise key."),
+    _entry("192", "Stage 2C calibration, fresh-seed replicate (config single_rep)", "dev_used", [(20261810, 20261811)],
+           [(1850000, 1850000)], [("output/trackc_stage2_C_calibration_rep/results.json", "20261810")],
+           note="Dev run 2026-11-04. Same pipeline as 192 with fresh seeds: worlds LHS seed 20261810, patients seed "
+                "[20261811, world index], noise key [1_850_000, chunk]; adds the 3- and 4-course variants. "
+                "The matching negative controls (193) use 20261812 and noise key 1_860_000, not yet spent."),
 ]
 ENTRIES.append(_reserved_stage2_dev(ENTRIES))
 ENTRIES.append(_entry("restart", "Stage 3 sealed run (restart plan)", "reserved", [(20262300, 20262499)],
