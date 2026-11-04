@@ -1,7 +1,9 @@
 # Track B Duke go/no-go packet (2026-11-02)
 
-**Verdict: NO-GO** for restricted Duke access and for any patient work now.
-Duke has not granted access. The school approval is not written down. Nothing in this packet is adopted. Nothing was downloaded, nobody was contacted, and no patient data was opened.
+> **Historical status note (2026-11-03):** The user now reports that Duke granted download access and started a local download. This supersedes only the access-status line below. The exact accepted terms are not saved, the archive is incomplete, and all eligibility, approval, protocol, QC, and scoring gates remain open. Metadata-only inventory is authorized after download completion; no MRI, mask, or landmark-coordinate contents are authorized by that scope. See [the current readiness note](track_b_duke_readiness_2026-11-03.md).
+
+**Historical verdict as of 2026-11-02: NO-GO** for restricted Duke access and for any patient work then.
+At that time, Duke access had not been confirmed in writing, school approval was not saved, nothing was adopted, and no dataset was downloaded or opened. The current access update appears above; remaining gates still block patient work.
 
 ## 1. Source and approval status
 

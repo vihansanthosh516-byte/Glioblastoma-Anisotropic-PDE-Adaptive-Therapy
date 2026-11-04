@@ -14,7 +14,7 @@ The claim is about prediction of source-provided labels. It is not a causal clai
 - The latest proposed narrow question is useful: at identical history-only volume draws, does PDE-based spatial ranking outperform a two-history non-PDE shape extrapolation? This tests two predictive systems; it does not isolate a causal PDE effect.
 - The primary target should be **next observed visit conditional on its realized interval** unless the cohort and visit schedule support a fixed, origin-known horizon. Call it retrospective horizon-conditioned evaluation, not a prospective fixed-day forecast.
 - The existing LUMIERE evidence is exploratory and exposed. The project previously used LUMIERE, and LUMIERE appears in [PREDICT-GBM](https://arxiv.org/html/2509.13360). Its automated labels, unresolved label-0 meaning, undocumented tool version, unresolved support/registration rules, and long runtime weaken the value of a large new patient run. Its public [Figshare record](https://springernature.figshare.com/articles/dataset/LUMIERE_dataset_-_MRI_data_and_automated_segmentations/21249516) also needs reconciliation with the project’s existing non-commercial/derived-output restrictions before any reuse or sharing.
-- Duke is the strongest structural match found so far: the [official record](https://zenodo.org/records/20548528) lists 61 patients and 3–18 sessions with masks. It is restricted and access has not been granted; triplet count, overlap, rights to derived outputs, school approval, and longitudinal registration QC remain unresolved. Treat Duke as **NO-GO now**, not as an available cohort.
+- Duke is the strongest structural match found so far: the [official record](https://zenodo.org/records/20548528) lists 61 patients and 3–18 sessions with masks. **Status update (2026-11-03):** the user reports that download access was granted and download started. At the latest local check, `C:\Users\vihan\DATASET_FINAL.zip` was 66,347,008 bytes, below the expected 17,043,569,844-byte archive size, and the file was growing. The public record still marks files restricted and describes two license paths, CC BY-NC-ND 4.0 or a custom Duke license; the accepted terms are not yet saved. The authors' [usage guide](https://github.com/deshanyang/GBM-DIR-QA) says visits are not registered to each other and relative dates may be offset by days. Triplet count, patient overlap, derived-output terms, school approval, and longitudinal MRI registration QC remain unresolved. The user authorized metadata-only local inventory after download completion; MRI, mask, and landmark-coordinate contents remain outside this scope. See [Duke readiness note](track_b_duke_readiness_2026-11-03.md). Duke remains **not ready for patient scoring**.
 - A separate public-record screen found no verified fresh, no-request cohort that passes the combined requirements for at least three masked visits, clear reuse terms, GBM eligibility, and project independence. [RHUH-GBM](https://www.cancerimagingarchive.net/collection/rhuh-gbm/) is structurally close but is already exposed through PREDICT-GBM. BraTS Longitudinal and WAW-Glioma remain unverified on access/terms, eligible GBM counts, longitudinal masks, or overlap. This was a bounded search, not proof that no such dataset exists.
 
 ## Recommended direction
@@ -96,10 +96,10 @@ It does not become independently confirmatory, clinically useful, causal, or hig
 
 - Current LUMIERE and Duke patient scoring: **blocked**.
 - Full LUMIERE four-analysis run: **not recommended**.
-- Duke: **conditional future path; access not granted**.
+- Duke: **conditional future path; access reportedly granted, exact accepted terms not recorded, local archive incomplete, metadata inventory prepared and pending**.
 - Fresh no-request cohort: **none verified in the bounded screen**.
 - Two-history proposal: **r3 draft, not adopted; selector, shared-volume helper, and typed failures are synthetic-only; no patient runner is wired**.
-- Patient voxel reads, external contact, data downloads, and scoring: **not performed or authorized by this plan**.
+- No project code initiated a download or external contact. The user reports a local download in progress. No archive member was opened, no patient voxel was read, and no scoring occurred. This plan does not authorize MRI/mask reads or patient scoring.
 
 ## Sources checked
 
