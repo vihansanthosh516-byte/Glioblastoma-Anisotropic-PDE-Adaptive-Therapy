@@ -101,9 +101,14 @@ ENTRIES = [
            [("output/trackc_stage2_D_negative_controls/results.json", "20261803")],
            note="Dev run 2026-11-04. Fresh patients for the worlds kept by script 192: seed [20261803, world index]; "
                 "noise key [1_820_000, world index]; the open-loop arms ignore readings."),
-    _entry("restart", "Stage 2 dev runs (restart plan)", "reserved", [(20261804, 20262099)],
-           [(1800000, 1800000), (1800017, 1809999), (1810001, 1819999), (1820001, 1899999)], purpose="stage2_dev",
-           note="Reserved 2026-11-03; shrinks as dev seeds are spent (190, 192, 193 so far). Dev runs only. Never a test."),
+    _entry("194", "Stage 2E regime map on the controlled worlds", "dev_used", [(20261804, 20261805)], [(1830000, 1830000)],
+           [("output/trackc_stage2_E_regime_map/results.json", "20261804")],
+           note="Dev run 2026-11-04. Evaluation patients seed [20261804, world index], selection patients seed "
+                "[20261805, world index], noise key [1_830_000, world index], the same key in every arm."),
+    _entry("restart", "Stage 2 dev runs (restart plan)", "reserved", [(20261806, 20262099)],
+           [(1800000, 1800000), (1800017, 1809999), (1810001, 1819999), (1820001, 1829999), (1830001, 1899999)],
+           purpose="stage2_dev",
+           note="Reserved 2026-11-03; shrinks as dev seeds are spent (190, 192, 193, 194 so far). Dev runs only. Never a test."),
     _entry("restart", "Stage 3 sealed run (restart plan)", "reserved", [(20262300, 20262499)],
            [(2300000, 2399999)], purpose="stage3_sealed",
            note="Reserved 2026-11-03. Spend only after the Stage 3 gate and the user's OK."),
