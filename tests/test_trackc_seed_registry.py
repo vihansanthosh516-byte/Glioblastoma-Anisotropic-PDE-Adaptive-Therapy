@@ -57,6 +57,8 @@ def test_check_free_refuses_spent_and_dev_seeds():
         assert reg.check_free(scenario=scen)
         assert reg.check_free(noise=noise)
         assert reg.check_free(scenario=scen, noise=noise, purpose="stage2_dev")
+    assert reg.check_free(scenario=(20261807, 20261807))                       # 199: open loop, no noise key
+    assert reg.check_free(scenario=(20261807, 20261807), purpose="stage2_dev")
 
 
 def test_check_free_accepts_reserved_block_only_for_its_purpose():

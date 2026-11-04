@@ -137,6 +137,9 @@ ENTRIES = [
            [(1840000, 1840000)], [("output/trackc_stage2_I_numerics/results.json", "20261806")],
            note="Dev run 2026-11-04. Patients seed [20261806, world index], noise key [1_840_000, world index]; "
                 "the open-loop arms ignore readings."),
+    _entry("199", "Stage 2J response-depth check on the controlled worlds", "dev_used", [(20261807, 20261807)], [],
+           [("output/trackc_stage2_J_response_depth/results.json", "20261807")],
+           note="Dev run 2026-11-04. Patients seed [20261807, world index]; open loop, no noise key."),
 ]
 ENTRIES.append(_reserved_stage2_dev(ENTRIES))
 ENTRIES.append(_entry("restart", "Stage 3 sealed run (restart plan)", "reserved", [(20262300, 20262499)],
