@@ -94,28 +94,28 @@ def test_build_manifest_checks_seeds_and_tree(tmp_path):
     files = ("src/trackc_sim.py", "src/run_demo.py")
     _make_repo(tmp_path, files)
     kw = dict(name="demo", protocol=PROTO, script="src/run_demo.py", paths=("src/trackc_sim.py",), root=tmp_path)
-    m = man.build_manifest(purpose="stage2_dev", scenario=(20261800, 20261849), noise=(1800000, 1800499), **kw)
+    m = man.build_manifest(purpose="stage2_dev", scenario=(20261900, 20261949), noise=(1850000, 1850499), **kw)
     assert m["git"]["clean"] is True and m["protocol_sha256"] and m["purpose"] == "stage2_dev"
     assert set(m["code_sha256"]) == {"src/trackc_sim.py", "src/run_demo.py"}
     assert m["label"].startswith("SIMULATION ONLY")
     # spent seeds are refused
     with pytest.raises(ValueError):
-        man.build_manifest(purpose="stage2_dev", scenario=(20261122, 20261122), noise=(1800000, 1800001), **kw)
+        man.build_manifest(purpose="stage2_dev", scenario=(20261122, 20261122), noise=(1850000, 1850001), **kw)
     # the sealed block cannot be spent under the dev purpose
     with pytest.raises(ValueError):
         man.build_manifest(purpose="stage2_dev", scenario=(20262300, 20262310), noise=(2300000, 2300010), **kw)
     # uncommitted code is refused unless asked otherwise
     (tmp_path / "src" / "run_demo.py").write_text("# edited\n", encoding="utf-8")
     with pytest.raises(RuntimeError):
-        man.build_manifest(purpose="stage2_dev", scenario=(20261800, 20261849), noise=(1800000, 1800499), **kw)
-    m2 = man.build_manifest(purpose="stage2_dev", scenario=(20261800, 20261849), noise=(1800000, 1800499),
+        man.build_manifest(purpose="stage2_dev", scenario=(20261900, 20261949), noise=(1850000, 1850499), **kw)
+    m2 = man.build_manifest(purpose="stage2_dev", scenario=(20261900, 20261949), noise=(1850000, 1850499),
                             require_clean=False, **kw)
     assert m2["git"]["clean"] is False and m2["git"]["dirty_paths"] == ["src/run_demo.py"]
 
 
 def test_build_manifest_refuses_missing_code(tmp_path):
     with pytest.raises((FileNotFoundError, RuntimeError)):
-        man.build_manifest("demo", PROTO, "stage2_dev", (20261800, 20261849), (1800000, 1800499),
+        man.build_manifest("demo", PROTO, "stage2_dev", (20261900, 20261949), (1850000, 1850499),
                            script="src/nope.py", require_clean=False, paths=("src/also_nope.py",), root=tmp_path)
 
 

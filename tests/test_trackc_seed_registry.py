@@ -50,18 +50,25 @@ def test_check_free_refuses_spent_and_dev_seeds():
     assert reg.check_free(noise=(1122001, 1122004))
     assert reg.check_free(scenario=(20262100, 20262100))          # 176 dev
     assert reg.check_free(scenario=(20262200, 20262200))          # 177 dev
+    # Stage 2 dev seeds already spent (190, 192): refused with or without the stage2_dev purpose
+    for scen, noise in (((20261800, 20261800), (1800001, 1800016)), ((20261801, 20261802), (1810000, 1810000))):
+        assert reg.check_free(scenario=scen)
+        assert reg.check_free(noise=noise)
+        assert reg.check_free(scenario=scen, noise=noise, purpose="stage2_dev")
 
 
 def test_check_free_accepts_reserved_block_only_for_its_purpose():
-    assert reg.check_free(scenario=(20261800, 20261899), noise=(1800000, 1800999),
+    assert reg.check_free(scenario=(20261900, 20261999), noise=(1850000, 1850999),
                           purpose="stage2_dev") == []
+    assert reg.check_free(scenario=(20261803, 20261803), noise=(1820000, 1820000),
+                          purpose="stage2_dev") == []                  # script 193 seeds, not yet spent
     # the dev block cannot be spent as a sealed block, and vice versa
-    assert reg.check_free(scenario=(20261800, 20261899), purpose="stage3_sealed")
+    assert reg.check_free(scenario=(20261900, 20261999), purpose="stage3_sealed")
     assert reg.check_free(scenario=(20262300, 20262399), purpose="stage2_dev")
     assert reg.check_free(scenario=(20262300, 20262399), noise=(2300000, 2300999),
                           purpose="stage3_sealed") == []
     # without a purpose a reserved block is not free
-    assert reg.check_free(scenario=(20261800, 20261899))
+    assert reg.check_free(scenario=(20261900, 20261999))
     # a request that spills out of the block is refused
     assert reg.check_free(scenario=(20262050, 20262150), purpose="stage2_dev")
     assert reg.check_free(scenario=(20261900, 20261800))          # low above high

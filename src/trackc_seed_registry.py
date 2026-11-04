@@ -15,6 +15,8 @@ Reserved on 2026-11-03 by paper/trackc_restart_plan_2026-11-03.md:
     stage2_dev     scenario 20261800-20262099, noise keys 1,800,000-1,899,999
     stage3_sealed  scenario 20262300-20262499, noise keys 2,300,000-2,399,999
                    (spend only after the Stage 3 gate and the user's OK)
+The stage2_dev block shrinks as seeds are spent: a dev_used entry is added after the run's manifest is written,
+and the reserved ranges below skip it, so a reserved block never touches a used seed.
 
 Run:  python src/trackc_seed_registry.py            check and print
       python src/trackc_seed_registry.py --write    also write output/trackc_seed_registry.json
@@ -28,7 +30,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 REGISTRY_PATH = ROOT / "output" / "trackc_seed_registry.json"
-DATE = "2026-11-03"
+DATE = "2026-11-04"
 
 
 def _entry(script, label, status, scen, noise, evidence=(), purpose=None, note=""):
@@ -88,9 +90,16 @@ ENTRIES = [
                 "k = 0-2, on different scenarios (20261300 + k)."),
     _entry("177", "dev plasticity sensitivity", "dev_used", [(20262200, 20262200)], [(1620000, 1620001)],
            [("output/trackc_dev_plasticity_sensitivity/dev_sensitivity_results.json", "20262200")]),
-    _entry("restart", "Stage 2 dev runs (restart plan)", "reserved", [(20261800, 20262099)],
-           [(1800000, 1899999)], purpose="stage2_dev",
-           note="Reserved 2026-11-03. Dev runs only. Never a test."),
+    _entry("190", "Stage 2A tail estimator", "dev_used", [(20261800, 20261800)], [(1800001, 1800016)],
+           [("output/trackc_stage2_A_tail_estimator/results.json", "20261800")],
+           note="Dev run started 2026-11-03. Noise key = [1_800_000 + replicate, chunk]."),
+    _entry("192", "Stage 2C calibration of the standard arm", "dev_used", [(20261801, 20261802)], [(1810000, 1810000)],
+           [("output/trackc_stage2_C_calibration/results.json", "20261801")],
+           note="Dev run 2026-11-04. Worlds: Latin hypercube seed 20261801. Patients: seed [20261802, world index]. "
+                "Noise key [1_810_000, chunk]; the open-loop arm ignores readings."),
+    _entry("restart", "Stage 2 dev runs (restart plan)", "reserved", [(20261803, 20262099)],
+           [(1800000, 1800000), (1800017, 1809999), (1810001, 1899999)], purpose="stage2_dev",
+           note="Reserved 2026-11-03; shrinks as dev seeds are spent (190, 192 so far). Dev runs only. Never a test."),
     _entry("restart", "Stage 3 sealed run (restart plan)", "reserved", [(20262300, 20262499)],
            [(2300000, 2399999)], purpose="stage3_sealed",
            note="Reserved 2026-11-03. Spend only after the Stage 3 gate and the user's OK."),
