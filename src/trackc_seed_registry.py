@@ -211,6 +211,33 @@ ENTRIES = [
            [(1892100, 1892100)], [("output/trackc_stage2_D_negative_controls_mixture_mix36/results.json", "20261842")],
            note="Dev run 2026-11-04. Fresh patients for the worlds kept by the mixture_mix calibration (mixed course cap): "
                 "seed [20261842, world index], noise key [1_892_100, world index]; the open-loop arms ignore readings."),
+    _entry("194", "Stage 2E regime map of the single_mix configuration", "dev_used", [(20261833, 20261834)], [(1891200, 1891200)],
+           [("output/trackc_stage2_E_regime_map_mix36/results.json", "20261833")],
+           note="Dev run 2026-11-04. Mixed course cap (63% of the patients allowed 3 courses, 37% allowed 6). Evaluation patients "
+                "seed [20261833, world index], selection patients seed [20261834, world index], noise key [1_891_200, world index], "
+                "the same key in every arm."),
+    _entry("194", "Stage 2E regime map of the mixture_mix configuration", "dev_used", [(20261843, 20261844)], [(1892200, 1892200)],
+           [("output/trackc_stage2_E_regime_map_mixture_mix36/results.json", "20261843")],
+           note="Dev run 2026-11-04. Mixed course cap. Evaluation patients seed [20261843, world index], selection patients seed "
+                "[20261844, world index], noise key [1_892_200, world index], the same key in every arm."),
+    _entry("198", "Stage 2I integration-step check of the single_mix configuration", "dev_used", [(20261835, 20261835)],
+           [(1891300, 1891300)], [("output/trackc_stage2_I_numerics_mix36/results.json", "20261835")],
+           note="Dev run 2026-11-04. Mixed course cap. Patients seed [20261835, world index], noise key [1_891_300, world index]; "
+                "the open-loop arms ignore readings."),
+    _entry("198", "Stage 2I integration-step check of the mixture_mix configuration", "dev_used", [(20261845, 20261845)],
+           [(1892300, 1892300)], [("output/trackc_stage2_I_numerics_mixture_mix36/results.json", "20261845")],
+           note="Dev run 2026-11-04. Mixed course cap. Patients seed [20261845, world index], noise key [1_892_300, world index]; "
+                "the open-loop arms ignore readings."),
+    _entry("199", "Stage 2J response-depth check of the single_mix configuration", "dev_used", [(20261836, 20261836)], [],
+           [("output/trackc_stage2_J_response_depth_mix36/results.json", "20261836")],
+           note="Dev run 2026-11-04. Mixed course cap. Patients seed [20261836, world index]; open loop, no noise key."),
+    _entry("199", "Stage 2J response-depth check of the mixture_mix configuration", "dev_used", [(20261846, 20261846)], [],
+           [("output/trackc_stage2_J_response_depth_mixture_mix36/results.json", "20261846")],
+           note="Dev run 2026-11-04. Mixed course cap. Patients seed [20261846, world index]; open loop, no noise key."),
+    _entry("201", "Stage 2K stratified MGMT anchor of the mixture_mix configuration", "dev_used", [(20261847, 20261847)],
+           [(1892400, 1892400)], [("output/trackc_stage2_K_stratified_anchor_mixture_mix36/results.json", "20261847")],
+           note="Dev run 2026-11-04. Mixed course cap. Fresh patients seed [20261847, world index], noise key [1_892_400, world "
+                "index]; the open-loop arms ignore readings."),
 ]
 ENTRIES.append(_reserved_stage2_dev(ENTRIES))
 ENTRIES.append(_entry("restart", "Stage 3 sealed run (restart plan)", "reserved", [(20262300, 20262499)],
