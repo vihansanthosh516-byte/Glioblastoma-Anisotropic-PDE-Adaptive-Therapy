@@ -1,8 +1,11 @@
 """
 Track C oracle with known parameters (Claude plan trackAC_new_results_plan_claude.md, result 1).
 ==============================================================================================
-SIMULATION ONLY. The oracle knows the true scenario parameters and state, so it is an
-upper reference, not a usable policy.
+SIMULATION ONLY. The oracle knows the true scenario parameters and state, so it is a
+known-parameter reference, not a usable policy. It is NOT a proven upper bound: its
+schedules are achievable, so its value is a lower bound on the true optimum (see below).
+[Label corrected 2026-11-03; older scripts and notes that call it an "upper reference"
+should be read this way.]
 
 The model in trackc_sim is autonomous (no time dependence), so one cycle maps (S, R) to the
 next (S, R) the same way at every cycle. Value iteration on a log-spaced (S, R) grid:
