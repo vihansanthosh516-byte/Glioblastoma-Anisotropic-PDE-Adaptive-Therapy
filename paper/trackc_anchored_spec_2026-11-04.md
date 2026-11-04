@@ -39,20 +39,22 @@ A "world" is one setting of the parameter ranges. Calibration means the standard
 1. Draw worlds by Latin hypercube over seven axes (`src/trackc_calibration.py`, all ranges assumed): a shift of the growth-rate range r (x0.5 to x2.5), a scale of the kill-to-growth range m (x0.05 to x1; kill strength is not anchored), a shift of the initial resistant fraction f0 (x0.5 to x10, capped at 0.9), the centre of the starting burden B0 (0.12 to 0.55, half width 0.10), the cost c (0 to 0.25), and the switching and reversion rates mu and nu (levels 0, 0.01, 0.04 per day, as in script 177). Each world gets its own patients. The standard arm is open loop, so no particle filter is needed and this step is cheap. The first run (script 192) uses 500 worlds with 400 patients each.
 2. Keep worlds whose standard-arm median PFS falls in 143 to 186 days. The median is the Kaplan-Meier median with linear interpolation between scan days, because a scan every 84 days puts the plain median on the grid 84, 168, 252 days. If none do inside the ranges allowed by the targets file, the finding is "this model class cannot reproduce the standard arm" and Stage 2 stops there for the old equations. The same worlds are re-run with the RANO floor and factor changed, with scans every 56 and 112 days, and with the old 1.2 x baseline rule, to show how much the answer depends on these assumptions.
 3. Negative controls on the kept worlds (script 193, fresh patients): (i) dose-dense versus standard dosing should show a PFS hazard ratio inside the RTOG 0525 interval, HR 0.87 (0.75 to 1.00); the dose-dense arm is the standard arm with the drug effect multiplied by 2.0 (an assumed ratio of drug exposure; 1.5 and 3.0 are sensitivity runs); (ii) a landmark comparison at the day-168 scan, 12 versus 6 courses among patients without a progression call, should fall inside GEINO 14-01, PFS HR 0.99 (0.71 to 1.38). A world with a model hazard ratio outside these intervals is marked "fails negative control". Hazard ratios use a Cox model with Efron ties (`src/trackc_survival.py`).
-4. In a spanning subset of kept worlds (about 6 to 12, chosen to cover the extremes of B0, c, mu and nu), run the policy contrasts: feedback rules against front-loaded dosing and against the best fixed schedule, on mean RMST, joint and paired tail, and courses used.
+4. In the controlled worlds (script 194 runs all of them, because the rules are simple; the first plan was a spanning subset of 6 to 12), run the policy contrasts: feedback rules against front-loaded dosing and against the best fixed schedule, on mean RMST, joint and paired tail, and courses used.
 5. The result is the map: where in (B0, c, mu, nu) each contrast is positive, zero or negative, and the boundary. A sign flip is the finding.
 
 ## 5. Stage 2 tests (development seeds 20261800 to 20262099 and noise keys 1,800,000 to 1,899,999; nothing is tuned on sealed seeds)
 
 | Script | Test | Status |
 |---|---|---|
-| 190 | A: tail estimator versus number of repeats | running; result pending |
+| 190 | A: tail estimator versus number of repeats | done 2026-11-04 (interim): the bias from few repeats is about 1 to 4 d and saturates; the tail deficit of feedback rules remains at 16 repeats |
 | 191 | B: exact identities and gain-versus-burden checks | done: 13 tests pass (scratch copy); algebra independently checked; wording corrected |
-| 192, 193 | C: calibrate the standard arm; D: negative controls | code and smoke runs done; real runs wait for the committed code (the manifest needs a clean tree) |
-| to write | E: regime map; F: cost-aware frontier and information-matched rules | after C and D |
-| to write | G: oracle on a finer grid, count cases where a policy beats the oracle | independent of C |
-| to write | H: how many washout durations and repeats place mu and nu in the right region with 90% probability | after E |
-| to write | I: numerics (step 0.25 vs 0.1, batch size 1 vs 150, both event modes) in a scratch copy | independent |
+| 192, 193 | C: calibrate the standard arm; D: negative controls | done for config `single` (81 of 500 worlds pass, 39 controlled). `--config single_rep` (fresh-seed replicate, adds 3- and 4-course variants) and `--config mixture` (responder/non-responder family) are defined in `src/trackc_calibration.py`; their status is in `START_HERE.md` |
+| 194 | E: regime map on all controlled worlds (simple rules, both endpoints, cost-aware arms, informed family maximum) | done for `single` (interim); `mixture` pending |
+| to write | F: cost-aware frontier and information-matched rules; G: oracle on a finer grid | F is partly covered by the cost-aware arms of 194; G by the share of patients who beat the informed family maximum (194) |
+| to write | H: how many washout durations and repeats place mu and nu in the right region with 90% probability | after the mixture result of 194 |
+| 198 | I: numerics (step 0.25 vs 0.1) | done for `single`: no changed call, no flipped flag. Batch size and the old event mode were not tested |
+| 199 | J (added): how deep a response the controlled worlds predict | done for `single`: no deep responders predicted; `mixture` pending |
+| 200 | post hoc analysis of C and D from the saved files | done for `single` |
 
 Kill rules are in the restart plan. Every output folder gets a manifest (seed block from `src/trackc_seed_registry.py`, protocol hash, code hashes, git commit, clean-tree flag).
 
