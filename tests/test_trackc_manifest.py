@@ -105,6 +105,10 @@ def test_build_manifest_checks_seeds_and_tree(tmp_path):
     # spent seeds are refused
     with pytest.raises(ValueError):
         man.build_manifest(purpose="stage2_dev", scenario=(20261122, 20261122), noise=(1850000, 1850001), **kw)
+    # a smoke run may skip the registry check, and the manifest says so
+    ms = man.build_manifest(purpose="stage2_dev", scenario=(20261122, 20261122), noise=(1850000, 1850001),
+                            check_seeds=False, **kw)
+    assert ms["seed_check"] == "skipped (smoke run)" and m["seed_check"] == "registry"
     # the sealed block cannot be spent under the dev purpose
     with pytest.raises(ValueError):
         man.build_manifest(purpose="stage2_dev", scenario=(20262300, 20262310), noise=(2300000, 2300010), **kw)

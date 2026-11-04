@@ -20,13 +20,17 @@ answer depends on those assumptions.
 Nothing here looks at a dosing policy contrast. The only arm is the open-loop standard arm. Passing is a necessary
 check, not evidence that a world is true.
 
-Seeds (registry: src/trackc_seed_registry.py, purpose stage2_dev):
+Seeds (registry: src/trackc_seed_registry.py, purpose stage2_dev), configuration "single" (the run of 2026-11-04):
     worlds     LHS seed 20261801
     patients   seed [20261802, world index]
     noise      key [1_810_000, chunk] (the arm ignores readings; the key is only passed to the simulator)
 Written to output/trackc_stage2_C_calibration/ (manifest.json first, then worlds.csv, kept_worlds.csv, results.json).
+Other configurations (--config single_rep | mixture) are defined in src/trackc_calibration.py: fresh seeds, a folder
+suffix, and for these two the extra variants with 3 and 4 courses in the standard arm (the RTOG 0525 standard arm had a
+median of 3 adjuvant cycles, so the 6-course arm is a stronger drug exposure than the trial arm).
 
 Run:  python src/192_trackc_calibration.py --workers 3
+      python src/192_trackc_calibration.py --config mixture --workers 3
       python src/192_trackc_calibration.py --smoke        (tiny run into a *_smoke folder)
 """
 from __future__ import annotations
@@ -54,8 +58,6 @@ import trackc_manifest as man  # noqa: E402
 import trackc_sim as tc  # noqa: E402
 
 SCRIPT = "src/192_trackc_calibration.py"
-OUT_DIR = PROJECT_ROOT / "output" / "trackc_stage2_C_calibration"
-WORLD_SEED, PATIENT_SEED, NOISE_BASE = 20261801, 20261802, 1_810_000
 N_WORLDS, N_PAT, CHUNK_WORLDS = 500, 400, 25
 OLD_MODEL_N = 2000
 VARIANTS = {
@@ -67,6 +69,11 @@ VARIANTS = {
     "scan4": {"endpoint": "rano", "factor": 1.4, "floor": 0.1, "scan": 4},
     "old_rule_1.2_baseline": {"endpoint": "baseline", "factor": 1.4, "floor": 0.1, "scan": None},
 }
+# standard arm with fewer courses (the trial median was 3 adjuvant cycles); added for the configurations after "single"
+EXTRA_VARIANTS = {
+    "courses3": {"endpoint": "rano", "factor": 1.4, "floor": 0.1, "scan": 3, "courses": 3},
+    "courses4": {"endpoint": "rano", "factor": 1.4, "floor": 0.1, "scan": 3, "courses": 4},
+}
 STAT_COLS = ("median_interp", "median_step", "S84", "S168", "S252", "event_fraction")
 WEAKEST = [
     "one published number (a median with its interval) fixes one condition per world; many worlds pass and the anchor does not say which is true",
@@ -76,13 +83,21 @@ WEAKEST = [
     "the model has no patients who never respond to TMZ and no early deaths or drop-outs; the early part of the PFS curve is not checked",
     "world classification uses 400 patients per world, so a world near the edge of the interval can flip; script 193 re-draws the kept worlds",
 ]
+MIXTURE_WEAKEST = [
+    "the mixture family is an assumed two-class split (responders keep the earlier kill range m in 6 to 20, non-responders have a weak range, responder fraction q in 0.1 to 0.6); it is a robustness probe for the weak-kill reading, not a fit and not an MGMT model",
+    "responders and non-responders share every other parameter range; a real split would also differ in growth, resistant fraction and switching",
+]
+
+
+def variants_for(cfg):
+    """The endpoint variants of one configuration ('single' keeps the seven of the run of 2026-11-04)."""
+    return dict(VARIANTS, **EXTRA_VARIANTS) if cfg["extra_variants"] else dict(VARIANTS)
 
 
 def _smoke(args):
-    global N_WORLDS, N_PAT, CHUNK_WORLDS, OLD_MODEL_N, OUT_DIR
+    global N_WORLDS, N_PAT, CHUNK_WORLDS, OLD_MODEL_N
     if args.smoke:
         N_WORLDS, N_PAT, CHUNK_WORLDS, OLD_MODEL_N = 12, 100, 6, 300
-        OUT_DIR = PROJECT_ROOT / "output" / "trackc_stage2_C_calibration_smoke"
 
 
 def run_variant(batch, v, chunk_key):
@@ -90,17 +105,18 @@ def run_variant(batch, v, chunk_key):
     old = (tc.RANO_FACTOR, tc.RANO_FLOOR)
     tc.RANO_FACTOR, tc.RANO_FLOOR = v["factor"], v["floor"]
     try:
-        return cal.run_arm(batch, scan_every=v["scan"], endpoint=v["endpoint"], seed=chunk_key)
+        return cal.run_arm(batch, courses=v.get("courses", cal.STD_COURSES), scan_every=v["scan"],
+                           endpoint=v["endpoint"], seed=chunk_key)
     finally:
         tc.RANO_FACTOR, tc.RANO_FLOOR = old
 
 
 def _job(args):
-    chunk, worlds, n_pat = args
-    batch = cal.concat([cal.draw_patients(w, n_pat, [PATIENT_SEED, w["world"]]) for w in worlds])
+    chunk, worlds, n_pat, cfg, variants = args
+    batch = cal.concat([cal.draw_patients(w, n_pat, [cfg["patient_seed"], w["world"]]) for w in worlds])
     rows = [dict(w) for w in worlds]
-    for vname, v in VARIANTS.items():
-        ttp, ev, courses = run_variant(batch, v, [NOISE_BASE, chunk])
+    for vname, v in variants.items():
+        ttp, ev, courses = run_variant(batch, v, [cfg["noise_c"], chunk])
         for k, row in enumerate(rows):
             sl = slice(k * n_pat, (k + 1) * n_pat)
             st = cal.pfs_stats(ttp[sl], ev[sl])
@@ -108,12 +124,12 @@ def _job(args):
     return rows
 
 
-def old_model_row(n):
+def old_model_row(n, cfg, variants):
     """The earlier world (script 150 ranges, c uniform 0 to 0.25, no switching) under every variant."""
-    scen = tc.draw_scenarios(n, [PATIENT_SEED, 999_999])
+    scen = tc.draw_scenarios(n, [cfg["patient_seed"], 999_999])
     out = {}
-    for vname, v in VARIANTS.items():
-        ttp, ev, courses = run_variant(scen, v, [NOISE_BASE, 999_999])
+    for vname, v in variants.items():
+        ttp, ev, courses = run_variant(scen, v, [cfg["noise_c"], 999_999])
         st = cal.pfs_stats(ttp, ev)
         out[vname] = {c: st[c] for c in STAT_COLS} | {"mean_courses": float(courses.mean())}
     return out
@@ -124,10 +140,13 @@ def _finite(x):
     return x[np.isfinite(x)]
 
 
-def analyse(rows, old_model=None):
-    """rows: list of world dicts as returned by _job. Pure function, no I/O."""
+def analyse(rows, old_model=None, variants=None, keys=None):
+    """rows: list of world dicts as returned by _job. Pure function, no I/O.
+    variants, keys: the variant dict and the world-column names of the configuration (defaults: 'single')."""
+    variants = VARIANTS if variants is None else variants
+    keys = cal.WORLD_KEYS if keys is None else keys
     n = len(rows)
-    ok = {v: np.array([cal.in_target(r[v]["median_interp"]) for r in rows]) for v in VARIANTS}
+    ok = {v: np.array([cal.in_target(r[v]["median_interp"]) for r in rows]) for v in variants}
     med = np.array([r["base"]["median_interp"] for r in rows])
     res = {"n_worlds": n, "target_days": list(cal.TARGET_PFS_DAYS),
            "base": {"n_pass": int(ok["base"].sum()), "frac_pass": float(ok["base"].mean()),
@@ -136,7 +155,7 @@ def analyse(rows, old_model=None):
                     "frac_below_target": float((med < cal.TARGET_PFS_DAYS[0]).mean()),
                     "frac_above_target": float((med > cal.TARGET_PFS_DAYS[1]).mean())},
            "variants": {}, "axes": {}}
-    for v in VARIANTS:
+    for v in variants:
         both, either = (ok[v] & ok["base"]).sum(), (ok[v] | ok["base"]).sum()
         mv = np.array([r[v]["median_interp"] for r in rows])
         res["variants"][v] = {"n_pass": int(ok[v].sum()), "frac_pass": float(ok[v].mean()),
@@ -144,7 +163,7 @@ def analyse(rows, old_model=None):
                               "median_interp_quantiles_5_25_50_75_95": [float(q) for q in np.percentile(_finite(mv), [5, 25, 50, 75, 95])] if np.isfinite(mv).any() else None,
                               "frac_below_target": float((mv < cal.TARGET_PFS_DAYS[0]).mean()),
                               "frac_above_target": float((mv > cal.TARGET_PFS_DAYS[1]).mean())}
-    for name in cal.WORLD_KEYS:
+    for name in keys:
         x = np.array([r[name] for r in rows], float)
         entry = {"spearman_with_median": None, "pass_fraction_by_bin": {}}
         good = np.isfinite(med)
@@ -167,16 +186,17 @@ def analyse(rows, old_model=None):
     return res
 
 
-def write_csvs(rows, out_dir):
-    cols = list(cal.WORLD_KEYS)
-    header = ["world"] + cols + [f"{v}_{c}" for v in VARIANTS for c in STAT_COLS] + [f"{v}_pass" for v in VARIANTS]
+def write_csvs(rows, out_dir, variants=None, keys=None):
+    variants = VARIANTS if variants is None else variants
+    cols = list(cal.WORLD_KEYS if keys is None else keys)
+    header = ["world"] + cols + [f"{v}_{c}" for v in variants for c in STAT_COLS] + [f"{v}_pass" for v in variants]
     with open(out_dir / "worlds.csv", "w", newline="", encoding="utf-8") as fh:
         w = csv.writer(fh)
         w.writerow(header)
         for r in rows:
             w.writerow([r["world"]] + [f"{r[c]:.10g}" for c in cols]
-                       + [f"{r[v][c]:.6g}" for v in VARIANTS for c in STAT_COLS]
-                       + [int(cal.in_target(r[v]["median_interp"])) for v in VARIANTS])
+                       + [f"{r[v][c]:.6g}" for v in variants for c in STAT_COLS]
+                       + [int(cal.in_target(r[v]["median_interp"])) for v in variants])
     with open(out_dir / "kept_worlds.csv", "w", newline="", encoding="utf-8") as fh:
         w = csv.writer(fh)
         w.writerow(["world"] + cols + ["base_median_interp"])
@@ -189,38 +209,45 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--workers", type=int, default=3)
     ap.add_argument("--smoke", action="store_true")
+    ap.add_argument("--config", default="single", help="run configuration of src/trackc_calibration.py (single, single_rep, mixture)")
     args = ap.parse_args()
     _smoke(args)
+    cfg = cal.get_config(args.config)
+    OUT_DIR = cal.stage_dir("C", cfg, args.smoke)
+    variants, keys = variants_for(cfg), cal.world_keys(cfg["family"])
     if (OUT_DIR / "results.json").exists():
         sys.exit(f"refusing to overwrite {OUT_DIR / 'results.json'}")
-    protocol = {"script": "192_trackc_calibration", "stage": "2C", "smoke": bool(args.smoke), "n_worlds": N_WORLDS,
+    protocol = {"script": "192_trackc_calibration", "stage": "2C", "config": cfg["name"], "family": cfg["family"],
+                "smoke": bool(args.smoke), "n_worlds": N_WORLDS,
                 "n_patients_per_world": N_PAT, "chunk_worlds": CHUNK_WORLDS, "old_model_n": OLD_MODEL_N,
-                "world_seed": WORLD_SEED, "patient_seed": PATIENT_SEED, "noise_base": NOISE_BASE,
-                "axes": [list(a) for a in cal.AXES], "mu_nu_levels": list(cal.MU_NU_LEVELS),
+                "world_seed": cfg["world_seed"], "patient_seed": cfg["patient_seed"], "noise_base": cfg["noise_c"],
+                "axes": [list(a) for a in cal.FAMILY_AXES[cfg["family"]]], "mu_nu_levels": list(cal.MU_NU_LEVELS),
                 "b0_half_width": cal.B0_HALF_WIDTH, "f0_cap": cal.F0_CAP, "std_courses": cal.STD_COURSES,
-                "target_days": list(cal.TARGET_PFS_DAYS), "variants": VARIANTS, "stat": "interpolated KM median"}
+                "target_days": list(cal.TARGET_PFS_DAYS), "variants": variants, "stat": "interpolated KM median"}
     manifest = man.build_manifest("192_trackc_calibration", protocol, purpose="stage2_dev",
-                                  scenario=(WORLD_SEED, PATIENT_SEED), noise=(NOISE_BASE, NOISE_BASE),
-                                  script=SCRIPT, require_clean=not args.smoke,
+                                  scenario=(cfg["world_seed"], cfg["patient_seed"]),
+                                  noise=(cfg["noise_c"], cfg["noise_c"]),
+                                  script=SCRIPT, require_clean=not args.smoke, check_seeds=not args.smoke,
                                   paths=man.CORE_CODE + ("src/trackc_survival.py", "src/trackc_calibration.py"))
     man.write_manifest(OUT_DIR, manifest)                  # before any simulation
     print(f"manifest written; protocol sha256 {manifest['protocol_sha256'][:12]}; "
-          f"git clean {manifest['git']['clean']}", flush=True)
+          f"git clean {manifest['git']['clean']}; config {cfg['name']} ({cfg['family']} family)", flush=True)
 
     t0 = time.time()
-    worlds = cal.draw_worlds(N_WORLDS, WORLD_SEED)
-    jobs = [(c, worlds[i:i + CHUNK_WORLDS], N_PAT) for c, i in enumerate(range(0, N_WORLDS, CHUNK_WORLDS))]
+    worlds = cal.draw_worlds(N_WORLDS, cfg["world_seed"], cfg["family"])
+    jobs = [(c, worlds[i:i + CHUNK_WORLDS], N_PAT, cfg, variants) for c, i in enumerate(range(0, N_WORLDS, CHUNK_WORLDS))]
     with ProcessPoolExecutor(max_workers=args.workers) as ex:
         rows = [row for part in ex.map(_job, jobs) for row in part]
     rows.sort(key=lambda r: r["world"])
-    old = old_model_row(OLD_MODEL_N)
-    write_csvs(rows, OUT_DIR)
+    old = old_model_row(OLD_MODEL_N, cfg, variants)
+    write_csvs(rows, OUT_DIR, variants, keys)
 
-    res = analyse(rows, old)
+    res = analyse(rows, old, variants, keys)
     res.update({"script": "192_trackc_calibration",
                 "label": "SIMULATION; DEVELOPMENT seeds only; exploratory; calibration of the standard arm only",
                 "protocol": protocol, "protocol_sha256": manifest["protocol_sha256"],
-                "weakest_points": WEAKEST, "runtime_s": time.time() - t0})
+                "weakest_points": WEAKEST + (MIXTURE_WEAKEST if cfg["family"] == "mixture" else []),
+                "runtime_s": time.time() - t0})
     (OUT_DIR / "results.json").write_text(json.dumps(res, indent=2, default=float) + "\n", encoding="utf-8")
 
     b = res["base"]

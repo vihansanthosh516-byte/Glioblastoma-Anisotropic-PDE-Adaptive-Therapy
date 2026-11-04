@@ -30,13 +30,16 @@ paired-regret tail (mean of the worst 10% paired differences), and courses used.
 Nothing is tuned on a sealed seed. The rules are simple on purpose; the particle-filter rules of scripts 154-173 are
 NOT run here (cost), so this test says nothing about them.
 
-Seeds (registry: src/trackc_seed_registry.py, purpose stage2_dev):
+Seeds (registry: src/trackc_seed_registry.py, purpose stage2_dev), configuration "single" (the run of 2026-11-04):
     evaluation patients   seed [20261804, world index], n = 1000 per world
     selection patients    seed [20261805, world index], n = 400 per world (best_fixed is chosen here)
     noise                 key [1_830_000, world index], the same in every arm
 Written to output/trackc_stage2_E_regime_map/ (manifest.json first, then arms_by_world.csv, results.json).
+--config single_rep | mixture reads the matching folder of script 193 and uses the seeds and folder suffix defined in
+src/trackc_calibration.py.
 
 Run:  python src/194_trackc_regime_map.py --workers 4
+      python src/194_trackc_regime_map.py --config mixture --workers 4
       python src/194_trackc_regime_map.py --smoke        (reads the smoke output of script 193)
 """
 from __future__ import annotations
@@ -65,9 +68,6 @@ import trackc_manifest as man  # noqa: E402
 import trackc_regime as rg  # noqa: E402
 
 SCRIPT = "src/194_trackc_regime_map.py"
-OUT_DIR = PROJECT_ROOT / "output" / "trackc_stage2_E_regime_map"
-D_DIR = PROJECT_ROOT / "output" / "trackc_stage2_D_negative_controls"
-EVAL_SEED, SEL_SEED, NOISE_BASE = 20261804, 20261805, 1_830_000
 N_EVAL, N_SEL = 1000, 400
 LAMBDAS = (0.0, 2.0, 5.0, 10.0, 20.0)      # days of restricted time that one course is worth in the cost-aware arms (ASSUMED grid)
 ENDPOINTS = {"3b_rano": "rano", "3a_baseline": "baseline"}
@@ -80,15 +80,13 @@ WEAKEST = [
     "each world has 1,000 evaluation patients, so a per-world difference carries a sampling error of a few days",
     "nothing here is a clinical or patient-specific claim",
 ]
-AXES = list(cal.WORLD_KEYS)
+AXES = list(cal.WORLD_KEYS)                # default world columns ('single' family); other families pass their own
 
 
 def _smoke(args):
-    global N_EVAL, N_SEL, OUT_DIR, D_DIR
+    global N_EVAL, N_SEL
     if args.smoke:
         N_EVAL, N_SEL = 100, 60
-        OUT_DIR = PROJECT_ROOT / "output" / "trackc_stage2_E_regime_map_smoke"
-        D_DIR = PROJECT_ROOT / "output" / "trackc_stage2_D_negative_controls_smoke"
 
 
 def read_controlled(d_dir):
@@ -96,16 +94,16 @@ def read_controlled(d_dir):
         return [{k: (int(v) if k == "world" else float(v)) for k, v in row.items()} for row in csv.DictReader(fh)]
 
 
-def evaluate_world(w, n_eval, n_sel):
+def evaluate_world(w, n_eval, n_sel, cfg):
     """All arms and both endpoints for one world. Pure function; returns a list of long-format rows."""
     world = int(w["world"])
-    ev = cal.draw_patients(w, n_eval, [EVAL_SEED, world])
-    sel = cal.draw_patients(w, n_sel, [SEL_SEED, world])
+    ev = cal.draw_patients(w, n_eval, [cfg["e_eval_seed"], world])
+    sel = cal.draw_patients(w, n_sel, [cfg["e_sel_seed"], world])
     sched, names = rg.candidate_schedules()
     arms = rg.policy_arms()
     rows = []
     for ep_label, endpoint in ENDPOINTS.items():
-        res = {name: rg.run_policy(ev, factory, budget, endpoint, [NOISE_BASE, world])
+        res = {name: rg.run_policy(ev, factory, budget, endpoint, [cfg["noise_e"], world])
                for name, (factory, budget) in arms.items()}
         ttp_sel, courses_sel = rg.evaluate_schedules(sel, sched, endpoint)
         ttp_ev, courses_ev = rg.evaluate_schedules(ev, sched, endpoint)
@@ -144,19 +142,21 @@ def _job(args):
     return evaluate_world(*args)
 
 
-def _ols_standardised(X, y):
+def _ols_standardised(X, y, names=None):
     """Standardised least-squares coefficients and R-squared; columns with no spread are dropped."""
+    names = AXES if names is None else names
     keep = [i for i in range(X.shape[1]) if X[:, i].std() > 0]
     Z = (X[:, keep] - X[:, keep].mean(0)) / X[:, keep].std(0)
     yc = y - y.mean()
     beta, *_ = np.linalg.lstsq(Z, yc, rcond=None)
     ss = float(((yc - Z @ beta) ** 2).sum())
     r2 = 1.0 - ss / float((yc ** 2).sum()) if (yc ** 2).sum() > 0 else float("nan")
-    return {AXES[k]: float(b) for k, b in zip(keep, beta)}, r2
+    return {names[k]: float(b) for k, b in zip(keep, beta)}, r2
 
 
-def analyse(rows, worlds):
-    """Summary over worlds. Pure function, no I/O."""
+def analyse(rows, worlds, keys=None):
+    """Summary over worlds. Pure function, no I/O. keys: the world-column names of the family (default 'single')."""
+    axes = AXES if keys is None else list(keys)
     w_by = {w["world"]: w for w in worlds}
     res = {"n_controlled_worlds": len(worlds), "reference": REFERENCE, "endpoints": {}}
     arms = sorted({r["arm"] for r in rows})
@@ -197,10 +197,10 @@ def analyse(rows, worlds):
                 sel = sorted([r for r in rows if r["endpoint"] == ep and r["arm"] == arm and r["tau"] == tau],
                              key=lambda r: r["world"])
                 y = np.array([r["diff_vs_soc6"] for r in sel])
-                X = np.array([[w_by[r["world"]][a] for a in AXES] for r in sel], float)
-                coef, r2 = _ols_standardised(X, y)
+                X = np.array([[w_by[r["world"]][a] for a in axes] for r in sel], float)
+                coef, r2 = _ols_standardised(X, y, axes)
                 sp = {}
-                for i, a in enumerate(AXES):
+                for i, a in enumerate(axes):
                     if X[:, i].std() > 0 and y.std() > 0:
                         sp[a] = float(spearmanr(X[:, i], y).statistic)
                 axes_block[arm] = {"spearman": sp, "standardised_ols_coef": coef, "ols_r2": r2}
@@ -223,8 +223,12 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--workers", type=int, default=4)
     ap.add_argument("--smoke", action="store_true")
+    ap.add_argument("--config", default="single", help="run configuration of src/trackc_calibration.py (single, single_rep, mixture)")
     args = ap.parse_args()
     _smoke(args)
+    cfg = cal.get_config(args.config)
+    OUT_DIR, D_DIR = cal.stage_dir("E", cfg, args.smoke), cal.stage_dir("D", cfg, args.smoke)
+    keys = cal.world_keys(cfg["family"])
     if (OUT_DIR / "results.json").exists():
         sys.exit(f"refusing to overwrite {OUT_DIR / 'results.json'}")
     if not (D_DIR / "results.json").exists():
@@ -233,8 +237,10 @@ def main():
     if not worlds:
         sys.exit("script 193 found no controlled world; see its kill rule")
     sched, names = rg.candidate_schedules()
-    protocol = {"script": "194_trackc_regime_map", "stage": "2E", "smoke": bool(args.smoke), "n_eval": N_EVAL, "n_sel": N_SEL,
-                "eval_seed": EVAL_SEED, "sel_seed": SEL_SEED, "noise_base": NOISE_BASE, "scan_every": rg.SCAN_EVERY,
+    protocol = {"script": "194_trackc_regime_map", "stage": "2E", "config": cfg["name"], "family": cfg["family"],
+                "smoke": bool(args.smoke), "n_eval": N_EVAL, "n_sel": N_SEL,
+                "eval_seed": cfg["e_eval_seed"], "sel_seed": cfg["e_sel_seed"], "noise_base": cfg["noise_e"],
+                "scan_every": rg.SCAN_EVERY,
                 "taus": list(rg.TAUS), "endpoints": ENDPOINTS, "reference": REFERENCE, "lambdas": list(LAMBDAS),
                 "arms": {k: v[1] for k, v in rg.policy_arms().items()}, "candidate_schedules": names,
                 "controlled_worlds": [w["world"] for w in worlds],
@@ -242,8 +248,9 @@ def main():
                 "input_results_sha256": hashlib.sha256((D_DIR / "results.json").read_bytes()).hexdigest(),
                 "rano_factor": cal.tc.RANO_FACTOR, "rano_floor": cal.tc.RANO_FLOOR}
     manifest = man.build_manifest("194_trackc_regime_map", protocol, purpose="stage2_dev",
-                                  scenario=(EVAL_SEED, SEL_SEED), noise=(NOISE_BASE, NOISE_BASE),
-                                  script=SCRIPT, require_clean=not args.smoke,
+                                  scenario=(cfg["e_eval_seed"], cfg["e_sel_seed"]),
+                                  noise=(cfg["noise_e"], cfg["noise_e"]),
+                                  script=SCRIPT, require_clean=not args.smoke, check_seeds=not args.smoke,
                                   paths=man.CORE_CODE + ("src/trackc_survival.py", "src/trackc_calibration.py",
                                                          "src/trackc_policies.py", "src/trackc_regime.py"))
     man.write_manifest(OUT_DIR, manifest)                  # before any simulation
@@ -252,10 +259,10 @@ def main():
 
     t0 = time.time()
     with ProcessPoolExecutor(max_workers=args.workers) as ex:
-        parts = list(ex.map(_job, [(w, N_EVAL, N_SEL) for w in worlds]))
+        parts = list(ex.map(_job, [(w, N_EVAL, N_SEL, cfg) for w in worlds]))
     rows = [r for part in parts for r in part]
     write_csv(rows, OUT_DIR)
-    res = analyse(rows, worlds)
+    res = analyse(rows, worlds, keys)
     res.update({"script": "194_trackc_regime_map",
                 "label": "SIMULATION; DEVELOPMENT seeds only; exploratory; simple rules only, no particle filter",
                 "protocol": protocol, "protocol_sha256": manifest["protocol_sha256"],

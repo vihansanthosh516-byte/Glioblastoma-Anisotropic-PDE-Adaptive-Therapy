@@ -19,6 +19,9 @@ Seeds (registry: src/trackc_seed_registry.py, purpose stage2_dev):
     noise      key [1_840_000, world index] (the arms ignore readings; the key is only passed to the simulator)
 Written to output/trackc_stage2_I_numerics/ (manifest.json first, then numerics_by_world.csv, results.json).
 
+Seeds above are those of configuration "single"; --config single_rep | mixture takes the seeds and folder suffix
+defined in src/trackc_calibration.py and reads the matching folder of script 193.
+
 Run:  python src/198_trackc_numerics.py --workers 4
       python src/198_trackc_numerics.py --smoke        (reads the smoke output of script 193)
 """
@@ -47,9 +50,6 @@ import trackc_manifest as man  # noqa: E402
 import trackc_sim as tc  # noqa: E402
 
 SCRIPT = "src/198_trackc_numerics.py"
-OUT_DIR = PROJECT_ROOT / "output" / "trackc_stage2_I_numerics"
-D_DIR = PROJECT_ROOT / "output" / "trackc_stage2_D_negative_controls"
-SCEN_SEED, NOISE_BASE = 20261806, 1_840_000
 N_PAT = 1000
 DTS = (0.25, 0.10)
 WEAKEST = [
@@ -60,11 +60,9 @@ WEAKEST = [
 
 
 def _smoke(args):
-    global N_PAT, OUT_DIR, D_DIR
+    global N_PAT
     if args.smoke:
         N_PAT = 200
-        OUT_DIR = PROJECT_ROOT / "output" / "trackc_stage2_I_numerics_smoke"
-        D_DIR = PROJECT_ROOT / "output" / "trackc_stage2_D_negative_controls_smoke"
 
 
 def read_controlled(d_dir):
@@ -72,13 +70,13 @@ def read_controlled(d_dir):
         return [{k: (int(v) if k == "world" else float(v)) for k, v in row.items()} for row in csv.DictReader(fh)]
 
 
-def measure(w, n_pat, dt):
+def measure(w, n_pat, dt, cfg):
     """The calibration and control quantities for one world at step `dt`. The module step is restored afterwards."""
     old = tc.DT
     tc.DT = dt
     try:
-        scen = cal.draw_patients(w, n_pat, [SCEN_SEED, int(w["world"])])
-        seed = [NOISE_BASE, int(w["world"])]
+        scen = cal.draw_patients(w, n_pat, [cfg["i_seed"], int(w["world"])])
+        seed = [cfg["noise_i"], int(w["world"])]
         ref = cal.run_arm(scen, seed=seed)
         st = cal.pfs_stats(ref[0], ref[1])
         dd = cal.dose_dense_control(scen, cal.DOSE_DENSE_MULT, seed=seed, ref=ref)
@@ -89,8 +87,8 @@ def measure(w, n_pat, dt):
     return {"median": st["median_interp"], "dd_hr": dd["hr"], "lm_hr": lm["hr"], "ttp_std": ref[0], "ttp_dd": dd_ttp}
 
 
-def evaluate_world(w, n_pat):
-    a, b = (measure(w, n_pat, dt) for dt in DTS)
+def evaluate_world(w, n_pat, cfg):
+    a, b = (measure(w, n_pat, dt, cfg) for dt in DTS)
     flags = lambda m: (cal.in_target(m["median"]),  # noqa: E731
                        cal.DOSE_DENSE_HR[1] <= m["dd_hr"] <= cal.DOSE_DENSE_HR[2],
                        cal.TWELVE_VS_SIX_HR[1] <= m["lm_hr"] <= cal.TWELVE_VS_SIX_HR[2])
@@ -142,8 +140,11 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--workers", type=int, default=4)
     ap.add_argument("--smoke", action="store_true")
+    ap.add_argument("--config", default="single", help="run configuration of src/trackc_calibration.py (single, single_rep, mixture)")
     args = ap.parse_args()
     _smoke(args)
+    cfg = cal.get_config(args.config)
+    OUT_DIR, D_DIR = cal.stage_dir("I", cfg, args.smoke), cal.stage_dir("D", cfg, args.smoke)
     if (OUT_DIR / "results.json").exists():
         sys.exit(f"refusing to overwrite {OUT_DIR / 'results.json'}")
     if not (D_DIR / "results.json").exists():
@@ -151,15 +152,16 @@ def main():
     worlds = read_controlled(D_DIR)
     if not worlds:
         sys.exit("script 193 found no controlled world")
-    protocol = {"script": "198_trackc_numerics", "stage": "2I", "smoke": bool(args.smoke), "n_patients_per_world": N_PAT,
-                "scenario_seed": SCEN_SEED, "noise_base": NOISE_BASE, "steps_days": list(DTS),
+    protocol = {"script": "198_trackc_numerics", "stage": "2I", "config": cfg["name"], "family": cfg["family"],
+                "smoke": bool(args.smoke), "n_patients_per_world": N_PAT,
+                "scenario_seed": cfg["i_seed"], "noise_base": cfg["noise_i"], "steps_days": list(DTS),
                 "dose_dense_multiplier": cal.DOSE_DENSE_MULT, "controlled_worlds": [w["world"] for w in worlds],
                 "input": str((D_DIR / "controlled_worlds.csv").relative_to(PROJECT_ROOT)),
                 "input_results_sha256": hashlib.sha256((D_DIR / "results.json").read_bytes()).hexdigest(),
                 "rano_factor": tc.RANO_FACTOR, "rano_floor": tc.RANO_FLOOR, "event_mode": tc.EVENT_MODE}
     manifest = man.build_manifest("198_trackc_numerics", protocol, purpose="stage2_dev",
-                                  scenario=(SCEN_SEED, SCEN_SEED), noise=(NOISE_BASE, NOISE_BASE),
-                                  script=SCRIPT, require_clean=not args.smoke,
+                                  scenario=(cfg["i_seed"], cfg["i_seed"]), noise=(cfg["noise_i"], cfg["noise_i"]),
+                                  script=SCRIPT, require_clean=not args.smoke, check_seeds=not args.smoke,
                                   paths=man.CORE_CODE + ("src/trackc_survival.py", "src/trackc_calibration.py"))
     man.write_manifest(OUT_DIR, manifest)                  # before any simulation
     print(f"manifest written; protocol sha256 {manifest['protocol_sha256'][:12]}; git clean {manifest['git']['clean']}; "
@@ -167,7 +169,7 @@ def main():
 
     t0 = time.time()
     with ProcessPoolExecutor(max_workers=args.workers) as ex:
-        rows = list(ex.map(_job, [(w, N_PAT) for w in worlds]))
+        rows = list(ex.map(_job, [(w, N_PAT, cfg) for w in worlds]))
     write_csv(rows, OUT_DIR)
     res = analyse(rows)
     res.update({"script": "198_trackc_numerics",

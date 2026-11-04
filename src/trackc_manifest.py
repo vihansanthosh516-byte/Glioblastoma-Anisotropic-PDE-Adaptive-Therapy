@@ -83,10 +83,12 @@ def git_state(paths=CORE_CODE, root=ROOT):
 
 
 def build_manifest(name, protocol, purpose, scenario, noise, script, require_clean=True,
-                   paths=CORE_CODE, root=ROOT):
+                   paths=CORE_CODE, root=ROOT, check_seeds=True):
     """Return the manifest dict. Raises ValueError if a seed block is not free for this purpose,
-    and RuntimeError if the code files are not committed (when require_clean is True)."""
-    problems = reg.check_free(scenario=scenario, noise=noise, purpose=purpose)
+    and RuntimeError if the code files are not committed (when require_clean is True).
+    check_seeds=False skips the registry check; scripts use it for --smoke runs only, because a smoke run
+    re-uses the seeds of the real run and its output is never a result."""
+    problems = reg.check_free(scenario=scenario, noise=noise, purpose=purpose) if check_seeds else []
     if problems:
         raise ValueError("seed problems: " + "; ".join(problems))
     run_paths = tuple(paths) + ((script,) if script else ())
@@ -101,6 +103,7 @@ def build_manifest(name, protocol, purpose, scenario, noise, script, require_cle
         "name": name, "label": LABEL, "purpose": purpose,
         "created_utc": datetime.now(timezone.utc).isoformat(),
         "scenario_seeds": list(scenario), "noise_keys": list(noise) if noise is not None else [],
+        "seed_check": "registry" if check_seeds else "skipped (smoke run)",
         "registry_sha256": reg.registry_document()["sha256"],
         "protocol": protocol, "protocol_sha256": protocol_hash(protocol, run_paths, root),
         "solver_constants": solver_constants(), "code_sha256": hashes, "git": state,

@@ -23,6 +23,9 @@ Seeds (registry: src/trackc_seed_registry.py, purpose stage2_dev):
     noise      none (open loop, no readings)
 Written to output/trackc_stage2_J_response_depth/ (manifest.json first, then depth_by_world.csv, results.json).
 
+The seed above is that of configuration "single"; --config single_rep | mixture takes the seed and folder suffix
+defined in src/trackc_calibration.py and reads the matching folder of script 193.
+
 Run:  python src/199_trackc_response_depth.py --workers 4
       python src/199_trackc_response_depth.py --smoke        (reads the smoke output of script 193)
 """
@@ -51,9 +54,6 @@ import trackc_manifest as man  # noqa: E402
 import trackc_sim as tc  # noqa: E402
 
 SCRIPT = "src/199_trackc_response_depth.py"
-OUT_DIR = PROJECT_ROOT / "output" / "trackc_stage2_J_response_depth"
-D_DIR = PROJECT_ROOT / "output" / "trackc_stage2_D_negative_controls"
-SCEN_SEED = 20261807
 N_PAT = 1000
 SCANS_USED = 4                                         # scans at cycles 3, 6, 9, 12 (days 84, 168, 252, 336)
 WEAKEST = [
@@ -65,11 +65,9 @@ WEAKEST = [
 
 
 def _smoke(args):
-    global N_PAT, OUT_DIR, D_DIR
+    global N_PAT
     if args.smoke:
         N_PAT = 200
-        OUT_DIR = PROJECT_ROOT / "output" / "trackc_stage2_J_response_depth_smoke"
-        D_DIR = PROJECT_ROOT / "output" / "trackc_stage2_D_negative_controls_smoke"
 
 
 def read_controlled(d_dir):
@@ -97,8 +95,8 @@ def summarise(ratio):
             "frac_any_shrinkage": float(np.mean(ratio < 1.0)), "median_best_ratio": float(np.median(ratio))}
 
 
-def evaluate_world(w, n_pat):
-    ratio = best_response(cal.draw_patients(w, n_pat, [SCEN_SEED, int(w["world"])]))
+def evaluate_world(w, n_pat, seed):
+    ratio = best_response(cal.draw_patients(w, n_pat, [seed, int(w["world"])]))
     return {"world": int(w["world"]), **summarise(ratio)}
 
 
@@ -120,8 +118,12 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--workers", type=int, default=4)
     ap.add_argument("--smoke", action="store_true")
+    ap.add_argument("--config", default="single", help="run configuration of src/trackc_calibration.py (single, single_rep, mixture)")
     args = ap.parse_args()
     _smoke(args)
+    cfg = cal.get_config(args.config)
+    OUT_DIR, D_DIR = cal.stage_dir("J", cfg, args.smoke), cal.stage_dir("D", cfg, args.smoke)
+    seed = cfg["j_seed"]
     if (OUT_DIR / "results.json").exists():
         sys.exit(f"refusing to overwrite {OUT_DIR / 'results.json'}")
     if not (D_DIR / "results.json").exists():
@@ -129,14 +131,15 @@ def main():
     worlds = read_controlled(D_DIR)
     if not worlds:
         sys.exit("script 193 found no controlled world")
-    protocol = {"script": "199_trackc_response_depth", "stage": "2J", "smoke": bool(args.smoke), "n_patients_per_world": N_PAT,
-                "scenario_seed": SCEN_SEED, "scans_used": SCANS_USED, "std_courses": cal.STD_COURSES,
+    protocol = {"script": "199_trackc_response_depth", "stage": "2J", "config": cfg["name"], "family": cfg["family"],
+                "smoke": bool(args.smoke), "n_patients_per_world": N_PAT,
+                "scenario_seed": seed, "scans_used": SCANS_USED, "std_courses": cal.STD_COURSES,
                 "controlled_worlds": [w["world"] for w in worlds],
                 "input": str((D_DIR / "controlled_worlds.csv").relative_to(PROJECT_ROOT)),
                 "input_results_sha256": hashlib.sha256((D_DIR / "results.json").read_bytes()).hexdigest()}
     manifest = man.build_manifest("199_trackc_response_depth", protocol, purpose="stage2_dev",
-                                  scenario=(SCEN_SEED, SCEN_SEED), noise=None,
-                                  script=SCRIPT, require_clean=not args.smoke,
+                                  scenario=(seed, seed), noise=None,
+                                  script=SCRIPT, require_clean=not args.smoke, check_seeds=not args.smoke,
                                   paths=man.CORE_CODE + ("src/trackc_survival.py", "src/trackc_calibration.py"))
     man.write_manifest(OUT_DIR, manifest)                  # before any simulation
     print(f"manifest written; protocol sha256 {manifest['protocol_sha256'][:12]}; git clean {manifest['git']['clean']}; "
@@ -144,8 +147,8 @@ def main():
 
     t0 = time.time()
     with ProcessPoolExecutor(max_workers=args.workers) as ex:
-        rows = list(ex.map(_job, [(w, N_PAT) for w in worlds]))
-    old = summarise(best_response(tc.draw_scenarios(2 * N_PAT, [SCEN_SEED, 999_999])))
+        rows = list(ex.map(_job, [(w, N_PAT, seed) for w in worlds]))
+    old = summarise(best_response(tc.draw_scenarios(2 * N_PAT, [seed, 999_999])))
     OUT_DIR.mkdir(parents=True, exist_ok=True)
     with open(OUT_DIR / "depth_by_world.csv", "w", newline="", encoding="utf-8") as fh:
         w = csv.writer(fh)

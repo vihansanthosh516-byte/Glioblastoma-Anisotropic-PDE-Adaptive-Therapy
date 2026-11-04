@@ -15,8 +15,16 @@ World axes (all ASSUMED):
     B0_center     centre of the starting-burden range (half width 0.10); B0 is the crowding axis
     c             cost of resistance (constant inside a world)
     mu, nu        drug-induced switching and reversion rates per day, from the levels used in script 177
+
+Mixture family (config "mixture", 2026-11-04; all ASSUMED). The family above gives every patient of a world the same
+kill-strength range, so a short median PFS can only come from a weak drug. The mixture family tests that reading: a
+fraction q of the patients ("responders") keep the kill range of the earlier design, m in [6, 20]; the others
+("non-responders") have the weak range, scaled by exp(log_m_scale_non). The anchor and the controls are then asked of
+this family with the same code. It is a robustness probe, not a fit, and it is not an MGMT model.
 """
 from __future__ import annotations
+
+from pathlib import Path
 
 import numpy as np
 from scipy.stats import qmc
@@ -24,6 +32,7 @@ from scipy.stats import qmc
 import trackc_sim as tc
 import trackc_survival as sv
 
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
 DAYS_PER_MONTH = 30.44
 TARGET_PFS_DAYS = (4.7 * DAYS_PER_MONTH, 6.1 * DAYS_PER_MONTH)       # 143.1 to 185.7 d (RTOG 0525 standard arm)
 STD_COURSES = 6                                                       # label: 6 maintenance cycles
@@ -34,29 +43,41 @@ B0_HALF_WIDTH = 0.10
 AXES = (("log_r_shift", -0.7, 0.9), ("log_m_scale", float(np.log(0.05)), 0.0),
         ("log_f0_shift", -0.7, 2.3), ("B0_center", 0.12, 0.55), ("c", 0.0, 0.25))
 WORLD_KEYS = [a[0] for a in AXES] + ["mu", "nu"]
+# Mixture family: the kill-scale axis is the scale of the NON-responders; q is the responder fraction.
+MIX_AXES = (("log_r_shift", -0.7, 0.9), ("log_m_scale_non", float(np.log(0.02)), float(np.log(0.3))),
+            ("log_f0_shift", -0.7, 2.3), ("B0_center", 0.12, 0.55), ("c", 0.0, 0.25), ("q", 0.1, 0.6))
+FAMILY_AXES = {"single": AXES, "mixture": MIX_AXES}
 SCAN_TIMES = (84, 168, 252, 336, 504)
 
 
+def world_keys(family="single"):
+    """Names of the world columns of one family, in a fixed order (the continuous axes, then mu and nu)."""
+    return [a[0] for a in FAMILY_AXES[family]] + ["mu", "nu"]
+
+
 # ---------------------------------------------------------------- worlds
-def draw_worlds(n, seed):
+def draw_worlds(n, seed, family="single"):
     """n worlds by Latin hypercube over the continuous axes; mu and nu take the three levels with equal weight."""
+    axes = FAMILY_AXES[family]
     rng = np.random.default_rng(seed)
-    u = qmc.LatinHypercube(d=len(AXES) + 2, seed=rng).random(n)
+    u = qmc.LatinHypercube(d=len(axes) + 2, seed=rng).random(n)
     worlds = []
     for i in range(n):
         w = {"world": i}
-        for k, (name, lo, hi) in enumerate(AXES):
+        for k, (name, lo, hi) in enumerate(axes):
             w[name] = float(lo + u[i, k] * (hi - lo))
         for k, name in enumerate(("mu", "nu")):
-            w[name] = MU_NU_LEVELS[min(int(u[i, len(AXES) + k] * len(MU_NU_LEVELS)), len(MU_NU_LEVELS) - 1)]
+            w[name] = MU_NU_LEVELS[min(int(u[i, len(axes) + k] * len(MU_NU_LEVELS)), len(MU_NU_LEVELS) - 1)]
         worlds.append(w)
     return worlds
 
 
 def world_ranges(w):
-    """The parameter-range dictionary of one world, in the format of tc.draw_scenarios."""
+    """The parameter-range dictionary of one world, in the format of tc.draw_scenarios.
+    For a mixture world this is the range of the non-responders (the responders are handled in draw_patients)."""
     base = tc.RANGES
-    s_r, s_m, s_f = np.exp(w["log_r_shift"]), np.exp(w["log_m_scale"]), np.exp(w["log_f0_shift"])
+    log_m = w["log_m_scale"] if "log_m_scale" in w else w["log_m_scale_non"]
+    s_r, s_m, s_f = np.exp(w["log_r_shift"]), np.exp(log_m), np.exp(w["log_f0_shift"])
     ranges = dict(base)
     ranges["r"] = (base["r"][0] * s_r, base["r"][1] * s_r, "log")
     ranges["m"] = (base["m"][0] * s_m, base["m"][1] * s_m, "log")
@@ -67,16 +88,59 @@ def world_ranges(w):
 
 
 def draw_patients(w, n, seed):
-    """n simulated patients of one world (arrays of length n, ready for tc.simulate)."""
+    """n simulated patients of one world (arrays of length n, ready for tc.simulate).
+    A world with a responder fraction q (mixture family) gives each patient the earlier kill range m in [6, 20] with
+    probability q; the draw for the responders and the responder flags use their own random streams, so the other
+    parameters of the patients do not depend on q."""
     scen = tc.draw_scenarios(n, seed, ranges=world_ranges(w))
     scen["mu"] = np.full(n, float(w["mu"]))
     scen["nu"] = np.full(n, float(w["nu"]))
+    if "q" in w:
+        seq = [int(s) for s in seed] if np.iterable(seed) else [int(seed)]
+        responder = np.random.default_rng(seq + [2]).random(n) < float(w["q"])
+        m_resp = tc.draw_scenarios(n, seq + [1], ranges=dict(world_ranges(w), m=tc.RANGES["m"]))["m"]
+        scen["m"] = np.where(responder, m_resp, scen["m"])
     return scen
 
 
 def concat(scens):
     """Stack scenario dictionaries (one per world) into one batch; patients stay independent."""
     return {k: np.concatenate([s[k] for s in scens]) for k in scens[0]}
+
+
+# ---------------------------------------------------------------- run configurations
+# A configuration names a world family, its seed blocks (registry: src/trackc_seed_registry.py, purpose
+# stage2_dev) and a suffix for the output folders. "single" is the configuration of the runs of 2026-11-04
+# (scripts 192 to 194); "single_rep" repeats it with fresh seeds; "mixture" uses the mixture family. The scripts take
+# --config NAME and hand the dictionary to their worker processes (module globals set in main() do not reach
+# spawned workers). Only "single_rep" and "mixture" add the 3- and 4-course variants of the standard arm.
+CONFIGS = {
+    "single": dict(family="single", suffix="", extra_variants=False, world_seed=20261801, patient_seed=20261802,
+                   noise_c=1_810_000, d_seed=20261803, noise_d=1_820_000, e_eval_seed=20261804, e_sel_seed=20261805,
+                   noise_e=1_830_000, i_seed=20261806, noise_i=1_840_000, j_seed=20261807),
+    "single_rep": dict(family="single", suffix="_rep", extra_variants=True, world_seed=20261810, patient_seed=20261811,
+                       noise_c=1_850_000, d_seed=20261812, noise_d=1_860_000, e_eval_seed=20261813,
+                       e_sel_seed=20261814, noise_e=1_870_000, i_seed=20261815, noise_i=1_880_000, j_seed=20261816),
+    "mixture": dict(family="mixture", suffix="_mixture", extra_variants=True, world_seed=20261820,
+                    patient_seed=20261821, noise_c=1_890_000, d_seed=20261822, noise_d=1_890_100,
+                    e_eval_seed=20261823, e_sel_seed=20261824, noise_e=1_890_200, i_seed=20261825,
+                    noise_i=1_890_300, j_seed=20261826),
+}
+STAGE_DIRS = {"C": "trackc_stage2_C_calibration", "D": "trackc_stage2_D_negative_controls",
+              "E": "trackc_stage2_E_regime_map", "I": "trackc_stage2_I_numerics",
+              "J": "trackc_stage2_J_response_depth", "CD": "trackc_stage2_CD_analysis"}
+
+
+def get_config(name):
+    """A copy of the named configuration, with its name added."""
+    if name not in CONFIGS:
+        raise KeyError(f"unknown config {name!r}; choose one of {sorted(CONFIGS)}")
+    return dict(CONFIGS[name], name=name)
+
+
+def stage_dir(stage, cfg, smoke=False):
+    """Output folder of one stage ('C', 'D', 'E', 'I', 'J', 'CD') for one configuration."""
+    return PROJECT_ROOT / "output" / (STAGE_DIRS[stage] + cfg["suffix"] + ("_smoke" if smoke else ""))
 
 
 # ---------------------------------------------------------------- arms

@@ -18,13 +18,15 @@ courses among patients without a progression call at the day-168 scan, measured 
 from a Cox model with Efron ties (src/trackc_survival.py). A control passes if the model hazard ratio lies inside
 the published 95% interval. No dosing policy is compared here.
 
-Seeds (registry: src/trackc_seed_registry.py, purpose stage2_dev):
+Seeds (registry: src/trackc_seed_registry.py, purpose stage2_dev), configuration "single" (the run of 2026-11-04):
     patients   seed [20261803, world index]
     noise      key [1_820_000, world index]   (the arms ignore readings; the key is only passed to the simulator)
 Written to output/trackc_stage2_D_negative_controls/ (manifest.json first, then controls.csv, controlled_worlds.csv,
-results.json).
+results.json). --config single_rep | mixture reads the matching folder of script 192 and uses the seeds and the folder
+suffix defined in src/trackc_calibration.py.
 
 Run:  python src/193_trackc_negative_controls.py --workers 3
+      python src/193_trackc_negative_controls.py --config mixture --workers 3
       python src/193_trackc_negative_controls.py --smoke        (reads the smoke output of script 192)
 """
 from __future__ import annotations
@@ -51,9 +53,6 @@ import trackc_calibration as cal  # noqa: E402
 import trackc_manifest as man  # noqa: E402
 
 SCRIPT = "src/193_trackc_negative_controls.py"
-OUT_DIR = PROJECT_ROOT / "output" / "trackc_stage2_D_negative_controls"
-C_DIR = PROJECT_ROOT / "output" / "trackc_stage2_C_calibration"
-SCEN_SEED, NOISE_BASE = 20261803, 1_820_000
 N_PAT = 3000
 DD_MULTS = (1.5, 2.0, 3.0)
 PRIMARY_MULT = cal.DOSE_DENSE_MULT
@@ -67,11 +66,9 @@ WEAKEST = [
 
 
 def _smoke(args):
-    global N_PAT, OUT_DIR, C_DIR
+    global N_PAT
     if args.smoke:
         N_PAT = 400
-        OUT_DIR = PROJECT_ROOT / "output" / "trackc_stage2_D_negative_controls_smoke"
-        C_DIR = PROJECT_ROOT / "output" / "trackc_stage2_C_calibration_smoke"
 
 
 def read_kept(c_dir):
@@ -79,13 +76,13 @@ def read_kept(c_dir):
         return [{k: (int(v) if k == "world" else float(v)) for k, v in row.items()} for row in csv.DictReader(fh)]
 
 
-def evaluate_world(w, n_pat):
+def evaluate_world(w, n_pat, cfg, keys):
     """One kept world: re-draw patients, re-check the calibration, run both controls. Pure function."""
-    scen = cal.draw_patients(w, n_pat, [SCEN_SEED, int(w["world"])])
-    seed = [NOISE_BASE, int(w["world"])]
+    scen = cal.draw_patients(w, n_pat, [cfg["d_seed"], int(w["world"])])
+    seed = [cfg["noise_d"], int(w["world"])]
     ref = cal.run_arm(scen, seed=seed)
     st = cal.pfs_stats(ref[0], ref[1])
-    row = {k: w[k] for k in ["world"] + cal.WORLD_KEYS}
+    row = {k: w[k] for k in ["world"] + list(keys)}
     row.update({"c_median_interp": w["base_median_interp"], "re_median_interp": st["median_interp"],
                 "re_pass": bool(cal.in_target(st["median_interp"])), "re_S84": st["S84"], "re_S168": st["S168"]})
     for m in DD_MULTS:
@@ -104,8 +101,9 @@ def _job(args):
     return evaluate_world(*args)
 
 
-def analyse(rows):
+def analyse(rows, keys=None):
     """Summary of the control results. Pure function, no I/O."""
+    keys = cal.WORLD_KEYS if keys is None else keys
     n = len(rows)
     res = {"n_kept_worlds_from_script_192": n, "primary_dose_multiplier": PRIMARY_MULT,
            "published": {"dose_dense_pfs_hr": list(cal.DOSE_DENSE_HR), "twelve_vs_six_pfs_hr": list(cal.TWELVE_VS_SIX_HR)}}
@@ -126,7 +124,7 @@ def analyse(rows):
     res["frac_landmark_hr_below_published_lower_bound"] = float(np.mean([r["lm_hr"] < cal.TWELVE_VS_SIX_HR[1] for r in rows]))
     res["axes"] = {}
     ctl = flag("controlled")
-    for name in cal.WORLD_KEYS:
+    for name in keys:
         x = np.array([r[name] for r in rows], float)
         entry = {"kept_mean": float(x.mean()), "controlled_mean": float(x[ctl].mean()) if ctl.any() else None,
                  "landmark_ok_mean": float(x[flag("lm_ok")].mean()) if flag("lm_ok").any() else None,
@@ -138,7 +136,8 @@ def analyse(rows):
     return res
 
 
-def write_csvs(rows, out_dir):
+def write_csvs(rows, out_dir, keys=None):
+    keys = list(cal.WORLD_KEYS if keys is None else keys)
     if not rows:
         return
     cols = list(rows[0].keys())
@@ -149,10 +148,10 @@ def write_csvs(rows, out_dir):
             w.writerow([f"{r[c]:.6g}" if isinstance(r[c], float) else int(r[c]) if isinstance(r[c], (bool, np.bool_)) else r[c] for c in cols])
     with open(out_dir / "controlled_worlds.csv", "w", newline="", encoding="utf-8") as fh:
         w = csv.writer(fh)
-        w.writerow(["world"] + cal.WORLD_KEYS + ["re_median_interp", f"dd{PRIMARY_MULT:g}_hr", "lm_hr"])
+        w.writerow(["world"] + keys + ["re_median_interp", f"dd{PRIMARY_MULT:g}_hr", "lm_hr"])
         for r in rows:
             if r["controlled"]:
-                w.writerow([r["world"]] + [f"{r[c]:.10g}" for c in cal.WORLD_KEYS]
+                w.writerow([r["world"]] + [f"{r[c]:.10g}" for c in keys]
                            + [f"{r['re_median_interp']:.6g}", f"{r[f'dd{PRIMARY_MULT:g}_hr']:.4f}", f"{r['lm_hr']:.4f}"])
 
 
@@ -160,15 +159,20 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--workers", type=int, default=3)
     ap.add_argument("--smoke", action="store_true")
+    ap.add_argument("--config", default="single", help="run configuration of src/trackc_calibration.py (single, single_rep, mixture)")
     args = ap.parse_args()
     _smoke(args)
+    cfg = cal.get_config(args.config)
+    OUT_DIR, C_DIR = cal.stage_dir("D", cfg, args.smoke), cal.stage_dir("C", cfg, args.smoke)
+    keys = cal.world_keys(cfg["family"])
     if (OUT_DIR / "results.json").exists():
         sys.exit(f"refusing to overwrite {OUT_DIR / 'results.json'}")
     if not (C_DIR / "results.json").exists():
         sys.exit(f"script 192 has not finished: {C_DIR / 'results.json'} is missing")
     kept = read_kept(C_DIR)
-    protocol = {"script": "193_trackc_negative_controls", "stage": "2D", "smoke": bool(args.smoke), "n_patients_per_world": N_PAT,
-                "scenario_seed": SCEN_SEED, "noise_base": NOISE_BASE, "dose_multipliers": list(DD_MULTS),
+    protocol = {"script": "193_trackc_negative_controls", "stage": "2D", "config": cfg["name"], "family": cfg["family"],
+                "smoke": bool(args.smoke), "n_patients_per_world": N_PAT,
+                "scenario_seed": cfg["d_seed"], "noise_base": cfg["noise_d"], "dose_multipliers": list(DD_MULTS),
                 "primary_multiplier": PRIMARY_MULT, "landmark_days": cal.LANDMARK_DAYS,
                 "published_dose_dense_hr": list(cal.DOSE_DENSE_HR), "published_12_vs_6_hr": list(cal.TWELVE_VS_SIX_HR),
                 "target_days": list(cal.TARGET_PFS_DAYS), "kept_worlds": [k["world"] for k in kept],
@@ -176,18 +180,18 @@ def main():
                 "input_results_sha256": hashlib.sha256((C_DIR / "results.json").read_bytes()).hexdigest()}
     last = max([k["world"] for k in kept], default=0)
     manifest = man.build_manifest("193_trackc_negative_controls", protocol, purpose="stage2_dev",
-                                  scenario=(SCEN_SEED, SCEN_SEED), noise=(NOISE_BASE, NOISE_BASE),
-                                  script=SCRIPT, require_clean=not args.smoke,
+                                  scenario=(cfg["d_seed"], cfg["d_seed"]), noise=(cfg["noise_d"], cfg["noise_d"]),
+                                  script=SCRIPT, require_clean=not args.smoke, check_seeds=not args.smoke,
                                   paths=man.CORE_CODE + ("src/trackc_survival.py", "src/trackc_calibration.py"))
     man.write_manifest(OUT_DIR, manifest)                  # before any simulation
     print(f"manifest written; protocol sha256 {manifest['protocol_sha256'][:12]}; git clean {manifest['git']['clean']}; "
-          f"{len(kept)} kept worlds (largest index {last})", flush=True)
+          f"{len(kept)} kept worlds (largest index {last}); config {cfg['name']}", flush=True)
 
     t0 = time.time()
     with ProcessPoolExecutor(max_workers=args.workers) as ex:
-        rows = list(ex.map(_job, [(w, N_PAT) for w in kept]))
-    write_csvs(rows, OUT_DIR)
-    res = analyse(rows)
+        rows = list(ex.map(_job, [(w, N_PAT, cfg, keys) for w in kept]))
+    write_csvs(rows, OUT_DIR, keys)
+    res = analyse(rows, keys)
     res.update({"script": "193_trackc_negative_controls",
                 "label": "SIMULATION; DEVELOPMENT seeds only; exploratory; negative controls on open-loop arms",
                 "protocol": protocol, "protocol_sha256": manifest["protocol_sha256"],
