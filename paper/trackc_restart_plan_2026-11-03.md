@@ -1,6 +1,8 @@
 # Track C restart plan (2026-11-03)
 
-**Status (2026-11-03):** approved by the user on 2026-11-03. Stage 0 (clean record) in progress. Stages 1 to 5 not started. No sealed run is authorized. This file is the durable copy of the approved plan; `START_HERE.md` points here.
+**Status (updated 2026-11-04):** approved by the user on 2026-11-03. Stage 0 (clean record) is done and committed. Stage 1 (targets table and anchored spec) is drafted and waits for the outside review; its reply must be logged in `paper/chatgpt_review_response.md`. Stage 2 is in progress on development seeds: script 190 (test A) is running, 191 (test B) is done, 192 (test C, calibration) and 193 (test D, negative controls) are written and 192 is running, 194 (test E, regime map, simple rules only) is written. Scripts 195 to 198 are claimed for tests F to I. Stages 3 to 5 not started. No sealed run is authorized. This file is the durable copy of the approved plan; `START_HERE.md` points here.
+
+Deviations from the plan as approved (recorded 2026-11-04): (1) the parallel harness of script 177 was not moved to `src/` because its execution manifest pins its path and hash; new scripts use their own process pools and the run manifest of `src/trackc_manifest.py`. (2) Test C uses an interpolated Kaplan-Meier median because a scan every 84 days puts the plain median on the grid 84, 168, 252 days. (3) Test E first uses simple rules only; the particle-filter rules are too slow for a first pass over many worlds.
 
 Everything below is simulation work unless it says otherwise. No clinical claim, no patient-specific effect, no digital-twin claim.
 
