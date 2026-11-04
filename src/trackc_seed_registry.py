@@ -190,6 +190,18 @@ ENTRIES = [
     _entry("199", "Stage 2J response-depth check of the single_rep replicate", "dev_used", [(20261816, 20261816)], [],
            [("output/trackc_stage2_J_response_depth_rep/results.json", "20261816")],
            note="Dev run 2026-11-04. Patients seed [20261816, world index]; open loop, no noise key."),
+    _entry("194", "Stage 2E regime map of the mixture family", "dev_used", [(20261823, 20261824)], [(1890200, 1890200)],
+           [("output/trackc_stage2_E_regime_map_mixture/results.json", "20261823")],
+           note="Dev run 2026-11-04. Evaluation patients seed [20261823, world index], selection patients seed "
+                "[20261824, world index], noise key [1_890_200, world index], the same key in every arm. A first launch "
+                "of this run was stopped a few minutes after its manifest was written, before any result existed, so "
+                "that the response-guided arms could be added; the run was relaunched with the same seeds."),
+    _entry("194", "Stage 2E regime map of the single_rep replicate", "dev_used", [(20261813, 20261814)], [(1870000, 1870000)],
+           [("output/trackc_stage2_E_regime_map_rep/results.json", "20261813")],
+           note="Dev run 2026-11-04. Evaluation patients seed [20261813, world index], selection patients seed "
+                "[20261814, world index], noise key [1_870_000, world index], the same key in every arm. A first launch "
+                "of this run was stopped a few minutes after its manifest was written, before any result existed, so "
+                "that the response-guided arms could be added; the run was relaunched with the same seeds."),
 ]
 ENTRIES.append(_reserved_stage2_dev(ENTRIES))
 ENTRIES.append(_entry("restart", "Stage 3 sealed run (restart plan)", "reserved", [(20262300, 20262499)],
