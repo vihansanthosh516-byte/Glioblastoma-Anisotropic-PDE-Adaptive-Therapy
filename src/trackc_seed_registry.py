@@ -258,6 +258,18 @@ ENTRIES = [
            [("output/trackc_stage2_H_value_of_information_mixture_mix36/results.json", "20261858")],
            note="Dev run 2026-11-04. Mixed course cap in the worlds of the configuration. Selection patients seed [20261858, world "
                 "index], evaluation patients seed [20261859, world index]; open loop, no noise key."),
+    _entry("204", "Stage 2M what the RANO-like headroom consists of, single configuration", "dev_used", [(20261860, 20261861)], [],
+           [("output/trackc_stage2_M_endpoint_mechanism/results.json", "20261860")],
+           note="Dev run 2026-11-04. Selection patients seed [20261860, world index], evaluation patients seed [20261861, world "
+                "index]; open loop, no noise key."),
+    _entry("204", "Stage 2M what the RANO-like headroom consists of, single_rep configuration", "dev_used", [(20261862, 20261863)], [],
+           [("output/trackc_stage2_M_endpoint_mechanism_rep/results.json", "20261862")],
+           note="Dev run 2026-11-04. Selection patients seed [20261862, world index], evaluation patients seed [20261863, world "
+                "index]; open loop, no noise key."),
+    _entry("204", "Stage 2M what the RANO-like headroom consists of, mixture configuration", "dev_used", [(20261864, 20261865)], [],
+           [("output/trackc_stage2_M_endpoint_mechanism_mixture/results.json", "20261864")],
+           note="Dev run 2026-11-04. Selection patients seed [20261864, world index], evaluation patients seed [20261865, world "
+                "index]; open loop, no noise key."),
 ]
 ENTRIES.append(_reserved_stage2_dev(ENTRIES))
 ENTRIES.append(_entry("restart", "Stage 3 sealed run (restart plan)", "reserved", [(20262300, 20262499)],
