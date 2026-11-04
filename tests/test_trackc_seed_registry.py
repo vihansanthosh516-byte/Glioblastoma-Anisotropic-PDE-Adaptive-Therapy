@@ -50,19 +50,20 @@ def test_check_free_refuses_spent_and_dev_seeds():
     assert reg.check_free(noise=(1122001, 1122004))
     assert reg.check_free(scenario=(20262100, 20262100))          # 176 dev
     assert reg.check_free(scenario=(20262200, 20262200))          # 177 dev
-    # Stage 2 dev seeds already spent (190, 192): refused with or without the stage2_dev purpose
+    # Stage 2 dev seeds already spent (190, 192, 193, 194, 198): refused with or without the stage2_dev purpose
     for scen, noise in (((20261800, 20261800), (1800001, 1800016)), ((20261801, 20261802), (1810000, 1810000)),
-                        ((20261803, 20261803), (1820000, 1820000)), ((20261804, 20261805), (1830000, 1830000))):
+                        ((20261803, 20261803), (1820000, 1820000)), ((20261804, 20261805), (1830000, 1830000)),
+                        ((20261806, 20261806), (1840000, 1840000))):
         assert reg.check_free(scenario=scen)
         assert reg.check_free(noise=noise)
         assert reg.check_free(scenario=scen, noise=noise, purpose="stage2_dev")
 
 
 def test_check_free_accepts_reserved_block_only_for_its_purpose():
-    assert reg.check_free(scenario=(20261900, 20261999), noise=(1850000, 1850999),
+    assert reg.check_free(scenario=(20261900, 20261999), noise=(1899000, 1899999),
                           purpose="stage2_dev") == []
-    assert reg.check_free(scenario=(20261806, 20261807), noise=(1840000, 1840000),
-                          purpose="stage2_dev") == []                  # the next free dev seeds, not yet spent
+    assert reg.check_free(scenario=(20261908, 20261909), noise=(1895000, 1895000),
+                          purpose="stage2_dev") == []                  # a free dev block no configuration uses
     # the dev block cannot be spent as a sealed block, and vice versa
     assert reg.check_free(scenario=(20261900, 20261999), purpose="stage3_sealed")
     assert reg.check_free(scenario=(20262300, 20262399), purpose="stage2_dev")
@@ -73,6 +74,18 @@ def test_check_free_accepts_reserved_block_only_for_its_purpose():
     # a request that spills out of the block is refused
     assert reg.check_free(scenario=(20262050, 20262150), purpose="stage2_dev")
     assert reg.check_free(scenario=(20261900, 20261800))          # low above high
+
+
+def test_remainder_helper_and_reserved_entry_follow_the_used_entries():
+    assert reg._remainder((1, 10), [(3, 4), (8, 20), (-5, 0)]) == [(1, 2), (5, 7)]
+    assert reg._remainder((1, 10), []) == [(1, 10)] and reg._remainder((1, 10), [(1, 10)]) == []
+    reserved = [e for e in reg.ENTRIES if e["status"] == "reserved" and e["purpose"] == "stage2_dev"][0]
+    used = [e for e in reg.ENTRIES if e["status"] != "reserved"]
+    again = reg._reserved_stage2_dev(used)
+    assert again["scenario_seeds"] == reserved["scenario_seeds"] and again["noise_keys"] == reserved["noise_keys"]
+    lo, hi = reg.STAGE2_DEV_SCENARIO_BLOCK
+    assert reserved["scenario_seeds"][0][0] > 20261806 and reserved["scenario_seeds"][-1][1] == hi
+    assert reserved["noise_keys"][0] == [1800000, 1800000]            # the one free key before the 190 block
 
 
 def test_unused_gap_seeds_are_free_without_purpose():

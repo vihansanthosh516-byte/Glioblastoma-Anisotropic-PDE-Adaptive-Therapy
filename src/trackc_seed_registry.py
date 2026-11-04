@@ -16,7 +16,8 @@ Reserved on 2026-11-03 by paper/trackc_restart_plan_2026-11-03.md:
     stage3_sealed  scenario 20262300-20262499, noise keys 2,300,000-2,399,999
                    (spend only after the Stage 3 gate and the user's OK)
 The stage2_dev block shrinks as seeds are spent: a dev_used entry is added after the run's manifest is written,
-and the reserved ranges below skip it, so a reserved block never touches a used seed.
+and the reserved stage2_dev ranges are computed from the dev_used entries (_reserved_stage2_dev), so a reserved
+block never touches a used seed.
 
 Run:  python src/trackc_seed_registry.py            check and print
       python src/trackc_seed_registry.py --write    also write output/trackc_seed_registry.json
@@ -37,6 +38,33 @@ def _entry(script, label, status, scen, noise, evidence=(), purpose=None, note="
     return {"script": script, "label": label, "status": status, "purpose": purpose,
             "scenario_seeds": [list(r) for r in scen], "noise_keys": [list(r) for r in noise],
             "evidence": [list(e) for e in evidence], "note": note}
+
+
+STAGE2_DEV_SCENARIO_BLOCK = (20261800, 20262099)
+STAGE2_DEV_NOISE_BLOCK = (1800000, 1899999)
+
+
+def _remainder(block, used):
+    """Inclusive ranges inside `block` that no range in `used` touches, sorted."""
+    lo, hi = block
+    out, cur = [], lo
+    for a, b in sorted((max(a, lo), min(b, hi)) for a, b in used if a <= hi and b >= lo):
+        if a > cur:
+            out.append((cur, a - 1))
+        cur = max(cur, b + 1)
+    if cur <= hi:
+        out.append((cur, hi))
+    return out
+
+
+def _reserved_stage2_dev(entries):
+    """The reserved stage2_dev entry: the block minus every range that a used entry already holds."""
+    used = [e for e in entries if e["status"] != "reserved"]
+    scen = _remainder(STAGE2_DEV_SCENARIO_BLOCK, [tuple(r) for e in used for r in e["scenario_seeds"]])
+    noise = _remainder(STAGE2_DEV_NOISE_BLOCK, [tuple(r) for e in used for r in e["noise_keys"]])
+    return _entry("restart", "Stage 2 dev runs (restart plan)", "reserved", scen, noise, purpose="stage2_dev",
+                  note="Reserved 2026-11-03; shrinks as dev seeds are spent (computed from the dev_used entries). "
+                       "Dev runs only. Never a test.")
 
 
 ENTRIES = [
@@ -105,14 +133,15 @@ ENTRIES = [
            [("output/trackc_stage2_E_regime_map/results.json", "20261804")],
            note="Dev run 2026-11-04. Evaluation patients seed [20261804, world index], selection patients seed "
                 "[20261805, world index], noise key [1_830_000, world index], the same key in every arm."),
-    _entry("restart", "Stage 2 dev runs (restart plan)", "reserved", [(20261806, 20262099)],
-           [(1800000, 1800000), (1800017, 1809999), (1810001, 1819999), (1820001, 1829999), (1830001, 1899999)],
-           purpose="stage2_dev",
-           note="Reserved 2026-11-03; shrinks as dev seeds are spent (190, 192, 193, 194 so far). Dev runs only. Never a test."),
-    _entry("restart", "Stage 3 sealed run (restart plan)", "reserved", [(20262300, 20262499)],
-           [(2300000, 2399999)], purpose="stage3_sealed",
-           note="Reserved 2026-11-03. Spend only after the Stage 3 gate and the user's OK."),
+    _entry("198", "Stage 2I integration-step check on the controlled worlds", "dev_used", [(20261806, 20261806)],
+           [(1840000, 1840000)], [("output/trackc_stage2_I_numerics/results.json", "20261806")],
+           note="Dev run 2026-11-04. Patients seed [20261806, world index], noise key [1_840_000, world index]; "
+                "the open-loop arms ignore readings."),
 ]
+ENTRIES.append(_reserved_stage2_dev(ENTRIES))
+ENTRIES.append(_entry("restart", "Stage 3 sealed run (restart plan)", "reserved", [(20262300, 20262499)],
+                      [(2300000, 2399999)], purpose="stage3_sealed",
+                      note="Reserved 2026-11-03. Spend only after the Stage 3 gate and the user's OK."))
 
 # Overlaps that exist on purpose or are recorded as a flaw. The test compares the computed
 # overlaps with this list, so a new accidental overlap fails the test.
