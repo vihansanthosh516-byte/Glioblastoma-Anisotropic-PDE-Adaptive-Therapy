@@ -98,6 +98,10 @@ def test_build_manifest_checks_seeds_and_tree(tmp_path):
     assert m["git"]["clean"] is True and m["protocol_sha256"] and m["purpose"] == "stage2_dev"
     assert set(m["code_sha256"]) == {"src/trackc_sim.py", "src/run_demo.py"}
     assert m["label"].startswith("SIMULATION ONLY")
+    assert m["noise_keys"] == [1850000, 1850499]
+    # a run with no noise key (open loop, no readings) is allowed and records an empty list
+    m0 = man.build_manifest(purpose="stage2_dev", scenario=(20261900, 20261949), noise=None, **kw)
+    assert m0["noise_keys"] == [] and m0["scenario_seeds"] == [20261900, 20261949]
     # spent seeds are refused
     with pytest.raises(ValueError):
         man.build_manifest(purpose="stage2_dev", scenario=(20261122, 20261122), noise=(1850000, 1850001), **kw)

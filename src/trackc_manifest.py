@@ -100,7 +100,7 @@ def build_manifest(name, protocol, purpose, scenario, noise, script, require_cle
     return {
         "name": name, "label": LABEL, "purpose": purpose,
         "created_utc": datetime.now(timezone.utc).isoformat(),
-        "scenario_seeds": list(scenario), "noise_keys": list(noise),
+        "scenario_seeds": list(scenario), "noise_keys": list(noise) if noise is not None else [],
         "registry_sha256": reg.registry_document()["sha256"],
         "protocol": protocol, "protocol_sha256": protocol_hash(protocol, run_paths, root),
         "solver_constants": solver_constants(), "code_sha256": hashes, "git": state,
