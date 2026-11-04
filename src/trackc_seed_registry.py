@@ -202,6 +202,15 @@ ENTRIES = [
                 "[20261814, world index], noise key [1_870_000, world index], the same key in every arm. A first launch "
                 "of this run was stopped a few minutes after its manifest was written, before any result existed, so "
                 "that the response-guided arms could be added; the run was relaunched with the same seeds."),
+    _entry("193", "Stage 2D negative controls of the single_mix configuration", "dev_used", [(20261832, 20261832)],
+           [(1891100, 1891100)], [("output/trackc_stage2_D_negative_controls_mix36/results.json", "20261832")],
+           note="Dev run 2026-11-04. Fresh patients for the worlds kept by the single_mix calibration (mixed course cap, "
+                "63% of the patients allowed 3 courses and 37% allowed 6): seed [20261832, world index], noise key "
+                "[1_891_100, world index]; the open-loop arms ignore readings."),
+    _entry("193", "Stage 2D negative controls of the mixture_mix configuration", "dev_used", [(20261842, 20261842)],
+           [(1892100, 1892100)], [("output/trackc_stage2_D_negative_controls_mixture_mix36/results.json", "20261842")],
+           note="Dev run 2026-11-04. Fresh patients for the worlds kept by the mixture_mix calibration (mixed course cap): "
+                "seed [20261842, world index], noise key [1_892_100, world index]; the open-loop arms ignore readings."),
 ]
 ENTRIES.append(_reserved_stage2_dev(ENTRIES))
 ENTRIES.append(_entry("restart", "Stage 3 sealed run (restart plan)", "reserved", [(20262300, 20262499)],
