@@ -84,8 +84,9 @@ def evaluate_world(w, n_pat, cfg):
     scen = cal.draw_patients(w, n_pat, [cfg["k_seed"], int(w["world"])])
     seed = [cfg["noise_k"], int(w["world"])]
     resp = cal.responder_mask(scen, w)
-    t0, e0, _ = cal.run_arm(scen, seed=seed)
-    t1, e1, _ = cal.run_arm(scen, dose=cal.DOSE_DENSE_MULT, seed=seed)
+    caps = cal.std_caps(cfg["std_courses"], n_pat)
+    t0, e0, _ = cal.run_arm(scen, courses=caps, seed=seed)
+    t1, e1, _ = cal.run_arm(scen, courses=caps, dose=cal.DOSE_DENSE_MULT, seed=seed)
     t, e, r = np.r_[t0, t1], np.r_[e0, e1], np.r_[resp, resp]
     med = lambda m: float(sv.km_median_interp(t[m], e[m])) if m.sum() > 1 else float("nan")  # noqa: E731
     row = {"world": int(w["world"]), "q": float(w["q"]), "responder_share_sample": float(resp.mean()),
@@ -156,7 +157,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--workers", type=int, default=4)
     ap.add_argument("--smoke", action="store_true")
-    ap.add_argument("--config", default="mixture", help="run configuration with a mixture family (mixture)")
+    ap.add_argument("--config", default="mixture", help="run configuration with a mixture family (mixture, mixture_mix)")
     args = ap.parse_args()
     _smoke(args)
     cfg = cal.get_config(args.config)
@@ -177,6 +178,7 @@ def main():
     protocol = {"script": "201_trackc_stratified_anchor", "stage": "2K", "config": cfg["name"], "family": cfg["family"],
                 "smoke": bool(args.smoke), "n_patients_per_world": N_PAT, "scenario_seed": cfg["k_seed"],
                 "noise_base": cfg["noise_k"], "dose_dense_multiplier": cal.DOSE_DENSE_MULT,
+                **cal.exposure_protocol(cfg),
                 "targets_days": {"unmethylated": list(cal.MGMT_UNMETHYLATED_PFS_DAYS), "methylated": list(cal.MGMT_METHYLATED_PFS_DAYS),
                                  "methylated_fraction_wilson_95": list(cal.MGMT_METHYLATED_FRACTION_CI)},
                 "kept_worlds": [k["world"] for k in kept], "controlled_worlds": controlled_ids,

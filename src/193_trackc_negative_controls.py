@@ -63,6 +63,11 @@ WEAKEST = [
     "the landmark control uses 3,000 simulated patients per world, about 1,500 of them past the landmark; a world near an interval edge can flip",
     "the real trials include toxicity, drop-out and deaths before progression, none of which are modelled",
 ]
+MIX_NOTE = ("with a mixed course cap (configs ending in _mix) the landmark comparison uses only the patients whose standard "
+            "cap is 6 and who are still progression-free at the day-168 scan, because the published trial randomised after 6 "
+            "completed cycles; that group is smaller than in the default configs, so the model landmark hazard ratio is "
+            "noisier (lm_n in controls.csv); the 3-or-6 cap split is an assumed reading of the reported median of 3 cycles "
+            "and 37% with 6 or more, and it does not depend on prognosis or response")
 
 
 def _smoke(args):
@@ -80,17 +85,18 @@ def evaluate_world(w, n_pat, cfg, keys):
     """One kept world: re-draw patients, re-check the calibration, run both controls. Pure function."""
     scen = cal.draw_patients(w, n_pat, [cfg["d_seed"], int(w["world"])])
     seed = [cfg["noise_d"], int(w["world"])]
-    ref = cal.run_arm(scen, seed=seed)
+    courses = cal.std_caps(cfg["std_courses"], n_pat)
+    ref = cal.run_arm(scen, courses=courses, seed=seed)
     st = cal.pfs_stats(ref[0], ref[1])
     row = {k: w[k] for k in ["world"] + list(keys)}
     row.update({"c_median_interp": w["base_median_interp"], "re_median_interp": st["median_interp"],
                 "re_pass": bool(cal.in_target(st["median_interp"])), "re_S84": st["S84"], "re_S168": st["S168"]})
     for m in DD_MULTS:
-        d = cal.dose_dense_control(scen, mult=m, seed=seed, ref=ref)
+        d = cal.dose_dense_control(scen, mult=m, seed=seed, ref=ref, courses=courses)
         tag = f"dd{m:g}"
         row[f"{tag}_hr"], row[f"{tag}_median"] = d["hr"], d["median_dose_dense"]
         row[f"{tag}_ok"] = bool(cal.DOSE_DENSE_HR[1] <= d["hr"] <= cal.DOSE_DENSE_HR[2])
-    lm = cal.landmark_control(scen, seed=seed, ref=ref)
+    lm = cal.landmark_control(scen, seed=seed, ref=ref, courses=courses)
     row.update({"lm_hr": lm["hr"], "lm_ci_lo": lm["ci"][0], "lm_ci_hi": lm["ci"][1], "lm_n": lm["n_landmark"]})
     row["lm_ok"] = bool(cal.TWELVE_VS_SIX_HR[1] <= lm["hr"] <= cal.TWELVE_VS_SIX_HR[2])
     row["controlled"] = bool(row["re_pass"] and row[f"dd{PRIMARY_MULT:g}_ok"] and row["lm_ok"])
@@ -159,7 +165,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--workers", type=int, default=3)
     ap.add_argument("--smoke", action="store_true")
-    ap.add_argument("--config", default="single", help="run configuration of src/trackc_calibration.py (single, single_rep, mixture)")
+    ap.add_argument("--config", default="single", help="run configuration of src/trackc_calibration.py (single, single_rep, mixture, single_mix, mixture_mix)")
     args = ap.parse_args()
     _smoke(args)
     cfg = cal.get_config(args.config)
@@ -173,7 +179,7 @@ def main():
     protocol = {"script": "193_trackc_negative_controls", "stage": "2D", "config": cfg["name"], "family": cfg["family"],
                 "smoke": bool(args.smoke), "n_patients_per_world": N_PAT,
                 "scenario_seed": cfg["d_seed"], "noise_base": cfg["noise_d"], "dose_multipliers": list(DD_MULTS),
-                "primary_multiplier": PRIMARY_MULT, "landmark_days": cal.LANDMARK_DAYS,
+                **cal.exposure_protocol(cfg), "primary_multiplier": PRIMARY_MULT, "landmark_days": cal.LANDMARK_DAYS,
                 "published_dose_dense_hr": list(cal.DOSE_DENSE_HR), "published_12_vs_6_hr": list(cal.TWELVE_VS_SIX_HR),
                 "target_days": list(cal.TARGET_PFS_DAYS), "kept_worlds": [k["world"] for k in kept],
                 "input": str((C_DIR / "kept_worlds.csv").relative_to(PROJECT_ROOT)),
@@ -195,7 +201,8 @@ def main():
     res.update({"script": "193_trackc_negative_controls",
                 "label": "SIMULATION; DEVELOPMENT seeds only; exploratory; negative controls on open-loop arms",
                 "protocol": protocol, "protocol_sha256": manifest["protocol_sha256"],
-                "weakest_points": WEAKEST, "runtime_s": time.time() - t0})
+                "weakest_points": WEAKEST + ([MIX_NOTE] if cfg["std_courses"] == "mix36" else []),
+                "runtime_s": time.time() - t0})
     (OUT_DIR / "results.json").write_text(json.dumps(res, indent=2, default=float) + "\n", encoding="utf-8")
 
     print(f"runtime {res['runtime_s']:.0f} s; wrote {OUT_DIR}")

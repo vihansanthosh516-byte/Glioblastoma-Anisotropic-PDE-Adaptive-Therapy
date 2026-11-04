@@ -76,13 +76,14 @@ def read_controlled(d_dir):
 
 
 def best_response(scen, courses=cal.STD_COURSES, scans=SCANS_USED, scan_every=cal.SCAN_EVERY):
-    """Smallest ratio of true burden to baseline over the first `scans` scans, standard arm, open loop."""
+    """Smallest ratio of true burden to baseline over the first `scans` scans, standard arm, open loop.
+    courses: an int, or one course cap per patient (see cal.std_caps)."""
     S = (1 - scen["f0"]) * scen["B0"]
     R = scen["f0"] * scen["B0"]
     base = S + R
     best = np.ones_like(base)
     for j in range(scans * scan_every):
-        treat = np.full(base.shape, float(j < courses))
+        treat = np.where(j < np.asarray(courses), 1.0, 0.0) * np.ones(base.shape)
         S, R = tc.run_cycle(S, R, scen, treat, j * tc.CYCLE_DAYS)
         if (j + 1) % scan_every == 0:                  # the scan at the start of cycle j + 1
             best = np.minimum(best, (S + R) / base)
@@ -95,8 +96,8 @@ def summarise(ratio):
             "frac_any_shrinkage": float(np.mean(ratio < 1.0)), "median_best_ratio": float(np.median(ratio))}
 
 
-def evaluate_world(w, n_pat, seed):
-    ratio = best_response(cal.draw_patients(w, n_pat, [seed, int(w["world"])]))
+def evaluate_world(w, n_pat, seed, std_courses=cal.STD_COURSES):
+    ratio = best_response(cal.draw_patients(w, n_pat, [seed, int(w["world"])]), courses=cal.std_caps(std_courses, n_pat))
     return {"world": int(w["world"]), **summarise(ratio)}
 
 
@@ -118,7 +119,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--workers", type=int, default=4)
     ap.add_argument("--smoke", action="store_true")
-    ap.add_argument("--config", default="single", help="run configuration of src/trackc_calibration.py (single, single_rep, mixture)")
+    ap.add_argument("--config", default="single", help="run configuration of src/trackc_calibration.py (single, single_rep, mixture, single_mix, mixture_mix)")
     args = ap.parse_args()
     _smoke(args)
     cfg = cal.get_config(args.config)
@@ -133,7 +134,7 @@ def main():
         sys.exit("script 193 found no controlled world")
     protocol = {"script": "199_trackc_response_depth", "stage": "2J", "config": cfg["name"], "family": cfg["family"],
                 "smoke": bool(args.smoke), "n_patients_per_world": N_PAT,
-                "scenario_seed": seed, "scans_used": SCANS_USED, "std_courses": cal.STD_COURSES,
+                "scenario_seed": seed, "scans_used": SCANS_USED, **cal.exposure_protocol(cfg, always=True),
                 "controlled_worlds": [w["world"] for w in worlds],
                 "input": str((D_DIR / "controlled_worlds.csv").relative_to(PROJECT_ROOT)),
                 "input_results_sha256": hashlib.sha256((D_DIR / "results.json").read_bytes()).hexdigest()}
@@ -147,8 +148,9 @@ def main():
 
     t0 = time.time()
     with ProcessPoolExecutor(max_workers=args.workers) as ex:
-        rows = list(ex.map(_job, [(w, N_PAT, seed) for w in worlds]))
-    old = summarise(best_response(tc.draw_scenarios(2 * N_PAT, [seed, 999_999])))
+        rows = list(ex.map(_job, [(w, N_PAT, seed, cfg["std_courses"]) for w in worlds]))
+    old = summarise(best_response(tc.draw_scenarios(2 * N_PAT, [seed, 999_999]),
+                                  courses=cal.std_caps(cfg["std_courses"], 2 * N_PAT)))
     OUT_DIR.mkdir(parents=True, exist_ok=True)
     with open(OUT_DIR / "depth_by_world.csv", "w", newline="", encoding="utf-8") as fh:
         w = csv.writer(fh)

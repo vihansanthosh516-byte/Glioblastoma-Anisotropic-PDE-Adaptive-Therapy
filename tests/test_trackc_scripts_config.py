@@ -90,8 +90,8 @@ def test_194_analyse_accepts_family_keys():
                 for tau in (365, 730):
                     d = 0.0 if arm == "soc6" else 1.0 + w["q"]
                     rows.append({"world": w["world"], "endpoint": ep, "arm": arm, "tau": tau, "rmst": 100.0,
-                                 "diff_vs_soc6": d, "ci_lo": d - 1, "ci_hi": d + 1, "regret_cvar10": -d,
-                                 "frac_worse": 0.1, "mean_courses": 3.0, "courses_diff_vs_soc6": 0.0 if arm == "soc6" else -3.0,
+                                 "diff_vs_ref": d, "ci_lo": d - 1, "ci_hi": d + 1, "regret_cvar10": -d,
+                                 "frac_worse": 0.1, "mean_courses": 3.0, "courses_diff_vs_ref": 0.0 if arm == "soc6" else -3.0,
                                  "frac_beats_informed_730": 0.0, "note": ""})
     res = s.analyse(rows, worlds, cal.world_keys("mixture"))
     block = res["endpoints"]["3b_rano"]["365"]["what_decides_the_gain"]

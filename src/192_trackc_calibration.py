@@ -27,7 +27,10 @@ Seeds (registry: src/trackc_seed_registry.py, purpose stage2_dev), configuration
 Written to output/trackc_stage2_C_calibration/ (manifest.json first, then worlds.csv, kept_worlds.csv, results.json).
 Other configurations (--config single_rep | mixture) are defined in src/trackc_calibration.py: fresh seeds, a folder
 suffix, and for these two the extra variants with 3 and 4 courses in the standard arm (the RTOG 0525 standard arm had a
-median of 3 adjuvant cycles, so the 6-course arm is a stronger drug exposure than the trial arm).
+median of 3 adjuvant cycles, so the 6-course arm is a stronger drug exposure than the trial arm). --config single_mix |
+mixture_mix give the standard arm a mixed course cap read from the two numbers reported for that trial arm (a cap of 3
+for 63% of the patients and of 6 for 37%, spread over the patient index) and show the 3-, 4- and 6-course arms as
+variants. The courses actually delivered (median, share with 6) are written to results.json for comparison.
 
 Run:  python src/192_trackc_calibration.py --workers 3
       python src/192_trackc_calibration.py --config mixture --workers 3
@@ -74,6 +77,8 @@ EXTRA_VARIANTS = {
     "courses3": {"endpoint": "rano", "factor": 1.4, "floor": 0.1, "scan": 3, "courses": 3},
     "courses4": {"endpoint": "rano", "factor": 1.4, "floor": 0.1, "scan": 3, "courses": 4},
 }
+# configurations with a mixed course cap (base = cap 3 for 63% of the patients, 6 for 37%) also show every patient on 6
+MIX_EXTRA_VARIANTS = dict(EXTRA_VARIANTS, courses6={"endpoint": "rano", "factor": 1.4, "floor": 0.1, "scan": 3, "courses": 6})
 STAT_COLS = ("median_interp", "median_step", "S84", "S168", "S252", "event_fraction")
 WEAKEST = [
     "one published number (a median with its interval) fixes one condition per world; many worlds pass and the anchor does not say which is true",
@@ -83,6 +88,10 @@ WEAKEST = [
     "the model has no patients who never respond to TMZ and no early deaths or drop-outs; the early part of the PFS curve is not checked",
     "world classification uses 400 patients per world, so a world near the edge of the interval can flip; script 193 re-draws the kept worlds",
 ]
+MIX36_WEAKEST = [
+    "the 3-or-6 course cap split (63% / 37%) is an assumed reading of two reported numbers (median 3 cycles delivered, 37% with 6 or more delivered); the caps are spread evenly over the patient index and do not depend on prognosis, response or tolerance",
+    "a cap is a planned maximum: a patient also stops at a progression call, so the courses delivered are fewer than the cap (delivered_courses in this file gives the median and the share with 6 courses, to compare with the trial's 3 and 37%); in the trial some patients also stopped for toxicity, which the model lacks",
+]
 MIXTURE_WEAKEST = [
     "the mixture family is an assumed two-class split (responders keep the earlier kill range m in 6 to 20, non-responders have a weak range, responder fraction q in 0.1 to 0.6); it is a robustness probe for the weak-kill reading, not a fit and not an MGMT model",
     "responders and non-responders share every other parameter range; a real split would also differ in growth, resistant fraction and switching",
@@ -91,7 +100,16 @@ MIXTURE_WEAKEST = [
 
 def variants_for(cfg):
     """The endpoint variants of one configuration ('single' keeps the seven of the run of 2026-11-04)."""
-    return dict(VARIANTS, **EXTRA_VARIANTS) if cfg["extra_variants"] else dict(VARIANTS)
+    if not cfg["extra_variants"]:
+        return dict(VARIANTS)
+    return dict(VARIANTS, **(MIX_EXTRA_VARIANTS if cfg["std_courses"] == "mix36" else EXTRA_VARIANTS))
+
+
+def base_courses(cfg, n_total, n_per_world):
+    """Course cap of the standard arm for a batch of n_total patients made of worlds with n_per_world patients each:
+    an int, or one cap per patient (the same split in every world; see cal.std_caps)."""
+    c = cal.std_caps(cfg["std_courses"], n_per_world)
+    return int(c) if np.ndim(c) == 0 else np.tile(c, n_total // n_per_world)
 
 
 def _smoke(args):
@@ -100,12 +118,13 @@ def _smoke(args):
         N_WORLDS, N_PAT, CHUNK_WORLDS, OLD_MODEL_N = 12, 100, 6, 300
 
 
-def run_variant(batch, v, chunk_key):
-    """Standard arm for one variant on a batch of patients; restores the RANO constants afterwards."""
+def run_variant(batch, v, chunk_key, base=cal.STD_COURSES):
+    """Standard arm for one variant on a batch of patients; restores the RANO constants afterwards.
+    base: the course cap of the configuration (int or one cap per patient); a variant with its own 'courses' overrides it."""
     old = (tc.RANO_FACTOR, tc.RANO_FLOOR)
     tc.RANO_FACTOR, tc.RANO_FLOOR = v["factor"], v["floor"]
     try:
-        return cal.run_arm(batch, courses=v.get("courses", cal.STD_COURSES), scan_every=v["scan"],
+        return cal.run_arm(batch, courses=v.get("courses", base), scan_every=v["scan"],
                            endpoint=v["endpoint"], seed=chunk_key)
     finally:
         tc.RANO_FACTOR, tc.RANO_FLOOR = old
@@ -114,24 +133,30 @@ def run_variant(batch, v, chunk_key):
 def _job(args):
     chunk, worlds, n_pat, cfg, variants = args
     batch = cal.concat([cal.draw_patients(w, n_pat, [cfg["patient_seed"], w["world"]]) for w in worlds])
+    base = base_courses(cfg, n_pat * len(worlds), n_pat)
     rows = [dict(w) for w in worlds]
     for vname, v in variants.items():
-        ttp, ev, courses = run_variant(batch, v, [cfg["noise_c"], chunk])
+        ttp, ev, courses = run_variant(batch, v, [cfg["noise_c"], chunk], base)
         for k, row in enumerate(rows):
             sl = slice(k * n_pat, (k + 1) * n_pat)
             st = cal.pfs_stats(ttp[sl], ev[sl])
-            row[vname] = {c: st[c] for c in STAT_COLS} | {"mean_courses": float(courses[sl].mean())}
+            row[vname] = {c: st[c] for c in STAT_COLS} | {"mean_courses": float(courses[sl].mean()),
+                                                           "median_courses": float(np.median(courses[sl])),
+                                                           "frac_courses_ge6": float(np.mean(courses[sl] >= 6))}
     return rows
 
 
 def old_model_row(n, cfg, variants):
     """The earlier world (script 150 ranges, c uniform 0 to 0.25, no switching) under every variant."""
     scen = tc.draw_scenarios(n, [cfg["patient_seed"], 999_999])
+    base = base_courses(cfg, n, n)
     out = {}
     for vname, v in variants.items():
-        ttp, ev, courses = run_variant(scen, v, [cfg["noise_c"], 999_999])
+        ttp, ev, courses = run_variant(scen, v, [cfg["noise_c"], 999_999], base)
         st = cal.pfs_stats(ttp, ev)
-        out[vname] = {c: st[c] for c in STAT_COLS} | {"mean_courses": float(courses.mean())}
+        out[vname] = {c: st[c] for c in STAT_COLS} | {"mean_courses": float(courses.mean()),
+                                                      "median_courses": float(np.median(courses)),
+                                                      "frac_courses_ge6": float(np.mean(courses >= 6))}
     return out
 
 
@@ -163,6 +188,15 @@ def analyse(rows, old_model=None, variants=None, keys=None):
                               "median_interp_quantiles_5_25_50_75_95": [float(q) for q in np.percentile(_finite(mv), [5, 25, 50, 75, 95])] if np.isfinite(mv).any() else None,
                               "frac_below_target": float((mv < cal.TARGET_PFS_DAYS[0]).mean()),
                               "frac_above_target": float((mv > cal.TARGET_PFS_DAYS[1]).mean())}
+        if n and "median_courses" in rows[0][v]:
+            # courses actually delivered (the cap is a planned maximum); trial: median 3, 37% with 6 or more
+            mc = np.array([r[v]["median_courses"] for r in rows])
+            g6 = np.array([r[v]["frac_courses_ge6"] for r in rows])
+            q3 = lambda x: [float(q) for q in np.percentile(x, [25, 50, 75])]  # noqa: E731
+            res["variants"][v]["delivered_courses"] = {
+                "median_courses_q25_50_75_all_worlds": q3(mc), "frac_ge6_q25_50_75_all_worlds": q3(g6),
+                "median_courses_q25_50_75_passing_worlds": q3(mc[ok[v]]) if ok[v].any() else None,
+                "frac_ge6_q25_50_75_passing_worlds": q3(g6[ok[v]]) if ok[v].any() else None}
     for name in keys:
         x = np.array([r[name] for r in rows], float)
         entry = {"spearman_with_median": None, "pass_fraction_by_bin": {}}
@@ -209,7 +243,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--workers", type=int, default=3)
     ap.add_argument("--smoke", action="store_true")
-    ap.add_argument("--config", default="single", help="run configuration of src/trackc_calibration.py (single, single_rep, mixture)")
+    ap.add_argument("--config", default="single", help="run configuration of src/trackc_calibration.py (single, single_rep, mixture, single_mix, mixture_mix)")
     args = ap.parse_args()
     _smoke(args)
     cfg = cal.get_config(args.config)
@@ -222,7 +256,7 @@ def main():
                 "n_patients_per_world": N_PAT, "chunk_worlds": CHUNK_WORLDS, "old_model_n": OLD_MODEL_N,
                 "world_seed": cfg["world_seed"], "patient_seed": cfg["patient_seed"], "noise_base": cfg["noise_c"],
                 "axes": [list(a) for a in cal.FAMILY_AXES[cfg["family"]]], "mu_nu_levels": list(cal.MU_NU_LEVELS),
-                "b0_half_width": cal.B0_HALF_WIDTH, "f0_cap": cal.F0_CAP, "std_courses": cal.STD_COURSES,
+                "b0_half_width": cal.B0_HALF_WIDTH, "f0_cap": cal.F0_CAP, **cal.exposure_protocol(cfg, always=True),
                 "target_days": list(cal.TARGET_PFS_DAYS), "variants": variants, "stat": "interpolated KM median"}
     manifest = man.build_manifest("192_trackc_calibration", protocol, purpose="stage2_dev",
                                   scenario=(cfg["world_seed"], cfg["patient_seed"]),
@@ -246,7 +280,8 @@ def main():
     res.update({"script": "192_trackc_calibration",
                 "label": "SIMULATION; DEVELOPMENT seeds only; exploratory; calibration of the standard arm only",
                 "protocol": protocol, "protocol_sha256": manifest["protocol_sha256"],
-                "weakest_points": WEAKEST + (MIXTURE_WEAKEST if cfg["family"] == "mixture" else []),
+                "weakest_points": WEAKEST + (MIXTURE_WEAKEST if cfg["family"] == "mixture" else [])
+                + (MIX36_WEAKEST if cfg["std_courses"] == "mix36" else []),
                 "runtime_s": time.time() - t0})
     (OUT_DIR / "results.json").write_text(json.dumps(res, indent=2, default=float) + "\n", encoding="utf-8")
 

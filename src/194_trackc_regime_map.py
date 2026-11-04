@@ -35,8 +35,12 @@ Seeds (registry: src/trackc_seed_registry.py, purpose stage2_dev), configuration
     selection patients    seed [20261805, world index], n = 400 per world (best_fixed is chosen here)
     noise                 key [1_830_000, world index], the same in every arm
 Written to output/trackc_stage2_E_regime_map/ (manifest.json first, then arms_by_world.csv, results.json).
---config single_rep | mixture reads the matching folder of script 193 and uses the seeds and folder suffix defined in
-src/trackc_calibration.py.
+--config single_rep | mixture | single_mix | mixture_mix reads the matching folder of script 193 and uses the seeds and
+folder suffix defined in src/trackc_calibration.py. The two *_mix configurations use a mixed course cap (3 for 63% of
+the patients, 6 for 37%, read from the two numbers reported for the trial's standard arm) as the reference arm
+"std_capmix". The difference columns are named *_vs_ref (versus that configuration's reference arm: soc6, or
+std_capmix); the folder of the first run (config single, 2026-11-04) has the earlier column names *_vs_soc6, which mean
+the same thing for soc6.
 
 Run:  python src/194_trackc_regime_map.py --workers 4
       python src/194_trackc_regime_map.py --config mixture --workers 4
@@ -71,7 +75,11 @@ SCRIPT = "src/194_trackc_regime_map.py"
 N_EVAL, N_SEL = 1000, 400
 LAMBDAS = (0.0, 2.0, 5.0, 10.0, 20.0)      # days of restricted time that one course is worth in the cost-aware arms (ASSUMED grid)
 ENDPOINTS = {"3b_rano": "rano", "3a_baseline": "baseline"}
-REFERENCE = "soc6"
+REFERENCE = "soc6"                           # configurations with six planned courses for everyone
+CAPMIX_REFERENCE = "std_capmix"              # configurations with a mixed course cap (cal.std_caps 'mix36')
+MIX36_WEAKEST = [
+    "the reference arm std_capmix gives a cap of 3 courses to 63% and of 6 to 37% of the patients (an assumed reading of the reported median of 3 cycles and 37% with 6 or more, spread over the patient index); it is a model of the trial's standard arm, not the trial arm, and the policy arms (soc6, front k, paced, rules) keep their own course budgets, only the reference changed",
+]
 WEAKEST = [
     "the controlled worlds are a thin slice of an assumed family that passed one published median and two published hazard ratios; the map describes the model, not tumours",
     "only simple rules are run; the particle-filter rules of scripts 154-173 are not, so nothing here says whether they would gain",
@@ -89,6 +97,11 @@ def _smoke(args):
         N_EVAL, N_SEL = 100, 60
 
 
+def reference_for(cfg):
+    """Name of the reference arm of a configuration: the six-course arm, or the mixed-cap arm for 'mix36'."""
+    return CAPMIX_REFERENCE if cfg.get("std_courses", cal.STD_COURSES) == "mix36" else REFERENCE
+
+
 def read_controlled(d_dir):
     with open(d_dir / "controlled_worlds.csv", encoding="utf-8") as fh:
         return [{k: (int(v) if k == "world" else float(v)) for k, v in row.items()} for row in csv.DictReader(fh)]
@@ -101,10 +114,15 @@ def evaluate_world(w, n_eval, n_sel, cfg):
     sel = cal.draw_patients(w, n_sel, [cfg["e_sel_seed"], world])
     sched, names = rg.candidate_schedules()
     arms = rg.policy_arms()
+    reference = reference_for(cfg)
     rows = []
     for ep_label, endpoint in ENDPOINTS.items():
         res = {name: rg.run_policy(ev, factory, budget, endpoint, [cfg["noise_e"], world])
                for name, (factory, budget) in arms.items()}
+        if reference == CAPMIX_REFERENCE:
+            ttp_t, _, used_t = cal.run_arm(ev, courses=cal.std_caps(cfg["std_courses"], n_eval), scan_every=rg.SCAN_EVERY,
+                                           endpoint=endpoint, seed=[cfg["noise_e"], world])
+            res[CAPMIX_REFERENCE] = (ttp_t, used_t)
         ttp_sel, courses_sel = rg.evaluate_schedules(sel, sched, endpoint)
         ttp_ev, courses_ev = rg.evaluate_schedules(ev, sched, endpoint)
         cols = np.arange(ttp_ev.shape[1])
@@ -120,7 +138,7 @@ def evaluate_world(w, n_eval, n_sel, cfg):
             score = np.minimum(ttp_ev, 730.0) - lam * courses_ev - 1e-6 * courses_ev
             pick = score.argmax(0)
             res["informed_family_max" if lam == 0 else f"informed{tag}"] = (ttp_ev[pick, cols], courses_ev[pick, cols])
-        ref_ttp, ref_courses = res[REFERENCE]
+        ref_ttp, ref_courses = res[reference]
         inf_capped = np.minimum(res["informed_family_max"][0], 730.0)
         for name, (ttp, courses) in res.items():
             # share of patients on whom this arm beats the informed family maximum (it should be near 0 if that
@@ -129,10 +147,10 @@ def evaluate_world(w, n_eval, n_sel, cfg):
             for tau in rg.TAUS:
                 st = rg.paired_stats(ttp, ref_ttp, tau)
                 rows.append({"world": world, "endpoint": ep_label, "arm": name, "tau": int(tau),
-                             "rmst": rg.rmst(ttp, tau), "diff_vs_soc6": st["diff"], "ci_lo": st["ci_lo"],
+                             "rmst": rg.rmst(ttp, tau), "diff_vs_ref": st["diff"], "ci_lo": st["ci_lo"],
                              "ci_hi": st["ci_hi"], "regret_cvar10": st["regret_cvar"], "frac_worse": st["frac_worse"],
                              "mean_courses": float(np.mean(courses)),
-                             "courses_diff_vs_soc6": float(np.mean(courses) - np.mean(ref_courses)),
+                             "courses_diff_vs_ref": float(np.mean(courses) - np.mean(ref_courses)),
                              "frac_beats_informed_730": beats,
                              "note": notes.get(name, "")})
     return rows
@@ -154,11 +172,12 @@ def _ols_standardised(X, y, names=None):
     return {names[k]: float(b) for k, b in zip(keep, beta)}, r2
 
 
-def analyse(rows, worlds, keys=None):
-    """Summary over worlds. Pure function, no I/O. keys: the world-column names of the family (default 'single')."""
+def analyse(rows, worlds, keys=None, reference=REFERENCE):
+    """Summary over worlds. Pure function, no I/O. keys: the world-column names of the family (default 'single').
+    reference: the arm the differences ('diff_vs_ref') are taken against (soc6, or std_capmix for a mixed cap)."""
     axes = AXES if keys is None else list(keys)
     w_by = {w["world"]: w for w in worlds}
-    res = {"n_controlled_worlds": len(worlds), "reference": REFERENCE, "endpoints": {}}
+    res = {"n_controlled_worlds": len(worlds), "reference": reference, "endpoints": {}}
     arms = sorted({r["arm"] for r in rows})
     for ep in ENDPOINTS:
         res["endpoints"][ep] = {}
@@ -167,7 +186,7 @@ def analyse(rows, worlds, keys=None):
             block = {}
             for arm in arms:
                 sel = [r for r in rows if r["endpoint"] == ep and r["arm"] == arm and r["tau"] == tau]
-                d = np.array([r["diff_vs_soc6"] for r in sel])
+                d = np.array([r["diff_vs_ref"] for r in sel])
                 if d.size == 0:
                     continue
                 block[arm] = {"n_worlds": int(d.size), "median_diff_days": float(np.median(d)),
@@ -177,17 +196,18 @@ def analyse(rows, worlds, keys=None):
                               "frac_worlds_clear_gain": float(np.mean([r["ci_lo"] > 0 for r in sel])),
                               "frac_worlds_clear_loss": float(np.mean([r["ci_hi"] < 0 for r in sel])),
                               "median_regret_cvar10": float(np.median([r["regret_cvar10"] for r in sel])),
-                              "median_courses_diff": float(np.median([r["courses_diff_vs_soc6"] for r in sel])),
+                              "median_courses_diff": float(np.median([r["courses_diff_vs_ref"] for r in sel])),
                               "median_frac_patients_beating_informed_family_max": float(np.median([r["frac_beats_informed_730"] for r in sel])),
                               "median_mean_courses": float(np.median([r["mean_courses"] for r in sel]))}
             res["endpoints"][ep][str(tau)] = {"arms": block}
             # which axis decides the gain of the two upper-bound-style arms and of the best simple rule
-            realizable = [a for a in block if a != "soc6" and not a.startswith(("best_fixed", "informed"))]
+            realizable = [a for a in block if a not in (reference, REFERENCE, CAPMIX_REFERENCE)
+                          and not a.startswith(("best_fixed", "informed"))]
             best_rule = max(realizable, key=lambda a: block[a]["median_diff_days"]) if realizable else None
             # cost-aware view: restricted time minus lambda x courses, relative to soc6, median over worlds
             net = {}
             for lam in LAMBDAS:
-                net[f"{lam:g}"] = {a: float(np.median([r["diff_vs_soc6"] - lam * r["courses_diff_vs_soc6"]
+                net[f"{lam:g}"] = {a: float(np.median([r["diff_vs_ref"] - lam * r["courses_diff_vs_ref"]
                                                       for r in rows if r["endpoint"] == ep and r["arm"] == a and r["tau"] == tau]))
                                    for a in block}
             axes_block = {}
@@ -196,7 +216,7 @@ def analyse(rows, worlds, keys=None):
                     continue
                 sel = sorted([r for r in rows if r["endpoint"] == ep and r["arm"] == arm and r["tau"] == tau],
                              key=lambda r: r["world"])
-                y = np.array([r["diff_vs_soc6"] for r in sel])
+                y = np.array([r["diff_vs_ref"] for r in sel])
                 X = np.array([[w_by[r["world"]][a] for a in axes] for r in sel], float)
                 coef, r2 = _ols_standardised(X, y, axes)
                 sp = {}
@@ -223,7 +243,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--workers", type=int, default=4)
     ap.add_argument("--smoke", action="store_true")
-    ap.add_argument("--config", default="single", help="run configuration of src/trackc_calibration.py (single, single_rep, mixture)")
+    ap.add_argument("--config", default="single", help="run configuration of src/trackc_calibration.py (single, single_rep, mixture, single_mix, mixture_mix)")
     args = ap.parse_args()
     _smoke(args)
     cfg = cal.get_config(args.config)
@@ -237,11 +257,12 @@ def main():
     if not worlds:
         sys.exit("script 193 found no controlled world; see its kill rule")
     sched, names = rg.candidate_schedules()
+    reference = reference_for(cfg)
     protocol = {"script": "194_trackc_regime_map", "stage": "2E", "config": cfg["name"], "family": cfg["family"],
                 "smoke": bool(args.smoke), "n_eval": N_EVAL, "n_sel": N_SEL,
                 "eval_seed": cfg["e_eval_seed"], "sel_seed": cfg["e_sel_seed"], "noise_base": cfg["noise_e"],
-                "scan_every": rg.SCAN_EVERY,
-                "taus": list(rg.TAUS), "endpoints": ENDPOINTS, "reference": REFERENCE, "lambdas": list(LAMBDAS),
+                "scan_every": rg.SCAN_EVERY, **cal.exposure_protocol(cfg),
+                "taus": list(rg.TAUS), "endpoints": ENDPOINTS, "reference": reference, "lambdas": list(LAMBDAS),
                 "arms": {k: v[1] for k, v in rg.policy_arms().items()}, "candidate_schedules": names,
                 "controlled_worlds": [w["world"] for w in worlds],
                 "input": str((D_DIR / "controlled_worlds.csv").relative_to(PROJECT_ROOT)),
@@ -262,18 +283,19 @@ def main():
         parts = list(ex.map(_job, [(w, N_EVAL, N_SEL, cfg) for w in worlds]))
     rows = [r for part in parts for r in part]
     write_csv(rows, OUT_DIR)
-    res = analyse(rows, worlds, keys)
+    res = analyse(rows, worlds, keys, reference)
     res.update({"script": "194_trackc_regime_map",
                 "label": "SIMULATION; DEVELOPMENT seeds only; exploratory; simple rules only, no particle filter",
                 "protocol": protocol, "protocol_sha256": manifest["protocol_sha256"],
-                "weakest_points": WEAKEST, "runtime_s": time.time() - t0})
+                "weakest_points": WEAKEST + (MIX36_WEAKEST if reference == CAPMIX_REFERENCE else []),
+                "runtime_s": time.time() - t0})
     (OUT_DIR / "results.json").write_text(json.dumps(res, indent=2, default=float) + "\n", encoding="utf-8")
 
     print(f"runtime {res['runtime_s']:.0f} s; wrote {OUT_DIR}")
     for ep in ENDPOINTS:
         for tau in (365, 730):
             blk = res["endpoints"][ep][str(tau)]["arms"]
-            print(f"== {ep}, restricted mean {tau} d, median difference to soc6 over {len(worlds)} worlds (days)")
+            print(f"== {ep}, restricted mean {tau} d, median difference to {reference} over {len(worlds)} worlds (days)")
             for arm, e in sorted(blk.items(), key=lambda kv: -kv[1]["median_diff_days"]):
                 print(f"   {arm:22s} {e['median_diff_days']:+7.1f}  [{e['min_max'][0]:+.0f}, {e['min_max'][1]:+.0f}]  "
                       f"courses {e['median_mean_courses']:.1f}  clear gain in {100 * e['frac_worlds_clear_gain']:.0f}% of worlds")

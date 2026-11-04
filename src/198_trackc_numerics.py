@@ -77,11 +77,12 @@ def measure(w, n_pat, dt, cfg):
     try:
         scen = cal.draw_patients(w, n_pat, [cfg["i_seed"], int(w["world"])])
         seed = [cfg["noise_i"], int(w["world"])]
-        ref = cal.run_arm(scen, seed=seed)
+        courses = cal.std_caps(cfg["std_courses"], n_pat)
+        ref = cal.run_arm(scen, courses=courses, seed=seed)
         st = cal.pfs_stats(ref[0], ref[1])
-        dd = cal.dose_dense_control(scen, cal.DOSE_DENSE_MULT, seed=seed, ref=ref)
-        dd_ttp = cal.run_arm(scen, dose=cal.DOSE_DENSE_MULT, seed=seed)[0]
-        lm = cal.landmark_control(scen, seed=seed, ref=ref)
+        dd = cal.dose_dense_control(scen, cal.DOSE_DENSE_MULT, seed=seed, ref=ref, courses=courses)
+        dd_ttp = cal.run_arm(scen, courses=courses, dose=cal.DOSE_DENSE_MULT, seed=seed)[0]
+        lm = cal.landmark_control(scen, seed=seed, ref=ref, courses=courses)
     finally:
         tc.DT = old
     return {"median": st["median_interp"], "dd_hr": dd["hr"], "lm_hr": lm["hr"], "ttp_std": ref[0], "ttp_dd": dd_ttp}
@@ -140,7 +141,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--workers", type=int, default=4)
     ap.add_argument("--smoke", action="store_true")
-    ap.add_argument("--config", default="single", help="run configuration of src/trackc_calibration.py (single, single_rep, mixture)")
+    ap.add_argument("--config", default="single", help="run configuration of src/trackc_calibration.py (single, single_rep, mixture, single_mix, mixture_mix)")
     args = ap.parse_args()
     _smoke(args)
     cfg = cal.get_config(args.config)
@@ -155,6 +156,7 @@ def main():
     protocol = {"script": "198_trackc_numerics", "stage": "2I", "config": cfg["name"], "family": cfg["family"],
                 "smoke": bool(args.smoke), "n_patients_per_world": N_PAT,
                 "scenario_seed": cfg["i_seed"], "noise_base": cfg["noise_i"], "steps_days": list(DTS),
+                **cal.exposure_protocol(cfg),
                 "dose_dense_multiplier": cal.DOSE_DENSE_MULT, "controlled_worlds": [w["world"] for w in worlds],
                 "input": str((D_DIR / "controlled_worlds.csv").relative_to(PROJECT_ROOT)),
                 "input_results_sha256": hashlib.sha256((D_DIR / "results.json").read_bytes()).hexdigest(),
