@@ -1,9 +1,8 @@
-# Track A v2 gate report — HRA009021 HBI/LBI (2026-10-31)
+# Track A v2 gate report — HRA009021 HBI/LBI (2026-10-31; updated 2026-11-03)
 
-## Decision: WAIT for one named item
+## Current decision: STOP before data access
 
-**Item:** an explicit map from each GSA sample name (`GBMxx01/02/03`, accessions HRS…) to HBI, LBI or Tumor, from the study authors.
-Until it arrives: do not download FASTQs, do not seal, do not score. If no map arrives, stop this cohort (see "If the map never comes").
+**Blocking item:** a public, explicit map from each GSA sample name/accession to donor code and HBI, LBI or Tumor. The existing metadata-only audit links 10 donor codes to the paper's region labels, but not individual GSA samples to regions. Do not infer region from suffix or expression. The user has ruled out author contact; proceed only if the map becomes public. Do not download FASTQs, seal a protocol, or score this cohort.
 
 ## Work done in this session
 - Checked the stated project facts against the repo files (all match; see table).
@@ -15,7 +14,7 @@ Until it arrives: do not download FASTQs, do not seal, do not score. If no map a
 ## Work NOT done
 - No FASTQ, count matrix or expression file was downloaded or read.
 - No protocol was sealed. No model was trained. Nothing was scored.
-- No message was sent to the authors. The user must send it.
+- No author contact was made. Do not contact authors.
 - No replacement cohort search beyond the 2026-10-30 screen.
 
 ## Facts checked
@@ -23,6 +22,7 @@ Until it arrives: do not download FASTQs, do not seal, do not score. If no map a
 | Claim | Status | Evidence |
 |---|---|---|
 | 10 donors, 30 samples, 3 per donor | Verified | `output/trackA_v2_data_check/hra009021_metadata_audit.json` (`samples_per_donor`) |
+| IDH-wildtype status for scRNA-seq subset | Supported at study-cohort level | The paper reports 26 IDH-wildtype GBM patients and a 10-person scRNA-seq subset from the same study; exact accession-to-paper case mapping remains incomplete. |
 | GSA workbook has no region labels | Verified | same file, `region_labels_present: false` |
 | Supplement Table 4 labels HBI/LBI/Tumor by donor code only | Verified | `output/trackA_v2_data_check/hra009021_supplement_audit.json` (`direct_gsa_sample_to_region_map_found: false`) |
 | Raw FASTQ total 764,601,130,806 bytes (about 765 GB), 60 files | As recorded | `output/trackA_v2_data_check/hra009021_file_inventory.json` |
@@ -38,34 +38,29 @@ Until it arrives: do not download FASTQs, do not seal, do not score. If no map a
 Conclusion: no public source maps GSA sample names to regions. Suffix order (01/02/03) must not be assumed. Inferring the region from expression is not allowed, because the label must not come from gene expression.
 
 ## Access and reuse terms
-- **Download:** earlier audit records GSA-Human status "Open access" for HRA009021. Not re-checked today (page timed out). Re-check before any download.
-- **Reuse:** no file-level license found. The article is CC BY-NC-ND (Europe PMC record). That covers the article text, not the data. NGDC/GSA-Human data-use policy still needs reading, plus any school or fair rule on human genomic data.
-- **Status: UNRESOLVED.** Public download does not prove reuse rights.
+- **Access:** the official [GSA-Human record](https://ngdc.cncb.ac.cn/gsa-human/browse/HRA009021) lists HRA009021 as Open access. The [NGDC policy](https://ngdc.cncb.ac.cn/gsa-human/document/Principle_of_Accessing_Human_Genetic_Resource_Data_in_NGDC_V1.pdf) says open-access data may be used directly for research.
+- **Use limits:** the policy limits use to the stated research scope and research group/collaborators, bars redistribution and participant identification, and allows submitters to set specific restrictions. No accession-specific license or restriction is displayed in the public record. The article’s CC BY-NC-ND license covers article text, not dataset rights.
+- **Status: CONDITIONAL.** No-request access and repository-level research-use terms are documented. Confirm school/fair suitability and any accession-specific restriction before data use.
 
 ## Exact counts
-- Donors: 10 (GBM23, 35, 36, 37, 41, 44, 45, 51, 52, 53). Exactly the minimum.
+- Donor records: 10 (GBM23, 35, 36, 37, 41, 44, 45, 51, 52, 53). Countable paired donors under Track A's exact sample-region rule: 0, because sample accessions lack region labels.
 - Samples: 30 (10 HBI + 10 LBI + 10 Tumor by the paper). Per-sample identity: unknown.
 - Paired HBI/LBI subset size: cannot be computed until the map exists. Upper bound if all 20 HBI/LBI runs are used: about 2/3 of the 765 GB total (roughly 510 GB, estimate only, assumes even file sizes).
 
-## Named item: request to the authors (user sends)
-Corresponding authors (from PMC11685534): Ying Hu (huying@hit.edu.cn), Hang Ji (jihang0723@163.com), Shaoshan Hu (shaoshanhu421@163.com).
-
-Draft message:
-> Dear Dr. Hu and Dr. Ji,
-> I am a student researcher reading your 2024 Nature Communications paper "Turning attention to tumor–host interface and focus on the peritumoral heterogeneity of glioblastoma." I would like to reanalyze the public data at GSA-Human HRA009021. The sample names there are GBMxx01, GBMxx02 and GBMxx03. Could you tell me which sample is HBI, which is LBI and which is Tumor for each patient? A table with sample accession (HRS…) and region would be enough. I will cite your paper and follow the GSA-Human data-use terms.
-> Thank you,
-> [name]
+## Contact status
+The user has ruled out author contact. The earlier unsent message draft is removed. Continue only if required mapping becomes publicly available.
 
 ## Unresolved questions
 1. The sample-to-region map (blocking).
-2. The GSA-Human / NGDC reuse terms, and any school rule (blocking before download).
-3. Storage: about 510–765 GB of FASTQ plus alignment space. The current free disk space is not checked.
-4. CPU runtime for Cell Ranger alignment of 20–30 runs on this laptop is not estimated.
+2. Cell-level malignant-label fields, provenance, and validation.
+3. Patient-level overlap with prior Track A use; exact public identifiers do not establish cross-study identity.
+4. Any accession-specific use restriction and school/fair suitability. Repository-level terms are documented above.
+5. Storage and runtime, only if all metadata gates later pass and a dated scope amendment authorizes data access.
 
-## If the map arrives
+## If a public map becomes available
 1. Check the map against donor, sample, experiment and run accessions in `hra009021_metadata_audit.json`.
-2. List the exact paired HBI/LBI runs and their byte sizes from `hra009021_file_inventory.json`. Ask the user to approve that subset.
-3. Write a protocol amendment and a frozen protocol for mentor review before scoring: donor-held-out folds (all cells of a donor in one fold, preprocessing and tuning on training donors only); adversarial scVI vs ordinary scVI vs adversary-off ablation vs listed baselines on identical folds; the hybrid-state biology test kept separate from the model test.
+2. Recheck the six-donor, IDH, malignant-label, reuse, and independence gates. A public map alone does not qualify the cohort.
+3. Report evidence for review. Do not download or score data unless a dated scope amendment and explicit user authorization cover the selected cohort and analysis.
 
 ## If the map never comes
-Stop this cohort. Search for a replacement only under the same gates: 10 or more donors, single-cell or single-nucleus data, region labels not from expression, a verified sample-to-label map, and clear reuse terms. Record any change of dataset or endpoint as a protocol amendment.
+Stop this cohort. Broad scouting stays paused. Reopen metadata screening only for a specific named accession that could plausibly pass the current Track A New gates. Keep the six-donor minimum and independence requirement. Record any change of dataset or endpoint in a dated scope amendment.
