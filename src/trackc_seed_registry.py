@@ -270,6 +270,11 @@ ENTRIES = [
            [("output/trackc_stage2_M_endpoint_mechanism_mixture/results.json", "20261864")],
            note="Dev run 2026-11-04. Selection patients seed [20261864, world index], evaluation patients seed [20261865, world "
                 "index]; open loop, no noise key."),
+    _entry("205", "Stage 2G finer search for the informed arm and the fixed frontier, mixture configuration", "dev_used",
+           [(20261874, 20261875)], [],
+           [("output/trackc_stage2_G_informed_search_mixture/results.json", "20261874")],
+           note="Dev run 2026-11-04. Selection patients seed [20261874, world index], evaluation patients seed [20261875, world "
+                "index]; open loop, no noise key. The other configurations of script 205 use the seeds in its G_SEEDS table."),
 ]
 ENTRIES.append(_reserved_stage2_dev(ENTRIES))
 ENTRIES.append(_entry("restart", "Stage 3 sealed run (restart plan)", "reserved", [(20262300, 20262499)],

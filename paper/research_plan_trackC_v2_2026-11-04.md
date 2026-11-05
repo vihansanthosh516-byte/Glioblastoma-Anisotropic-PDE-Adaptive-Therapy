@@ -1,6 +1,6 @@
 # Research plan (form text), Track C, version 2, 2026-11-04
 
-Drafted with AI assistance (Claude). The author must read, edit, and own every claim, and state AI use wherever the venue requires it. Each field below is at most 2,000 characters. Status: DRAFT. It replaces `paper/research_plan_trackC_draft.md` (2026-10-27), which was written before the model was checked against published trial numbers. Numbers from the runs are in `paper/trackc_stage2_report_2026-11-04.md` and `vault/PAPER_FINDINGS_LEDGER.md` (rows C1 to C33); they are interim.
+Drafted with AI assistance (Claude). The author must read, edit, and own every claim, and state AI use wherever the venue requires it. Each field below is at most 2,000 characters. Status: DRAFT. It replaces `paper/research_plan_trackC_draft.md` (2026-10-27), which was written before the model was checked against published trial numbers. Numbers from the runs are in `paper/trackc_stage2_report_2026-11-04.md` and `vault/PAPER_FINDINGS_LEDGER.md` (rows C1 to C35); they are interim.
 
 ## Rationale
 
