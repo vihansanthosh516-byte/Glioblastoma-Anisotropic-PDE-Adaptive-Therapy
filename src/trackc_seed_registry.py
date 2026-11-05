@@ -274,7 +274,27 @@ ENTRIES = [
            [(20261874, 20261875)], [],
            [("output/trackc_stage2_G_informed_search_mixture/results.json", "20261874")],
            note="Dev run 2026-11-04. Selection patients seed [20261874, world index], evaluation patients seed [20261875, world "
-                "index]; open loop, no noise key. The other configurations of script 205 use the seeds in its G_SEEDS table."),
+                "index]; open loop, no noise key."),
+    _entry("205", "Stage 2G finer search for the informed arm and the fixed frontier, single configuration", "dev_used",
+           [(20261870, 20261871)], [],
+           [("output/trackc_stage2_G_informed_search/results.json", "20261870")],
+           note="Dev run 2026-11-04. Selection patients seed [20261870, world index], evaluation patients seed [20261871, world "
+                "index]; open loop, no noise key."),
+    _entry("205", "Stage 2G finer search for the informed arm and the fixed frontier, single_rep configuration", "dev_used",
+           [(20261872, 20261873)], [],
+           [("output/trackc_stage2_G_informed_search_rep/results.json", "20261872")],
+           note="Dev run 2026-11-04. Selection patients seed [20261872, world index], evaluation patients seed [20261873, world "
+                "index]; open loop, no noise key."),
+    _entry("205", "Stage 2G finer search for the informed arm and the fixed frontier, single_mix configuration", "dev_used",
+           [(20261876, 20261877)], [],
+           [("output/trackc_stage2_G_informed_search_mix36/results.json", "20261876")],
+           note="Dev run 2026-11-04. Mixed course cap in the worlds of the configuration. Selection patients seed [20261876, world "
+                "index], evaluation patients seed [20261877, world index]; open loop, no noise key."),
+    _entry("205", "Stage 2G finer search for the informed arm and the fixed frontier, mixture_mix configuration", "dev_used",
+           [(20261878, 20261879)], [],
+           [("output/trackc_stage2_G_informed_search_mixture_mix36/results.json", "20261878")],
+           note="Dev run 2026-11-04. Mixed course cap in the worlds of the configuration. Selection patients seed [20261878, world "
+                "index], evaluation patients seed [20261879, world index]; open loop, no noise key."),
 ]
 ENTRIES.append(_reserved_stage2_dev(ENTRIES))
 ENTRIES.append(_entry("restart", "Stage 3 sealed run (restart plan)", "reserved", [(20262300, 20262499)],
