@@ -1,4 +1,4 @@
-# Track A: Core-vs-edge programs in labeled GBM tissue are explained by known confounds
+# Track A: Core-vs-edge program tests did not meet adjusted success criteria
 
 Status: final for this cohort (2026-10-29). Two pre-registered tests; both fail their own confound rule. No third test on this cohort.
 
@@ -30,8 +30,8 @@ Per-cohort, test 1: Ivy GAP p = 0.063, Angers p = 0.047. Test 2: Ivy GAP p = 0.0
 
 ## Interpretation
 - Both programs show strong, reproducible core-vs-edge shifts in raw tissue.
-- Both shifts vanish once known tissue gradients are removed: the senescence/SASP signal tracks hypoxia in the core; the OXPHOS signal tracks neuron-rich normal brain at the edge.
-- So, in bulk labeled tissue, these two programs give no evidence of tumor-cell-intrinsic core-vs-edge biology beyond those gradients.
+- Neither program met its adjusted success criterion. The adjusted tests were not statistically significant, while the adjusted point estimates retained their direction. These results do not establish that hypoxia or neuron content explains the raw shifts.
+- These bulk-tissue analyses do not demonstrate tumor-cell-intrinsic core-vs-edge biology beyond the measured covariates. They also do not establish that such biology is absent.
 - Value for the framework: it shows that bulk core-vs-edge contrasts must be adjusted for hypoxia and normal-brain content before any claim of new biology. Tracks B and C do not use Track A outputs; there is no patient-level join.
 
 ## Limits (stated in full)
