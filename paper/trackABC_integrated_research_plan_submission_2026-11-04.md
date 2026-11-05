@@ -18,10 +18,12 @@ The scientific contribution will be a patient-grounded MRI transition analysis f
 
 ### Research Questions
 
-1. Among eligible Duke patients, are newly appearing nonenhancing FLAIR-labeled regions more likely than persistent FLAIR-labeled regions at the same distance from the current core to receive a core label at the next visit?
-2. Does adding local ADC level and its change over time improve held-out prediction of that next-visit core-label transition?
-3. In virtual patients under the moderate-concordance assumption, does a policy using molecular, MRI/ADC, and drug-suppression information increase 730-day restricted time to simulated progression over the best development-selected fixed schedule under both progression definitions and in both calibration families, without increasing mean course use for either endpoint?
-4. How does any simulated advantage change when the assumed links among molecular state, MRI state, and drug resistance are weak, absent, or reversed?
+**Central question:** Does newly emerging nonenhancing peritumoral FLAIR tissue show higher next-scan necrotic/enhancing core-label conversion than distance-matched persistent tissue—and can that patient-derived MRI/ADC transition signal, combined with uncertain molecular information and sensitive/resistant tumor dynamics, improve simulated adaptive scheduling over the best fixed regimen without increasing treatment-course use?
+
+1. **Primary patient question:** At the same physical distance from the existing core, does newly appearing nonenhancing FLAIR tissue have a higher next-scan necrotic/enhancing core-label conversion rate than persistent FLAIR tissue?
+2. **ADC question:** Does current ADC and its change over time improve patient-held-out prediction of that transition beyond the prespecified MRI and clinical baseline?
+3. **Integrated simulation question:** In virtual patients under the moderate-concordance assumption, does a policy using molecular, MRI/ADC, and drug-suppression information increase 730-day restricted time to simulated progression over the best development-selected fixed schedule under both progression definitions and in both calibration families, without increasing mean course use for either endpoint?
+4. **Robustness question:** Under which assumed relationships among molecular state, MRI risk, and drug resistance does information fusion help, fail to help, or cause worse simulated outcomes?
 
 ### Hypotheses
 
