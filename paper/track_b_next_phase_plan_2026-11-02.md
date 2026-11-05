@@ -1,6 +1,6 @@
 # Track B next phase: independent patient forecast test
 
-**Status:** Decision plan, not a protocol amendment or authorization to read patient data. Track A and Track C are outside scope. The LUMIERE patient run remains paused; its synthetic implementation is development infrastructure. No patient images, masks, outcomes or restricted files were read for this plan.
+**Status (updated 2026-11-04):** Decision plan, not a protocol amendment or authorization to read patient data. Track A and Track C are outside scope. The LUMIERE patient run remains paused; its synthetic implementation is development infrastructure. Since this plan was drafted, a separate metadata-only Duke inventory was completed and the user-reported local archive matched its expected size and supplied MD5. The inventory did not establish final eligibility, patient-level independence, or a frozen triplet count. Exact accepted data-use/output terms and written school approval are not recorded. No MRI or mask voxels, landmark coordinates, or patient scores were read. See [current Duke readiness](track_b_duke_readiness_2026-11-03.md); its access and metadata status supersedes the older status statements below. Patient-image and mask reads remain blocked.
 
 ## Decision
 
