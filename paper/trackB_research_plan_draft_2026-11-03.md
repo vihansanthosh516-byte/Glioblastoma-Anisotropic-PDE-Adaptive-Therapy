@@ -14,6 +14,10 @@ Track B began as a patient-specific tumor-growth forecasting project. Prior work
 
 The Duke record describes 61 patients and 503 sessions, with 3–18 sessions per patient, six MRI sequences, automated segmentation labels, relative clinical dates, treatment information, and vessel landmarks for preoperative and recurrence scans. It also states that the released sessions share an atlas field of view but still need longitudinal registration. The record names an nnU-Net segmentation workflow but does not state the exact trained checkpoint version; the masks will therefore be treated as source-provided automated labels, not expert ground truth. These totals do not establish the eligible sample size, and landmark pairs are not available for every consecutive scan pair (Criscuolo et al., 2026; Yang, n.d.; Zhang et al., 2025).
 
+## Cross-Track Integration Boundary
+
+The three tracks will be connected as an evidence framework, not merged as if they measured the same patients. Track A's completed A5 analysis used a separate mixed-cell expression cohort and did not meet its frozen success rule; it has no drug-response endpoint. Track B will measure longitudinal changes among Duke's automated MRI labels. Track C will simulate drug suppression and resistance under explicitly assumed parameter ranges. The available Track A and Duke records do not share patient identifiers, and the Duke metadata reviewed so far does not establish drug identity, dose, cycle count, interruptions, or adherence. Therefore, no Track A molecular score or Track B patient will be used to set an individual Track C drug-kill parameter. Any cross-track comparison will be population-level and clearly labeled as a scenario illustration, not patient-specific therapy prediction or a clinical recommendation.
+
 ## Research Question, Hypotheses, Engineering Goals, and Expected Outcomes
 
 ### Research Question
