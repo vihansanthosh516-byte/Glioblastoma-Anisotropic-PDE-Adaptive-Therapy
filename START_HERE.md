@@ -254,6 +254,6 @@ All Track C results below are SIMULATION on assumed parameter ranges, run on dev
 | single_mix | done | done | done | done | done | done | not applicable | done | done | not planned |
 | mixture_mix | done | done | done | done | done | done | done | done | done | not planned |
 
-Test G (script 205; design section 5d): code and 12 tests written, not run. The test-G seeds 20261870 to 20261879 are not yet in the registry (register them after the first run has written its manifest).
+Test G (script 205; design section 5d): code and 12 tests written and committed (aa4d85f). The `mixture` run was started on 2026-11-04 at 18:22 (11 controlled worlds, 6 workers; output folder `output/trackc_stage2_G_informed_search_mixture/`; its manifest is written, git clean True; its seeds 20261874 and 20261875 are in the registry). The finished run writes `search_by_world.csv`, `frontier_by_world.csv` and `results.json` after the manifest. If the folder holds only `manifest.json` and no process is running, the run was cut off: delete that folder and rerun `python src/205_trackc_informed_search.py --config mixture --workers 6` with a clean code tree. The seeds of the other configurations (20261870 to 20261873 and 20261876 to 20261879, see `G_SEEDS` in the script) are not yet spent or registered. No result is read yet.
 Last full Track C test run (scratch copy, 2026-11-04): 204 passed, 1 skipped (`output/` is absent in the copy) in 1 h 48 min. The scratch copy of `src` and `tests` equalled the working tree except for the new files of script 205 (checked with `diff -rq`).
 
