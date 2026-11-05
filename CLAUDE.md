@@ -166,3 +166,9 @@ The author gives Claude's overviews, numbers and claims to ChatGPT for an indepe
 - Discarding the existing work and starting over is acceptable to the user. Say so plainly when it is the better choice. Do not defend sunk cost.
 - Current scope (updated 2026-10-20): personal computational-biology research, not currently an ISEF/GARSEF submission. The user may switch or clear chats; `START_HERE.md` is the durable project handoff and must be updated when the research decision or next step changes. The project is probabilistic RANO. Findings must be backed by solid science. Claims of novelty must say how they were checked and what is unverified.
 - Presentation rule from the user: show best real results, do not advertise failures, never fabricate. Answer questions on limits fully when asked.
+
+## Uniqueness rule (user rule, 2026-11-04; applies to every project and every task)
+- "New biology" here means a NEW METHOD that is clearly unique, like the user's hybrid method. A result is not finished because it is done, verified or well written.
+- The method must contain or be benchmarked against ALL existing methods in its field (list them, run them on the same data and the same score), and must beat them or add something none of them has. State how novelty was checked (full prior-art search, not snippets) and what stays unverified.
+- Until a method like that exists, do not stop and do not call the work complete. A map or a negative result is a stepping stone, not the goal.
+- Report honestly if the method does not beat the baselines; then say what to try next. Never fabricate or tune toward a positive result.
