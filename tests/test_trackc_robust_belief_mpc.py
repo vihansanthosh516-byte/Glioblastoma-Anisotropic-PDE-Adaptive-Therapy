@@ -19,6 +19,7 @@ sys.modules[_SPEC.name] = _MODULE
 _SPEC.loader.exec_module(_MODULE)
 RobustBeliefMPC = _MODULE.RobustBeliefMPC
 robust_endpoint_utility = _MODULE.robust_endpoint_utility
+evaluate_robust_belief_mpc = _MODULE.evaluate_robust_belief_mpc
 
 
 def _policy(*, budget=4, scan_every=2, forecast_cycles=4):
@@ -53,6 +54,96 @@ def test_robust_utility_caps_time_at_tau():
         500.0, 400.0, 2.0, 1.0, tau=365.0, course_penalty=5.0
     )
     assert float(got) == pytest.approx(355.0)
+
+
+@pytest.mark.parametrize(
+    ("first_event", "expected_utility"),
+    [("baseline", -4.0), ("rano", 23.0)],
+)
+def test_forecast_scores_both_endpoints_on_one_earliest_event_path(
+    monkeypatch, first_event, expected_utility
+):
+    policy = RobustBeliefMPC(
+        scan_every=1,
+        budget=4,
+        course_penalty=5.0,
+        n_particles=8,
+        prediction_particles=4,
+        forecast_cycles=2,
+        stop_endpoint="either",
+    )
+    policy.used = np.array([0])
+    calls = []
+
+    def controlled_cycle(S, R, theta, treat, t0, *, prog_level=None, ttp=None):
+        cycle = int(t0 // tc.CYCLE_DAYS)
+        calls.append(np.asarray(treat, dtype=bool).copy())
+        if first_event == "baseline" and cycle == 0:
+            ttp[0, 0] = 1.0
+            return S, R
+        if first_event == "rano" and cycle == 0:
+            return np.full_like(S, 1.5), R
+        return S, R
+
+    monkeypatch.setattr(tc, "run_cycle", controlled_cycle)
+    theta = {
+        "r": np.array([[0.01]]),
+        "m": np.array([[6.0]]),
+        "f0": np.array([[0.05]]),
+        "c": np.array([[0.0]]),
+        "eps": np.array([[0.0]]),
+        "B0": np.array([[1.0]]),
+        "a_sr": np.array([[1.0]]),
+        "a_rs": np.array([[1.0]]),
+    }
+    got = policy._forecast_pattern(
+        {
+            "S": np.array([[0.95]]),
+            "R": np.array([[0.05]]),
+            "theta": theta,
+        },
+        rows=np.array([0]),
+        j=0,
+        pattern=np.array([True, True]),
+        nadir_start=np.array([1.0]),
+        t_base_now=np.array([[np.nan]]),
+        t_rano_now=np.array([[np.nan]]),
+    )
+
+    assert calls[0][0, 0]
+    assert not calls[1][0, 0]
+    assert got.shape == (1,)
+    assert got[0] == pytest.approx(expected_utility)
+
+
+def test_evaluator_uses_the_policy_stop_rule(monkeypatch):
+    policy = _policy()
+    calls = []
+    sentinel = {"checked": True}
+
+    def fake_two_endpoint_simulation(scenarios, supplied_policy, seed, *, stop_endpoint, budget):
+        calls.append((scenarios["scan_every"], supplied_policy, seed, stop_endpoint, budget))
+        return sentinel
+
+    monkeypatch.setattr(tc, "simulate_two_endpoints", fake_two_endpoint_simulation)
+    got = evaluate_robust_belief_mpc(_scenarios(1), policy, 20261204)
+
+    assert got is sentinel
+    assert calls == [(policy.scan_every, policy, 20261204, policy.stop_endpoint, policy.budget)]
+
+
+def test_evaluator_rejects_stop_rule_mismatched_to_planner(monkeypatch):
+    policy = _policy()
+    monkeypatch.setattr(
+        tc,
+        "simulate_two_endpoints",
+        lambda *args, **kwargs: pytest.fail("mismatched rule must stop before simulation"),
+    )
+
+    with pytest.raises(ValueError, match="must match the planner"):
+        evaluate_robust_belief_mpc(
+            _scenarios(1), policy, 20261205, endpoint="rano"
+        )
 
 
 @pytest.mark.parametrize(

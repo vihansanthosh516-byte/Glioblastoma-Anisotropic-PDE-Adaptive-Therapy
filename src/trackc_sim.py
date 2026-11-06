@@ -527,6 +527,120 @@ def simulate(scen, policy, seed, track_fr=False, endpoint="baseline", budget=Non
     return out
 
 
+def simulate_two_endpoints(scen, policy, seed, track_fr=False, stop_endpoint="either", budget=None):
+    """Score baseline and RANO-like progression on one treatment trajectory.
+
+    Treatment stops when ``stop_endpoint`` is reached: ``"baseline"`` for the continuous
+    1.2 x baseline event, ``"rano"`` for the scan-based nadir event, or ``"either"`` for
+    the first of those events. Both endpoint times are still followed to the horizon on
+    that same trajectory, with no treatment after the chosen stop event. The returned
+    course count therefore belongs to the shared path and is not duplicated by endpoint.
+
+    This is a synthetic estimand helper. It leaves :func:`simulate` unchanged. Stop timing
+    uses latent simulator progression, which is an idealized treatment-stop rule: the policy
+    does not receive the hidden event time, and an ongoing 28-day cycle is not interrupted;
+    later cycles receive no treatment after the event. Administrative censoring occurs only
+    at the simulation horizon. Scan noise is pre-drawn before policy initialization, matching
+    the existing simulator contract.
+    """
+    if stop_endpoint not in ("baseline", "rano", "either"):
+        raise ValueError(f"unknown stop endpoint {stop_endpoint!r}")
+    cap = BUDGET if budget is None else int(budget)
+    dose = scen.get("dose")
+    scan_every = scen.get("scan_every")
+    rng = np.random.default_rng(seed)
+    N = len(scen["r"])
+    sd = scen.get("sigma_true", scen["sigma"])[:, None]
+    if "noise_df" in scen:
+        df = float(scen["noise_df"][0])
+        noise = rng.standard_t(df, (N, N_CYCLES)) * np.sqrt((df - 2) / df) * sd
+    else:
+        noise = rng.standard_normal((N, N_CYCLES)) * sd
+    if "bias" in scen:
+        noise = noise + scen["bias"][:, None]
+    p = scen
+    if "drift" in scen:
+        p = dict(scen, m=scen["m"].copy())
+    u_miss = None
+    if "miss_p" in scen:
+        u_miss = np.random.default_rng([*np.atleast_1d(seed).tolist(), 1]).random((N, N_CYCLES))
+    delays = sorted(set(np.asarray(scen.get("delay", [0])).tolist()) - {0})
+    S = (1 - scen["f0"]) * scen["B0"]
+    R = scen["f0"] * scen["B0"]
+    past = {d: S + R for d in delays}
+    level = scen.get("prog_factor", PROG_FACTOR) * scen["B0"]
+    ttp_baseline = np.full(N, np.nan)
+    ttp_rano = np.full(N, np.nan)
+    used = np.zeros(N, int)
+    hits, total = 0, 0
+    policy.reset(scen, rng)
+    y_prev = None
+    base0 = nadir = None
+    for j in range(N_CYCLES):
+        scan = np.ones(N, bool) if scan_every is None else (j % scan_every == 0)
+        B_true = S + R
+        if j == 0:
+            base0, nadir = B_true.copy(), B_true.copy()
+        else:
+            hit = scan & np.isnan(ttp_rano) & (
+                B_true >= RANO_FACTOR * np.maximum(nadir, RANO_FLOOR * base0)
+            )
+            ttp_rano[hit] = j * CYCLE_DAYS
+            nadir = np.where(scan, np.minimum(nadir, B_true), nadir)
+
+        B = S + R
+        for d in delays:
+            B = np.where(scen["delay"] == d, past[d], B)
+        y = np.log(B) + noise[:, j]
+        if u_miss is not None:
+            if j > 0:
+                q = scen["miss_p"]
+                if "miss_p_hi" in scen:
+                    q = np.where(S + R >= scen["B0"], scen["miss_p_hi"], q)
+                y = np.where(u_miss[:, j] < q, np.nan if "miss_visible" in scen else y_prev, y)
+            y_prev = y
+        if scan_every is not None:
+            y = np.where(scan, y, np.nan)
+        treat = policy.act(j, y) & (used < cap)
+        stop_event = np.isnan(ttp_baseline) if stop_endpoint == "baseline" else (
+            np.isnan(ttp_rano) if stop_endpoint == "rano" else
+            (np.isnan(ttp_baseline) & np.isnan(ttp_rano))
+        )
+        if track_fr and policy.uses_filter:
+            lo, hi = policy.pf.fr_interval()
+            fr_true = R / (S + R)
+            hits += int(((fr_true >= lo) & (fr_true <= hi) & stop_event).sum())
+            total += int(stop_event.sum())
+        treat = treat & stop_event
+        used += treat
+        snaps = {CYCLE_DAYS - d: None for d in delays} if delays else None
+        S, R = run_cycle(
+            S, R, p, treat if dose is None else treat * dose,
+            j * CYCLE_DAYS, prog_level=level, ttp=ttp_baseline, snaps=snaps,
+        )
+        for d in delays:
+            past[d] = sum(snaps[CYCLE_DAYS - d])
+        if "drift" in scen:
+            p["m"] = np.where(treat, p["m"] * (1.0 - scen["drift"]), p["m"])
+        policy.advance(j, treat)
+
+    capped_baseline = np.isnan(ttp_baseline)
+    capped_rano = np.isnan(ttp_rano)
+    ttp_baseline[capped_baseline] = HORIZON
+    ttp_rano[capped_rano] = HORIZON
+    out = {
+        "ttp_baseline": ttp_baseline,
+        "capped_baseline": capped_baseline,
+        "ttp_rano": ttp_rano,
+        "capped_rano": capped_rano,
+        "courses": used,
+        "stop_endpoint": stop_endpoint,
+    }
+    if track_fr and policy.uses_filter:
+        out["fr_cover"] = (hits, total)
+    return out
+
+
 # ---------------------------------------------------------------- statistics
 def cvar_lower(x, alpha=0.10):
     """Mean of the lowest alpha fraction, with fractional weight at the cutoff."""

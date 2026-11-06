@@ -88,6 +88,7 @@ class RobustBeliefMPC:
         prediction_particles: posterior draws used by the planner per patient.
         forecast_cycles: local forecast length. Must be a multiple of ``scan_every``;
             the selected scan-interval pattern repeats throughout this window.
+        stop_endpoint: treatment stops at ``baseline``, ``rano``, or the first of either.
         ranges: optional parameter prior passed to ``ParticleFilter``.
 
     Benchmarking: ``evaluate_robust_belief_mpc`` applies the policy's scan interval and
@@ -107,6 +108,7 @@ class RobustBeliefMPC:
         n_particles=500,
         prediction_particles=16,
         forecast_cycles=6,
+        stop_endpoint="either",
         ranges=None,
     ):
         self.scan_every = _as_int(scan_every, "scan_every")
@@ -115,6 +117,9 @@ class RobustBeliefMPC:
         self.n_particles = _as_int(n_particles, "n_particles")
         self.prediction_particles = _as_int(prediction_particles, "prediction_particles")
         self.forecast_cycles = _as_int(forecast_cycles, "forecast_cycles")
+        if stop_endpoint not in ("baseline", "rano", "either"):
+            raise ValueError("stop_endpoint must be baseline, rano, or either")
+        self.stop_endpoint = stop_endpoint
         if not 1 <= self.scan_every <= 4:
             raise ValueError("scan_every must be between 1 and 4 cycles")
         if not 1 <= self.budget <= tc.BUDGET:
@@ -190,44 +195,37 @@ class RobustBeliefMPC:
         return state
 
     def _forecast_pattern(self, state, rows, j, pattern, nadir_start, t_base_now, t_rano_now):
-        """Predict both endpoints under one repeated scan-interval pattern."""
+        """Predict both endpoint times on one shared treatment path."""
         theta = state["theta"]
-        S_base, R_base = state["S"].copy(), state["R"].copy()
-        S_rano, R_rano = state["S"].copy(), state["R"].copy()
+        S, R = state["S"].copy(), state["R"].copy()
         B0 = theta["B0"]
         ttp_base = t_base_now.copy()
         ttp_rano = t_rano_now.copy()
-        courses_base = np.zeros_like(ttp_base, dtype=float)
-        courses_rano = np.zeros_like(ttp_rano, dtype=float)
+        courses = np.zeros_like(ttp_base, dtype=float)
         nadir = np.minimum(nadir_start[:, None], B0)
 
         for h in range(self.forecast_cycles):
             cycle = j + h
             on = bool(pattern[h % self.scan_every])
-            can_dose_base = (self.used[rows, None] + courses_base < self.budget) & np.isnan(ttp_base)
-            can_dose_rano = (self.used[rows, None] + courses_rano < self.budget) & np.isnan(ttp_rano)
-            treat_base = can_dose_base & on
-            treat_rano = can_dose_rano & on
-            courses_base += treat_base
-            courses_rano += treat_rano
-            S_base, R_base = tc.run_cycle(
-                S_base,
-                R_base,
+            if self.stop_endpoint == "baseline":
+                still_treat = np.isnan(ttp_base)
+            elif self.stop_endpoint == "rano":
+                still_treat = np.isnan(ttp_rano)
+            else:
+                still_treat = np.isnan(ttp_base) & np.isnan(ttp_rano)
+            treat = (self.used[rows, None] + courses < self.budget) & still_treat & on
+            courses += treat
+            S, R = tc.run_cycle(
+                S,
+                R,
                 theta,
-                treat_base,
+                treat,
                 h * tc.CYCLE_DAYS,
                 prog_level=tc.PROG_FACTOR * B0,
                 ttp=ttp_base,
             )
-            S_rano, R_rano = tc.run_cycle(
-                S_rano,
-                R_rano,
-                theta,
-                treat_rano,
-                h * tc.CYCLE_DAYS,
-            )
             if (cycle + 1) % self.scan_every == 0:
-                B_rano = S_rano + R_rano
+                B_rano = S + R
                 threshold = tc.RANO_FACTOR * np.maximum(nadir, tc.RANO_FLOOR * B0)
                 hit = np.isnan(ttp_rano) & (B_rano >= threshold)
                 ttp_rano[hit] = (h + 1) * tc.CYCLE_DAYS
@@ -239,8 +237,8 @@ class RobustBeliefMPC:
         utility = robust_endpoint_utility(
             ttp_base,
             ttp_rano,
-            courses_base,
-            courses_rano,
+            courses,
+            courses,
             tau=forecast_days,
             course_penalty=self.course_penalty,
         )
@@ -383,14 +381,32 @@ def _as_int(value, name):
     return result
 
 
-def evaluate_robust_belief_mpc(evaluation_scenarios, policy, seed, *, endpoint="rano"):
-    """Evaluate a frozen policy with its configured scan interval and course budget."""
+def evaluate_robust_belief_mpc(
+    evaluation_scenarios, policy, seed, *, stop_endpoint=None, endpoint=None
+):
+    """Evaluate both endpoints on one path using the policy's configured stop rule.
+
+    ``endpoint`` remains as a compatibility alias for callers that want to set the
+    treatment stop rule explicitly; returned outcomes always include both endpoint times.
+    """
     if not isinstance(policy, RobustBeliefMPC):
         raise TypeError("policy must be a RobustBeliefMPC")
+    if endpoint is not None:
+        if stop_endpoint is not None:
+            raise ValueError("pass stop_endpoint or endpoint, not both")
+        stop_endpoint = endpoint
+    if stop_endpoint is None:
+        stop_endpoint = policy.stop_endpoint
+    if stop_endpoint != policy.stop_endpoint:
+        raise ValueError("evaluation stop_endpoint must match the planner's configured rule")
     eval_scenarios = dict(evaluation_scenarios)
     eval_scenarios["scan_every"] = policy.scan_every
-    return tc.simulate(
-        eval_scenarios, policy, seed, endpoint=endpoint, budget=policy.budget
+    return tc.simulate_two_endpoints(
+        eval_scenarios,
+        policy,
+        seed,
+        stop_endpoint=stop_endpoint,
+        budget=policy.budget,
     )
 
 

@@ -452,3 +452,160 @@ def test_policy_rng_use_does_not_change_precomputed_scan_noise():
     assert len(quiet.readings) == len(noisy.readings)
     for quiet_y, noisy_y in zip(quiet.readings, noisy.readings):
         np.testing.assert_array_equal(quiet_y, noisy_y)
+
+
+def test_common_scan_noise_remains_paired_when_treatment_paths_diverge():
+    class RecordingPolicy:
+        uses_filter = False
+
+        def __init__(self, treat):
+            self.treat = bool(treat)
+            self.readings = []
+            self.delivered = []
+
+        def reset(self, scen, rng):
+            self.rng = rng
+            self.rng.standard_normal(257)
+
+        def act(self, j, y):
+            self.readings.append(np.asarray(y).copy())
+            self.rng.standard_normal(31)
+            return np.full(y.shape, self.treat, dtype=bool)
+
+        def advance(self, j, treat):
+            self.delivered.append(np.asarray(treat).copy())
+
+    scen = one(r=0.03, m=1.4, f0=0.1, c=0.0, eps=0.0, B0=0.2, sigma=0.05)
+    quiet = RecordingPolicy(treat=False)
+    treated = RecordingPolicy(treat=True)
+    seed = 20261128
+    tc.simulate(scen, quiet, seed=seed, budget=2)
+    tc.simulate(scen, treated, seed=seed, budget=2)
+
+    noise = np.random.default_rng(seed).standard_normal((1, tc.N_CYCLES)) * scen["sigma"][:, None]
+    residuals = []
+    for policy in (quiet, treated):
+        S = (1.0 - scen["f0"]) * scen["B0"]
+        R = scen["f0"] * scen["B0"]
+        ttp = np.full(1, np.nan)
+        policy_noise = []
+        for j, y in enumerate(policy.readings):
+            policy_noise.append(y - np.log(S + R))
+            S, R = tc.run_cycle(
+                S,
+                R,
+                scen,
+                policy.delivered[j],
+                j * tc.CYCLE_DAYS,
+                prog_level=tc.PROG_FACTOR * scen["B0"],
+                ttp=ttp,
+            )
+        residuals.append(np.stack(policy_noise, axis=1))
+        np.testing.assert_allclose(
+            residuals[-1], noise[:, : len(policy.readings)], rtol=0.0, atol=1e-12
+        )
+
+    common_cycles = min(residuals[0].shape[1], residuals[1].shape[1])
+    np.testing.assert_array_equal(residuals[0][:, :common_cycles], residuals[1][:, :common_cycles])
+
+
+def test_simulate_two_endpoints_matches_single_endpoint_stop_runs():
+    scen = tc.draw_scenarios(4, seed=20261130, sigmas=(0.05,))
+    scen["scan_every"] = np.full(4, 2)
+    seed = 20261201
+
+    for stop_endpoint in ("baseline", "rano"):
+        paired = tc.simulate_two_endpoints(
+            scen,
+            tc.Periodic(3),
+            seed=seed,
+            stop_endpoint=stop_endpoint,
+        )
+        single = tc.simulate(
+            scen,
+            tc.Periodic(3),
+            seed=seed,
+            endpoint=stop_endpoint,
+        )
+        key = "ttp_baseline" if stop_endpoint == "baseline" else "ttp_rano"
+        np.testing.assert_array_equal(paired[key], single["ttp"])
+        np.testing.assert_array_equal(paired["courses"], single["courses"])
+
+
+def test_two_endpoint_scores_share_one_path_but_stop_rule_is_explicit():
+    class AlwaysTreat:
+        uses_filter = False
+
+        def reset(self, scen, rng):
+            pass
+
+        def act(self, j, y):
+            return np.ones(y.shape, dtype=bool)
+
+        def advance(self, j, treat):
+            pass
+
+    scen = one(r=0.03, m=0.0, f0=0.0, c=0.0, eps=0.0, B0=0.2, sigma=0.05)
+    scen["scan_every"] = np.array([2])
+    baseline_stop = tc.simulate_two_endpoints(
+        scen, AlwaysTreat(), seed=20261202, stop_endpoint="baseline", budget=4
+    )
+    rano_stop = tc.simulate_two_endpoints(
+        scen, AlwaysTreat(), seed=20261202, stop_endpoint="rano", budget=4
+    )
+
+    assert baseline_stop["stop_endpoint"] == "baseline"
+    assert rano_stop["stop_endpoint"] == "rano"
+    np.testing.assert_array_equal(baseline_stop["ttp_baseline"], rano_stop["ttp_baseline"])
+    np.testing.assert_array_equal(baseline_stop["ttp_rano"], rano_stop["ttp_rano"])
+    assert baseline_stop["courses"][0] < rano_stop["courses"][0]
+    assert "courses_baseline" not in baseline_stop and "courses_rano" not in baseline_stop
+
+
+@pytest.mark.parametrize("first_event", ["baseline", "rano"])
+def test_either_stop_blocks_later_courses_after_first_progression(monkeypatch, first_event):
+    class RecordingPolicy:
+        uses_filter = False
+
+        def __init__(self):
+            self.treatments = []
+
+        def reset(self, scen, rng):
+            pass
+
+        def act(self, j, y):
+            return np.ones(y.shape, dtype=bool)
+
+        def advance(self, j, treat):
+            self.treatments.append(np.asarray(treat).copy())
+
+    def controlled_cycle(S, R, p, treat, t0, *, prog_level=None, ttp=None, snaps=None):
+        cycle = int(t0 // tc.CYCLE_DAYS)
+        if first_event == "baseline" and cycle == 0:
+            ttp[0] = 1.0
+            return np.array([0.5]), np.array([0.0])
+        if first_event == "rano":
+            if cycle == 0:
+                return np.array([0.5]), np.array([0.0])
+            if cycle == 1:
+                return np.array([0.8]), np.array([0.0])
+        return S, R
+
+    monkeypatch.setattr(tc, "run_cycle", controlled_cycle)
+    scen = one(r=0.01, m=0.0, f0=0.0, c=0.0, eps=0.0, B0=1.0, sigma=0.05)
+    policy = RecordingPolicy()
+    result = tc.simulate_two_endpoints(
+        scen, policy, seed=20261203, stop_endpoint="either", budget=4
+    )
+
+    assert result["stop_endpoint"] == "either"
+    stop_cycle = 1 if first_event == "baseline" else 2
+    assert all(policy.treatments[j][0] for j in range(stop_cycle))
+    assert not policy.treatments[stop_cycle][0]
+    assert not policy.treatments[stop_cycle + 1][0]
+    if first_event == "baseline":
+        assert not result["capped_baseline"][0]
+        assert result["capped_rano"][0]
+    else:
+        assert not result["capped_rano"][0]
+        assert result["capped_baseline"][0]
