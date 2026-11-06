@@ -129,6 +129,12 @@ This is a local, model-based information diagnostic at one assumed parameter poi
 
 **Verification:** the focused identifiability, Fisher-information, and signal-conditioning suites passed 38 tests in a scratch copy. The full Track C scratch suite passed 316 tests and skipped one seed-registry test because `output/` was absent from the scratch copy; that test file separately passed 10 and reproduced the documented skip. After removing a trailing blank line from the new test file, its focused suite passed 3 tests, and SHA-256 comparison found no differences across all 429 `src/` and `tests/` files between scratch and worktree. These checks validate code behavior, not method superiority.
 
+### Predeclared Fisher-information grid stress test (not run yet)
+
+To check how much the one-point result depends on the assumed signal strengths, I will evaluate every point in this fixed grid: `q` in `{0.5, 0.7, 0.9}` and each of `a`, `b`, and `d` in `{-0.5, 0, 0.5}`. I will evaluate all 81 parameter points under the same four `f0` distributions used above. The `q = 0.5` slice is a negative control because a coin-flip molecular report carries no information.
+
+For this grid check, I will use 64 Gauss-Legendre `f0` nodes, 401 MRI-score points from -8 to 8, central differences of `1e-4`, and the same `1e-6` relative eigenvalue threshold. I will report all points and all four distributions, with no parameter selection. This coarse grid is a model stress test, not a calibrated biological range, exhaustive identifiability proof, finite-sample study, or policy result. It requires no random seed.
+
 ## Targeted prior-art update (2026-11-06)
 
 A targeted search for unknown observation dependence found methods that already handle uncertainty in sensor cross-correlation and POMDP observation models. Robust fusion methods minimize worst-case error over uncertain cross-covariances ([Wu & Hu, 2019](https://link.springer.com/article/10.1186/s13634-019-0640-6)); distributionally robust POMDPs optimize against an ambiguity set for transition-observation distributions ([Nakao et al., 2020](https://epubs.siam.org/doi/10.1137/19M1268410)); and a 2026 preprint studies policy robustness to observation-model perturbations ([Kraske et al., 2026](https://arxiv.org/abs/2604.21256)). This makes “robust fusion” or “robust POMDP” alone an established-method claim, not a novelty claim.
