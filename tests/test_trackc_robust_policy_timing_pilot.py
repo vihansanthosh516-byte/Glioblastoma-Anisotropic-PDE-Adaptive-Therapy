@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import importlib.util
+import hashlib
+import json
 import math
 import sys
 from pathlib import Path
@@ -57,3 +59,28 @@ def test_pilot_manifest_contract_excludes_policy_outcomes():
     assert all(f'"{field}"' in manifest_source for field in required)
     for forbidden in (""""policy_scores""", """"utility""", """"endpoint_times""", """"course_counts""", """"policy_ranks"""):
         assert forbidden not in manifest_source
+
+
+def test_completed_manifest_has_timings_and_no_outcome_fields():
+    manifest_path = REPO / "output" / "trackc_robust_policy_timing_pilot_20261106_followup" / "manifest.json"
+    amendment_path = REPO / "paper" / "trackc_robust_policy_timing_amendment_2026-11-06.md"
+    if not manifest_path.exists() or not amendment_path.exists():
+        pytest.skip("completed timing record or amendment is not present")
+    record = json.loads(manifest_path.read_text(encoding="utf-8"))
+    assert record["status"] == "completed"
+    assert set(record["timing_seconds"]) == {"single", "mixture"}
+    assert all(0 < value < 7200 for value in record["timing_seconds"].values())
+    assert record["signal_f0_bounds"] == pytest.approx(F0_REFERENCE_BOUNDS)
+    assert record["candidate_model_grid_size"] == 81
+    assert record["matched_d0_model_grid_size"] == 27
+    assert record["outcome_scores_saved"] is False
+    assert record["outcome_scores_inspected"] is False
+    assert record["returned_outcome_objects_discarded"] is True
+    forbidden = {"policy_scores", "utilities", "endpoint_times", "course_counts", "policy_ranks"}
+    assert not forbidden.intersection(record)
+
+    def file_hash(path: Path) -> str:
+        return hashlib.sha256(path.read_bytes()).hexdigest()
+
+    assert record["runner_script_sha256"] == file_hash(SCRIPT_PATH)
+    assert record["amendment_sha256"] == file_hash(amendment_path)

@@ -331,6 +331,14 @@ ENTRIES = [
            note="Single-family synthetic input generation reached the runner's f0-bound guard and stopped before any "
                 "policy simulation. No policy RNG seeds were consumed; mixture family was not run. No outcome scores "
                 "were saved or inspected. Exact attempt and error are recorded in the manifest and failure memo."),
+    _entry("218", "robust policy timing follow-up (completed; outcomes discarded)", "dev_used",
+           [(20261952, 20261957), (20261963, 20261968)], [],
+           [("output/trackc_robust_policy_timing_pilot_20261106_followup/manifest.json", '"status": "completed"')],
+           note="Timing-only synthetic pilot under paper/trackc_robust_policy_timing_amendment_2026-11-06.md. "
+                "Full harness ran once per response family; returned policy outcome objects were discarded. No scores "
+                "were saved or inspected. Exact elapsed seconds, settings, environment, hashes, and seed map are in "
+                "the manifest.",
+           policy=[(20261958, 20261962), (20261969, 20261973)]),
 ]
 ENTRIES.append(_reserved_stage2_dev(ENTRIES))
 ENTRIES.append(_entry("restart", "Stage 3 sealed run (restart plan)", "reserved", [(20262300, 20262499)],

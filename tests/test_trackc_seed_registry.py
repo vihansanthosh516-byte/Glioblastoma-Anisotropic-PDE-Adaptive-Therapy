@@ -45,6 +45,16 @@ def test_reserved_blocks_touch_no_used_seed():
                         assert reg._overlap(a, b) is None, (r["label"], u["label"], a, b)
 
 
+def test_robust_timing_followup_seeds_and_manifest_are_recorded():
+    entry = next(e for e in reg.ENTRIES if e["script"] == "218")
+    assert entry["status"] == "dev_used"
+    assert entry["scenario_seeds"] == [[20261952, 20261957], [20261963, 20261968]]
+    assert entry["policy_seeds"] == [[20261958, 20261962], [20261969, 20261973]]
+    assert entry["evidence"] == [[
+        "output/trackc_robust_policy_timing_pilot_20261106_followup/manifest.json", '"status": "completed"'
+    ]]
+
+
 def test_check_free_refuses_spent_and_dev_seeds():
     assert reg.check_free(scenario=(20261122, 20261122))          # 167 sealed draw
     assert reg.check_free(scenario=(20261121, 20261121))          # shared tuning draw
