@@ -117,6 +117,14 @@ I then ran deterministic quadrature under three log-uniform `f0` priors from the
 
 Track A and Duke data are not patient-linked, and neither supplies paired signal/resistance labels. Fitting `d` by using simulated latent resistance would be oracle calibration, not evidence that the project can learn dependence from real observations. Before an outcome benchmark, test finite-sample identifiability with the nuisance parameters unknown under the actual `f0` ranges. If estimates remain weak or unstable, use a predeclared uncertainty set over signal models rather than claim that `d` was learned. The proposed robust policy still needs implementation, fair baselines, and held-out evaluation.
 
+### Predeclared local-information diagnostic (not run when this protocol was written)
+
+Before a finite-sample recovery simulation, I will calculate the expected Fisher information for `theta = (q, a, b, d)` from the exact marginal paired-signal likelihood. I will evaluate the fixed point `(0.8, 0.5, 0.4, 0.6)` under four distributions: the full reference `f0` range and the three calibration ranges listed above. The full reference range is a standard-normal-score negative control; the three truncated ranges are the calibration conditions of interest.
+
+For each condition, I will use 256 Gauss-Legendre `f0` nodes, 1,601 equally spaced MRI scores from -8 to 8, and central finite differences with step `1e-4`. I will integrate the discrete-report/continuous-score Fisher matrix by the trapezoid rule. I will call an eigenvalue nonzero only when it exceeds `1e-6` times the largest eigenvalue. I will report the full eigenvalue spectrum, effective rank, condition number, and the nuisance-adjusted local Cramér–Rao standard-error bound for `d` when the matrix is full rank. A rank-deficient matrix will have no finite bound reported for `d`.
+
+This is a local, model-based information diagnostic at one assumed parameter point. It is not a parameter-recovery experiment, power analysis, patient estimate, or policy result. A later finite-sample study must use registered development seeds and must include unknown `q`, `a`, and `b`; the local diagnostic cannot replace it.
+
 ## Targeted prior-art update (2026-11-06)
 
 A targeted search for unknown observation dependence found methods that already handle uncertainty in sensor cross-correlation and POMDP observation models. Robust fusion methods minimize worst-case error over uncertain cross-covariances ([Wu & Hu, 2019](https://link.springer.com/article/10.1186/s13634-019-0640-6)); distributionally robust POMDPs optimize against an ambiguity set for transition-observation distributions ([Nakao et al., 2020](https://epubs.siam.org/doi/10.1137/19M1268410)); and a 2026 preprint studies policy robustness to observation-model perturbations ([Kraske et al., 2026](https://arxiv.org/abs/2604.21256)). This makes “robust fusion” or “robust POMDP” alone an established-method claim, not a novelty claim.
