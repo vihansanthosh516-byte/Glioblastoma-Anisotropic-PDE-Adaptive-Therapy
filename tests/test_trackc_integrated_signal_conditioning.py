@@ -70,6 +70,71 @@ def test_zero_signal_association_gives_flat_f0_likelihood_even_with_residual_dep
     assert np.ptp(log_likelihood[0]) < 1e-12
 
 
+def test_uninformative_molecular_report_has_constant_likelihood_at_q_half():
+    f0_particles = np.array([[0.001, 0.004, 0.02, 0.2, 0.8]])
+    parameters = SignalModelParameters(q=0.5, a=0.9, b=-0.6, d=0.75)
+    for report in (False, True):
+        likelihood = integrated_signal_log_likelihood(
+            f0_particles,
+            SignalObservations(
+                molecular_report=np.array([report]), mri_score=np.array([0.0])
+            ),
+            parameters,
+            channels=("molecular",),
+        )
+        np.testing.assert_allclose(likelihood, np.log(0.5), rtol=0.0, atol=1e-12)
+
+
+def test_zero_residual_dependence_factorizes_joint_likelihood():
+    f0_particles = np.array([[0.001, 0.004, 0.02, 0.2, 0.8]])
+    observations = SignalObservations(
+        molecular_report=np.array([True]), mri_score=np.array([-0.35])
+    )
+    parameters = SignalModelParameters(q=0.82, a=0.45, b=-0.3, d=0.0)
+    joint = integrated_signal_log_likelihood(
+        f0_particles, observations, parameters
+    )
+    molecular = integrated_signal_log_likelihood(
+        f0_particles, observations, parameters, channels=("molecular",)
+    )
+    mri = integrated_signal_log_likelihood(
+        f0_particles, observations, parameters, channels=("mri",)
+    )
+    np.testing.assert_allclose(joint, molecular + mri, rtol=0.0, atol=1e-12)
+
+
+def test_residual_dependence_changes_joint_but_not_single_channel_likelihoods():
+    f0_particles = np.array([[0.001, 0.004, 0.02, 0.2, 0.8]])
+    observations = SignalObservations(
+        molecular_report=np.array([True]), mri_score=np.array([0.75])
+    )
+    independent = SignalModelParameters(q=0.82, a=0.45, b=-0.3, d=0.0)
+    dependent = SignalModelParameters(q=0.82, a=0.45, b=-0.3, d=0.7)
+
+    joint_independent = integrated_signal_log_likelihood(
+        f0_particles, observations, independent
+    )
+    joint_dependent = integrated_signal_log_likelihood(
+        f0_particles, observations, dependent
+    )
+    molecular_independent = integrated_signal_log_likelihood(
+        f0_particles, observations, independent, channels=("molecular",)
+    )
+    molecular_dependent = integrated_signal_log_likelihood(
+        f0_particles, observations, dependent, channels=("molecular",)
+    )
+    mri_independent = integrated_signal_log_likelihood(
+        f0_particles, observations, independent, channels=("mri",)
+    )
+    mri_dependent = integrated_signal_log_likelihood(
+        f0_particles, observations, dependent, channels=("mri",)
+    )
+
+    assert not np.allclose(joint_independent, joint_dependent)
+    np.testing.assert_allclose(molecular_independent, molecular_dependent)
+    np.testing.assert_allclose(mri_independent, mri_dependent)
+
+
 @pytest.mark.parametrize(("a", "ascending"), [(0.8, True), (-0.8, False)])
 def test_molecular_likelihood_order_tracks_declared_link_sign(a, ascending):
     f0_particles = np.array([[0.001, 0.8]])

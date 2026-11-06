@@ -38,7 +38,13 @@ class SignalTruth:
 
 @dataclass(frozen=True)
 class SignalModelParameters:
-    """Assumed observation-model parameters known to a policy, never fitted on test outcomes."""
+    """Assumed factor coefficients known to a policy, never fitted on test outcomes.
+
+    ``a`` and ``b`` are loadings on the resistance score, and ``d`` is the
+    residual-factor coefficient. They are not generally the empirical
+    correlations in a virtual cohort, especially when its resistance scores
+    come from a non-normal distribution of ``f0`` values.
+    """
 
     q: float
     a: float
@@ -47,9 +53,9 @@ class SignalModelParameters:
 
     def __post_init__(self):
         object.__setattr__(self, "q", _bounded_probability(self.q, "q"))
-        object.__setattr__(self, "a", _bounded_correlation(self.a, "a"))
-        object.__setattr__(self, "b", _bounded_correlation(self.b, "b"))
-        object.__setattr__(self, "d", _bounded_correlation(self.d, "d"))
+        object.__setattr__(self, "a", _bounded_coefficient(self.a, "a"))
+        object.__setattr__(self, "b", _bounded_coefficient(self.b, "b"))
+        object.__setattr__(self, "d", _bounded_coefficient(self.d, "d"))
 
 
 def _bounded_probability(value: float, name: str) -> float:
@@ -64,15 +70,15 @@ def _bounded_probability(value: float, name: str) -> float:
     return result
 
 
-def _bounded_correlation(value: float, name: str) -> float:
+def _bounded_coefficient(value: float, name: str) -> float:
     if isinstance(value, (bool, np.bool_)):
-        raise ValueError(f"{name} must be a finite number in [-1, 1]")
+        raise ValueError(f"{name} must be a finite coefficient in [-1, 1]")
     try:
         result = float(value)
     except (TypeError, ValueError, OverflowError) as exc:
-        raise ValueError(f"{name} must be a finite number in [-1, 1]") from exc
+        raise ValueError(f"{name} must be a finite coefficient in [-1, 1]") from exc
     if not np.isfinite(result) or not -1.0 <= result <= 1.0:
-        raise ValueError(f"{name} must be a finite number in [-1, 1]")
+        raise ValueError(f"{name} must be a finite coefficient in [-1, 1]")
     return result
 
 
@@ -164,9 +170,9 @@ def generate_integrated_signals(
         raise ValueError("seed must be a non-negative integer")
 
     q = _bounded_probability(q, "q")
-    a = _bounded_correlation(a, "a")
-    b = _bounded_correlation(b, "b")
-    d = _bounded_correlation(d, "d")
+    a = _bounded_coefficient(a, "a")
+    b = _bounded_coefficient(b, "b")
+    d = _bounded_coefficient(d, "d")
 
     rng = np.random.default_rng(int(seed))
     if f0 is None:
