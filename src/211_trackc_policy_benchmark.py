@@ -270,6 +270,48 @@ class FixedSchedulePolicy:
         del cycle, treatment
 
 
+def _fixed_schedule_control_catalog(settings: PolicyBenchmarkSettings) -> dict:
+    """Build explicit fixed-course references allowed by the configured global budget.
+
+    These are simulator schedule controls, not clinical regimens. The simulator's
+    treatment cycle is 28 days; the every-other-cycle arm is a 56-day pacing control,
+    not a dose-dense clinical schedule.
+    """
+    controls = {}
+
+    six_course = np.zeros(tc.N_CYCLES, dtype=bool)
+    six_course[:6] = True
+    controls["standard_six_course"] = {
+        "schedule": six_course,
+        "planned_courses": 6,
+        "cycle_indices": list(range(6)),
+        "nominal_interval_days": tc.CYCLE_DAYS,
+        "description": "six courses at the first six 28-day cycle starts",
+    }
+
+    if settings.course_budget >= 12:
+        front_loaded = np.zeros(tc.N_CYCLES, dtype=bool)
+        front_loaded[:12] = True
+        controls["standard_twelve_course_front_loaded"] = {
+            "schedule": front_loaded,
+            "planned_courses": 12,
+            "cycle_indices": list(range(12)),
+            "nominal_interval_days": tc.CYCLE_DAYS,
+            "description": "twelve courses at the first twelve 28-day cycle starts",
+        }
+
+        paced = np.zeros(tc.N_CYCLES, dtype=bool)
+        paced[0:24:2] = True
+        controls["paced_twelve_course_every_other_cycle"] = {
+            "schedule": paced,
+            "planned_courses": 12,
+            "cycle_indices": list(range(0, 24, 2)),
+            "nominal_interval_days": 2 * tc.CYCLE_DAYS,
+            "description": "twelve courses at every other 28-day cycle start (56-day spacing)",
+        }
+    return controls
+
+
 class CourseCappedPolicy:
     """Apply an arm-specific course cap while preserving its policy interface."""
 
@@ -798,8 +840,7 @@ def run_shared_policy_world(
         n_f0_nodes=settings.n_f0_nodes, **deepcopy(common_mpc)
     )
     no_signal_mpc = mpc.RobustBeliefMPC(**deepcopy(common_mpc))
-    standard_schedule = np.zeros(tc.N_CYCLES, dtype=bool)
-    standard_schedule[:6] = True
+    fixed_control_catalog = _fixed_schedule_control_catalog(settings)
     fixed_schedule = chosen_fixed["schedule"]
     policies = {
         "loo_dependence_aware_mpc": full_signal_mpc,
@@ -807,8 +848,11 @@ def run_shared_policy_world(
         "no_signal_mpc": no_signal_mpc,
         "q_learning": q_policy,
         "selection_best_fixed": FixedSchedulePolicy(fixed_schedule),
-        "standard_six_course": FixedSchedulePolicy(standard_schedule),
     }
+    policies.update({
+        name: FixedSchedulePolicy(spec["schedule"])
+        for name, spec in fixed_control_catalog.items()
+    })
     if include_ambiguity_controller:
         ambiguity_module = _load_source_module(
             "trackc_robust_signal_ambiguity",
@@ -882,6 +926,16 @@ def run_shared_policy_world(
         "n_selection_patients": n_selection,
         "n_evaluation_patients": n_evaluation,
         "selected_fixed_schedule": chosen_fixed,
+        "fixed_schedule_control_catalog": {
+            name: {
+                "planned_courses": int(spec["planned_courses"]),
+                "cycle_indices": list(spec["cycle_indices"]),
+                "nominal_interval_days": int(spec["nominal_interval_days"]),
+                "description": spec["description"],
+                "role": "explicit synthetic schedule reference; not a clinical regimen",
+            }
+            for name, spec in fixed_control_catalog.items()
+        },
         "baseline_selection": baseline_selection,
         "baseline_arm_metadata": {
             name: {
@@ -922,6 +976,7 @@ def run_shared_policy_world(
 __all__ = [
     "FixedSchedulePolicy",
     "PolicyBenchmarkSettings",
+    "_fixed_schedule_control_catalog",
     "conditional_independence_grid",
     "robust_utility",
     "run_shared_policy_world",

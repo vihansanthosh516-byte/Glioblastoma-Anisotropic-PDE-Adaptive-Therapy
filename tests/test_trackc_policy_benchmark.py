@@ -187,6 +187,26 @@ def test_course_cap_wrapper_stops_policy_after_arm_specific_limit():
     assert decisions == [True, True, False, False]
 
 
+def test_fixed_schedule_controls_expose_six_and_twelve_course_references():
+    full_budget = benchmark.PolicyBenchmarkSettings(course_budget=12)
+    controls = benchmark._fixed_schedule_control_catalog(full_budget)
+
+    assert set(controls) == {
+        "standard_six_course",
+        "standard_twelve_course_front_loaded",
+        "paced_twelve_course_every_other_cycle",
+    }
+    assert controls["standard_six_course"]["cycle_indices"] == list(range(6))
+    assert controls["standard_twelve_course_front_loaded"]["cycle_indices"] == list(range(12))
+    assert controls["paced_twelve_course_every_other_cycle"]["cycle_indices"] == list(range(0, 24, 2))
+    assert controls["paced_twelve_course_every_other_cycle"]["nominal_interval_days"] == 56
+    assert all(spec["schedule"].sum() == spec["planned_courses"] for spec in controls.values())
+
+    reduced_budget = benchmark.PolicyBenchmarkSettings(course_budget=6)
+    reduced_controls = benchmark._fixed_schedule_control_catalog(reduced_budget)
+    assert set(reduced_controls) == {"standard_six_course"}
+
+
 def test_full_policy_harness_runs_all_arms_on_shared_endpoint_path(monkeypatch):
     received_f0_bounds = []
     received_scan_intervals = []
@@ -229,7 +249,7 @@ def test_full_policy_harness_runs_all_arms_on_shared_endpoint_path(monkeypatch):
     )
     generation_parameters = SignalModelParameters(q=0.6, a=0.2, b=0.4, d=0.3)
     settings = benchmark.PolicyBenchmarkSettings(
-        course_budget=6,
+        course_budget=12,
         tau_days=84.0,
         n_f0_nodes=8,
         mpc_particles=2,
@@ -280,6 +300,8 @@ def test_full_policy_harness_runs_all_arms_on_shared_endpoint_path(monkeypatch):
         "q_learning",
         "selection_best_fixed",
         "standard_six_course",
+        "standard_twelve_course_front_loaded",
+        "paced_twelve_course_every_other_cycle",
         "finite_set_minimax_mpc",
     }
     expected.update(
@@ -294,6 +316,9 @@ def test_full_policy_harness_runs_all_arms_on_shared_endpoint_path(monkeypatch):
         "scan_rule", "state_estimation", "filtered_threshold_grid", "raw_threshold_grid"
     }
     assert result["baseline_selection"]["tie_rule"] == "first catalog entry wins exact selection-score ties"
+    fixed_controls = result["fixed_schedule_control_catalog"]
+    assert fixed_controls["standard_twelve_course_front_loaded"]["cycle_indices"] == list(range(12))
+    assert fixed_controls["paced_twelve_course_every_other_cycle"]["nominal_interval_days"] == 56
     assert set(result["baseline_selection"]["scores"]) == set(test_catalog)
     assert sum(name.startswith("filtered_threshold_grid_") for name in result["arm_outcomes"]) == 1
     assert sum(name.startswith("raw_threshold_grid_") for name in result["arm_outcomes"]) == 1

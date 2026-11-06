@@ -79,4 +79,10 @@ Focused suites: `test_trackc_policy_benchmark.py`, `test_trackc_sim.py`, `test_t
 
 The harness now contains scan rules, state-estimation policies, and selection across the 24-setting raw-threshold and 128-setting filtered-threshold grids. It still lacks the equal-course fixed-schedule frontier, dose-dense proxy, six-versus-twelve-course landmark comparison, multi-world aggregation, precision target, exact held-out world anchors, and frozen interval method. Resolve these before any research-scale outcome comparison. Selection and evaluation patients from one assumed world support a development comparison only.
 
+### Follow-up: explicit fixed-course references (2026-11-06)
+
+The shared benchmark now evaluates three explicit schedule references when the configured budget permits them: six courses at the first six 28-day cycle starts, twelve courses at the first twelve cycle starts, and twelve courses spaced every other cycle (56-day intervals). The twelve-course arms are omitted when the configured global budget is below twelve. Result metadata records planned course counts, cycle indices, intervals, and the non-clinical role of these synthetic schedules. The primary paired contrast is unchanged.
+
+The 56-day schedule is a pacing control, **not** a dose-dense regimen. The simulator's fixed 28-day cycle cannot represent a treatment interval shorter than 28 days; a genuine dose-dense comparator would need a separately reviewed time-resolution change. The new contract checks only schedule construction, budget handling, and runner inclusion. No policy outcome comparison was run. Equal-course frontier matching, multi-world aggregation, a precision target, exact held-out world anchors, and a frozen interval method remain open.
+
 All tests use assumed virtual patients. Passing tests establish only that the implemented paths follow their contracts. They do not show that any policy improves treatment utility, describes real biology, is unique, or is better than published methods.
