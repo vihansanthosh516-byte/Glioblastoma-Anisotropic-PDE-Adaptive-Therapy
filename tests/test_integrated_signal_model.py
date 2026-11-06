@@ -1,7 +1,11 @@
 import numpy as np
 import pytest
 
-from src.trackc_integrated_signal_model import generate_integrated_signals
+from src.trackc_integrated_signal_model import (
+    _calibrate_mri_score,
+    _uncalibrate_mri_score,
+    generate_integrated_signals,
+)
 
 
 def test_signal_draw_is_deterministic_and_policy_view_has_no_truth_fields():
@@ -75,7 +79,7 @@ def test_correlation_boundary_settings_remain_finite_and_valid(a, b, d):
     assert np.isfinite(observed.mri_score).all()
 
 
-def test_history_template_sets_mri_score_marginal():
+def test_history_template_sets_mri_score_location_and_scale():
     template = np.array([-3.0, -1.0, 0.0, 2.0, 5.0])
     observed, _ = generate_integrated_signals(
         n=20_000, q=0.7, a=0.0, b=0.0, d=0.0, seed=20261107,
@@ -83,7 +87,20 @@ def test_history_template_sets_mri_score_marginal():
     )
     assert np.isfinite(observed.mri_score).all()
     assert abs(np.mean(observed.mri_score) - np.mean(template)) < 0.1
-    assert abs(np.quantile(observed.mri_score, 0.5) - np.median(template)) < 0.1
+    assert abs(np.std(observed.mri_score, ddof=1) - np.std(template, ddof=1)) < 0.1
+
+
+@pytest.mark.parametrize(
+    "template",
+    [np.array([-4.0, -1.0, 0.0, 2.0, 7.0]), np.array([0.0, 0.0, 1.0])],
+)
+def test_history_template_transform_round_trips_even_with_ties(template):
+    latent = np.array([-1.5, -0.25, 0.0, 0.4, 1.7])
+    scores = _calibrate_mri_score(latent, template)
+
+    np.testing.assert_allclose(
+        _uncalibrate_mri_score(scores, template), latent, rtol=0.0, atol=1e-14
+    )
 
 
 @pytest.mark.parametrize(
@@ -103,7 +120,15 @@ def test_invalid_settings_are_rejected(kwargs):
         generate_integrated_signals(**kwargs)
 
 
-@pytest.mark.parametrize("template", [np.array([]), np.array([1.0, np.inf])])
+@pytest.mark.parametrize(
+    "template",
+    [
+        np.array([]),
+        np.array([1.0]),
+        np.array([1.0, 1.0]),
+        np.array([1.0, np.inf]),
+    ],
+)
 def test_invalid_mri_template_is_rejected(template):
     with pytest.raises(ValueError, match="mri_template"):
         generate_integrated_signals(

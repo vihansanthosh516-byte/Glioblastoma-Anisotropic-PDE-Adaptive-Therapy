@@ -209,6 +209,32 @@ def test_joint_signal_likelihood_normalizes_over_reports_and_mri(parameters):
     assert total_probability == pytest.approx(1.0, abs=1e-9)
 
 
+def test_template_calibration_preserves_joint_likelihood_ratios():
+    template = np.array([-3.0, -1.0, 0.5, 2.0, 4.0])
+    location = float(np.mean(template))
+    scale = float(np.std(template, ddof=1))
+    latent_score = -0.65
+    f0_particles = np.array([[0.003, 0.02, 0.15, 0.7]])
+    parameters = SignalModelParameters(q=0.82, a=0.4, b=0.5, d=-0.35)
+    reports = np.array([True])
+
+    raw_likelihood = integrated_signal_log_likelihood(
+        f0_particles,
+        SignalObservations(reports, np.array([latent_score])),
+        parameters,
+    )
+    calibrated_likelihood = integrated_signal_log_likelihood(
+        f0_particles,
+        SignalObservations(reports, np.array([location + scale * latent_score])),
+        parameters,
+        mri_template=template,
+    )
+
+    np.testing.assert_allclose(
+        calibrated_likelihood, raw_likelihood, rtol=0.0, atol=1e-13
+    )
+
+
 def _small_policy(observations, parameters, channels):
     return _MPC.SignalConditionedBeliefMPC(
         observations,

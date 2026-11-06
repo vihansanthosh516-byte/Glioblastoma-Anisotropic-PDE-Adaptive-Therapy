@@ -76,15 +76,24 @@ def _bounded_correlation(value: float, name: str) -> float:
     return result
 
 
-def _to_empirical_marginal(values: np.ndarray, template: np.ndarray | None) -> np.ndarray:
-    """Map latent Gaussian ranks to a history-only empirical signal distribution."""
+def _template_location_scale(template: np.ndarray) -> tuple[float, float]:
+    """Return the training-only MRI template's mean and sample SD."""
+    marginal = np.asarray(template, dtype=float).reshape(-1)
+    if marginal.size < 2 or not np.isfinite(marginal).all():
+        raise ValueError("mri_template must contain at least two finite values")
+    location = float(np.mean(marginal))
+    scale = float(np.std(marginal, ddof=1))
+    if not np.isfinite(location) or not np.isfinite(scale) or scale <= 0.0:
+        raise ValueError("mri_template must have a finite, positive sample SD")
+    return location, scale
+
+
+def _calibrate_mri_score(values: np.ndarray, template: np.ndarray | None) -> np.ndarray:
+    """Calibrate latent MRI scores to a history-only template's mean and sample SD."""
     if template is None:
         return values.copy()
-    marginal = np.asarray(template, dtype=float).reshape(-1)
-    if marginal.size == 0 or not np.isfinite(marginal).all():
-        raise ValueError("mri_template must be non-empty and finite")
-    probabilities = ndtr(values)
-    return np.quantile(marginal, probabilities, method="linear")
+    location, scale = _template_location_scale(template)
+    return location + scale * np.asarray(values, dtype=float)
 
 
 def f0_to_resistance_score(f0, *, reference_bounds=F0_REFERENCE_BOUNDS) -> np.ndarray:
@@ -107,20 +116,13 @@ def f0_to_resistance_score(f0, *, reference_bounds=F0_REFERENCE_BOUNDS) -> np.nd
     return ndtri(np.clip(probability, 1e-8, 1.0 - 1e-8))
 
 
-def _empirical_score_to_latent_z(values, template) -> np.ndarray:
-    """Invert a history-only empirical marginal by its mid-rank Gaussian score."""
+def _uncalibrate_mri_score(values, template) -> np.ndarray:
+    """Invert the history-only affine location/scale calibration exactly."""
     scores = np.asarray(values, dtype=float)
-    marginal = np.asarray(template, dtype=float).reshape(-1)
-    if marginal.size == 0 or not np.isfinite(marginal).all():
-        raise ValueError("mri_template must be non-empty and finite")
     if not np.isfinite(scores).all():
         raise ValueError("MRI scores must be finite")
-    ordered = np.sort(marginal)
-    left = np.searchsorted(ordered, scores, side="left")
-    right = np.searchsorted(ordered, scores, side="right")
-    probability = (left + right) / (2.0 * ordered.size)
-    probability = np.clip(probability, 0.5 / (ordered.size + 1), 1.0 - 0.5 / (ordered.size + 1))
-    return ndtri(probability)
+    location, scale = _template_location_scale(template)
+    return (scores - location) / scale
 
 
 def generate_integrated_signals(
@@ -152,8 +154,9 @@ def generate_integrated_signals(
     ``q``. The report and MRI score are the only fields returned in observations.
 
     The parameters are scenario assumptions. ``mri_template`` must be built from
-    training-only or otherwise permitted history data; its empirical marginal is
-    applied by a Gaussian-rank transform.
+    training-only or otherwise permitted history data. Its mean and sample standard
+    deviation calibrate the synthetic MRI-score units; the template's full empirical
+    distribution is not used.
     """
     if isinstance(n, (bool, np.bool_)) or not isinstance(n, Integral) or n < 1:
         raise ValueError("n must be a positive integer")
@@ -182,7 +185,7 @@ def generate_integrated_signals(
     )
     molecular_state = molecular_state_z >= 0.0
     molecular_report = molecular_state ^ (rng.random(int(n)) >= q)
-    mri_score = _to_empirical_marginal(mri_latent_z, mri_template)
+    mri_score = _calibrate_mri_score(mri_latent_z, mri_template)
 
     observations = SignalObservations(
         molecular_report=np.asarray(molecular_report, dtype=bool),
@@ -208,8 +211,9 @@ def integrated_signal_log_likelihood(
     """Return log p(observed signals | f0 particles) for particle-filter weighting.
 
     The joint likelihood follows the Gaussian dependence model used by the generator.
-    A history-only empirical MRI transform has a parameter-independent Jacobian, so its
-    Gaussian-rank likelihood is sufficient for comparing f0 particles.
+    The optional history-only MRI transform is affine. Its Jacobian is constant across
+    f0 particles, so the transformed Gaussian likelihood is sufficient for comparing
+    particles.
     """
     if not all(hasattr(observations, name) for name in ("molecular_report", "mri_score")):
         raise TypeError("observations must provide molecular_report and mri_score")
@@ -248,7 +252,7 @@ def integrated_signal_log_likelihood(
     mri_z = None
     if "mri" in channels:
         mri_z = (
-            _empirical_score_to_latent_z(mri_scores, mri_template)
+            _uncalibrate_mri_score(mri_scores, mri_template)
             if mri_template is not None
             else mri_scores
         )[:, None]
