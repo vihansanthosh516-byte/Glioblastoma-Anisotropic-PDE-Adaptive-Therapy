@@ -21,12 +21,21 @@ from itertools import product
 import numpy as np
 
 import trackc_sim as tc
+from trackc_integrated_signal_model import (
+    F0_REFERENCE_BOUNDS,
+    SignalModelParameters,
+    SignalObservations,
+    integrated_signal_log_likelihood,
+)
 
 
 # The anchored development family contains both weak and strong kill values. The default
 # ParticleFilter prior (m=6..20) excludes most weak-kill patients, so this policy uses a
 # broad support interval. It does not encode the calibrated world's mixture structure.
 BELIEF_RANGES = dict(tc.RANGES, m=(0.1, 20.0, "log"))
+INTEGRATED_BELIEF_RANGES = dict(
+    BELIEF_RANGES, f0=(F0_REFERENCE_BOUNDS[0], F0_REFERENCE_BOUNDS[1], "log")
+)
 
 
 def robust_endpoint_utility(
@@ -297,6 +306,69 @@ class RobustBeliefMPC:
         self.pf.propagate(j, applied)
 
 
+class SignalConditionedBeliefMPC(RobustBeliefMPC):
+    """Robust-belief MPC initialized with explicit molecular and/or MRI signal evidence.
+
+    The policy receives only observed signals and a fixed assumed likelihood. It never
+    receives the simulated patient's true f0. Use the same broad integrated prior for
+    signal and no-signal comparisons.
+    """
+
+    def __init__(
+        self,
+        observations: SignalObservations | None,
+        parameters: SignalModelParameters,
+        *,
+        channels=("molecular", "mri"),
+        mri_template=None,
+        **kwargs,
+    ):
+        self.signal_channels = frozenset(channels)
+        if self.signal_channels - {"molecular", "mri"}:
+            raise ValueError("channels may contain only 'molecular' and 'mri'")
+        if self.signal_channels and not all(
+            hasattr(observations, name) for name in ("molecular_report", "mri_score")
+        ):
+            raise TypeError("observations must provide molecular_report and mri_score")
+        if not all(hasattr(parameters, name) for name in ("q", "a", "b", "d")):
+            raise TypeError("parameters must provide q, a, b, and d")
+        self.signal_parameters = SignalModelParameters(
+            q=parameters.q, a=parameters.a, b=parameters.b, d=parameters.d
+        )
+        if observations is None:
+            self.signal_observations = None
+        else:
+            self.signal_observations = SignalObservations(
+                molecular_report=np.asarray(observations.molecular_report).copy(),
+                mri_score=np.asarray(observations.mri_score, dtype=float).copy(),
+            )
+        self.mri_template = None if mri_template is None else np.asarray(mri_template, dtype=float).copy()
+        ranges = kwargs.pop("ranges", None)
+        super().__init__(
+            ranges=INTEGRATED_BELIEF_RANGES if ranges is None else ranges,
+            **kwargs,
+        )
+
+    def reset(self, scen, rng):
+        """Initialize prior particles, then condition weights on supplied baseline signals."""
+        n_patients = len(scen["sigma"])
+        if self.signal_channels:
+            if (
+                self.signal_observations.molecular_report.shape != (n_patients,)
+                or self.signal_observations.mri_score.shape != (n_patients,)
+            ):
+                raise ValueError("signal arrays must have one value per simulated patient")
+        super().reset(scen, rng)
+        if self.signal_channels:
+            self.pf.logw += integrated_signal_log_likelihood(
+                self.pf.theta["f0"],
+                self.signal_observations,
+                self.signal_parameters,
+                channels=self.signal_channels,
+                mri_template=self.mri_template,
+            )
+
+
 def _as_int(value, name):
     """Accept integral numeric settings without silently truncating fractions or booleans."""
     if isinstance(value, (bool, np.bool_)):
@@ -324,7 +396,9 @@ def evaluate_robust_belief_mpc(evaluation_scenarios, policy, seed, *, endpoint="
 
 __all__ = [
     "BELIEF_RANGES",
+    "INTEGRATED_BELIEF_RANGES",
     "RobustBeliefMPC",
+    "SignalConditionedBeliefMPC",
     "evaluate_robust_belief_mpc",
     "robust_endpoint_utility",
 ]

@@ -11,7 +11,11 @@ from dataclasses import dataclass
 from numbers import Integral
 
 import numpy as np
-from scipy.special import ndtr
+from scipy.special import ndtr, ndtri
+
+
+# Envelope of the assumed f0 ranges in the calibration families.
+F0_REFERENCE_BOUNDS = (0.001 * float(np.exp(-0.7)), 0.9)
 
 
 @dataclass(frozen=True)
@@ -30,6 +34,22 @@ class SignalTruth:
     molecular_state_z: np.ndarray
     molecular_state: np.ndarray
     mri_latent_z: np.ndarray
+
+
+@dataclass(frozen=True)
+class SignalModelParameters:
+    """Assumed observation-model parameters known to a policy, never fitted on test outcomes."""
+
+    q: float
+    a: float
+    b: float
+    d: float
+
+    def __post_init__(self):
+        object.__setattr__(self, "q", _bounded_probability(self.q, "q"))
+        object.__setattr__(self, "a", _bounded_correlation(self.a, "a"))
+        object.__setattr__(self, "b", _bounded_correlation(self.b, "b"))
+        object.__setattr__(self, "d", _bounded_correlation(self.d, "d"))
 
 
 def _bounded_probability(value: float, name: str) -> float:
@@ -67,6 +87,42 @@ def _to_empirical_marginal(values: np.ndarray, template: np.ndarray | None) -> n
     return np.quantile(marginal, probabilities, method="linear")
 
 
+def f0_to_resistance_score(f0, *, reference_bounds=F0_REFERENCE_BOUNDS) -> np.ndarray:
+    """Map simulator f0 through one fixed log-uniform reference CDF to a Gaussian score."""
+    values = np.asarray(f0, dtype=float)
+    try:
+        low, high = (float(reference_bounds[0]), float(reference_bounds[1]))
+    except (TypeError, ValueError, IndexError, OverflowError) as exc:
+        raise ValueError("reference_bounds must contain two finite values") from exc
+    if (
+        not np.isfinite(values).all()
+        or np.any(values <= 0.0)
+        or np.any(values >= 1.0)
+        or not np.isfinite([low, high]).all()
+        or low <= 0.0
+        or high <= low
+    ):
+        raise ValueError("f0 and reference bounds must be finite, with 0 < f0 < 1 and 0 < low < high")
+    probability = (np.log(values) - np.log(low)) / (np.log(high) - np.log(low))
+    return ndtri(np.clip(probability, 1e-8, 1.0 - 1e-8))
+
+
+def _empirical_score_to_latent_z(values, template) -> np.ndarray:
+    """Invert a history-only empirical marginal by its mid-rank Gaussian score."""
+    scores = np.asarray(values, dtype=float)
+    marginal = np.asarray(template, dtype=float).reshape(-1)
+    if marginal.size == 0 or not np.isfinite(marginal).all():
+        raise ValueError("mri_template must be non-empty and finite")
+    if not np.isfinite(scores).all():
+        raise ValueError("MRI scores must be finite")
+    ordered = np.sort(marginal)
+    left = np.searchsorted(ordered, scores, side="left")
+    right = np.searchsorted(ordered, scores, side="right")
+    probability = (left + right) / (2.0 * ordered.size)
+    probability = np.clip(probability, 0.5 / (ordered.size + 1), 1.0 - 0.5 / (ordered.size + 1))
+    return ndtri(probability)
+
+
 def generate_integrated_signals(
     n: int,
     *,
@@ -75,9 +131,14 @@ def generate_integrated_signals(
     b: float,
     d: float,
     seed: int,
+    f0: np.ndarray | None = None,
     mri_template: np.ndarray | None = None,
 ) -> tuple[SignalObservations, SignalTruth]:
     """Draw paired synthetic signals and separate policy inputs from latent truth.
+
+    If ``f0`` is supplied, one fixed log-uniform reference CDF maps simulator
+    resistance fraction to ``Z_resistance``. If omitted, the older independent-normal
+    generator remains available for isolated component tests.
 
     Independent standard-normal variables define:
 
@@ -105,7 +166,13 @@ def generate_integrated_signals(
     d = _bounded_correlation(d, "d")
 
     rng = np.random.default_rng(int(seed))
-    resistance_z = rng.standard_normal(int(n))
+    if f0 is None:
+        resistance_z = rng.standard_normal(int(n))
+    else:
+        f0_values = np.asarray(f0, dtype=float)
+        if f0_values.shape != (int(n),):
+            raise ValueError(f"f0 must have shape ({int(n)},)")
+        resistance_z = f0_to_resistance_score(f0_values)
     e_bio = rng.standard_normal(int(n))
     e_mri = rng.standard_normal(int(n))
 
@@ -130,4 +197,98 @@ def generate_integrated_signals(
     return observations, truth
 
 
-__all__ = ["SignalObservations", "SignalTruth", "generate_integrated_signals"]
+def integrated_signal_log_likelihood(
+    f0_particles,
+    observations: SignalObservations,
+    parameters: SignalModelParameters,
+    *,
+    channels=("molecular", "mri"),
+    mri_template: np.ndarray | None = None,
+) -> np.ndarray:
+    """Return log p(observed signals | f0 particles) for particle-filter weighting.
+
+    The joint likelihood follows the Gaussian dependence model used by the generator.
+    A history-only empirical MRI transform has a parameter-independent Jacobian, so its
+    Gaussian-rank likelihood is sufficient for comparing f0 particles.
+    """
+    if not all(hasattr(observations, name) for name in ("molecular_report", "mri_score")):
+        raise TypeError("observations must provide molecular_report and mri_score")
+    if not all(hasattr(parameters, name) for name in ("q", "a", "b", "d")):
+        raise TypeError("parameters must provide q, a, b, and d")
+    parameters = SignalModelParameters(
+        q=parameters.q, a=parameters.a, b=parameters.b, d=parameters.d
+    )
+    channels = frozenset(channels)
+    unknown = channels - {"molecular", "mri"}
+    if unknown:
+        raise ValueError(f"unknown signal channels: {sorted(unknown)}")
+
+    particles = np.asarray(f0_particles, dtype=float)
+    if particles.ndim < 1 or particles.shape[0] < 1:
+        raise ValueError("f0_particles must have patients on axis 0")
+    if not np.isfinite(particles).all() or np.any(particles <= 0.0) or np.any(particles >= 1.0):
+        raise ValueError("f0_particles must be finite and in (0, 1)")
+    n_patients = particles.shape[0]
+    reports = np.asarray(observations.molecular_report)
+    mri_scores = np.asarray(observations.mri_score, dtype=float)
+    if reports.shape != (n_patients,) or mri_scores.shape != (n_patients,):
+        raise ValueError("signal arrays must have one value per patient")
+    if not np.isin(reports, [False, True, 0, 1]).all():
+        raise ValueError("molecular_report must contain only boolean values")
+    reports = reports.astype(bool, copy=False)
+    if not np.isfinite(mri_scores).all():
+        raise ValueError("mri_score must be finite")
+
+    resistance_z = f0_to_resistance_score(particles)
+    result = np.zeros_like(resistance_z, dtype=float)
+    q, a, b, d = parameters.q, parameters.a, parameters.b, parameters.d
+    var_bio = max(0.0, 1.0 - a * a)
+    var_mri = max(0.0, 1.0 - b * b)
+
+    mri_z = None
+    if "mri" in channels:
+        mri_z = (
+            _empirical_score_to_latent_z(mri_scores, mri_template)
+            if mri_template is not None
+            else mri_scores
+        )[:, None]
+        safe_var_mri = max(var_mri, 1e-12)
+        result += -0.5 * (
+            np.log(2.0 * np.pi * safe_var_mri)
+            + ((mri_z - b * resistance_z) ** 2) / safe_var_mri
+        )
+
+    if "molecular" in channels:
+        mean_bio = a * resistance_z
+        if mri_z is not None and var_mri > 1e-12:
+            mean_bio = mean_bio + (
+                np.sqrt(var_bio) * d / np.sqrt(var_mri)
+            ) * (mri_z - b * resistance_z)
+            var_conditional = var_bio * max(0.0, 1.0 - d * d)
+        else:
+            var_conditional = var_bio
+        p_state_positive = _normal_positive_probability(mean_bio, var_conditional)
+        p_report_positive = q * p_state_positive + (1.0 - q) * (1.0 - p_state_positive)
+        p_report = np.where(reports[:, None], p_report_positive, 1.0 - p_report_positive)
+        result += np.log(np.clip(p_report, 1e-300, 1.0))
+    return result
+
+
+def _normal_positive_probability(mean, variance):
+    """Return P(N(mean, variance) >= 0), including deterministic limits."""
+    mean = np.asarray(mean, dtype=float)
+    variance = float(variance)
+    if variance <= 1e-14:
+        return np.where(mean > 0.0, 1.0, np.where(mean < 0.0, 0.0, 0.5))
+    return ndtr(mean / np.sqrt(variance))
+
+
+__all__ = [
+    "F0_REFERENCE_BOUNDS",
+    "SignalModelParameters",
+    "SignalObservations",
+    "SignalTruth",
+    "f0_to_resistance_score",
+    "generate_integrated_signals",
+    "integrated_signal_log_likelihood",
+]
