@@ -96,3 +96,11 @@ The focused scratch run passed **22 tests in 58.57 seconds** across `test_trackc
 Remaining limits: the project has not run the benchmark at research scale or across held-out virtual worlds. It still needs exact world-anchor enforcement, a precision target, a frozen interval method, and registered development seeds before outcome comparison. The broad project title remains unchanged; this mechanics work does not establish global uniqueness, biological validity, clinical benefit, or superiority.
 
 All tests use assumed virtual patients. Passing tests establish only that the implemented paths follow their contracts. They do not show that any policy improves treatment utility, describes real biology, is unique, or is better than published methods.
+
+### Full Track C suite after manifest-test fixture repair (2026-11-06)
+
+- The full scratch-copy run covered all 35 `test_trackc_*.py` files: **377 passed, 1 skipped in 850.89 seconds**.
+- The skip was `test_trackc_seed_registry.py:109`, because the scratch copy intentionally omitted `output/`.
+- The first full run exposed two stale unit-test fixtures that hard-coded seed ranges no longer reserved for the test purpose. The manifest implementation was unchanged; the unit tests now use small synthetic seed values and a mocked registry, while the separate registry suite continues to exercise the real registry.
+- SHA-256 comparison matched all **340 source files and 103 test files** between the scratch copy and worktree, excluding `__pycache__`.
+- These remain mechanics tests only. No research-scale policy outcomes, patient data, or sealed evaluation were run.
