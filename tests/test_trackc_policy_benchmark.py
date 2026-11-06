@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import importlib.util
+import inspect
 from pathlib import Path
 import sys
 
@@ -23,6 +24,13 @@ assert SPEC is not None and SPEC.loader is not None
 benchmark = importlib.util.module_from_spec(SPEC)
 sys.modules[SPEC.name] = benchmark
 SPEC.loader.exec_module(benchmark)
+
+
+def test_ambiguity_controller_is_opt_in_by_default():
+    parameter = inspect.signature(benchmark.run_shared_policy_world).parameters[
+        "include_ambiguity_controller"
+    ]
+    assert parameter.default is False
 
 
 def _quiet_scenario():
@@ -217,6 +225,7 @@ def test_full_policy_harness_runs_all_arms_on_shared_endpoint_path(monkeypatch):
     )
     models = (
         SignalModelParameters(q=0.6, a=0.2, b=0.4, d=0.1),
+        SignalModelParameters(q=0.8, a=-0.1, b=0.7, d=-0.2),
     )
     generation_parameters = SignalModelParameters(q=0.6, a=0.2, b=0.4, d=0.3)
     settings = benchmark.PolicyBenchmarkSettings(
@@ -261,6 +270,7 @@ def test_full_policy_harness_runs_all_arms_on_shared_endpoint_path(monkeypatch):
         q_training_seed=[2026110605],
         evaluation_seed=[2026110606],
         settings=settings,
+        include_ambiguity_controller=True,
     )
 
     expected = {
@@ -270,6 +280,7 @@ def test_full_policy_harness_runs_all_arms_on_shared_endpoint_path(monkeypatch):
         "q_learning",
         "selection_best_fixed",
         "standard_six_course",
+        "finite_set_minimax_mpc",
     }
     expected.update(
         name for name, spec in test_catalog.items()
@@ -291,6 +302,15 @@ def test_full_policy_harness_runs_all_arms_on_shared_endpoint_path(monkeypatch):
             result["selected_baseline_by_family"][family]["name"]
         ]["evaluated_on_holdout"]
     assert result["primary_paired_contrast"]["robust_utility_difference"].shape == (2,)
+    assert result["primary_paired_contrast"]["contrast"] == (
+        "loo_dependence_aware_mpc minus loo_conditional_independence_mpc"
+    )
+    assert result["exploratory_controller"]["included"] is True
+    assert result["exploratory_controller"]["model_set_size"] == 2
+    assert "excluded from frozen primary contrast" in result["exploratory_controller"]["role"]
+    assert set(result["arm_outcomes"]["finite_set_minimax_mpc"]) >= {
+        "ttp_baseline", "ttp_rano", "courses", "robust_utility"
+    }
     for arm in result["arm_outcomes"].values():
         assert arm["ttp_baseline"].shape == (2,)
         assert arm["ttp_rano"].shape == (2,)
@@ -310,7 +330,8 @@ def test_full_policy_harness_runs_all_arms_on_shared_endpoint_path(monkeypatch):
         "mri_template_sha256": None,
     }
     assert result["inference_model_parameters"] == [
-        {"q": 0.6, "a": 0.2, "b": 0.4, "d": 0.1}
+        {"q": 0.6, "a": 0.2, "b": 0.4, "d": 0.1},
+        {"q": 0.8, "a": -0.1, "b": 0.7, "d": -0.2},
     ]
     assert result["signal_generation_in_inference_grid"] is False
     assert set(result["input_fingerprints"]) == {

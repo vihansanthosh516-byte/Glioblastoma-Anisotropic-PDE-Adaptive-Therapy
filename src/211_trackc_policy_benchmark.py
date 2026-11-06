@@ -662,6 +662,7 @@ def run_shared_policy_world(
     q_training_seed,
     evaluation_seed,
     settings: PolicyBenchmarkSettings = PolicyBenchmarkSettings(),
+    include_ambiguity_controller: bool = False,
 ) -> dict:
     """Run a paired, same-cohort development comparison in one virtual world.
 
@@ -808,6 +809,18 @@ def run_shared_policy_world(
         "selection_best_fixed": FixedSchedulePolicy(fixed_schedule),
         "standard_six_course": FixedSchedulePolicy(standard_schedule),
     }
+    if include_ambiguity_controller:
+        ambiguity_module = _load_source_module(
+            "trackc_robust_signal_ambiguity",
+            "216_trackc_robust_signal_ambiguity.py",
+        )
+        policies["finite_set_minimax_mpc"] = (
+            ambiguity_module.SignalAmbiguityBeliefMPC(
+                observations,
+                model_parameters=models,
+                **deepcopy(common_mpc),
+            )
+        )
     selected_baseline_names = {
         row["name"] for row in baseline_selection["winners"].values()
     }
@@ -885,6 +898,16 @@ def run_shared_policy_world(
         "selected_baseline_by_family": baseline_selection["winners"],
         "arm_outcomes": arms,
         "primary_paired_contrast": primary,
+        "exploratory_controller": {
+            "name": "finite_set_minimax_mpc",
+            "included": bool(include_ambiguity_controller),
+            "model_set_size": len(models),
+            "role": "additional development arm; excluded from frozen primary contrast",
+            "interpretation": (
+                "not evaluated" if not include_ambiguity_controller else
+                "synthetic development outcome only; no clinical or superiority claim"
+            ),
+        },
         "path_rule": "all arms share initial virtual patients, precomputed observation-noise stream, scan schedule, and budget; each arm has its own action-dependent path; both endpoint times share that arm's path and course count; treatment stops at the first baseline or RANO-like event",
         "signal_rule": "LOO arms use only unlabeled evaluation-cohort baseline signals and leave each patient out of their own peer-weight fit",
         "limits": [

@@ -23,7 +23,13 @@ The policy propagates the chosen action through every filter. Model order is can
 - A caller must provide the model set. No evaluation outcomes select models or settings.
 - The default latent resistance-fraction support matches the simulator range, 0.001–0.1. A different world must pass its frozen range explicitly.
 - A one-model set matches the existing fixed-likelihood controller when both use the same prior range.
-- The policy is not wired into `src/211_trackc_policy_benchmark.py`.
+- The policy can be enabled as an opt-in arm in `src/211_trackc_policy_benchmark.py`; it remains outside the frozen primary contrast.
+
+## Shared benchmark wiring (2026-11-06)
+
+`run_shared_policy_world` now accepts `include_ambiguity_controller=False`. When enabled, the benchmark loads the finite-set minimax policy and supplies the same evaluation-cohort baseline observations, predeclared inference model set, MPC settings, virtual patients, scan schedule, endpoint rules, and evaluation random seed used by the other arms. It records the arm's inclusion status and model-set size. The existing primary contrast remains dependence-aware LOO MPC minus conditional-independence LOO MPC.
+
+The integration test enabled the new arm on a two-patient synthetic evaluation cohort and a two-model inference set. It verified outcome-array fields, shared evaluation mechanics, and the unchanged primary contrast. This was a mechanics test: it did not save or interpret arm utility differences. No planned policy-outcome analysis has run. The controller remains exploratory and has not shown a benefit.
 
 ## Mechanics verification
 
@@ -34,6 +40,8 @@ The first one-model equivalence test failed because a cloned filter used a separ
 ### Follow-up audit (2026-11-06)
 
 The initial filename used `215`, which already belongs to the LOO predictive-check script. The prototype is now `216_trackc_robust_signal_ambiguity.py`. The seed registry now records controller RNG seeds separately from scenario seeds and observation-noise keys, detects numeric collisions across streams, and records the discarded 20261111/20261112 timing attempt. A follow-up scratch run passed **80 tests, with 1 skipped in 25.12 seconds**, across the ambiguity, signal-conditioning, robust-MPC, LOO, and seed-registry suites. The skip is the registry test that requires a separate sealed-run artifact omitted from the scratch copy. These remain code and bookkeeping checks, not policy outcome evidence.
+
+After benchmark wiring, six focused suites passed **95 tests, with 1 skipped in 55.66 seconds**, in scratch: policy benchmark, ambiguity MPC, signal conditioning, robust MPC, LOO model averaging, and seed registry. The skipped test needs an `output/` sealed-run artifact omitted from the scratch copy. The benchmark mechanics test exercised a two-model ambiguity arm on two virtual patients; it checked output structure and primary-contrast stability, not comparative performance. All 441 source and test files matched the final worktree after the scratch test copy was synchronized.
 
 ## Synthetic timing
 
@@ -52,7 +60,7 @@ The exact use of a finite ambiguity set over paired molecular-like and MRI-like 
 ## Gates before any outcome comparison
 
 1. Freeze the full and independence-only model sets, including parameter bounds and any out-of-grid truth anchors. Do not choose the set after viewing policy outcomes.
-2. Wire the controller into the shared policy benchmark with identical virtual patients, observations, scan schedule, treatment budget, and endpoint handling.
+2. **Complete:** wire the controller into the shared policy benchmark with identical virtual patients, observations, scan schedule, treatment budget, and endpoint handling. Mechanics tests pass; performance remains unknown.
 3. Include the matched conditional-independence set, no-signal MPC, failed LOO model average as a secondary comparator, fixed schedules, equal-course frontier, Q-learning, and applicable scan/state-estimation controls.
 4. Freeze the world-level estimand, uncertainty intervals, precision target, number of worlds, and fresh development seeds before scoring. Keep selection worlds disjoint from evaluation worlds.
 5. Report benefit and harm across every prespecified world. Do not tune the set, policy, endpoint, or success rule after scores appear. Do not use sealed seeds.
