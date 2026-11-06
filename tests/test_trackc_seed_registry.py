@@ -23,6 +23,8 @@ def test_only_known_overlaps_exist():
     kinds = {(o["kind"], tuple(o["range"])) for o in reg.find_overlaps()}
     assert ("noise", (1300001, 1300002)) in kinds       # 169 vs 176, recorded as a flaw
     assert ("scenario", (20261031, 20261031)) in kinds   # shared 150 training draw, by design
+    assert ("scenario", (20261111, 20261111)) in kinds   # discarded ambiguity timing overlap
+    assert ("scenario-policy", (20261112, 20261112)) in kinds  # discarded cross-stream collision
 
 
 def test_new_accidental_overlap_is_caught():
@@ -37,7 +39,7 @@ def test_reserved_blocks_touch_no_used_seed():
     assert {e["purpose"] for e in reserved} == {"stage2_dev", "stage3_sealed"}
     for r in reserved:
         for u in used:
-            for field in ("scenario_seeds", "noise_keys"):
+            for field in ("scenario_seeds", "noise_keys", "policy_seeds"):
                 for a in r[field]:
                     for b in u[field]:
                         assert reg._overlap(a, b) is None, (r["label"], u["label"], a, b)
@@ -50,6 +52,8 @@ def test_check_free_refuses_spent_and_dev_seeds():
     assert reg.check_free(noise=(1122001, 1122004))
     assert reg.check_free(scenario=(20262100, 20262100))          # 176 dev
     assert reg.check_free(scenario=(20262200, 20262200))          # 177 dev
+    assert reg.check_free(policy=(20262605, 20262605))             # ambiguity-MPC timing RNG
+    assert reg.check_free(policy=(20262604, 20262604))            # cross-stream number reuse is refused
     # Stage 2 dev seeds already spent (190, 192, 193, 194, 198): refused with or without the stage2_dev purpose
     for scen, noise in (((20261800, 20261800), (1800001, 1800016)), ((20261801, 20261802), (1810000, 1810000)),
                         ((20261803, 20261803), (1820000, 1820000)), ((20261804, 20261805), (1830000, 1830000)),
@@ -128,3 +132,20 @@ def test_registry_document_is_stable_and_hashed():
     changed = copy.deepcopy(reg.ENTRIES)
     changed[0]["scenario_seeds"][0][0] += 1
     assert reg.registry_document(changed)["sha256"] != a["sha256"]
+
+
+def test_policy_seed_overlaps_are_detected_separately():
+    a = reg._entry("x", "policy-a", "dev_used", [], [], policy=[(7, 7)])
+    b = reg._entry("y", "policy-b", "dev_used", [], [], policy=[(7, 7)])
+    overlaps = reg.find_overlaps([a, b])
+    assert overlaps == [{"kind": "policy", "range": [7, 7], "scripts": ["x", "y"]}]
+    assert reg.check_free(policy=(7, 7), entries=[a])
+
+
+def test_cross_stream_seed_number_reuse_is_detected():
+    scenario = reg._entry("sim", "scenario", "dev_used", [(42, 42)], [])
+    policy = reg._entry("mpc", "policy", "dev_used", [], [], policy=[(42, 42)])
+    assert reg.find_overlaps([scenario, policy]) == [
+        {"kind": "scenario-policy", "range": [42, 42], "scripts": ["mpc", "sim"]}
+    ]
+    assert reg.check_free(policy=(42, 42), entries=[scenario])

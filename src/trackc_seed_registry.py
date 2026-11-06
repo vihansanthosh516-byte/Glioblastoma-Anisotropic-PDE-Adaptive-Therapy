@@ -1,7 +1,8 @@
 """Track C seed registry (SIMULATION bookkeeping only; runs no simulation).
 
-Every scenario seed and observation-noise key that a Track C script has used is listed here, with
-its status. The point: new work must not reuse a seed that fed a sealed test or a tuning draw.
+Every scenario seed, observation-noise key, and policy-RNG seed that a Track C script has used is
+listed here, with its status. The point: new work must not reuse a seed that fed a sealed test or a
+tuning draw.
 
 Status values
     spent      scored once as a sealed test, or the tuning draw that chose a sealed arm. Never reuse.
@@ -31,12 +32,13 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 REGISTRY_PATH = ROOT / "output" / "trackc_seed_registry.json"
-DATE = "2026-11-04"
+DATE = "2026-11-06"
 
 
-def _entry(script, label, status, scen, noise, evidence=(), purpose=None, note=""):
+def _entry(script, label, status, scen, noise, evidence=(), purpose=None, note="", policy=()):
     return {"script": script, "label": label, "status": status, "purpose": purpose,
             "scenario_seeds": [list(r) for r in scen], "noise_keys": [list(r) for r in noise],
+            "policy_seeds": [list(r) for r in policy],
             "evidence": [list(e) for e in evidence], "note": note}
 
 
@@ -305,14 +307,32 @@ ENTRIES = [
            [("output/trackc_loo_predictive_check/diagnostic.json", '"seed_root": 20261905')],
            note="Frozen synthetic signal-prediction diagnostic, run 2026-11-06. Gate failed at n=18 and n=28; do not reuse "
                 "these roots to tune the method. No treatment outcomes or patient data."),
+    _entry("216", "ambiguity MPC initial timing attempt (discarded; seed collision)", "dev_used",
+           [(20261109, 20261109), (20261111, 20261111)], [],
+           [("output/trackc_robust_signal_ambiguity_20261106/timing.json", '"discarded_timing_attempt"')],
+           note="Timing only; all timing values discarded and no policy outcomes saved or examined. Scenario seed 20261111 "
+                "overlaps script 166 development. Controller seed 20261112 numerically matches script 166 sealed scenario "
+                "seed, but belongs to a separate RNG stream. Recorded for audit; never use these seeds as evaluation data.",
+           policy=[(20261110, 20261110), (20261112, 20261112)]),
+    _entry("216", "ambiguity MPC timing attempts (fresh; superseded timings)", "dev_used",
+           [(20262600, 20262600), (20262602, 20262602)], [],
+           [("output/trackc_robust_signal_ambiguity_20261106/timing.json", '"additional_fresh_timing_attempts"')],
+           note="Timing only, no policy outcomes. These single timing observations were superseded by the final timing "
+                "run and are not treated as performance evidence.",
+           policy=[(20262601, 20262601), (20262603, 20262603)]),
+    _entry("216", "ambiguity MPC final timing run", "dev_used",
+           [(20262604, 20262604)], [],
+           [("output/trackc_robust_signal_ambiguity_20261106/timing.json", '"scenario_seed": 20262604')],
+           note="Final synthetic timing only; no outcomes. Controller RNG seed is recorded separately as a policy seed.",
+           policy=[(20262605, 20262605)]),
 ]
 ENTRIES.append(_reserved_stage2_dev(ENTRIES))
 ENTRIES.append(_entry("restart", "Stage 3 sealed run (restart plan)", "reserved", [(20262300, 20262499)],
                       [(2300000, 2399999)], purpose="stage3_sealed",
                       note="Reserved 2026-11-03. Spend only after the Stage 3 gate and the user's OK."))
 
-# Overlaps that exist on purpose or are recorded as a flaw. The test compares the computed
-# overlaps with this list, so a new accidental overlap fails the test.
+# Numeric seed overlaps that exist on purpose or are recorded as a flaw. The test compares the
+# computed same-stream and cross-stream overlaps with this list, so a new accidental collision fails.
 KNOWN_OVERLAPS = [
     {"kind": "scenario", "range": [20261031, 20261031], "scripts": ["150", "153", "154", "156"],
      "why": "shared script-150 training draw, by design (documented in each script)"},
@@ -321,6 +341,11 @@ KNOWN_OVERLAPS = [
     {"kind": "noise", "range": [1300001, 1300022], "scripts": ["169", "176"],
      "why": "176 noise keys equal 169 sealed noise keys for k = 0-2, on different scenarios; "
             "176 calls its seeds 'unused before'. Recorded, no result changed."},
+    {"kind": "scenario", "range": [20261111, 20261111], "scripts": ["166", "216"],
+     "why": "Script 216 used this only in a discarded timing attempt; no policy outcome was saved or examined."},
+    {"kind": "scenario-policy", "range": [20261112, 20261112], "scripts": ["166", "216"],
+     "why": "Script 216's controller seed numerically matched script 166's sealed scenario seed; the timing attempt "
+           "was discarded and no policy outcome was saved or examined."},
 ]
 
 
@@ -333,7 +358,7 @@ def validate_entries(entries=ENTRIES):
     """Return a list of problems with the table itself (empty list = fine)."""
     problems = []
     for e in entries:
-        for field in ("scenario_seeds", "noise_keys"):
+        for field in ("scenario_seeds", "noise_keys", "policy_seeds"):
             for lo, hi in e[field]:
                 if not (isinstance(lo, int) and isinstance(hi, int) and lo <= hi):
                     problems.append(f"{e['script']} {e['label']}: bad range {lo, hi} in {field}")
@@ -345,18 +370,21 @@ def validate_entries(entries=ENTRIES):
 
 
 def find_overlaps(entries=ENTRIES):
-    """Overlaps between used entries (reserved entries are checked by check_free).
-    Returns a list of {"kind", "range", "scripts"} sorted for stable comparison."""
+    """Numeric seed overlaps between used entries; includes cross-stream collisions.
+    Reserved entries are checked by check_free. Returns stable {kind, range, scripts} rows."""
     used = [e for e in entries if e["status"] != "reserved"]
     cells = {}
-    for kind, field in (("scenario", "scenario_seeds"), ("noise", "noise_keys")):
-        for i, a in enumerate(used):
-            for b in used[i + 1:]:
-                for ra in a[field]:
-                    for rb in b[field]:
-                        ov = _overlap(ra, rb)
-                        if ov:
-                            cells.setdefault((kind, ov), set()).update((a["script"], b["script"]))
+    streams = (("scenario", "scenario_seeds"), ("noise", "noise_keys"), ("policy", "policy_seeds"))
+    for i, a in enumerate(used):
+        for b in used[i + 1:]:
+            for ia, (kind_a, field_a) in enumerate(streams):
+                for kind_b, field_b in streams[ia:]:
+                    kind = kind_a if kind_a == kind_b else f"{kind_a}-{kind_b}"
+                    for ra in a[field_a]:
+                        for rb in b[field_b]:
+                            ov = _overlap(ra, rb)
+                            if ov:
+                                cells.setdefault((kind, ov), set()).update((a["script"], b["script"]))
     out = [{"kind": k, "range": list(r), "scripts": sorted(s)} for (k, r), s in cells.items()]
     return sorted(out, key=lambda o: (o["kind"], o["range"]))
 
@@ -373,15 +401,18 @@ def unexpected_overlaps(entries=ENTRIES, known=KNOWN_OVERLAPS):
     return bad
 
 
-def check_free(scenario=None, noise=None, purpose=None, entries=ENTRIES):
+def check_free(scenario=None, noise=None, purpose=None, entries=ENTRIES, policy=None):
     """Return a list of problems with using these ranges. Empty list = free to use.
 
-    scenario / noise: inclusive (low, high) or None.
-    purpose: 'stage2_dev' or 'stage3_sealed' to spend a reserved block. The request must then lie
-    inside that reserved block. Without a purpose, any overlap with any entry is a problem.
+    scenario / noise / policy: inclusive (low, high) or None. Policy covers controller RNG seeds.
+    purpose: 'stage2_dev' or 'stage3_sealed' to spend a reserved scenario/noise block. The request
+    must then lie inside that reserved block. No policy-RNG block is reserved; check policy seeds
+    without a purpose. Without a purpose, any overlap in the requested stream is a problem.
     """
     problems = []
-    requests = [("scenario", "scenario_seeds", scenario), ("noise", "noise_keys", noise)]
+    requests = [("scenario", "scenario_seeds", scenario), ("noise", "noise_keys", noise),
+                ("policy", "policy_seeds", policy)]
+    streams = (("scenario", "scenario_seeds"), ("noise", "noise_keys"), ("policy", "policy_seeds"))
     for kind, field, req in requests:
         if req is None:
             continue
@@ -391,15 +422,16 @@ def check_free(scenario=None, noise=None, purpose=None, entries=ENTRIES):
             continue
         inside_block = False
         for e in entries:
-            for rng in e[field]:
-                ov = _overlap(req, rng)
-                if not ov:
-                    continue
-                if e["status"] == "reserved" and e["purpose"] == purpose:
-                    inside_block = inside_block or (rng[0] <= req[0] and req[1] <= rng[1])
-                else:
-                    problems.append(f"{kind} {ov[0]}-{ov[1]} overlaps {e['script']} {e['label']} "
-                                    f"({e['status']}, {rng[0]}-{rng[1]})")
+            for existing_kind, existing_field in streams:
+                for rng in e[existing_field]:
+                    ov = _overlap(req, rng)
+                    if not ov:
+                        continue
+                    if (existing_field == field and e["status"] == "reserved" and e["purpose"] == purpose):
+                        inside_block = inside_block or (rng[0] <= req[0] and req[1] <= rng[1])
+                    else:
+                        problems.append(f"{kind} {ov[0]}-{ov[1]} numerically overlaps {existing_kind} seed "
+                                        f"in {e['script']} {e['label']} ({e['status']}, {rng[0]}-{rng[1]})")
         if purpose and not inside_block:
             problems.append(f"{kind} {req[0]}-{req[1]} is not inside the reserved block for {purpose}")
     return problems
@@ -442,7 +474,8 @@ def main(argv=None):
     problems += failures
     for e in ENTRIES:
         lo = ", ".join(f"{a}-{b}" for a, b in e["scenario_seeds"])
-        print(f"{e['status']:9s} {e['script']:8s} {e['label']:48s} scenario {lo}")
+        policy = ", ".join(f"{a}-{b}" for a, b in e["policy_seeds"]) or "-"
+        print(f"{e['status']:9s} {e['script']:8s} {e['label']:48s} scenario {lo} policy {policy}")
     for o in find_overlaps():
         print(f"overlap {o['kind']} {o['range']} scripts {o['scripts']}")
     print(f"evidence files skipped (missing): {len(skipped)}")
