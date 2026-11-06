@@ -30,6 +30,9 @@ def test_smoke_run_reports_all_conditions_but_cannot_pass_protocol_gate():
     )
     assert result["protocol_run"] is False
     assert result["primary_gate"]["status"] == "not_protocol_run"
+    assert {"python", "numpy", "scipy", "platform", "source_commit"}.issubset(
+        result["runtime_environment"]
+    )
     assert len(result["all_cohort_scores"]) == 3 * 7 * 2 * 2
     assert len(result["group_summaries"]) == 3 * 7 * 2
     assert all(

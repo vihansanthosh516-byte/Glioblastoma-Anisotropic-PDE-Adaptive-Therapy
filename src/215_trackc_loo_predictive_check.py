@@ -9,11 +9,14 @@ from __future__ import annotations
 import argparse
 import hashlib
 import importlib.util
+import os
+import platform
 import json
 import sys
 from pathlib import Path
 
 import numpy as np
+import scipy
 from scipy.stats import t as student_t
 
 from trackc_integrated_signal_model import SignalModelParameters
@@ -199,6 +202,13 @@ def build_diagnostic(
     """Build the frozen protocol result; reduced arguments are for smoke tests only."""
     pre_run_code_hashes = _file_hashes()
     pre_run_protocol_hash = _hash(PROTOCOL_PATH)
+    runtime_environment = {
+        "python": platform.python_version(),
+        "numpy": np.__version__,
+        "scipy": scipy.__version__,
+        "platform": platform.platform(),
+        "source_commit": os.environ.get("TRACKC_SOURCE_COMMIT"),
+    }
     seed_roots = tuple(int(value) for value in seed_roots)
     sample_sizes = tuple(int(value) for value in sample_sizes)
     if not seed_roots or len(set(seed_roots)) != len(seed_roots) or any(value < 0 for value in seed_roots):
@@ -286,6 +296,7 @@ def build_diagnostic(
         "protocol_run": bool(protocol_run),
         "protocol_sha256": pre_run_protocol_hash,
         "code_sha256": pre_run_code_hashes,
+        "runtime_environment": runtime_environment,
         "protocol": {
             "scenario_seed_roots": [int(seed_roots[0]), int(seed_roots[-1])],
             "root_seed_count": len(seed_roots),
