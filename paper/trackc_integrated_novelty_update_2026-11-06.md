@@ -59,6 +59,14 @@ This narrows the defensible candidate further: a predeclared GBM simulation stud
 - Kraske et al. (2026), [Robustness Analysis of POMDP Policies to Observation Perturbations](https://arxiv.org/abs/2604.21256), for robustness to observation-model misspecification.
 - [MORE-CLEAR multimodal offline RL for sepsis management](https://www.nature.com/articles/s41746-026-02611-8), an adjacent clinical-treatment-policy example, not a GBM comparator.
 
+## Linked-cohort route checked (2026-11-06)
+
+The [TCIA UPENN-GBM record](https://www.cancerimagingarchive.net/collection/upenn-gbm/) and its [dataset paper](https://pmc.ncbi.nlm.nih.gov/articles/PMC9338035/) offer a possible same-patient imaging/clinical/molecular bridge: the record describes 630 subjects, mpMRI, tumor-subregion masks, radiomics, clinical outcomes, and molecular labels under CC BY 4.0. The paper reports 611 baseline scans and 60 follow-up scans; 19 follow-up cases lack the baseline scan in the collection, leaving at most 41 baseline/follow-up pairs before exact identifier checks. Molecular coverage is incomplete: IDH status is available for 515 baseline cases and MGMT status for 317. This is a radiogenomic cohort, not a single-cell Core/Periphery cohort; it cannot directly validate A5's regional expression result.
+
+UPENN-GBM is also not untouched in this project. The existing exploratory `src/109_upenn_rater_noise.py` result records 55 patients and 220 paired imaging studies (`output/upenn_rater_noise.json`). That earlier analysis used the dataset for segmentation/rater-noise characterization, not the new integrated outcome question. The cohort may still support a separately labeled, patient-held-out exploratory radiogenomic analysis, but it cannot serve as fresh external confirmation here. Its small paired-follow-up subset also makes it a weak replacement for Duke's longitudinal imaging arm. No new UPENN images or masks were read for this screen.
+
+**Design implication:** keep Duke for the longitudinal MRI transition question and treat UPENN only as a possible exploratory same-patient MRI/molecular anchor after exact metadata joins and exposure documentation. Do not substitute UPENN molecular labels for the A5 cell-state signature or claim that the separate cohorts establish a patient-level molecular-to-resistance link. This route could make one part of the framework more patient-linked; it does not make the full therapy model clinically validated or establish novelty.
+
 ## Additional prior-art correction and implementation gate (2026-11-06)
 
 The targeted follow-up makes the generic reliability-fusion claim weaker than the earlier draft suggested:
