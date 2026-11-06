@@ -57,6 +57,17 @@ The broad title is not itself a novelty claim. M4RL already joins multiscale GBM
 
 The exact use of a finite ambiguity set over paired molecular-like and MRI-like signal models in this GBM simulator remains unverified as prior art. That is a hypothesis for further searching, not a claim of novelty. The finite-set rule may be overly conservative or may lose to the no-signal controller. Its behavior depends on the supplied model set, which is analyst-defined and not fitted from linked patient data.
 
+### Prior-art follow-up (2026-11-06)
+
+Targeted primary-source searches found closer overlap and narrowed the novelty boundary:
+
+- A prospective study of 21 patients with high-grade glioma personalized a family of biology-based tumor models from baseline-to-mid-treatment mpMRI, then forecast later tumor response during and after chemoradiation ([Hormuth et al., 2025](https://pmc.ncbi.nlm.nih.gov/articles/PMC12815495/)). It directly overlaps patient-specific biology-based longitudinal MRI forecasting. It does not establish the same paired molecular-like/MRI signal uncertainty policy comparison.
+- Glioblastoma reinforcement learning for temozolomide scheduling predates this project ([Zade et al., 2020](https://doi.org/10.1016/j.cmpb.2020.105443)). M4RL later combined multiscale GBM biology with reinforcement-learning drug-combination scheduling ([Liu et al., 2025](https://pmc.ncbi.nlm.nih.gov/articles/PMC13155510/)).
+- A 2026 preprint combines reaction-diffusion, residual learning, adaptive digital-twin updating, and MPC treatment scheduling on synthetic tumor trajectories ([W. Liu et al., 2026](https://arxiv.org/abs/2607.13877)). A multicenter 2026 GBM study compares multimodal MRI fusion architectures for survival prediction ([Frontiers Oncology, 2026](https://www.frontiersin.org/journals/oncology/articles/10.3389/fonc.2026.1867582/full)).
+- Worst-case control over uncertain POMDP transition or observation models is established outside oncology. Examples include moment-based distributionally robust POMDPs ([Nakao et al., 2020](https://epubs.siam.org/doi/10.1137/19M1268410)), robust uncertain-POMDP synthesis ([Suilen et al., IJCAI 2020](https://www.ijcai.org/proceedings/2020/0569.pdf)), and 2026 analysis of robustness to observation-model perturbations ([Kraske et al., 2026](https://arxiv.org/abs/2604.21256)). A finite-set minimax policy alone is therefore not a method novelty claim.
+
+The narrow remaining candidate is an application and evaluation question: whether a predeclared uncertainty set over paired biology-like and MRI-like signals changes treatment decisions and improves held-out simulated outcomes in a GBM-motivated model, after comparison at equal drug use with strong controls. The model set is not empirically calibrated from patient-linked Track A and MRI records. Any positive result would remain conditional on simulator assumptions. The targeted search is not exhaustive; novelty remains unverified.
+
 ## Gates before any outcome comparison
 
 1. Freeze the full and independence-only model sets, including parameter bounds and any out-of-grid truth anchors. Do not choose the set after viewing policy outcomes.
