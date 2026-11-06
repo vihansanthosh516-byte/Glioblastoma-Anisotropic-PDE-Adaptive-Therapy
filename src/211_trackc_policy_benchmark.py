@@ -935,6 +935,12 @@ def run_shared_policy_world(
                     **deepcopy(common_mpc),
                 )
             )
+            policies_for_signals["finite_set_d0_minimax_mpc"] = (
+                ambiguity_module.SignalAmbiguityBeliefMPC(
+                    signal_observations, model_parameters=ci_models,
+                    **deepcopy(common_mpc),
+                )
+            )
         return policies_for_signals
 
     fixed_control_catalog = _fixed_schedule_control_catalog(settings)
@@ -1124,6 +1130,17 @@ def run_shared_policy_world(
             "included": bool(include_ambiguity_controller),
             "model_set_size": len(models),
             "role": "additional development arm; excluded from frozen primary contrast",
+            "interpretation": (
+                "not evaluated" if not include_ambiguity_controller else
+                "synthetic development outcome only; no clinical or superiority claim"
+            ),
+        },
+        "exploratory_d0_controller": {
+            "name": "finite_set_d0_minimax_mpc",
+            "included": bool(include_ambiguity_controller),
+            "model_set_size": len(ci_models),
+            "dependence_rule": "same q/a/b support as the full set, with d fixed to 0",
+            "role": "matched d=0 minimax control; excluded from frozen primary contrast",
             "interpretation": (
                 "not evaluated" if not include_ambiguity_controller else
                 "synthetic development outcome only; no clinical or superiority claim"

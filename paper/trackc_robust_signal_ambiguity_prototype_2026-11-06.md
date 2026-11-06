@@ -31,6 +31,10 @@ The policy propagates the chosen action through every filter. Model order is can
 
 The integration test enabled the new arm on a two-patient synthetic evaluation cohort and a two-model inference set. It verified outcome-array fields, shared evaluation mechanics, and the unchanged primary contrast. This was a mechanics test: it did not save or interpret arm utility differences. No planned policy-outcome analysis has run. The controller remains exploratory and has not shown a benefit.
 
+### Matched d=0 minimax control (2026-11-06)
+
+The opt-in benchmark now also evaluates `finite_set_d0_minimax_mpc`. It uses the same observation data, MPC settings, virtual patients, and random streams as `finite_set_minimax_mpc`; its model set preserves the supplied q/a/b support and fixes d to 0. This tests whether allowing nonzero dependence values changes the finite-set minimax controller, holding the q/a/b support and other policy settings fixed. Both arms remain additional development arms outside the frozen primary contrast. The integration test checks the d=0 model-set size, output arrays, and unchanged primary contrast. It does not compare or interpret their outcome values.
+
 ## Mechanics verification
 
 The new suite covers worst-case action selection, deterministic ties, invalid and duplicate model sets, simulator-matched default support, separate model-conditioned filters, missing-scan handling, one-model equivalence, course-budget behavior, and model-order invariance. The four focused suites passed **68 tests in 23.86 seconds** in a scratch copy. The tested source and test hashes matched the worktree. This validates mechanics only. It does not show that the controller improves utility, is clinically useful, or is novel.
@@ -46,6 +50,8 @@ After benchmark wiring, six focused suites passed **95 tests, with 1 skipped in 
 ### Uninformative-signal negative control (2026-11-06)
 
 A new end-to-end regression test sets `q=0.5` and `a=b=d=0`, so both synthetic signals carry no information about resistance. Under identical settings and random seeds, the finite-set controller exactly matched no-signal MPC for baseline endpoint time, RANO-like endpoint time, and courses used in a two-patient synthetic run. The six focused suites now pass **97 tests, with 1 skipped in 84.64 seconds**, in a scratch copy. The skipped registry test needs a sealed-run artifact omitted from that copy. SHA-256 comparison confirmed that the copied `src` and `tests` matched the worktree. This validates a null-information behavior only; it is not evidence of policy benefit, patient relevance, or novelty.
+
+After adding the matched d=0 minimax control, the same six focused suites passed **97 tests, with 1 skipped in 94.53 seconds**, in a fresh scratch copy. SHA-256 comparison confirmed that all 443 copied Python source and test files matched the worktree, excluding generated `__pycache__` files. The skipped registry test needs a sealed-run artifact omitted from the copy. The new check verifies plumbing only; no policy outcomes were generated or compared.
 
 ## Synthetic timing
 

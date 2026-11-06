@@ -32,7 +32,7 @@ The next candidate should address the documented weak finite-sample identificati
 
 1. Estimate a set or distribution of plausible signal-dependence parameters using development/calibration worlds only, retaining weakly identified values instead of selecting one point estimate.
 2. Freeze a robust policy that evaluates actions across that uncertainty set, with no fitting or peer-weight adaptation on evaluation worlds.
-3. Compare it on fresh, disjoint virtual worlds with a conditional-independence policy that receives the same calibration information, plus single-signal, no-signal, fixed-schedule, and equal-course controls.
+3. Compare it on fresh, disjoint virtual worlds with the matched finite-set minimax control that preserves q/a/b support and fixes d=0, plus the conditional-independence policy with the same calibration information, single-signal, no-signal, fixed-schedule, and equal-course controls.
 4. Check signal prediction and policy value as separate gates. If signal prediction is inadequate, label policy findings as a simulator stress test rather than evidence that the estimated signal model works.
 5. Freeze the world-level estimand, sample-size/precision target, bootstrap unit, simultaneous interval method, numerical tolerances, and all evaluation anchors before generating evaluation outcomes. Report all anchors, including harm; do not change the frozen rule to obtain a positive result.
 

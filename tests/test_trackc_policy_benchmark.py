@@ -322,6 +322,7 @@ def test_full_policy_harness_runs_all_arms_on_shared_endpoint_path(monkeypatch):
         "standard_twelve_course_front_loaded",
         "paced_twelve_course_every_other_cycle",
         "finite_set_minimax_mpc",
+        "finite_set_d0_minimax_mpc",
     }
     expected.update(
         name for name, spec in test_catalog.items()
@@ -373,7 +374,18 @@ def test_full_policy_harness_runs_all_arms_on_shared_endpoint_path(monkeypatch):
     assert result["exploratory_controller"]["included"] is True
     assert result["exploratory_controller"]["model_set_size"] == 2
     assert "excluded from frozen primary contrast" in result["exploratory_controller"]["role"]
+    assert result["exploratory_d0_controller"]["included"] is True
+    assert result["exploratory_d0_controller"]["model_set_size"] == len(
+        benchmark.conditional_independence_grid(models)
+    )
+    assert result["exploratory_d0_controller"]["dependence_rule"] == (
+        "same q/a/b support as the full set, with d fixed to 0"
+    )
+    assert "excluded from frozen primary contrast" in result["exploratory_d0_controller"]["role"]
     assert set(result["arm_outcomes"]["finite_set_minimax_mpc"]) >= {
+        "ttp_baseline", "ttp_rano", "courses", "robust_utility"
+    }
+    assert set(result["arm_outcomes"]["finite_set_d0_minimax_mpc"]) >= {
         "ttp_baseline", "ttp_rano", "courses", "robust_utility"
     }
     for arm in result["arm_outcomes"].values():
