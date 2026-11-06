@@ -300,6 +300,11 @@ ENTRIES = [
            [("output/trackc_finite_sample_signal_recovery/diagnostic.json", '"seed_root": 20261880')],
            note="Development-only synthetic parameter recovery, run 2026-11-06; 25 roots keyed by f0 range, truth anchor, and "
                 "sample size. No treatment outcomes or patient data."),
+    _entry("215", "LOO paired-signal predictive check (development; gate not passed)", "dev_used",
+           [(20261905, 20261929)], [],
+           [("output/trackc_loo_predictive_check/diagnostic.json", '"seed_root": 20261905')],
+           note="Frozen synthetic signal-prediction diagnostic, run 2026-11-06. Gate failed at n=18 and n=28; do not reuse "
+                "these roots to tune the method. No treatment outcomes or patient data."),
 ]
 ENTRIES.append(_reserved_stage2_dev(ENTRIES))
 ENTRIES.append(_entry("restart", "Stage 3 sealed run (restart plan)", "reserved", [(20262300, 20262499)],

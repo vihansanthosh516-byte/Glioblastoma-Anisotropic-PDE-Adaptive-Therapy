@@ -64,12 +64,15 @@ def test_check_free_refuses_spent_and_dev_seeds():
 
 
 def test_check_free_accepts_reserved_block_only_for_its_purpose():
-    assert reg.check_free(scenario=(20261905, 20262004), noise=(1899000, 1899999),
-                          purpose="stage2_dev") == []
-    assert reg.check_free(scenario=(20261908, 20261909), noise=(1895000, 1895000),
+    reserved = next(e for e in reg.ENTRIES if e["status"] == "reserved" and e["purpose"] == "stage2_dev")
+    scen = tuple(reserved["scenario_seeds"][0])
+    noise = tuple(reserved["noise_keys"][0])
+    assert reg.check_free(scenario=scen, noise=noise, purpose="stage2_dev") == []
+    probe = (scen[0], min(scen[0] + 1, scen[1]))
+    assert reg.check_free(scenario=probe, noise=(1895000, 1895000),
                           purpose="stage2_dev") == []                  # a free dev block no configuration uses
     # the dev block cannot be spent as a sealed block, and vice versa
-    assert reg.check_free(scenario=(20261905, 20262004), purpose="stage3_sealed")
+    assert reg.check_free(scenario=scen, purpose="stage3_sealed")
     assert reg.check_free(scenario=(20262300, 20262399), purpose="stage2_dev")
     assert reg.check_free(scenario=(20262300, 20262399), noise=(2300000, 2300999),
                           purpose="stage3_sealed") == []
