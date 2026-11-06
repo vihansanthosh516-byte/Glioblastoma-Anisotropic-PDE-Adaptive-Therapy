@@ -23,6 +23,12 @@ This is a targeted primary-source update, not an exhaustive systematic review. I
 - The existing track data do not form a linked multimodal patient cohort. Track A can inform only an explicitly assumed molecular-like signal range; Track B can inform only permitted MRI/ADC observation characteristics; Track C supplies the assumed drug-suppression simulator. The molecular-to-resistance relationship remains simulated. The umbrella title can stay, but the protocol must say this clearly.
 - To keep the result informative rather than positivity-seeking, evaluate all predeclared signal regimes, including independent, noisy, shuffled, wrong-sign, and mismatched-likelihood controls. Report both progression endpoints, treatment-course use, mean and lower-tail outcomes, and the full regime map. Do not choose a winning regime after seeing evaluation outcomes.
 
+## Additional source check (2026-11-06)
+
+The full text of Liu, Trimboli, and Li's 2026 preprint, [AI-Augmented Adaptive Digital Twin Modeling for Brain Tumor Evolution Prediction and Treatment Scheduling](https://arxiv.org/abs/2607.13877), describes a reaction-diffusion model, a 3D learned residual, recursive patient-specific model updates, and model-predictive chemotherapy/radiotherapy scheduling. It reports tests on 387 synthetic tumor trajectories and compares scheduling with a fixed treatment schedule. This is direct overlap with the umbrella idea of combining brain-tumor progression modeling and in-silico therapy optimization, even though it does not test this project's proposed dependence-aware molecular-like/MRI-like likelihood contrast. The preprint itself says the trajectories are patient-data-informed synthetic data, so it is not evidence of clinical benefit or external patient validation.
+
+This narrows the defensible candidate further: a predeclared GBM simulation study of when explicitly modeling residual dependence between assumed molecular-like and MRI-like signals changes policy utility versus a matched conditional-independence model. No source checked so far verifies that exact contrast as new, and no project outcome run shows it is better. The title can remain as the umbrella description, but it cannot be used as a novelty or performance claim.
+
 ## Required next steps before outcome simulation
 
 1. Freeze the data-generating signal regimes separately from the policy's fixed assumed likelihood; make the no-signal, molecular-only, MRI-only, and joint-signal arms use the same broad prior and patient worlds.
