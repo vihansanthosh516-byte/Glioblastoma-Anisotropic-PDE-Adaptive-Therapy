@@ -101,6 +101,7 @@ All tests use assumed virtual patients. Passing tests establish only that the im
 
 - The full scratch-copy run covered all 35 `test_trackc_*.py` files: **377 passed, 1 skipped in 850.89 seconds**.
 - The skip was `test_trackc_seed_registry.py:109`, because the scratch copy intentionally omitted `output/`.
+- I then copied only the referenced frozen-protocol evidence file into the scratch tree and reran that suite: **13 passed, no skips**.
 - The first full run exposed two stale unit-test fixtures that hard-coded seed ranges no longer reserved for the test purpose. The manifest implementation was unchanged; the unit tests now use small synthetic seed values and a mocked registry, while the separate registry suite continues to exercise the real registry.
 - SHA-256 comparison matched all **340 source files and 103 test files** between the scratch copy and worktree, excluding `__pycache__`.
 - These remain mechanics tests only. No research-scale policy outcomes, patient data, or sealed evaluation were run.
