@@ -49,6 +49,15 @@ def _quiet_scenario():
     }
 
 
+def _calibration_cohort(n, scenario_seed, signal_seed):
+    scenarios = tc.draw_scenarios(n, seed=scenario_seed, sigmas=(0.05,))
+    observations, _truth = generate_integrated_signals(
+        n, q=0.6, a=0.2, b=0.4, d=0.3,
+        seed=signal_seed, f0=scenarios["f0"],
+    )
+    return scenarios, observations
+
+
 def test_restricted_course_count_excludes_courses_starting_at_or_after_cutoff():
     scenario = _quiet_scenario()
     schedule = np.zeros(tc.N_CYCLES, dtype=bool)
@@ -233,6 +242,9 @@ def test_full_policy_harness_runs_all_arms_on_shared_endpoint_path(monkeypatch):
 
     monkeypatch.setattr(benchmark, "_load_source_module", recording_loader)
     selection = tc.draw_scenarios(2, seed=2026110601, sigmas=(0.05,))
+    calibration, calibration_observations = _calibration_cohort(
+        2, scenario_seed=2026110611, signal_seed=2026110618
+    )
     evaluation = tc.draw_scenarios(2, seed=2026110602, sigmas=(0.05,))
     observations, _truth = generate_integrated_signals(
         2,
@@ -276,19 +288,26 @@ def test_full_policy_harness_runs_all_arms_on_shared_endpoint_path(monkeypatch):
     result = benchmark.run_shared_policy_world(
         world_id="tiny-mechanics-test",
         selection_scenarios=selection,
+        calibration_scenarios=calibration,
         evaluation_scenarios=evaluation,
         selection_patient_ids=("selection-0", "selection-1"),
+        calibration_patient_ids=("calibration-0", "calibration-1"),
         evaluation_patient_ids=("evaluation-0", "evaluation-1"),
+        calibration_observations=calibration_observations,
         evaluation_observations=observations,
         model_parameters=models,
         signal_generation_parameters=generation_parameters,
         signal_generation_seed=2026110603,
+        calibration_signal_generation_seed=2026110618,
         signal_generation_mri_template_sha256=None,
         selection_scenario_seed=2026110610,
-        evaluation_scenario_seed=2026110611,
+        calibration_scenario_seed=2026110611,
+        evaluation_scenario_seed=2026110612,
         selection_seed=[2026110604],
         q_training_seed=[2026110605],
+        calibration_seed=[2026110619],
         evaluation_seed=[2026110606],
+        schedule_mixture_seed=[2026110620],
         settings=settings,
         include_ambiguity_controller=True,
     )
@@ -311,7 +330,28 @@ def test_full_policy_harness_runs_all_arms_on_shared_endpoint_path(monkeypatch):
             result["selected_baseline_by_family"]["raw_threshold_grid"]["name"],
         }
     )
-    assert set(result["arm_outcomes"]) == expected
+    matched_arm_names = {
+        row["evaluation_arm"]
+        for row in result["matched_fixed_schedule_controls"].values()
+        if row["status"] == "evaluated"
+    }
+    assert set(result["arm_outcomes"]) == expected | matched_arm_names
+    assert set(result["calibration_course_use"]) == set(result["matched_fixed_schedule_controls"])
+    for policy_name, control in result["matched_fixed_schedule_controls"].items():
+        assert control["calibration_mean_courses"] == pytest.approx(
+            result["calibration_course_use"][policy_name]
+        )
+        assert control["selection_mix"]["target_mean_courses"] == pytest.approx(
+            control["calibration_mean_courses"]
+        )
+        if control["status"] == "evaluated":
+            assert control["evaluation_arm"] in result["arm_outcomes"]
+            assert control["evaluation_course_use_difference"] == pytest.approx(
+                control["evaluation_mean_courses"] - control["calibration_mean_courses"]
+            )
+            assert control["paired_worst_endpoint_days_difference"].shape == (2,)
+            assert control["paired_robust_utility_difference"].shape == (2,)
+            assert len(control["assignment"]["assignment_sha256"]) == 64
     assert set(result["selected_baseline_by_family"]) == {
         "scan_rule", "state_estimation", "filtered_threshold_grid", "raw_threshold_grid"
     }
@@ -361,28 +401,37 @@ def test_full_policy_harness_runs_all_arms_on_shared_endpoint_path(monkeypatch):
     assert result["signal_generation_in_inference_grid"] is False
     assert set(result["input_fingerprints"]) == {
         "selection_scenarios_sha256",
+        "calibration_scenarios_sha256",
         "evaluation_scenarios_sha256",
         "selection_patient_ids_sha256",
+        "calibration_patient_ids_sha256",
         "evaluation_patient_ids_sha256",
+        "calibration_observations_sha256",
         "evaluation_observations_sha256",
     }
     assert all(len(value) == 64 for value in result["input_fingerprints"].values())
     assert result["cohorts"]["selection"]["n_patients"] == 2
+    assert result["cohorts"]["calibration"]["n_patients"] == 2
     assert result["cohorts"]["evaluation"]["n_patients"] == 2
     assert result["seeds"]["selection_scenario_generation"] == [2026110610]
-    assert result["seeds"]["evaluation_scenario_generation"] == [2026110611]
+    assert result["seeds"]["calibration_scenario_generation"] == [2026110611]
+    assert result["seeds"]["evaluation_scenario_generation"] == [2026110612]
     assert result["scenario_seed_provenance"].startswith("caller-declared;")
     assert "each arm has its own action-dependent path" in result["path_rule"]
     assert "share one treatment path" not in result["path_rule"]
-    assert received_f0_bounds == [settings.signal_f0_bounds, settings.signal_f0_bounds]
+    assert received_f0_bounds == [settings.signal_f0_bounds] * 4
     assert len(received_scan_intervals) == (
-        settings.q_episodes + 1 + len(test_catalog) + len(result["arm_outcomes"])
+        settings.q_episodes + 1 + len(test_catalog)
+        + len(result["calibration_course_use"]) + len(result["arm_outcomes"])
     )
     assert all(np.all(interval == settings.scan_every) for interval in received_scan_intervals)
 
 
 def test_harness_rejects_overlapping_synthetic_patient_ids_before_policy_fit(monkeypatch):
     selection = tc.draw_scenarios(1, seed=2026110631, sigmas=(0.05,))
+    calibration, calibration_observations = _calibration_cohort(
+        1, scenario_seed=2026110637, signal_seed=2026110638
+    )
     evaluation = tc.draw_scenarios(1, seed=2026110632, sigmas=(0.05,))
     parameters = SignalModelParameters(0.6, 0.2, 0.4, 0.3)
     observations, _truth = generate_integrated_signals(
@@ -393,28 +442,38 @@ def test_harness_rejects_overlapping_synthetic_patient_ids_before_policy_fit(mon
         pytest.fail("policy fitting must not start for overlapping cohorts")
 
     monkeypatch.setattr(benchmark, "select_fixed_schedule", unexpected_fit)
-    with pytest.raises(ValueError, match="patient IDs must be disjoint"):
+    with pytest.raises(ValueError, match="pairwise disjoint"):
         benchmark.run_shared_policy_world(
             world_id="overlapping-cohorts",
             selection_scenarios=selection,
+            calibration_scenarios=calibration,
             evaluation_scenarios=evaluation,
             selection_patient_ids=("same-virtual-patient",),
+            calibration_patient_ids=("calibration-0",),
             evaluation_patient_ids=("same-virtual-patient",),
+            calibration_observations=calibration_observations,
             evaluation_observations=observations,
             model_parameters=(parameters,),
             signal_generation_parameters=parameters,
             signal_generation_seed=2026110633,
+            calibration_signal_generation_seed=2026110638,
             signal_generation_mri_template_sha256=None,
             selection_scenario_seed=2026110631,
+            calibration_scenario_seed=2026110637,
             evaluation_scenario_seed=2026110632,
             selection_seed=[2026110634],
             q_training_seed=[2026110635],
+            calibration_seed=[2026110639],
             evaluation_seed=[2026110636],
+            schedule_mixture_seed=[2026110640],
         )
 
 
 def test_harness_requires_budget_that_can_include_six_course_comparator():
     selection = tc.draw_scenarios(1, seed=2026110607, sigmas=(0.05,))
+    calibration, calibration_observations = _calibration_cohort(
+        1, scenario_seed=2026110613, signal_seed=2026110614
+    )
     evaluation = tc.draw_scenarios(1, seed=2026110608, sigmas=(0.05,))
     observations, _truth = generate_integrated_signals(
         1, q=0.6, a=0.2, b=0.4, d=0.3, seed=2026110609, f0=evaluation["f0"]
@@ -433,25 +492,35 @@ def test_harness_requires_budget_that_can_include_six_course_comparator():
         benchmark.run_shared_policy_world(
             world_id="invalid-budget",
             selection_scenarios=selection,
+            calibration_scenarios=calibration,
             evaluation_scenarios=evaluation,
             selection_patient_ids=("selection-0",),
+            calibration_patient_ids=("calibration-0",),
             evaluation_patient_ids=("evaluation-0",),
+            calibration_observations=calibration_observations,
             evaluation_observations=observations,
             model_parameters=(SignalModelParameters(0.6, 0.2, 0.4, 0.3),),
             signal_generation_parameters=SignalModelParameters(0.6, 0.2, 0.4, 0.3),
             signal_generation_seed=2026110609,
+            calibration_signal_generation_seed=2026110614,
             signal_generation_mri_template_sha256=None,
             selection_scenario_seed=2026110607,
+            calibration_scenario_seed=2026110613,
             evaluation_scenario_seed=2026110608,
             selection_seed=[2026110610],
             q_training_seed=[2026110611],
+            calibration_seed=[2026110615],
             evaluation_seed=[2026110612],
+            schedule_mixture_seed=[2026110616],
             settings=settings,
         )
 
 
 def test_harness_rejects_f0_values_outside_declared_signal_prior_before_fitting():
     selection = tc.draw_scenarios(2, seed=2026110613, sigmas=(0.05,))
+    calibration, calibration_observations = _calibration_cohort(
+        2, scenario_seed=2026110619, signal_seed=2026110620
+    )
     evaluation = tc.draw_scenarios(2, seed=2026110614, sigmas=(0.05,))
     evaluation["f0"][0] = 0.12
     observations, _truth = generate_integrated_signals(
@@ -468,19 +537,26 @@ def test_harness_rejects_f0_values_outside_declared_signal_prior_before_fitting(
         benchmark.run_shared_policy_world(
             world_id="f0-prior-mismatch",
             selection_scenarios=selection,
+            calibration_scenarios=calibration,
             evaluation_scenarios=evaluation,
             selection_patient_ids=("selection-0", "selection-1"),
+            calibration_patient_ids=("calibration-0", "calibration-1"),
             evaluation_patient_ids=("evaluation-0", "evaluation-1"),
+            calibration_observations=calibration_observations,
             evaluation_observations=observations,
             model_parameters=(SignalModelParameters(0.6, 0.2, 0.4, 0.3),),
             signal_generation_parameters=SignalModelParameters(0.6, 0.2, 0.4, 0.3),
             signal_generation_seed=2026110615,
+            calibration_signal_generation_seed=2026110620,
             signal_generation_mri_template_sha256=None,
             selection_scenario_seed=2026110613,
+            calibration_scenario_seed=2026110619,
             evaluation_scenario_seed=2026110614,
             selection_seed=[2026110616],
             q_training_seed=[2026110617],
+            calibration_seed=[2026110621],
             evaluation_seed=[2026110618],
+            schedule_mixture_seed=[2026110622],
         )
 
 
@@ -518,26 +594,36 @@ def test_signal_generation_metadata_validates_seed_and_optional_template_hash():
 def test_harness_rejects_reused_signal_generation_seed_before_fitting():
     selection = tc.draw_scenarios(1, seed=2026110619, sigmas=(0.05,))
     evaluation = tc.draw_scenarios(1, seed=2026110620, sigmas=(0.05,))
+    calibration, calibration_observations = _calibration_cohort(
+        1, scenario_seed=2026110625, signal_seed=2026110628
+    )
     parameters = SignalModelParameters(0.6, 0.2, 0.4, 0.3)
     observations, _truth = generate_integrated_signals(
         1, q=0.6, a=0.2, b=0.4, d=0.3, seed=2026110622, f0=evaluation["f0"]
     )
 
-    with pytest.raises(ValueError, match="scenario-generation.*seeds must be distinct"):
+    with pytest.raises(ValueError, match="seeds must be distinct"):
         benchmark.run_shared_policy_world(
             world_id="reused-signal-seed",
             selection_scenarios=selection,
+            calibration_scenarios=calibration,
             evaluation_scenarios=evaluation,
             selection_patient_ids=("selection-0",),
+            calibration_patient_ids=("calibration-0",),
             evaluation_patient_ids=("evaluation-0",),
+            calibration_observations=calibration_observations,
             evaluation_observations=observations,
             model_parameters=(parameters,),
             signal_generation_parameters=parameters,
             signal_generation_seed=2026110622,
+            calibration_signal_generation_seed=2026110628,
             signal_generation_mri_template_sha256=None,
             selection_scenario_seed=2026110619,
+            calibration_scenario_seed=2026110625,
             evaluation_scenario_seed=2026110620,
             selection_seed=[2026110622],
             q_training_seed=[2026110623],
+            calibration_seed=[2026110626],
             evaluation_seed=[2026110624],
+            schedule_mixture_seed=[2026110627],
         )

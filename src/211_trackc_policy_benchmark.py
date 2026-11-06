@@ -25,6 +25,7 @@ from trackc_integrated_signal_model import (
     SignalModelParameters,
     SignalObservations,
 )
+from trackc_equal_course_frontier import randomize_schedule_mix, select_schedule_mix
 
 
 def _load_source_module(module_name: str, filename: str):
@@ -151,6 +152,38 @@ def _validate_disjoint_patient_ids(selection_ids, evaluation_ids, n_selection, n
     if overlap:
         raise ValueError("selection and evaluation patient IDs must be disjoint")
     return selection, evaluation
+
+
+def _validate_three_disjoint_patient_ids(
+    selection_ids, calibration_ids, evaluation_ids,
+    n_selection: int, n_calibration: int, n_evaluation: int,
+):
+    selection = _validate_patient_ids(selection_ids, n_selection, "selection_patient_ids")
+    calibration = _validate_patient_ids(calibration_ids, n_calibration, "calibration_patient_ids")
+    evaluation = _validate_patient_ids(evaluation_ids, n_evaluation, "evaluation_patient_ids")
+    if set(selection).intersection(calibration):
+        raise ValueError("selection and calibration patient IDs must be disjoint")
+    if set(selection).intersection(evaluation) or set(calibration).intersection(evaluation):
+        raise ValueError("selection, calibration, and evaluation patient IDs must be pairwise disjoint")
+    return selection, calibration, evaluation
+
+
+def _copy_signal_observations(observations, n_patients: int, name: str) -> SignalObservations:
+    if not all(hasattr(observations, key) for key in ("molecular_report", "mri_score")):
+        raise TypeError(f"{name} must provide molecular_report and mri_score")
+    report = np.asarray(observations.molecular_report)
+    mri_score = np.asarray(observations.mri_score, dtype=float)
+    if report.shape != (n_patients,) or mri_score.shape != (n_patients,):
+        raise ValueError(f"{name} must contain one molecular and MRI signal per patient")
+    if not np.isin(report, (False, True, 0, 1)).all() or not np.isfinite(mri_score).all():
+        raise ValueError(f"{name} signals must be binary and finite")
+    return SignalObservations(report.astype(bool, copy=True), mri_score.copy())
+
+
+def _named_assignment_seed(seed: int, label: str) -> int:
+    """Derive stable independent schedule-assignment streams from one master seed."""
+    payload = f"trackc-schedule-mixture-v1:{seed}:{label}".encode("utf-8")
+    return int.from_bytes(hashlib.sha256(payload).digest()[:8], "little")
 
 
 def _fingerprint_array_mapping(values: Mapping) -> str:
@@ -615,7 +648,10 @@ def select_fixed_schedule(
         catalog_schedules, catalog_names = rg.candidate_schedules()
         schedules = catalog_schedules if schedules is None else schedules
         schedule_names = catalog_names if schedule_names is None else schedule_names
-    schedule_array = np.asarray(schedules, dtype=bool)
+    raw_schedules = np.asarray(schedules)
+    if not np.isin(raw_schedules, (False, True, 0, 1)).all():
+        raise ValueError("schedules must contain only binary actions")
+    schedule_array = raw_schedules.astype(bool, copy=True)
     names = tuple(schedule_names)
     if schedule_array.ndim != 2 or schedule_array.shape[1] != tc.N_CYCLES or schedule_array.shape[0] == 0:
         raise ValueError("schedules must be a nonempty schedule catalog with one column per cycle")
@@ -648,6 +684,10 @@ def select_fixed_schedule(
     course_means = checked["courses_through_cutoff"].reshape(len(schedule_array), n_patients).mean(axis=1)
     total_course_means = checked["courses"].reshape(len(schedule_array), n_patients).mean(axis=1)
     utility_means = utilities.mean(axis=1)
+    worst_endpoint_days = np.minimum(
+        np.minimum(checked["ttp_baseline"], settings.tau_days),
+        np.minimum(checked["ttp_rano"], settings.tau_days),
+    ).reshape(len(schedule_array), n_patients)
     best_index = max(
         range(len(schedule_array)),
         key=lambda index: (
@@ -662,6 +702,18 @@ def select_fixed_schedule(
         "selection_mean_robust_utility": float(utility_means[best_index]),
         "selection_mean_courses": float(course_means[best_index]),
         "selection_mean_total_courses": float(total_course_means[best_index]),
+        "schedule_metrics": [
+            {
+                "schedule_index": int(index),
+                "schedule_name": names[index],
+                "mean_courses": float(course_means[index]),
+                "mean_total_courses": float(total_course_means[index]),
+                "mean_worst_endpoint_days": float(worst_endpoint_days[index].mean()),
+                "mean_robust_utility": float(utility_means[index]),
+                "schedule": schedule_array[index].copy(),
+            }
+            for index in range(len(schedule_array))
+        ],
         "selection_seed": list(seed_key),
         "n_selection_patients": int(n_patients),
     }
@@ -690,42 +742,46 @@ def run_shared_policy_world(
     *,
     world_id: str,
     selection_scenarios: Mapping,
+    calibration_scenarios: Mapping,
     evaluation_scenarios: Mapping,
     selection_patient_ids: Sequence[str],
+    calibration_patient_ids: Sequence[str],
     evaluation_patient_ids: Sequence[str],
+    calibration_observations: SignalObservations,
     evaluation_observations: SignalObservations,
     model_parameters: Sequence[SignalModelParameters],
     signal_generation_parameters: SignalModelParameters,
     signal_generation_seed,
+    calibration_signal_generation_seed,
     signal_generation_mri_template_sha256: str | None,
     selection_scenario_seed,
+    calibration_scenario_seed,
     evaluation_scenario_seed,
     selection_seed,
     q_training_seed,
+    calibration_seed,
     evaluation_seed,
+    schedule_mixture_seed,
     settings: PolicyBenchmarkSettings = PolicyBenchmarkSettings(),
     include_ambiguity_controller: bool = False,
 ) -> dict:
-    """Run a paired, same-cohort development comparison in one virtual world.
+    """Run a three-cohort development comparison in one virtual world.
 
-    Training and fixed-schedule selection use selection patients only. The LOO signal
-    controllers use only unlabeled baseline signals from the evaluation cohort and leave
-    each patient's own signal out of that patient's model-weight fit. All arms share the
-    same evaluation cohort, precomputed observation-noise stream, scan interval,
-    endpoint-stop rule, and budget. Each policy has its own action-dependent trajectory;
-    its two endpoint times share that policy's path and course count. The caller must
-    provide disjoint cohort IDs and separate scenario-generation seeds. Those seeds are
-    caller-declared; fingerprints independently identify the scenario and observation
-    arrays actually consumed. The caller must also distinguish signal-generator
-    truth/seed from the inference grid. This function returns in-memory synthetic
-    outcomes and writes no files.
+    Selection patients choose schedules and baseline families. Calibration patients
+    estimate feedback-policy course use. Their target doses choose randomized mixtures
+    on the selection-only fixed-schedule frontier. Evaluation patients score all arms.
+    Cohort IDs and scenario, signal, policy, and assignment seeds must be disjoint.
+    Evaluation outcomes never choose a schedule or mixture. This returns synthetic
+    outcomes in memory and writes no files.
     """
     if not isinstance(world_id, str) or not world_id.strip():
         raise ValueError("world_id must be a nonempty string")
     n_selection = _validate_scenarios(selection_scenarios, "selection_scenarios")
+    n_calibration = _validate_scenarios(calibration_scenarios, "calibration_scenarios")
     n_evaluation = _validate_scenarios(evaluation_scenarios, "evaluation_scenarios")
-    selection_ids, evaluation_ids = _validate_disjoint_patient_ids(
-        selection_patient_ids, evaluation_patient_ids, n_selection, n_evaluation
+    selection_ids, calibration_ids, evaluation_ids = _validate_three_disjoint_patient_ids(
+        selection_patient_ids, calibration_patient_ids, evaluation_patient_ids,
+        n_selection, n_calibration, n_evaluation,
     )
     generation_seed, mri_template_sha256 = _validate_signal_generation_metadata(
         signal_generation_parameters,
@@ -737,6 +793,7 @@ def run_shared_policy_world(
     f0_low, f0_high = settings.signal_f0_bounds
     for name, scenarios in (
         ("selection_scenarios", selection_scenarios),
+        ("calibration_scenarios", calibration_scenarios),
         ("evaluation_scenarios", evaluation_scenarios),
     ):
         if "f0" not in scenarios:
@@ -752,41 +809,63 @@ def run_shared_policy_world(
     selection_scenario_seed_key = _validate_seed(
         selection_scenario_seed, "selection_scenario_seed"
     )
+    calibration_scenario_seed_key = _validate_seed(
+        calibration_scenario_seed, "calibration_scenario_seed"
+    )
     evaluation_scenario_seed_key = _validate_seed(
         evaluation_scenario_seed, "evaluation_scenario_seed"
     )
+    calibration_signal_seed_key = _validate_seed(
+        calibration_signal_generation_seed, "calibration_signal_generation_seed"
+    )
+    if len(calibration_signal_seed_key) != 1:
+        raise ValueError("calibration_signal_generation_seed must be one integer")
     selection_seed_key = _validate_seed(selection_seed, "selection_seed")
     q_seed_key = _validate_seed(q_training_seed, "q_training_seed")
+    calibration_seed_key = _validate_seed(calibration_seed, "calibration_seed")
     eval_seed_key = _validate_seed(evaluation_seed, "evaluation_seed")
+    mixture_seed_key = _validate_seed(schedule_mixture_seed, "schedule_mixture_seed")
+    if len(mixture_seed_key) != 1:
+        raise ValueError("schedule_mixture_seed must be one integer")
     all_seeds = {
         selection_scenario_seed_key,
+        calibration_scenario_seed_key,
         evaluation_scenario_seed_key,
         selection_seed_key,
         q_seed_key,
+        calibration_seed_key,
         eval_seed_key,
+        mixture_seed_key,
         (generation_seed,),
+        calibration_signal_seed_key,
     }
-    if len(all_seeds) != 6:
-        raise ValueError("scenario-generation, signal-generation, selection, Q-training, and evaluation seeds must be distinct")
-    observations = evaluation_observations
-    if not all(hasattr(observations, key) for key in ("molecular_report", "mri_score")):
-        raise TypeError("evaluation_observations must provide molecular_report and mri_score")
-    report = np.asarray(observations.molecular_report)
-    mri_score = np.asarray(observations.mri_score, dtype=float)
-    if report.shape != (n_evaluation,) or mri_score.shape != (n_evaluation,):
-        raise ValueError("evaluation signals must have one value per evaluation patient")
-    if not np.isin(report, (False, True, 0, 1)).all() or not np.isfinite(mri_score).all():
-        raise ValueError("evaluation signals must be binary and finite")
-    observations = SignalObservations(report.astype(bool, copy=True), mri_score.copy())
+    if len(all_seeds) != 10:
+        raise ValueError(
+            "selection, calibration, and evaluation scenario, signal, policy, and mixture seeds must be distinct"
+        )
+    calibration_observations = _copy_signal_observations(
+        calibration_observations, n_calibration, "calibration_observations"
+    )
+    observations = _copy_signal_observations(
+        evaluation_observations, n_evaluation, "evaluation_observations"
+    )
     models = tuple(model_parameters)
     input_fingerprints = {
         "selection_scenarios_sha256": _fingerprint_array_mapping(selection_scenarios),
+        "calibration_scenarios_sha256": _fingerprint_array_mapping(calibration_scenarios),
         "evaluation_scenarios_sha256": _fingerprint_array_mapping(evaluation_scenarios),
         "selection_patient_ids_sha256": _fingerprint_array_mapping({
             "patient_ids": np.asarray(selection_ids, dtype=str),
         }),
         "evaluation_patient_ids_sha256": _fingerprint_array_mapping({
             "patient_ids": np.asarray(evaluation_ids, dtype=str),
+        }),
+        "calibration_patient_ids_sha256": _fingerprint_array_mapping({
+            "patient_ids": np.asarray(calibration_ids, dtype=str),
+        }),
+        "calibration_observations_sha256": _fingerprint_array_mapping({
+            "molecular_report": calibration_observations.molecular_report,
+            "mri_score": calibration_observations.mri_score,
         }),
         "evaluation_observations_sha256": _fingerprint_array_mapping({
             "molecular_report": observations.molecular_report,
@@ -831,40 +910,42 @@ def run_shared_policy_world(
         "stop_endpoint": "either",
         "ranges": mpc.INTEGRATED_BELIEF_RANGES,
     }
-    full_signal_mpc = loo_module.LOOModelAveragedBeliefMPC(
-        observations, model_parameters=models, f0_bounds=settings.signal_f0_bounds,
-        n_f0_nodes=settings.n_f0_nodes, **deepcopy(common_mpc)
-    )
-    ci_signal_mpc = loo_module.LOOModelAveragedBeliefMPC(
-        observations, model_parameters=ci_models, f0_bounds=settings.signal_f0_bounds,
-        n_f0_nodes=settings.n_f0_nodes, **deepcopy(common_mpc)
-    )
-    no_signal_mpc = mpc.RobustBeliefMPC(**deepcopy(common_mpc))
+    def make_signal_policies(signal_observations):
+        policies_for_signals = {
+            "loo_dependence_aware_mpc": loo_module.LOOModelAveragedBeliefMPC(
+                signal_observations, model_parameters=models,
+                f0_bounds=settings.signal_f0_bounds, n_f0_nodes=settings.n_f0_nodes,
+                **deepcopy(common_mpc),
+            ),
+            "loo_conditional_independence_mpc": loo_module.LOOModelAveragedBeliefMPC(
+                signal_observations, model_parameters=ci_models,
+                f0_bounds=settings.signal_f0_bounds, n_f0_nodes=settings.n_f0_nodes,
+                **deepcopy(common_mpc),
+            ),
+            "no_signal_mpc": mpc.RobustBeliefMPC(**deepcopy(common_mpc)),
+        }
+        if include_ambiguity_controller:
+            ambiguity_module = _load_source_module(
+                "trackc_robust_signal_ambiguity",
+                "216_trackc_robust_signal_ambiguity.py",
+            )
+            policies_for_signals["finite_set_minimax_mpc"] = (
+                ambiguity_module.SignalAmbiguityBeliefMPC(
+                    signal_observations, model_parameters=models,
+                    **deepcopy(common_mpc),
+                )
+            )
+        return policies_for_signals
+
     fixed_control_catalog = _fixed_schedule_control_catalog(settings)
     fixed_schedule = chosen_fixed["schedule"]
-    policies = {
-        "loo_dependence_aware_mpc": full_signal_mpc,
-        "loo_conditional_independence_mpc": ci_signal_mpc,
-        "no_signal_mpc": no_signal_mpc,
-        "q_learning": q_policy,
-        "selection_best_fixed": FixedSchedulePolicy(fixed_schedule),
-    }
+    policies = make_signal_policies(observations)
+    policies["q_learning"] = q_policy
+    policies["selection_best_fixed"] = FixedSchedulePolicy(fixed_schedule)
     policies.update({
         name: FixedSchedulePolicy(spec["schedule"])
         for name, spec in fixed_control_catalog.items()
     })
-    if include_ambiguity_controller:
-        ambiguity_module = _load_source_module(
-            "trackc_robust_signal_ambiguity",
-            "216_trackc_robust_signal_ambiguity.py",
-        )
-        policies["finite_set_minimax_mpc"] = (
-            ambiguity_module.SignalAmbiguityBeliefMPC(
-                observations,
-                model_parameters=models,
-                **deepcopy(common_mpc),
-            )
-        )
     selected_baseline_names = {
         row["name"] for row in baseline_selection["winners"].values()
     }
@@ -873,10 +954,74 @@ def run_shared_policy_world(
             continue
         cap = min(int(spec["max_courses"]), settings.course_budget)
         policies[name] = CourseCappedPolicy(spec["factory"](), cap)
+
+    calibration_policies = make_signal_policies(calibration_observations)
+    calibration_policies["q_learning"] = deepcopy(q_policy)
+    for name, spec in baseline_catalog.items():
+        if not spec["evaluate_all"] and name not in selected_baseline_names:
+            continue
+        calibration_policies[name] = deepcopy(policies[name])
+    calibration_arms = {
+        name: _evaluate_policy(policy, calibration_scenarios, calibration_seed_key, settings)
+        for name, policy in calibration_policies.items()
+    }
     arms = {
         name: _evaluate_policy(policy, evaluation_scenarios, eval_seed_key, settings)
         for name, policy in policies.items()
     }
+
+    schedule_by_index = {
+        int(row["schedule_index"]): row for row in chosen_fixed["schedule_metrics"]
+    }
+    matched_schedule_controls = {}
+    for policy_name, calibration_outcome in calibration_arms.items():
+        target_courses = float(np.mean(calibration_outcome["courses_through_cutoff"]))
+        match = select_schedule_mix(chosen_fixed["schedule_metrics"], target_courses)
+        match_record = {key: value for key, value in match.items() if key != "frontier_points"}
+        match_record["frontier_points"] = [
+            {key: value for key, value in point.items() if key != "schedule"}
+            for point in match["frontier_points"]
+        ]
+        if match["status"] != "matched":
+            matched_schedule_controls[policy_name] = {
+                "status": match["status"],
+                "calibration_mean_courses": target_courses,
+                "selection_mix": match_record,
+                "evaluation_arm": None,
+            }
+            continue
+        lower_schedule = schedule_by_index[match["lower_schedule_index"]]["schedule"]
+        upper_schedule = schedule_by_index[match["upper_schedule_index"]]["schedule"]
+        assignment_seed = _named_assignment_seed(mixture_seed_key[0], policy_name)
+        mixed_schedules, assignment = randomize_schedule_mix(
+            lower_schedule, upper_schedule,
+            match["upper_mix_probability"], n_evaluation, assignment_seed,
+        )
+        arm_name = f"matched_fixed_mix_for_{policy_name}"
+        mixture_outcome = _evaluate_policy(
+            FixedSchedulePolicy(mixed_schedules), evaluation_scenarios,
+            eval_seed_key, settings,
+        )
+        arms[arm_name] = mixture_outcome
+        adaptive_worst_days = np.minimum(arms[policy_name]["rmst_baseline"], arms[policy_name]["rmst_rano"])
+        mixture_worst_days = np.minimum(
+            mixture_outcome["rmst_baseline"], mixture_outcome["rmst_rano"]
+        )
+        matched_schedule_controls[policy_name] = {
+            "status": "evaluated",
+            "calibration_mean_courses": target_courses,
+            "selection_mix": match_record,
+            "assignment": assignment,
+            "evaluation_arm": arm_name,
+            "evaluation_mean_courses": float(np.mean(mixture_outcome["courses_through_cutoff"])),
+            "evaluation_course_use_difference": float(
+                np.mean(mixture_outcome["courses_through_cutoff"]) - target_courses
+            ),
+            "paired_worst_endpoint_days_difference": adaptive_worst_days - mixture_worst_days,
+            "paired_robust_utility_difference": (
+                arms[policy_name]["robust_utility"] - mixture_outcome["robust_utility"]
+            ),
+        }
     candidate = arms["loo_dependence_aware_mpc"]
     control = arms["loo_conditional_independence_mpc"]
     primary = {
@@ -903,6 +1048,17 @@ def run_shared_policy_world(
             "f0_source": "evaluation_scenarios['f0']",
             "mri_template_sha256": mri_template_sha256,
         },
+        "calibration_signal_generation": {
+            "generator": "trackc_integrated_signal_model.generate_integrated_signals",
+            "parameters": {
+                "q": float(signal_generation_parameters.q),
+                "a": float(signal_generation_parameters.a),
+                "b": float(signal_generation_parameters.b),
+                "d": float(signal_generation_parameters.d),
+            },
+            "seed": calibration_signal_seed_key[0],
+            "f0_source": "calibration_scenarios['f0']",
+        },
         "inference_model_parameters": [
             {"q": float(model.q), "a": float(model.a), "b": float(model.b), "d": float(model.d)}
             for model in models
@@ -911,19 +1067,25 @@ def run_shared_policy_world(
         "input_fingerprints": input_fingerprints,
         "seeds": {
             "selection_scenario_generation": list(selection_scenario_seed_key),
+            "calibration_scenario_generation": list(calibration_scenario_seed_key),
             "evaluation_scenario_generation": list(evaluation_scenario_seed_key),
+            "calibration_signal_generation": list(calibration_signal_seed_key),
             "selection": list(selection_seed_key),
             "q_training": list(q_seed_key),
+            "calibration_policy_simulation": list(calibration_seed_key),
             "evaluation": list(eval_seed_key),
+            "schedule_mixture_master": list(mixture_seed_key),
         },
         "scenario_seed_provenance": (
             "caller-declared; realized scenario arrays are independently fingerprinted"
         ),
         "cohorts": {
             "selection": {"n_patients": n_selection, "patient_ids_sha256": input_fingerprints["selection_patient_ids_sha256"]},
+            "calibration": {"n_patients": n_calibration, "patient_ids_sha256": input_fingerprints["calibration_patient_ids_sha256"]},
             "evaluation": {"n_patients": n_evaluation, "patient_ids_sha256": input_fingerprints["evaluation_patient_ids_sha256"]},
         },
         "n_selection_patients": n_selection,
+        "n_calibration_patients": n_calibration,
         "n_evaluation_patients": n_evaluation,
         "selected_fixed_schedule": chosen_fixed,
         "fixed_schedule_control_catalog": {
@@ -951,6 +1113,11 @@ def run_shared_policy_world(
         },
         "selected_baseline_by_family": baseline_selection["winners"],
         "arm_outcomes": arms,
+        "calibration_course_use": {
+            name: float(np.mean(outcome["courses_through_cutoff"]))
+            for name, outcome in calibration_arms.items()
+        },
+        "matched_fixed_schedule_controls": matched_schedule_controls,
         "primary_paired_contrast": primary,
         "exploratory_controller": {
             "name": "finite_set_minimax_mpc",
@@ -963,7 +1130,7 @@ def run_shared_policy_world(
             ),
         },
         "path_rule": "all arms share initial virtual patients, precomputed observation-noise stream, scan schedule, and budget; each arm has its own action-dependent path; both endpoint times share that arm's path and course count; treatment stops at the first baseline or RANO-like event",
-        "signal_rule": "LOO arms use only unlabeled evaluation-cohort baseline signals and leave each patient out of their own peer-weight fit",
+        "signal_rule": "LOO controllers use only unlabeled baseline signals from the cohort being simulated and leave each patient out of their own peer-weight fit; calibration signals set course-use targets, evaluation signals do not set mixtures",
         "limits": [
             "Development simulation only; no patient treatment effect is estimated.",
             "Track A and Duke data are not joined to these virtual patients.",
