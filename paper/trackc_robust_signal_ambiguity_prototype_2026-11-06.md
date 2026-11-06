@@ -53,6 +53,14 @@ A new end-to-end regression test sets `q=0.5` and `a=b=d=0`, so both synthetic s
 
 After adding the matched d=0 minimax control, the same six focused suites passed **97 tests, with 1 skipped in 94.53 seconds**, in a fresh scratch copy. SHA-256 comparison confirmed that all 443 copied Python source and test files matched the worktree, excluding generated `__pycache__` files. The skipped registry test needs a sealed-run artifact omitted from the copy. The new check verifies plumbing only; no policy outcomes were generated or compared.
 
+### Forecast-sampling fairness correction (2026-11-06)
+
+Before any policy-outcome comparison, code review found that each model's action values used 16 random posterior-particle draws from a sequential generator. The 81-model candidate and 27-model d=0 control therefore gave matched d=0 models different forecast draws. Taking a minimum over many noisy estimates can also bias the candidate's estimated worst-case value downward. This was a comparison-quality risk, not evidence that either policy wins.
+
+The multi-model controller now uses keyed, stratified uniforms for each virtual patient and scan cycle. Every model uses the same uniforms, independent of model order and set size. A regression test verifies that a shared d=0 model selects identical posterior particles in the full and reduced sets when its filter state matches. The one-model path remains unchanged. Eight focused suites passed **107 tests, with 2 skipped in 88.21 seconds**, in a scratch copy. The skips required an omitted sealed-run artifact and an omitted timing record. SHA-256 comparison found no differences in copied Python source or test files after excluding generated `__pycache__` files.
+
+This correction improves paired Monte Carlo sampling. It does **not** remove the minimum-of-noisy-estimates bias, establish policy benefit, or validate the signal-to-resistance mapping. Before any outcome comparison, test action stability as `prediction_particles` increases and compare the stagewise minimax rule with a persistent-model uncertainty treatment. The current policy recomputes the worst model at each scan; it does not maintain one posterior probability for a fixed unknown global signal model.
+
 ## Synthetic timing
 
 One timing call measured reset, baseline signal conditioning, and the first plan only. It used the existing 81-model grid, 128 filter particles, 8 prediction particles, a 3-cycle scan interval, and a 3-cycle forecast. The fresh-seed timing record is [`output/trackc_robust_signal_ambiguity_20261106/timing.json`](../output/trackc_robust_signal_ambiguity_20261106/timing.json).
@@ -85,5 +93,6 @@ The narrow remaining candidate is an application and evaluation question: whethe
 3. Include the matched conditional-independence set, no-signal MPC, failed LOO model average as a secondary comparator, fixed schedules, equal-course frontier, Q-learning, and applicable scan/state-estimation controls.
 4. Freeze the world-level estimand, uncertainty intervals, precision target, number of worlds, and fresh development seeds before scoring. Keep selection worlds disjoint from evaluation worlds.
 5. Report benefit and harm across every prespecified world. Do not tune the set, policy, endpoint, or success rule after scores appear. Do not use sealed seeds.
+6. Before scoring, show that robust action choices are stable across larger posterior-prediction sample counts. Compare stagewise minimax with a persistent-model or model-averaged control; label any remaining model-switching assumption.
 
 The integrated title still exceeds the empirical connection between tracks: Track A expression, Duke MRI, and Track C virtual patients are not patient-linked. The signal-to-resistance mapping remains a simulator assumption. Any result from this prototype would support only a conditional simulation claim.

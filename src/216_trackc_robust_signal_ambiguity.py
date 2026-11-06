@@ -46,6 +46,55 @@ def maximin_action_index(model_action_values) -> int:
     return int(np.argmax(np.min(values, axis=0)))
 
 
+def keyed_stratified_uniforms(seed, patient_indices, *, cycle: int, n_draws: int) -> np.ndarray:
+    """Make stable per-patient stratified uniforms, independent of model-set size/order."""
+    for value, name in ((seed, "seed"), (cycle, "cycle"), (n_draws, "n_draws")):
+        if isinstance(value, (bool, np.bool_)) or not isinstance(value, (int, np.integer)):
+            raise ValueError(f"{name} must be an integer")
+    if seed < 0 or cycle < 0 or n_draws < 1:
+        raise ValueError("seed and cycle must be non-negative and n_draws must be positive")
+    rows = np.asarray(patient_indices)
+    if rows.ndim != 1 or rows.dtype.kind not in "iu" or rows.dtype.kind == "b" or (rows < 0).any():
+        raise ValueError("patient_indices must be a one-dimensional array of non-negative integers")
+    uniforms = np.empty((rows.size, int(n_draws)), dtype=float)
+    strata = np.arange(int(n_draws), dtype=float)
+    for index, patient in enumerate(rows):
+        rng = np.random.default_rng(
+            np.random.SeedSequence([int(seed), int(cycle), int(patient)])
+        )
+        uniforms[index] = (strata + rng.random(int(n_draws))) / int(n_draws)
+    return uniforms
+
+
+def stratified_particle_indices(weights, uniforms) -> np.ndarray:
+    """Select weighted particles with supplied common stratified uniforms."""
+    probabilities = np.asarray(weights, dtype=float)
+    quantiles = np.asarray(uniforms, dtype=float)
+    if (
+        probabilities.ndim != 2
+        or not probabilities.shape[0]
+        or not probabilities.shape[1]
+        or not np.isfinite(probabilities).all()
+        or (probabilities < 0.0).any()
+        or (probabilities.sum(axis=1) <= 0.0).any()
+    ):
+        raise ValueError("weights must be a nonempty finite non-negative 2D array with positive row sums")
+    if (
+        quantiles.ndim != 2
+        or quantiles.shape[0] != probabilities.shape[0]
+        or not quantiles.shape[1]
+        or not np.isfinite(quantiles).all()
+        or (quantiles < 0.0).any()
+        or (quantiles >= 1.0).any()
+    ):
+        raise ValueError("uniforms must be a finite 2D array with matching rows and values in [0, 1)")
+    normalized = probabilities / probabilities.sum(axis=1, keepdims=True)
+    cumulative = np.cumsum(normalized, axis=1)
+    cumulative[:, -1] = 1.0
+    indices = (quantiles[:, :, None] >= cumulative[:, None, :]).sum(axis=2)
+    return np.minimum(indices, probabilities.shape[1] - 1).astype(np.intp, copy=False)
+
+
 def _copy_observations(observations):
     if not all(hasattr(observations, name) for name in ("molecular_report", "mri_score")):
         raise TypeError("observations must provide molecular_report and mri_score")
@@ -108,6 +157,10 @@ class SignalAmbiguityBeliefMPC(_MPC.RobustBeliefMPC):
         n_patients = len(np.asarray(scen["sigma"]))
         if self.observations.molecular_report.shape != (n_patients,):
             raise ValueError("signal arrays must have one value per simulated patient")
+        self._prediction_seed = (
+            int(rng.integers(0, 2**32, dtype=np.uint64))
+            if len(self.model_parameters) > 1 else None
+        )
         super().reset(scen, rng)
         common_prior = copy.deepcopy(self.pf)
         filters = []
@@ -156,7 +209,19 @@ class SignalAmbiguityBeliefMPC(_MPC.RobustBeliefMPC):
         self.pf = self.model_filters[0]
         return seen
 
-    def _sample_from_filter(self, particle_filter, rows):
+    def _sample_from_filter(self, particle_filter, rows, *, uniforms=None):
+        if uniforms is not None:
+            weights = particle_filter.w[rows]
+            pick = stratified_particle_indices(weights, uniforms)
+            row_grid = rows[:, None]
+            return {
+                "S": particle_filter.S[row_grid, pick].copy(),
+                "R": particle_filter.R[row_grid, pick].copy(),
+                "theta": {
+                    name: value[row_grid, pick].copy()
+                    for name, value in particle_filter.theta.items()
+                },
+            }
         previous = self.pf
         self.pf = particle_filter
         try:
@@ -181,9 +246,15 @@ class SignalAmbiguityBeliefMPC(_MPC.RobustBeliefMPC):
             return super()._replan(rows, j, previous_nadir[0])
 
         scores = np.empty((len(self.model_filters), self.patterns.shape[0], rows.size), dtype=float)
+        uniforms = keyed_stratified_uniforms(
+            self._prediction_seed,
+            rows,
+            cycle=j,
+            n_draws=self.prediction_particles,
+        )
         for model_index, particle_filter in enumerate(self.model_filters):
             self.pf = particle_filter
-            state = self._sample_from_filter(particle_filter, rows)
+            state = self._sample_from_filter(particle_filter, rows, uniforms=uniforms)
             carrying_capacity = state["theta"]["B0"]
             burden = state["S"] + state["R"]
             t_base_now = np.where(burden >= tc.PROG_FACTOR * carrying_capacity, 0.0, np.nan)
@@ -252,4 +323,9 @@ class SignalAmbiguityBeliefMPC(_MPC.RobustBeliefMPC):
         self.pf = self.model_filters[0]
 
 
-__all__ = ["SignalAmbiguityBeliefMPC", "maximin_action_index"]
+__all__ = [
+    "SignalAmbiguityBeliefMPC",
+    "keyed_stratified_uniforms",
+    "maximin_action_index",
+    "stratified_particle_indices",
+]
