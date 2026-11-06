@@ -527,7 +527,10 @@ def simulate(scen, policy, seed, track_fr=False, endpoint="baseline", budget=Non
     return out
 
 
-def simulate_two_endpoints(scen, policy, seed, track_fr=False, stop_endpoint="either", budget=None):
+def simulate_two_endpoints(
+    scen, policy, seed, track_fr=False, stop_endpoint="either", budget=None,
+    course_cutoff_days=None,
+):
     """Score baseline and RANO-like progression on one treatment trajectory.
 
     Treatment stops when ``stop_endpoint`` is reached: ``"baseline"`` for the continuous
@@ -542,9 +545,17 @@ def simulate_two_endpoints(scen, policy, seed, track_fr=False, stop_endpoint="ei
     later cycles receive no treatment after the event. Administrative censoring occurs only
     at the simulation horizon. Scan noise is pre-drawn before policy initialization, matching
     the existing simulator contract.
+
+    Optional ``course_cutoff_days`` records courses whose cycle starts before that time in
+    ``courses_through_cutoff``. The simulator still reports total delivered courses in
+    ``courses`` and applies the selected progression stop rule to both counts.
     """
     if stop_endpoint not in ("baseline", "rano", "either"):
         raise ValueError(f"unknown stop endpoint {stop_endpoint!r}")
+    if course_cutoff_days is not None:
+        course_cutoff_days = float(course_cutoff_days)
+        if not np.isfinite(course_cutoff_days) or not 0.0 < course_cutoff_days <= HORIZON:
+            raise ValueError("course_cutoff_days must be finite and in (0, simulator horizon]")
     cap = BUDGET if budget is None else int(budget)
     dose = scen.get("dose")
     scan_every = scen.get("scan_every")
@@ -572,6 +583,7 @@ def simulate_two_endpoints(scen, policy, seed, track_fr=False, stop_endpoint="ei
     ttp_baseline = np.full(N, np.nan)
     ttp_rano = np.full(N, np.nan)
     used = np.zeros(N, int)
+    used_through_cutoff = np.zeros(N, int) if course_cutoff_days is not None else None
     hits, total = 0, 0
     policy.reset(scen, rng)
     y_prev = None
@@ -613,6 +625,8 @@ def simulate_two_endpoints(scen, policy, seed, track_fr=False, stop_endpoint="ei
             total += int(stop_event.sum())
         treat = treat & stop_event
         used += treat
+        if used_through_cutoff is not None and j * CYCLE_DAYS < course_cutoff_days:
+            used_through_cutoff += treat
         snaps = {CYCLE_DAYS - d: None for d in delays} if delays else None
         S, R = run_cycle(
             S, R, p, treat if dose is None else treat * dose,
@@ -636,6 +650,8 @@ def simulate_two_endpoints(scen, policy, seed, track_fr=False, stop_endpoint="ei
         "courses": used,
         "stop_endpoint": stop_endpoint,
     }
+    if used_through_cutoff is not None:
+        out["courses_through_cutoff"] = used_through_cutoff
     if track_fr and policy.uses_filter:
         out["fr_cover"] = (hits, total)
     return out
