@@ -17,7 +17,11 @@ import numpy as np
 
 import trackc_regime as rg
 import trackc_sim as tc
-from trackc_integrated_signal_model import SignalModelParameters, SignalObservations
+from trackc_integrated_signal_model import (
+    F0_REFERENCE_BOUNDS,
+    SignalModelParameters,
+    SignalObservations,
+)
 
 
 def _load_source_module(module_name: str, filename: str):
@@ -39,6 +43,7 @@ class PolicyBenchmarkSettings:
     course_budget: int = tc.BUDGET
     tau_days: float = 730.0
     course_penalty: float = 5.0
+    signal_f0_bounds: tuple[float, float] = tuple(map(float, tc.RANGES["f0"][:2]))
     n_f0_nodes: int = 256
     mpc_particles: int = 500
     prediction_particles: int = 16
@@ -63,6 +68,20 @@ class PolicyBenchmarkSettings:
             raise ValueError("tau_days must be finite and in (0, simulator horizon]")
         if not np.isfinite(self.course_penalty) or self.course_penalty < 0:
             raise ValueError("course_penalty must be finite and non-negative")
+        try:
+            f0_bounds = tuple(map(float, self.signal_f0_bounds))
+        except (TypeError, ValueError, OverflowError) as exc:
+            raise ValueError("signal_f0_bounds must contain two finite bounds") from exc
+        if (
+            len(f0_bounds) != 2
+            or not np.isfinite(f0_bounds).all()
+            or f0_bounds[0] <= 0.0
+            or f0_bounds[1] <= f0_bounds[0]
+            or f0_bounds[0] < F0_REFERENCE_BOUNDS[0]
+            or f0_bounds[1] > F0_REFERENCE_BOUNDS[1]
+        ):
+            raise ValueError("signal_f0_bounds must be ordered inside the signal reference bounds")
+        object.__setattr__(self, "signal_f0_bounds", f0_bounds)
         if not np.isfinite(self.q_learning_rate) or not 0 < self.q_learning_rate <= 1:
             raise ValueError("q_learning_rate must be in (0, 1]")
         if not 0 <= self.q_min_epsilon <= self.q_epsilon <= 1:
@@ -344,6 +363,21 @@ def run_shared_policy_world(
     n_evaluation = _validate_scenarios(evaluation_scenarios, "evaluation_scenarios")
     if settings.course_budget < 6:
         raise ValueError("course_budget must be at least 6 to include the standard six-course comparator")
+    f0_low, f0_high = settings.signal_f0_bounds
+    for name, scenarios in (
+        ("selection_scenarios", selection_scenarios),
+        ("evaluation_scenarios", evaluation_scenarios),
+    ):
+        if "f0" not in scenarios:
+            raise ValueError(f"{name} must include f0 values covered by signal_f0_bounds")
+        f0 = np.asarray(scenarios["f0"], dtype=float)
+        if (
+            f0.shape != np.asarray(scenarios["r"]).shape
+            or not np.isfinite(f0).all()
+            or (f0 < f0_low).any()
+            or (f0 > f0_high).any()
+        ):
+            raise ValueError(f"{name} contains f0 values outside the declared signal_f0_bounds")
     selection_seed_key = _validate_seed(selection_seed, "selection_seed")
     q_seed_key = _validate_seed(q_training_seed, "q_training_seed")
     eval_seed_key = _validate_seed(evaluation_seed, "evaluation_seed")
@@ -394,10 +428,12 @@ def run_shared_policy_world(
         "ranges": mpc.INTEGRATED_BELIEF_RANGES,
     }
     full_signal_mpc = loo_module.LOOModelAveragedBeliefMPC(
-        observations, model_parameters=models, n_f0_nodes=settings.n_f0_nodes, **deepcopy(common_mpc)
+        observations, model_parameters=models, f0_bounds=settings.signal_f0_bounds,
+        n_f0_nodes=settings.n_f0_nodes, **deepcopy(common_mpc)
     )
     ci_signal_mpc = loo_module.LOOModelAveragedBeliefMPC(
-        observations, model_parameters=ci_models, n_f0_nodes=settings.n_f0_nodes, **deepcopy(common_mpc)
+        observations, model_parameters=ci_models, f0_bounds=settings.signal_f0_bounds,
+        n_f0_nodes=settings.n_f0_nodes, **deepcopy(common_mpc)
     )
     no_signal_mpc = mpc.RobustBeliefMPC(**deepcopy(common_mpc))
     standard_schedule = np.zeros(tc.N_CYCLES, dtype=bool)

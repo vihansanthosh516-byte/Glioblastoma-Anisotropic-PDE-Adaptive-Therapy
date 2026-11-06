@@ -29,6 +29,12 @@ The paired score is the earlier of the two progression times, restricted at `tau
 - SHA-256 comparison found 17 source/test files identical between the scratch copy and the working tree.
 - The scratch copy was `C:\Users\vihan\AppData\Local\Temp\trackc-policy-benchmark-7e59e425143d4a56be726f89a5dc1c8a`.
 
+### Follow-up audit: signal-prior alignment
+
+A code audit found that the LOO signal controllers used the signal model's broad reference `f0` bounds by default, while the simulator drew `f0` from the narrower log-uniform range `[0.001, 0.1]`. Because the joint signal likelihood integrates over `f0`, this gave the controllers a nuisance prior that did not match the virtual-patient generator. The benchmark now defaults `signal_f0_bounds` to the simulator range, refuses selection or evaluation scenarios outside the declared range, and passes the same bounds to both dependence-aware and conditional-independence controllers. A regression test captures both constructor calls and verifies the bounds. This changes no outcome result; none has been run.
+
+The updated six-suite scratch run passed **80 tests in 25.40 seconds**. SHA-256 matched all seven relevant source/test files between the tested copy and working tree. This is implementation evidence only; it does not show policy benefit.
+
 ## Limits and next work
 
 The six-arm harness is not the full baseline panel in `trackc_candidate_methods_design_2026-11-04.md`. It does not yet run the scan-rule and state-estimation policies, equal-course fixed-schedule frontier, dose-dense proxy, or six-versus-twelve-course comparison. It also has no multi-world aggregation, precision gate, or frozen outcome protocol. These must be resolved before any policy outcome comparison.

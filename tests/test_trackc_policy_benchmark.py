@@ -89,7 +89,23 @@ def test_conditional_independence_control_preserves_candidate_qab_support():
     assert all(row.d == 0.0 for row in control)
 
 
-def test_full_policy_harness_runs_all_arms_on_shared_endpoint_path():
+def test_full_policy_harness_runs_all_arms_on_shared_endpoint_path(monkeypatch):
+    received_f0_bounds = []
+    original_loader = benchmark._load_source_module
+
+    def recording_loader(module_name, filename):
+        module = original_loader(module_name, filename)
+        if filename == "214_trackc_loo_model_average.py":
+            original_controller = module.LOOModelAveragedBeliefMPC
+
+            def recording_controller(*args, **kwargs):
+                received_f0_bounds.append(tuple(kwargs["f0_bounds"]))
+                return original_controller(*args, **kwargs)
+
+            monkeypatch.setattr(module, "LOOModelAveragedBeliefMPC", recording_controller)
+        return module
+
+    monkeypatch.setattr(benchmark, "_load_source_module", recording_loader)
     selection = tc.draw_scenarios(2, seed=2026110601, sigmas=(0.05,))
     evaluation = tc.draw_scenarios(2, seed=2026110602, sigmas=(0.05,))
     observations, _truth = generate_integrated_signals(
@@ -144,6 +160,8 @@ def test_full_policy_harness_runs_all_arms_on_shared_endpoint_path():
         assert (arm["courses_through_cutoff"] <= arm["courses"]).all()
         assert (arm["courses"] <= settings.course_budget).all()
     assert result["analysis_type"] == "synthetic_virtual_world_development"
+    assert result["settings"]["signal_f0_bounds"] == tuple(map(float, tc.RANGES["f0"][:2]))
+    assert received_f0_bounds == [settings.signal_f0_bounds, settings.signal_f0_bounds]
 
 
 def test_harness_requires_budget_that_can_include_six_course_comparator():
@@ -173,4 +191,31 @@ def test_harness_requires_budget_that_can_include_six_course_comparator():
             q_training_seed=[2026110611],
             evaluation_seed=[2026110612],
             settings=settings,
+        )
+
+
+def test_harness_rejects_f0_values_outside_declared_signal_prior_before_fitting():
+    selection = tc.draw_scenarios(2, seed=2026110613, sigmas=(0.05,))
+    evaluation = tc.draw_scenarios(2, seed=2026110614, sigmas=(0.05,))
+    evaluation["f0"][0] = 0.12
+    observations, _truth = generate_integrated_signals(
+        2,
+        q=0.6,
+        a=0.2,
+        b=0.4,
+        d=0.3,
+        seed=2026110615,
+        f0=evaluation["f0"],
+    )
+
+    with pytest.raises(ValueError, match="outside the declared signal_f0_bounds"):
+        benchmark.run_shared_policy_world(
+            world_id="f0-prior-mismatch",
+            selection_scenarios=selection,
+            evaluation_scenarios=evaluation,
+            evaluation_observations=observations,
+            model_parameters=(SignalModelParameters(0.6, 0.2, 0.4, 0.3),),
+            selection_seed=[2026110616],
+            q_training_seed=[2026110617],
+            evaluation_seed=[2026110618],
         )
