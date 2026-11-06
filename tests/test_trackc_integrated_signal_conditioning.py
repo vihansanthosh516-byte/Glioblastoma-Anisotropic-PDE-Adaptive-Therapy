@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import importlib.util
+import math
 import sys
 from pathlib import Path
 
 import numpy as np
 import pytest
+from scipy.integrate import quad
 
 REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO / "src"))
@@ -132,6 +134,79 @@ def test_correct_joint_likelihood_prefers_generating_f0_on_average():
     difference = log_likelihood[:, 1] - log_likelihood[:, 0]
     assert difference[:n_per_group].mean() < 0.0
     assert difference[n_per_group:].mean() > 0.0
+
+
+@pytest.mark.parametrize("report", [False, True])
+def test_joint_likelihood_matches_direct_latent_integral(report):
+    parameters = SignalModelParameters(q=0.83, a=0.45, b=-0.35, d=0.6)
+    f0 = 0.031
+    mri_score = 0.4
+    observations = SignalObservations(
+        molecular_report=np.array([report]), mri_score=np.array([mri_score])
+    )
+    got = integrated_signal_log_likelihood(
+        np.array([[f0]]), observations, parameters
+    )
+
+    z_resistance = float(f0_to_resistance_score(np.array([f0]))[0])
+    sd_bio = math.sqrt(1.0 - parameters.a**2)
+    sd_mri_given_bio = math.sqrt(
+        (1.0 - parameters.b**2) * (1.0 - parameters.d**2)
+    )
+
+    def integrand(z_bio):
+        density_bio = math.exp(
+            -0.5 * ((z_bio - parameters.a * z_resistance) / sd_bio) ** 2
+        ) / (math.sqrt(2.0 * math.pi) * sd_bio)
+        mri_mean = (
+            parameters.b * z_resistance
+            + math.sqrt(1.0 - parameters.b**2)
+            * parameters.d
+            * (z_bio - parameters.a * z_resistance)
+            / sd_bio
+        )
+        density_mri = math.exp(
+            -0.5 * ((mri_score - mri_mean) / sd_mri_given_bio) ** 2
+        ) / (math.sqrt(2.0 * math.pi) * sd_mri_given_bio)
+        state_positive = z_bio >= 0.0
+        report_probability = (
+            parameters.q
+            if report == state_positive
+            else 1.0 - parameters.q
+        )
+        return density_bio * density_mri * report_probability
+
+    direct = quad(integrand, -np.inf, 0.0, epsabs=1e-12)[0]
+    direct += quad(integrand, 0.0, np.inf, epsabs=1e-12)[0]
+    assert float(np.exp(got[0, 0])) == pytest.approx(direct, rel=1e-9, abs=1e-12)
+
+
+@pytest.mark.parametrize(
+    "parameters",
+    [
+        SignalModelParameters(q=0.83, a=0.45, b=-0.35, d=0.6),
+        SignalModelParameters(q=0.67, a=-0.4, b=0.55, d=-0.7),
+        SignalModelParameters(q=0.91, a=0.0, b=0.0, d=0.8),
+    ],
+)
+def test_joint_signal_likelihood_normalizes_over_reports_and_mri(parameters):
+    f0 = 0.037
+    total_probability = 0.0
+    for report in (False, True):
+        def density(mri_score):
+            observations = SignalObservations(
+                molecular_report=np.array([report]),
+                mri_score=np.array([mri_score]),
+            )
+            log_likelihood = integrated_signal_log_likelihood(
+                np.array([[f0]]), observations, parameters
+            )
+            return float(np.exp(log_likelihood[0, 0]))
+
+        total_probability += quad(
+            density, -np.inf, np.inf, epsabs=1e-10, epsrel=1e-10
+        )[0]
+    assert total_probability == pytest.approx(1.0, abs=1e-9)
 
 
 def _small_policy(observations, parameters, channels):
