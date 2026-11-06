@@ -5,6 +5,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 from scipy.special import logsumexp
+import trackc_sim as tc
 
 from trackc_integrated_signal_model import (
     SignalModelParameters,
@@ -133,6 +134,35 @@ def test_mpc_reset_adds_finite_peer_weighted_signal_likelihood():
     assert policy.pf.logw.shape == (5, 32)
     assert np.isfinite(policy.pf.logw).all()
     np.testing.assert_allclose(logsumexp(policy.log_model_weights, axis=1), 0.0, atol=1e-12)
+
+
+def test_loo_signal_mpc_runs_both_endpoints_on_one_synthetic_path():
+    observations = _observations()
+    scenarios = tc.draw_scenarios(5, seed=20261106, sigmas=(0.05,))
+    policy = LOOModelAveragedBeliefMPC(
+        observations,
+        model_parameters=_models(),
+        f0_bounds=(0.03, 0.8),
+        n_f0_nodes=24,
+        n_particles=16,
+        prediction_particles=2,
+        scan_every=3,
+        budget=2,
+        forecast_cycles=3,
+        stop_endpoint="either",
+    )
+
+    outcome = tc.simulate_two_endpoints(
+        scenarios, policy, seed=[20261106, 3], stop_endpoint="either", budget=2
+    )
+
+    assert outcome["stop_endpoint"] == "either"
+    assert outcome["ttp_baseline"].shape == (5,)
+    assert outcome["ttp_rano"].shape == (5,)
+    assert outcome["courses"].shape == (5,)
+    assert np.isfinite(outcome["ttp_baseline"]).all()
+    assert np.isfinite(outcome["ttp_rano"]).all()
+    assert np.all((outcome["courses"] >= 0) & (outcome["courses"] <= 2))
 
 
 @pytest.mark.parametrize(
