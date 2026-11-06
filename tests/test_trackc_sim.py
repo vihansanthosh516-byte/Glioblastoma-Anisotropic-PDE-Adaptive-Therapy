@@ -418,3 +418,37 @@ def test_holiday_containment_caps_consecutive_courses():
     base = tc.simulate(scen, tc.make_policy(("riskf", 0.1, 2, 0)), seed=44)
     same = tc.simulate(scen, tc.make_policy(("riskh", 0.1, 2, 0, 99)), seed=44)
     assert np.array_equal(base["ttp"], same["ttp"])
+
+
+def test_policy_rng_use_does_not_change_precomputed_scan_noise():
+    class RecordingNoTreat:
+        uses_filter = False
+
+        def __init__(self, burn_rng):
+            self.burn_rng = burn_rng
+            self.readings = []
+
+        def reset(self, scen, rng):
+            self.rng = rng
+            if self.burn_rng:
+                rng.standard_normal(257)
+
+        def act(self, j, y):
+            self.readings.append(np.asarray(y).copy())
+            if self.burn_rng:
+                self.rng.standard_normal(31)
+            return np.zeros(y.shape, dtype=bool)
+
+        def advance(self, j, treat):
+            pass
+
+    scen = tc.draw_scenarios(4, seed=20261106, sigmas=(0.05,))
+    quiet = RecordingNoTreat(burn_rng=False)
+    noisy = RecordingNoTreat(burn_rng=True)
+    tc.simulate(scen, quiet, seed=20261107)
+    tc.simulate(scen, noisy, seed=20261107)
+
+    assert len(quiet.readings) > 1
+    assert len(quiet.readings) == len(noisy.readings)
+    for quiet_y, noisy_y in zip(quiet.readings, noisy.readings):
+        np.testing.assert_array_equal(quiet_y, noisy_y)

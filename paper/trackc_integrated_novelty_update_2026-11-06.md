@@ -86,3 +86,7 @@ Before evaluating the longitudinal-fusion question, the implementation must:
 4. Freeze the primary utility and both progression endpoints before development evaluation. Report adverse regimes and negative controls, even when they defeat the candidate.
 
 Until then, the verified result is only an implementation result: the baseline joint-likelihood function matches an independent latent-variable integral and normalizes over the two reports and continuous MRI score in tested parameter settings. The focused numerical tests passed in a scratch copy (`38 passed`). This validates a probability calculation; it does not show policy improvement or novelty.
+
+## Paired-noise implementation check (2026-11-06)
+
+The simulator generates each run's full scan-noise matrix before calling the policy's `reset` method. A new regression test confirms that extra random-number use inside a policy does not change observed scan values when two policies receive the same world, seed, and treatment actions. This supports common-random-number pairing; it does not make observed values identical when treatment actions change the tumor trajectory. A scratch run passed 64 tests across the targeted simulator test, signal conditioning, robust MPC, marker benchmark, and Q-learning suites; the copied `src` and `tests` trees matched the worktree by SHA-256. The full `test_trackc_sim.py` suite was not completed. No policy outcome comparison ran, so this check says nothing about which method performs better.
