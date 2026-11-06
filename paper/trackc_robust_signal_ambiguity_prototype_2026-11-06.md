@@ -43,6 +43,10 @@ The initial filename used `215`, which already belongs to the LOO predictive-che
 
 After benchmark wiring, six focused suites passed **95 tests, with 1 skipped in 55.66 seconds**, in scratch: policy benchmark, ambiguity MPC, signal conditioning, robust MPC, LOO model averaging, and seed registry. The skipped test needs an `output/` sealed-run artifact omitted from the scratch copy. The benchmark mechanics test exercised a two-model ambiguity arm on two virtual patients; it checked output structure and primary-contrast stability, not comparative performance. All 441 source and test files matched the final worktree after the scratch test copy was synchronized.
 
+### Uninformative-signal negative control (2026-11-06)
+
+A new end-to-end regression test sets `q=0.5` and `a=b=d=0`, so both synthetic signals carry no information about resistance. Under identical settings and random seeds, the finite-set controller exactly matched no-signal MPC for baseline endpoint time, RANO-like endpoint time, and courses used in a two-patient synthetic run. The six focused suites now pass **97 tests, with 1 skipped in 84.64 seconds**, in a scratch copy. The skipped registry test needs a sealed-run artifact omitted from that copy. SHA-256 comparison confirmed that the copied `src` and `tests` matched the worktree. This validates a null-information behavior only; it is not evidence of policy benefit, patient relevance, or novelty.
+
 ## Synthetic timing
 
 One timing call measured reset, baseline signal conditioning, and the first plan only. It used the existing 81-model grid, 128 filter particles, 8 prediction particles, a 3-cycle scan interval, and a 3-cycle forecast. The fresh-seed timing record is [`output/trackc_robust_signal_ambiguity_20261106/timing.json`](../output/trackc_robust_signal_ambiguity_20261106/timing.json).

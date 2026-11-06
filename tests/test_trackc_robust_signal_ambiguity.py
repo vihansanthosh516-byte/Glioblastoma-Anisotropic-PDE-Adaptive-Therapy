@@ -140,6 +140,51 @@ def test_one_model_matches_fixed_signal_mpc_on_same_random_stream():
         fixed.advance(cycle, fixed_action)
 
 
+def test_uninformative_signal_model_matches_no_signal_mpc():
+    model = SignalModelParameters(q=0.5, a=0.0, b=0.0, d=0.0)
+    observations = SignalObservations(
+        molecular_report=np.asarray([True, False]),
+        mri_score=np.asarray([1.2, -0.8]),
+    )
+    scenarios = tc.draw_scenarios(2, seed=20261109)
+    ambiguity = SignalAmbiguityBeliefMPC(
+        observations,
+        model_parameters=(model,),
+        scan_every=1,
+        budget=2,
+        n_particles=64,
+        prediction_particles=4,
+        forecast_cycles=1,
+        ranges=_MPC.INTEGRATED_BELIEF_RANGES,
+    )
+    no_signal = _MPC.RobustBeliefMPC(
+        scan_every=1,
+        budget=2,
+        n_particles=64,
+        prediction_particles=4,
+        forecast_cycles=1,
+        ranges=_MPC.INTEGRATED_BELIEF_RANGES,
+    )
+
+    ambiguity_outcome = tc.simulate_two_endpoints(
+        scenarios,
+        ambiguity,
+        seed=[20261109, 3],
+        stop_endpoint="either",
+        budget=2,
+    )
+    no_signal_outcome = tc.simulate_two_endpoints(
+        scenarios,
+        no_signal,
+        seed=[20261109, 3],
+        stop_endpoint="either",
+        budget=2,
+    )
+
+    for name in ("ttp_baseline", "ttp_rano", "courses"):
+        np.testing.assert_array_equal(ambiguity_outcome[name], no_signal_outcome[name])
+
+
 def test_ambiguity_policy_runs_shared_endpoint_simulation_with_finite_budget():
     scenarios = tc.draw_scenarios(2, seed=20261107)
     policy = _policy(_models())
