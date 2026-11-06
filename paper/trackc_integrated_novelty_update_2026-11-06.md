@@ -44,13 +44,17 @@ This narrows the defensible candidate further: a predeclared GBM simulation stud
 - TumorTwin preprint: https://arxiv.org/abs/2505.00670.
 - Robust contextual RL under measurement and dynamics uncertainty: https://arxiv.org/abs/2610.22336.
 - Patient-specific HGG MRI data assimilation: https://pmc.ncbi.nlm.nih.gov/articles/PMC12308963/.
+- Kashanian et al. (2026), patient-specific glioblastoma reaction-diffusion modeling with MRI and Ki-67/IDH1 immunohistochemical markers: https://pubmed.ncbi.nlm.nih.gov/42259355/ (DOI: 10.1088/1361-6560/ae79ca).
 - 2026 neuro-oncology digital-twin review: https://pmc.ncbi.nlm.nih.gov/articles/PMC13036663/. This review is field context, not primary evidence of exact methodological overlap.
+
+The 2026 Kashanian et al. primary study links standard MRI and Ki-67/IDH1 immunohistochemistry to a patient-specific reaction-diffusion growth model and evaluates forecast tumor extent against follow-up imaging. It directly overlaps the broad biology-plus-MRI progression-modeling part of the project's title; its abstract frames treatment-response modeling and planning as future extensions, so it is not direct evidence that it tests a treatment policy. Separately, Liu et al.'s 2025 M4RL study already combines glioblastoma tumor/TAM biology, drug-response dynamics, and reinforcement-learning schedules for CSF1R and IGF1R inhibitors. The broad title therefore combines themes with direct prior art on both the modeling and therapy-optimization sides. The remaining defensible target is a specific held-out decision-method comparison, whose novelty and performance remain unverified.
 
 ## Sources checked
 
 - Chaudhuri et al. (2023), [Predictive digital twin for optimizing patient-specific radiotherapy regimens under uncertainty in high-grade gliomas](https://pmc.ncbi.nlm.nih.gov/articles/PMC10598726/).
 - [A data assimilation framework for predicting the spatiotemporal response of high-grade gliomas to chemoradiation](https://pmc.ncbi.nlm.nih.gov/articles/PMC12308963/).
 - Liu et al. (2025), [Multiscale mathematical model-informed reinforcement learning optimizes combination treatment scheduling in glioblastoma evolution](https://pmc.ncbi.nlm.nih.gov/articles/PMC13155510/), *Science Advances*, 11(32), eadv3316.
+- Kashanian et al. (2026), [Integrating immunohistochemical biomarkers into patient-specific reaction-diffusion models of glioblastoma growth](https://pubmed.ncbi.nlm.nih.gov/42259355/), *Physics in Medicine & Biology*, 71(13), DOI: 10.1088/1361-6560/ae79ca.
 - [Patient-Specific Computational Framework to Spatiotemporally Forecast Treatment Response and Identify Biologically Informed Radiotherapy Targets in High-Grade Glioma](https://ascopubs.org/doi/abs/10.1200/CCI-25-00336), *JCO Clinical Cancer Informatics*.
 - Xie et al. (2026), [Robust Reinforcement Learning for Dynamic Treatment Regimes under Model and Measurement Uncertainty](https://arxiv.org/abs/2610.22336), preprint posted October 15, 2026.
 - Browning et al. (2026), [Adaptive therapy under parametric, structural, and measurement uncertainty](https://arxiv.org/abs/2608.18387), preprint posted August 2026.
