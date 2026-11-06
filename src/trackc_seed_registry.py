@@ -325,6 +325,12 @@ ENTRIES = [
            [("output/trackc_robust_signal_ambiguity_20261106/timing.json", '"scenario_seed": 20262604')],
            note="Final synthetic timing only; no outcomes. Controller RNG seed is recorded separately as a policy seed.",
            policy=[(20262605, 20262605)]),
+    _entry("217", "robust policy full-harness timing pilot (failed input guard; no outcomes)", "dev_used",
+           [(20261930, 20261935)], [],
+           [("output/trackc_robust_policy_timing_pilot_20261106/manifest.json", '"status": "failed"')],
+           note="Single-family synthetic input generation reached the runner's f0-bound guard and stopped before any "
+                "policy simulation. No policy RNG seeds were consumed; mixture family was not run. No outcome scores "
+                "were saved or inspected. Exact attempt and error are recorded in the manifest and failure memo."),
 ]
 ENTRIES.append(_reserved_stage2_dev(ENTRIES))
 ENTRIES.append(_entry("restart", "Stage 3 sealed run (restart plan)", "reserved", [(20262300, 20262499)],
