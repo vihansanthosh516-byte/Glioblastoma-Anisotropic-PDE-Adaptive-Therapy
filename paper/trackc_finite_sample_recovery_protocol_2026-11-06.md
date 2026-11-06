@@ -1,6 +1,6 @@
 # Track C finite-sample signal-recovery protocol
 
-**Status: frozen for a synthetic development diagnostic; no policy or patient evaluation.**
+**Status: protocol frozen; synthetic development diagnostic complete; no policy or patient evaluation.**
 
 ## Question
 
@@ -25,3 +25,9 @@ When `q`, `a`, `b`, and `d` are all unknown, how often will a finite sample of p
 ## Verification and limits
 
 Tests will check deterministic substreams, the 81-point candidate set, finite likelihoods, and the `q=0.5` invariance to `a` and `d`. The complete run will use only synthetic observations and registered development seeds. It will not inspect Track A, Duke, or any patient image, expression, mask, or outcome. A positive simulation result would establish only recovery under these assumed distributions and this estimator grid; it would not show that the signal parameters can be learned from the project's separate cohorts or that the treatment policy is better.
+
+## Post-run reporting correction (2026-11-06)
+
+The first completed output computed a `d`-sign score for the `q=0.5` negative-control anchor. That score is not meaningful: under this model, a coin-flip molecular report makes `a` and `d` unidentifiable from the observed pair. The final summary therefore sets that anchor's `d_sign_correct` field to null and excludes it from the sign-recovery denominator. This correction changes no generated observations, likelihoods, candidate fits, or other metrics; the completed run is not repeated and the original seed draws remain spent.
+
+The corrected record contains 2,100 rows, 84 groups, the full 81-candidate grid, and the `postprocessing_correction` note. The 25 used roots are recorded as `dev_used` in `src/trackc_seed_registry.py`; the registry check passed. The focused recovery and registry suites passed 16 tests, with one existing evidence test skipped because the scratch copy did not contain `output/trackc_sealed_containment/frozen_protocol.json`.

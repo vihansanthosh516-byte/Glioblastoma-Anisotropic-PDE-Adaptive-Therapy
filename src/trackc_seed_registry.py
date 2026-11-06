@@ -295,6 +295,11 @@ ENTRIES = [
            [("output/trackc_stage2_G_informed_search_mixture_mix36/results.json", "20261878")],
            note="Dev run 2026-11-04. Mixed course cap in the worlds of the configuration. Selection patients seed [20261878, world "
                 "index], evaluation patients seed [20261879, world index]; open loop, no noise key."),
+    _entry("213", "finite-sample signal recovery (development)", "dev_used",
+           [(20261880, 20261904)], [],
+           [("output/trackc_finite_sample_signal_recovery/diagnostic.json", '"seed_root": 20261880')],
+           note="Development-only synthetic parameter recovery, run 2026-11-06; 25 roots keyed by f0 range, truth anchor, and "
+                "sample size. No treatment outcomes or patient data."),
 ]
 ENTRIES.append(_reserved_stage2_dev(ENTRIES))
 ENTRIES.append(_entry("restart", "Stage 3 sealed run (restart plan)", "reserved", [(20262300, 20262499)],

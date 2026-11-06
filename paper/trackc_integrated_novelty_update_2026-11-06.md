@@ -157,6 +157,19 @@ A newly verified 2026 primary study further overlaps the broad multimodal title:
 
 The resulting research target remains narrow and unverified: evaluate, on frozen held-out GBM simulation worlds, whether a dependence-aware signal policy adds decision value beyond independence, fixed-dependence, robust/averaged-dependence, single-channel, no-signal, and same-information learning controls. The current code gives the joint policy the generating dependence coefficient, so it does not yet test learning or robustness to unknown dependence. The dependence-to-biology mapping remains synthetic and assumed. No targeted search result justifies claiming that the proposed narrow test is unique, and no policy outcome comparison has been run.
 
-## Finite-sample recovery diagnostic (protocol frozen, not yet run)
+## Finite-sample recovery diagnostic (2026-11-06)
 
-The next method check is a synthetic parameter-recovery study with all four signal parameters unknown to the estimator. Its frozen protocol uses seven truth anchors, three calibration `f0` ranges, cohort sizes 18, 28, 100, and 500, 25 development replicates per cell, and the same 81-point likelihood grid. A `q=0.5` anchor is included as a negative control, and `a` and `b` vary in two other anchors. The 25 roots `20261880–20261904` are reserved within the Stage 2 development pool. The estimator integrates out `f0` with 256 quadrature nodes; the generator's latent `f0` values are not given to the fit. Results will report all groups and near-maximum likelihood sets, not a selected favorable regime. See [`trackc_finite_sample_recovery_protocol_2026-11-06.md`](trackc_finite_sample_recovery_protocol_2026-11-06.md). This experiment can test only recovery under the assumed simulator; even good recovery would not establish a biological mapping or treatment-policy value.
+The frozen synthetic study evaluated seven truth anchors, three calibration `f0` ranges, cohort sizes 18, 28, 100, and 500, 25 replicates per condition, and all 81 likelihood-grid candidates (2,100 cohorts total; 84 condition groups). The fit did not receive the generator's latent `f0` values; it integrated them out with 256 quadrature nodes. Seeds `20261880–20261904` were drawn from the reserved Stage 2 development block. The complete protocol and all replicate-level results are in [`trackc_finite_sample_recovery_protocol_2026-11-06.md`](trackc_finite_sample_recovery_protocol_2026-11-06.md) and [`output/trackc_finite_sample_signal_recovery/diagnostic.json`](../output/trackc_finite_sample_signal_recovery/diagnostic.json).
+
+Across the 375 nonzero-`d`, `q>0.5` cohorts at each sample size, the result was:
+
+| Virtual patients | Correct sign of `d` | Exact truth in MLE tie set | Median width of `d` values within ΔlogL ≤ 2 |
+| ---: | ---: | ---: | ---: |
+| 18 | 62.4% | 13.1% | 1.0 |
+| 28 | 69.3% | 15.5% | 1.0 |
+| 100 | 76.0% | 30.7% | 0.5 |
+| 500 | 95.5% | 77.9% | 0.0 |
+
+The profile width uses the fixed grid and is descriptive, not a confidence interval. At the 18–28 cohort sizes most relevant to this project, sign recovery was modest and the median near-maximum set covered the full tested `d` range `[-0.5,0.5]`. At `q=0.5`, all 300 negative-control rows now have a null sign score; the median near-maximum `d` width was the full 1.0 at every sample size, as expected when `d` is unidentifiable. A post-run reporting correction excluded this negative-control anchor from sign accuracy; it changed no generated data, likelihood, or fit and the simulation was not repeated. The correction is recorded in the protocol and output JSON.
+
+These results weaken the case for plugging a single estimated `d` into the policy at small cohort sizes. They support testing a policy that accounts for a broad dependence uncertainty set, but they do not show such a policy helps. The design is favorable to the estimator because every generating truth lies on the candidate grid and the correct `f0` prior family is known. It remains an assumption-only simulator; no patient data, treatment outcomes, or policy comparison was used. After the reporting correction, the focused recovery and seed-registry suites passed 16 tests in a scratch copy; one existing evidence test was skipped because its sealed-output fixture was absent there.

@@ -43,6 +43,17 @@ def test_q_half_likelihood_is_invariant_to_a_and_d():
     assert np.ptp(same_q_and_b) < 1e-12
 
 
+def test_q_half_negative_control_does_not_receive_a_sign_recovery_score():
+    truth = (0.5, 0.5, 0.5, 0.5)
+    observations = _MODULE._seeded_dataset(
+        777005, 1, 0, 0, truth, _MODULE.F0_RANGES["default"], 8
+    )
+    result = _MODULE.evaluate_observations(
+        observations, truth, _MODULE.F0_RANGES["default"], n_nodes=16
+    )
+    assert result["d_sign_correct"] is None
+
+
 def test_keyed_synthetic_observations_are_reproducible():
     truth = _MODULE.TRUTH_ANCHORS[0]
     bounds = _MODULE.F0_RANGES["default"]

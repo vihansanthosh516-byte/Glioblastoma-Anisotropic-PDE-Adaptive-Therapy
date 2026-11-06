@@ -132,7 +132,9 @@ def evaluate_observations(observations, truth, f0_bounds, *, n_nodes=N_F0_NODES)
     truth_log_likelihood = float(likelihoods[truth_index])
     truth_in_mle_ties = bool(truth_index in mle_indices)
     d_profile = [point[3] for point in profile_points]
-    nonzero_truth = truth_tuple[3] != 0.0
+    # When q=0.5, the molecular report is a coin flip and d is structurally
+    # unidentifiable; do not score its sign as a recovery target.
+    sign_identifiable = truth_tuple[3] != 0.0 and truth_tuple[0] != 0.5
     return {
         "mle_parameters": list(map(float, mle_points[0])),
         "mle_tie_count": int(len(mle_points)),
@@ -140,7 +142,7 @@ def evaluate_observations(observations, truth, f0_bounds, *, n_nodes=N_F0_NODES)
         "truth_log_likelihood_minus_max": truth_log_likelihood - maximum,
         "d_hat_tie_mean": d_hat,
         "d_absolute_error": abs(d_hat - truth_tuple[3]),
-        "d_sign_correct": (bool(np.sign(d_hat) == np.sign(truth_tuple[3])) if nonzero_truth else None),
+        "d_sign_correct": (bool(np.sign(d_hat) == np.sign(truth_tuple[3])) if sign_identifiable else None),
         "d_profile_min_delta_2": float(min(d_profile)),
         "d_profile_max_delta_2": float(max(d_profile)),
         "d_profile_width_delta_2": float(max(d_profile) - min(d_profile)),
@@ -161,7 +163,10 @@ def _summarize(rows):
         d_widths = np.asarray([r["d_profile_width_delta_2"] for r in group], dtype=float)
         truth_tie = np.asarray([r["truth_in_mle_ties"] for r in group], dtype=float)
         truth_profile = np.asarray([r["truth_d_in_profile_delta_2"] for r in group], dtype=float)
-        sign_rows = [r for r in group if r["d_sign_correct"] is not None]
+        sign_rows = [
+            r for r in group
+            if r["d_sign_correct"] is not None and r["truth_parameters"][0] != 0.5
+        ]
         out[key] = {
             "n_replicates": len(group),
             "truth_in_mle_ties_rate": float(np.mean(truth_tie)),
