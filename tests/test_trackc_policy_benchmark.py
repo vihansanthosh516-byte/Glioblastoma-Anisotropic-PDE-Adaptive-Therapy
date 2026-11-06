@@ -195,8 +195,9 @@ def test_full_policy_harness_runs_all_arms_on_shared_endpoint_path(monkeypatch):
         f0=evaluation["f0"],
     )
     models = (
-        SignalModelParameters(q=0.6, a=0.2, b=0.4, d=0.3),
+        SignalModelParameters(q=0.6, a=0.2, b=0.4, d=0.1),
     )
+    generation_parameters = SignalModelParameters(q=0.6, a=0.2, b=0.4, d=0.3)
     settings = benchmark.PolicyBenchmarkSettings(
         course_budget=6,
         tau_days=84.0,
@@ -228,6 +229,9 @@ def test_full_policy_harness_runs_all_arms_on_shared_endpoint_path(monkeypatch):
         evaluation_scenarios=evaluation,
         evaluation_observations=observations,
         model_parameters=models,
+        signal_generation_parameters=generation_parameters,
+        signal_generation_seed=2026110603,
+        signal_generation_mri_template_sha256=None,
         selection_seed=[2026110604],
         q_training_seed=[2026110605],
         evaluation_seed=[2026110606],
@@ -271,6 +275,23 @@ def test_full_policy_harness_runs_all_arms_on_shared_endpoint_path(monkeypatch):
         assert (arm["courses"] <= settings.course_budget).all()
     assert result["analysis_type"] == "synthetic_virtual_world_development"
     assert result["settings"]["signal_f0_bounds"] == tuple(map(float, tc.RANGES["f0"][:2]))
+    assert result["signal_generation"] == {
+        "generator": "trackc_integrated_signal_model.generate_integrated_signals",
+        "parameters": {"q": 0.6, "a": 0.2, "b": 0.4, "d": 0.3},
+        "seed": 2026110603,
+        "f0_source": "evaluation_scenarios['f0']",
+        "mri_template_sha256": None,
+    }
+    assert result["inference_model_parameters"] == [
+        {"q": 0.6, "a": 0.2, "b": 0.4, "d": 0.1}
+    ]
+    assert result["signal_generation_in_inference_grid"] is False
+    assert set(result["input_fingerprints"]) == {
+        "selection_scenarios_sha256",
+        "evaluation_scenarios_sha256",
+        "evaluation_observations_sha256",
+    }
+    assert all(len(value) == 64 for value in result["input_fingerprints"].values())
     assert received_f0_bounds == [settings.signal_f0_bounds, settings.signal_f0_bounds]
     assert len(received_scan_intervals) == (
         settings.q_episodes + 1 + len(test_catalog) + len(result["arm_outcomes"])
@@ -301,6 +322,9 @@ def test_harness_requires_budget_that_can_include_six_course_comparator():
             evaluation_scenarios=evaluation,
             evaluation_observations=observations,
             model_parameters=(SignalModelParameters(0.6, 0.2, 0.4, 0.3),),
+            signal_generation_parameters=SignalModelParameters(0.6, 0.2, 0.4, 0.3),
+            signal_generation_seed=2026110600,
+            signal_generation_mri_template_sha256=None,
             selection_seed=[2026110610],
             q_training_seed=[2026110611],
             evaluation_seed=[2026110612],
@@ -329,7 +353,58 @@ def test_harness_rejects_f0_values_outside_declared_signal_prior_before_fitting(
             evaluation_scenarios=evaluation,
             evaluation_observations=observations,
             model_parameters=(SignalModelParameters(0.6, 0.2, 0.4, 0.3),),
+            signal_generation_parameters=SignalModelParameters(0.6, 0.2, 0.4, 0.3),
+            signal_generation_seed=2026110615,
+            signal_generation_mri_template_sha256=None,
             selection_seed=[2026110616],
             q_training_seed=[2026110617],
             evaluation_seed=[2026110618],
+        )
+
+
+def test_input_fingerprint_is_key_order_independent_and_value_sensitive():
+    left = {"b": np.asarray([2.0]), "a": np.asarray([1, 3], dtype=np.int64)}
+    reversed_order = {"a": left["a"], "b": left["b"]}
+    changed_value = {"a": left["a"], "b": np.asarray([2.5])}
+
+    digest = benchmark._fingerprint_array_mapping(left)
+
+    assert digest == benchmark._fingerprint_array_mapping(reversed_order)
+    assert digest != benchmark._fingerprint_array_mapping(changed_value)
+
+
+def test_signal_generation_metadata_validates_seed_and_optional_template_hash():
+    parameters = SignalModelParameters(q=0.6, a=0.2, b=0.4, d=0.3)
+
+    assert benchmark._validate_signal_generation_metadata(parameters, 42, None) == (42, None)
+    assert benchmark._validate_signal_generation_metadata(parameters, 42, "A" * 64) == (
+        42, "a" * 64
+    )
+    with pytest.raises(ValueError, match="one integer"):
+        benchmark._validate_signal_generation_metadata(parameters, (42, 43), None)
+    with pytest.raises(ValueError, match="64-character hex digest"):
+        benchmark._validate_signal_generation_metadata(parameters, 42, "not-a-hash")
+
+
+def test_harness_rejects_reused_signal_generation_seed_before_fitting():
+    selection = tc.draw_scenarios(1, seed=2026110619, sigmas=(0.05,))
+    evaluation = tc.draw_scenarios(1, seed=2026110620, sigmas=(0.05,))
+    parameters = SignalModelParameters(0.6, 0.2, 0.4, 0.3)
+    observations, _truth = generate_integrated_signals(
+        1, q=0.6, a=0.2, b=0.4, d=0.3, seed=2026110621, f0=evaluation["f0"]
+    )
+
+    with pytest.raises(ValueError, match="signal-generation.*seeds must be distinct"):
+        benchmark.run_shared_policy_world(
+            world_id="reused-signal-seed",
+            selection_scenarios=selection,
+            evaluation_scenarios=evaluation,
+            evaluation_observations=observations,
+            model_parameters=(parameters,),
+            signal_generation_parameters=parameters,
+            signal_generation_seed=2026110622,
+            signal_generation_mri_template_sha256=None,
+            selection_seed=[2026110622],
+            q_training_seed=[2026110623],
+            evaluation_seed=[2026110624],
         )

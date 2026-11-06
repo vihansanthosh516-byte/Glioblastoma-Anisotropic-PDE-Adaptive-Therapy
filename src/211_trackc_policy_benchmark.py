@@ -8,8 +8,10 @@ from __future__ import annotations
 
 from copy import deepcopy
 from dataclasses import dataclass
+import hashlib
 import importlib.util
 import itertools
+import json
 from pathlib import Path
 import sys
 from typing import Mapping, Sequence
@@ -121,6 +123,56 @@ def _validate_seed(seed, name: str) -> tuple[int, ...]:
     if not values:
         raise ValueError(f"{name} must not be empty")
     return tuple(values)
+
+
+def _fingerprint_array_mapping(values: Mapping) -> str:
+    """Hash named array inputs with stable key order, dtype, shape, and bytes."""
+    if not isinstance(values, Mapping):
+        raise TypeError("fingerprint input must be a mapping")
+    digest = hashlib.sha256()
+    for key in sorted(values):
+        if not isinstance(key, str):
+            raise TypeError("fingerprint mapping keys must be strings")
+        array = np.asarray(values[key])
+        if array.dtype.hasobject:
+            raise TypeError(f"fingerprint value {key!r} has unsupported object dtype")
+        if array.dtype.kind in "biufc":
+            array = np.asarray(array, dtype=array.dtype.newbyteorder("<"))
+            payload = np.ascontiguousarray(array).tobytes(order="C")
+        else:
+            payload = json.dumps(
+                array.tolist(), sort_keys=True, separators=(",", ":"), ensure_ascii=False
+            ).encode("utf-8")
+        header = json.dumps(
+            {"key": key, "dtype": array.dtype.str, "shape": list(array.shape)},
+            sort_keys=True, separators=(",", ":"),
+        ).encode("utf-8")
+        digest.update(len(header).to_bytes(8, "little"))
+        digest.update(header)
+        digest.update(len(payload).to_bytes(8, "little"))
+        digest.update(payload)
+    return digest.hexdigest()
+
+
+def _validate_signal_generation_metadata(
+    parameters: SignalModelParameters,
+    seed,
+    mri_template_sha256: str | None,
+) -> tuple[int, str | None]:
+    if not isinstance(parameters, SignalModelParameters):
+        raise TypeError("signal_generation_parameters must be SignalModelParameters")
+    seed_key = _validate_seed(seed, "signal_generation_seed")
+    if len(seed_key) != 1:
+        raise ValueError("signal_generation_seed must be one integer")
+    if mri_template_sha256 is not None:
+        if (
+            not isinstance(mri_template_sha256, str)
+            or len(mri_template_sha256) != 64
+            or any(char not in "0123456789abcdefABCDEF" for char in mri_template_sha256)
+        ):
+            raise ValueError("signal_generation_mri_template_sha256 must be a 64-character hex digest")
+        mri_template_sha256 = mri_template_sha256.lower()
+    return seed_key[0], mri_template_sha256
 
 
 def _validate_scenarios(scenarios: Mapping, name: str) -> int:
@@ -563,6 +615,9 @@ def run_shared_policy_world(
     evaluation_scenarios: Mapping,
     evaluation_observations: SignalObservations,
     model_parameters: Sequence[SignalModelParameters],
+    signal_generation_parameters: SignalModelParameters,
+    signal_generation_seed,
+    signal_generation_mri_template_sha256: str | None,
     selection_seed,
     q_training_seed,
     evaluation_seed,
@@ -574,12 +629,19 @@ def run_shared_policy_world(
     controllers use only unlabeled baseline signals from the evaluation cohort and leave
     each patient's own signal out of that patient's model-weight fit. All arms share the
     same evaluation cohort, evaluation seed, scan interval, endpoint-stop rule, and budget.
+    The caller must distinguish signal-generator truth/seed from the inference grid.
+    Returned fingerprints identify the exact scenario and observation arrays consumed.
     This function returns in-memory synthetic outcomes and writes no files.
     """
     if not isinstance(world_id, str) or not world_id.strip():
         raise ValueError("world_id must be a nonempty string")
     n_selection = _validate_scenarios(selection_scenarios, "selection_scenarios")
     n_evaluation = _validate_scenarios(evaluation_scenarios, "evaluation_scenarios")
+    generation_seed, mri_template_sha256 = _validate_signal_generation_metadata(
+        signal_generation_parameters,
+        signal_generation_seed,
+        signal_generation_mri_template_sha256,
+    )
     if settings.course_budget < 6:
         raise ValueError("course_budget must be at least 6 to include the standard six-course comparator")
     f0_low, f0_high = settings.signal_f0_bounds
@@ -600,8 +662,9 @@ def run_shared_policy_world(
     selection_seed_key = _validate_seed(selection_seed, "selection_seed")
     q_seed_key = _validate_seed(q_training_seed, "q_training_seed")
     eval_seed_key = _validate_seed(evaluation_seed, "evaluation_seed")
-    if len({selection_seed_key, q_seed_key, eval_seed_key}) != 3:
-        raise ValueError("selection, Q-training, and evaluation seeds must be distinct")
+    all_seeds = {selection_seed_key, q_seed_key, eval_seed_key, (generation_seed,)}
+    if len(all_seeds) != 4:
+        raise ValueError("signal-generation, selection, Q-training, and evaluation seeds must be distinct")
     observations = evaluation_observations
     if not all(hasattr(observations, key) for key in ("molecular_report", "mri_score")):
         raise TypeError("evaluation_observations must provide molecular_report and mri_score")
@@ -613,6 +676,14 @@ def run_shared_policy_world(
         raise ValueError("evaluation signals must be binary and finite")
     observations = SignalObservations(report.astype(bool, copy=True), mri_score.copy())
     models = tuple(model_parameters)
+    input_fingerprints = {
+        "selection_scenarios_sha256": _fingerprint_array_mapping(selection_scenarios),
+        "evaluation_scenarios_sha256": _fingerprint_array_mapping(evaluation_scenarios),
+        "evaluation_observations_sha256": _fingerprint_array_mapping({
+            "molecular_report": observations.molecular_report,
+            "mri_score": observations.mri_score,
+        }),
+    }
     ci_models = conditional_independence_grid(models)
 
     chosen_fixed = select_fixed_schedule(
@@ -697,6 +768,24 @@ def run_shared_policy_world(
         "analysis_type": "synthetic_virtual_world_development",
         "world_id": world_id,
         "settings": settings.__dict__.copy(),
+        "signal_generation": {
+            "generator": "trackc_integrated_signal_model.generate_integrated_signals",
+            "parameters": {
+                "q": float(signal_generation_parameters.q),
+                "a": float(signal_generation_parameters.a),
+                "b": float(signal_generation_parameters.b),
+                "d": float(signal_generation_parameters.d),
+            },
+            "seed": generation_seed,
+            "f0_source": "evaluation_scenarios['f0']",
+            "mri_template_sha256": mri_template_sha256,
+        },
+        "inference_model_parameters": [
+            {"q": float(model.q), "a": float(model.a), "b": float(model.b), "d": float(model.d)}
+            for model in models
+        ],
+        "signal_generation_in_inference_grid": signal_generation_parameters in models,
+        "input_fingerprints": input_fingerprints,
         "seeds": {
             "selection": list(selection_seed_key),
             "q_training": list(q_seed_key),
