@@ -1,5 +1,7 @@
 # Track C Stage 2 report (interim, started 2026-11-04)
 
+> **Correction, 2026-11-06:** this report's RTOG 0525 “matching” and “controlled-world” results use the superseded progression-only proxy described below. They do not reproduce clinical PFS, because the simulator starts at first adjuvant treatment and omits death while RTOG PFS starts at randomization and counts progression or death. All results remain in place as historical simulation findings, but downstream policy comparisons restricted to those worlds inherit the same limitation. See [`trackc_rtog0525_calibration_correction_2026-11-06.md`](trackc_rtog0525_calibration_correction_2026-11-06.md).
+
 **Status: INTERIM.** Everything here is a computer simulation with assumed parameter ranges, run on development seeds. The numbers are exploratory. None is a test result, none is a clinical claim, none is a patient-specific claim, and none says a digital twin is validated. Seeds are listed in `output/trackc_seed_registry.json`. Each run folder has a `manifest.json` (git commit, protocol hash, seed blocks, clean-tree flag). Plan: `paper/trackc_restart_plan_2026-11-03.md`. Design: `paper/trackc_anchored_spec_2026-11-04.md`.
 
 Each test below answers four questions: what was asked, did it work, what is the weakest point, what comes next. Words such as "running" inside a section describe the time that section was written; `START_HERE.md` has the current status table. A glossary (world, kill scale, the arms, the frontier, the paired tail) is in `paper/trackc_overview_for_review_2026-11-04.md`.

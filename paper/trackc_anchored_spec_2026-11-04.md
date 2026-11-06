@@ -1,5 +1,7 @@
 # Track C anchored specification (draft for review, 2026-11-04)
 
+> **Correction, 2026-11-06:** this draft's RTOG 0525 calibration is superseded. Its trial target is PFS from randomization and includes death; this draft starts the simulation at first adjuvant treatment and scores progression only under a RANO-like rule. Existing screens are historical, conditional simulation results, not a match to clinical RTOG PFS. See [`trackc_rtog0525_calibration_correction_2026-11-06.md`](trackc_rtog0525_calibration_correction_2026-11-06.md) before using any anchor claim.
+
 Status: Stage 1 of `paper/trackc_restart_plan_2026-11-03.md`. Design only. No simulation was run for this file. It is not a protocol, it freezes no hypothesis, and it authorises no sealed run. Published numbers and their verification levels are in `paper/trackc_calibration_targets_2026-11-03.md`. Everything here is a computer simulation with assumed parameters. No clinical claim, no patient-specific claim, no digital-twin claim.
 
 ## 1. The question
