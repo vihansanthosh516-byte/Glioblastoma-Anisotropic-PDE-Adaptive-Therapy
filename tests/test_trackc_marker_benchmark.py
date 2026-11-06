@@ -33,6 +33,8 @@ marker_policy_outcomes = marker_benchmark.marker_policy_outcomes
 robust_training_scores = marker_benchmark.robust_training_scores
 select_global_fixed_schedule = marker_benchmark.select_global_fixed_schedule
 upper_hull = marker_benchmark.upper_hull
+protocol_record = marker_benchmark._protocol
+SELECTION_RULE_DESCRIPTION = marker_benchmark.SELECTION_RULE_DESCRIPTION
 
 
 def _selection_outcomes(ttp_rano, courses_rano, ttp_baseline=None, courses_baseline=None):
@@ -82,6 +84,15 @@ def test_benchmark_selector_uses_patientwise_worst_endpoint_utility():
 
     assert result["schedule"] == "balanced"
     assert result["training_robust_utility"] == pytest.approx(300.0)
+
+
+def test_protocol_metadata_matches_patientwise_selection_rule():
+    protocol = protocol_record("mixture")
+
+    assert protocol["selection_rule"] == SELECTION_RULE_DESCRIPTION
+    assert "mean across selection patients of min" in protocol["selection_rule"]
+    assert "lambda*courses_RANO" in protocol["selection_rule"]
+    assert "lambda*courses_baseline" in protocol["selection_rule"]
 
 
 def test_schedule_selector_does_not_turn_near_ties_into_course_ties():

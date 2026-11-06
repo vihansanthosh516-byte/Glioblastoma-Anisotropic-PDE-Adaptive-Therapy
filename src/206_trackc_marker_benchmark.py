@@ -558,6 +558,14 @@ def _worker(args):
     return evaluate_world(*args)
 
 
+SELECTION_RULE_DESCRIPTION = (
+    "maximize over schedules the mean across selection patients of min("
+    "min(ttp_RANO, 730) - lambda*courses_RANO, "
+    "min(ttp_baseline, 730) - lambda*courses_baseline); exact utility ties "
+    "prefer fewer endpoint-averaged courses, then candidate catalog order"
+)
+
+
 def _protocol(config, n_eval=N_EVAL, n_sel=N_SEL):
     seed = SEED_CONFIGS[config]
     cfg = cal.get_config(seed["calibration_config"])
@@ -575,7 +583,7 @@ def _protocol(config, n_eval=N_EVAL, n_sel=N_SEL):
         "se_grid": list(MARKER_LEVELS),
         "sp_grid": list(MARKER_LEVELS),
         "marker_positive_definition": "simulator responder-class membership (m-range); hypothetical marker, not MGMT",
-        "selection_rule": "for each observed marker group, choose one of the existing 56 schedules by min(mean RMST_RANO_730, mean RMST_baseline_730) - lambda * mean delivered courses; course count is averaged over endpoint-specific simulations",
+        "selection_rule": SELECTION_RULE_DESCRIPTION,
         "selection_lambda_days_per_course": list(LAMBDAS),
         "selection_tie_break": "prefer fewer mean delivered courses, then candidate catalog order",
         "minimum_marker_group_selection_n": MIN_GROUP_SELECTION,
