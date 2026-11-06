@@ -17,6 +17,24 @@ import trackc_manifest as man  # noqa: E402
 import trackc_sim as tc  # noqa: E402
 
 PROTO = {"hypothesis": "demo", "margin_days": -7}
+TEST_SCENARIO = (101, 202)
+TEST_NOISE = (303, 404)
+
+
+def _mock_seed_registry(monkeypatch):
+    """Keep manifest unit tests independent of the project's changing seed ledger."""
+    calls = []
+
+    def check_free(*, scenario, noise, purpose):
+        calls.append((scenario, noise, purpose))
+        if scenario == (303, 303):
+            return ["synthetic spent-seed conflict"]
+        if scenario == (404, 405):
+            return ["synthetic purpose-range conflict"]
+        return []
+
+    monkeypatch.setattr(man.reg, "check_free", check_free)
+    return calls
 
 
 def _git_available():
@@ -90,40 +108,42 @@ def test_git_state_without_git_repo_is_unknown(tmp_path):
 
 
 @pytest.mark.skipif(not _git_available(), reason="git not installed")
-def test_build_manifest_checks_seeds_and_tree(tmp_path):
+def test_build_manifest_checks_seeds_and_tree(tmp_path, monkeypatch):
+    seed_calls = _mock_seed_registry(monkeypatch)
     files = ("src/trackc_sim.py", "src/run_demo.py")
     _make_repo(tmp_path, files)
     kw = dict(name="demo", protocol=PROTO, script="src/run_demo.py", paths=("src/trackc_sim.py",), root=tmp_path)
-    m = man.build_manifest(purpose="stage2_dev", scenario=(20261900, 20261949), noise=(1899000, 1899499), **kw)
+    m = man.build_manifest(purpose="stage2_dev", scenario=TEST_SCENARIO, noise=TEST_NOISE, **kw)
     assert m["git"]["clean"] is True and m["protocol_sha256"] and m["purpose"] == "stage2_dev"
     assert set(m["code_sha256"]) == {"src/trackc_sim.py", "src/run_demo.py"}
     assert m["label"].startswith("SIMULATION ONLY")
-    assert m["noise_keys"] == [1899000, 1899499]
+    assert m["noise_keys"] == list(TEST_NOISE)
+    assert seed_calls[0] == (TEST_SCENARIO, TEST_NOISE, "stage2_dev")
     # a run with no noise key (open loop, no readings) is allowed and records an empty list
-    m0 = man.build_manifest(purpose="stage2_dev", scenario=(20261900, 20261949), noise=None, **kw)
-    assert m0["noise_keys"] == [] and m0["scenario_seeds"] == [20261900, 20261949]
-    # spent seeds are refused
+    m0 = man.build_manifest(purpose="stage2_dev", scenario=TEST_SCENARIO, noise=None, **kw)
+    assert m0["noise_keys"] == [] and m0["scenario_seeds"] == list(TEST_SCENARIO)
+    # registry conflicts are refused
     with pytest.raises(ValueError):
-        man.build_manifest(purpose="stage2_dev", scenario=(20261122, 20261122), noise=(1899000, 1899001), **kw)
+        man.build_manifest(purpose="stage2_dev", scenario=(303, 303), noise=(303, 304), **kw)
     # a smoke run may skip the registry check, and the manifest says so
-    ms = man.build_manifest(purpose="stage2_dev", scenario=(20261122, 20261122), noise=(1899000, 1899001),
-                            check_seeds=False, **kw)
+    ms = man.build_manifest(purpose="stage2_dev", scenario=(303, 303), noise=(303, 304), check_seeds=False, **kw)
     assert ms["seed_check"] == "skipped (smoke run)" and m["seed_check"] == "registry"
-    # the sealed block cannot be spent under the dev purpose
+    # purpose-range conflicts are refused
     with pytest.raises(ValueError):
-        man.build_manifest(purpose="stage2_dev", scenario=(20262300, 20262310), noise=(2300000, 2300010), **kw)
+        man.build_manifest(purpose="stage2_dev", scenario=(404, 405), noise=(404, 405), **kw)
     # uncommitted code is refused unless asked otherwise
     (tmp_path / "src" / "run_demo.py").write_text("# edited\n", encoding="utf-8")
     with pytest.raises(RuntimeError):
-        man.build_manifest(purpose="stage2_dev", scenario=(20261900, 20261949), noise=(1899000, 1899499), **kw)
-    m2 = man.build_manifest(purpose="stage2_dev", scenario=(20261900, 20261949), noise=(1899000, 1899499),
+        man.build_manifest(purpose="stage2_dev", scenario=TEST_SCENARIO, noise=TEST_NOISE, **kw)
+    m2 = man.build_manifest(purpose="stage2_dev", scenario=TEST_SCENARIO, noise=TEST_NOISE,
                             require_clean=False, **kw)
     assert m2["git"]["clean"] is False and m2["git"]["dirty_paths"] == ["src/run_demo.py"]
 
 
-def test_build_manifest_refuses_missing_code(tmp_path):
+def test_build_manifest_refuses_missing_code(tmp_path, monkeypatch):
+    _mock_seed_registry(monkeypatch)
     with pytest.raises((FileNotFoundError, RuntimeError)):
-        man.build_manifest("demo", PROTO, "stage2_dev", (20261900, 20261949), (1899000, 1899499),
+        man.build_manifest("demo", PROTO, "stage2_dev", TEST_SCENARIO, TEST_NOISE,
                            script="src/nope.py", require_clean=False, paths=("src/also_nope.py",), root=tmp_path)
 
 
