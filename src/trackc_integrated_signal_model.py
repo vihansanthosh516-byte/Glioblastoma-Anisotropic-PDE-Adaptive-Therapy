@@ -58,6 +58,31 @@ class SignalModelParameters:
         object.__setattr__(self, "d", _bounded_coefficient(self.d, "d"))
 
 
+def standard_normal_marginal_signature(parameters: SignalModelParameters) -> tuple[float, float]:
+    """Return (q, rho), which determines paired-signal marginals under normal R.
+
+    This identity assumes a standard-normal latent resistance score and independent
+    standard-normal factor errors. After resistance is marginalized, the two latent
+    Gaussian scores are bivariate normal with correlation
+
+        rho = a*b + sqrt(1-a^2)*sqrt(1-b^2)*d.
+
+    The observed binary molecular report and continuous MRI score then depend on
+    ``q`` and ``rho``, not on ``a``, ``b``, and ``d`` separately. This is a structural
+    identifiability diagnostic, not an estimator or an empirical correlation.
+    """
+    if not all(hasattr(parameters, name) for name in ("q", "a", "b", "d")):
+        raise TypeError("parameters must provide q, a, b, and d")
+    parameters = SignalModelParameters(
+        q=parameters.q, a=parameters.a, b=parameters.b, d=parameters.d
+    )
+    q, a, b, d = parameters.q, parameters.a, parameters.b, parameters.d
+    rho = a * b + np.sqrt(max(0.0, 1.0 - a * a)) * np.sqrt(
+        max(0.0, 1.0 - b * b)
+    ) * d
+    return float(q), float(np.clip(rho, -1.0, 1.0))
+
+
 def _bounded_probability(value: float, name: str) -> float:
     if isinstance(value, (bool, np.bool_)):
         raise ValueError(f"{name} must be a finite number in [0, 1]")
@@ -301,4 +326,5 @@ __all__ = [
     "f0_to_resistance_score",
     "generate_integrated_signals",
     "integrated_signal_log_likelihood",
+    "standard_normal_marginal_signature",
 ]

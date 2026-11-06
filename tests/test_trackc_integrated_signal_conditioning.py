@@ -20,6 +20,7 @@ from trackc_integrated_signal_model import (
     f0_to_resistance_score,
     generate_integrated_signals,
     integrated_signal_log_likelihood,
+    standard_normal_marginal_signature,
 )
 from src.trackc_integrated_signal_model import (
     SignalModelParameters as NamespacedSignalParameters,
@@ -133,6 +134,21 @@ def test_residual_dependence_changes_joint_but_not_single_channel_likelihoods():
     assert not np.allclose(joint_independent, joint_dependent)
     np.testing.assert_allclose(molecular_independent, molecular_dependent)
     np.testing.assert_allclose(mri_independent, mri_dependent)
+
+
+def test_standard_normal_marginal_signals_do_not_identify_a_b_and_d_separately():
+    first = SignalModelParameters(q=0.8, a=0.5, b=0.4, d=0.6)
+    q, rho = standard_normal_marginal_signature(first)
+
+    a_alt, b_alt = 0.8, 0.5
+    d_alt = (rho - a_alt * b_alt) / (
+        math.sqrt(1.0 - a_alt * a_alt) * math.sqrt(1.0 - b_alt * b_alt)
+    )
+    second = SignalModelParameters(q=q, a=a_alt, b=b_alt, d=d_alt)
+
+    assert first.d != pytest.approx(second.d)
+    assert (first.a, first.b) != (second.a, second.b)
+    assert standard_normal_marginal_signature(second) == pytest.approx((q, rho))
 
 
 @pytest.mark.parametrize(("a", "ascending"), [(0.8, True), (-0.8, False)])
