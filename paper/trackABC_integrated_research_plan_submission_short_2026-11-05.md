@@ -2,7 +2,7 @@
 
 ## Project Title
 
-**How Will Multimodal Information Change Simulated Glioblastoma Treatment Scheduling? A Mathematical Study of Molecular Signals, Longitudinal MRI, and Drug Suppression**
+**Integrating Tumor Biology and Longitudinal MRI for Glioblastoma Progression Modeling and In-Silico Therapy Optimization**
 
 ## Rationale
 
