@@ -57,6 +57,108 @@ def _validate_observations(observations: SignalObservations) -> SignalObservatio
     return SignalObservations(reports.astype(bool, copy=True), scores.copy())
 
 
+def _validate_models(model_parameters):
+    models = tuple(model_parameters)
+    if not models or any(not isinstance(row, SignalModelParameters) for row in models):
+        raise ValueError("model_parameters must be a nonempty sequence of SignalModelParameters")
+    if len(set(models)) != len(models):
+        raise ValueError("model_parameters must not contain duplicates")
+    return models
+
+
+def marginal_signal_log_densities(
+    observations: SignalObservations,
+    *,
+    model_parameters=DEFAULT_MODEL_GRID,
+    f0_bounds=F0_REFERENCE_BOUNDS,
+    n_f0_nodes=256,
+) -> np.ndarray:
+    """Return an ``(patients, models)`` matrix marginalized over the fixed f0 prior."""
+    observations = _validate_observations(observations)
+    models = _validate_models(model_parameters)
+    if isinstance(n_f0_nodes, bool) or int(n_f0_nodes) != n_f0_nodes or n_f0_nodes < 2:
+        raise ValueError("n_f0_nodes must be an integer of at least 2")
+    values = np.stack(
+        [
+            _DEPENDENCE.marginal_signal_log_density(
+                observations,
+                parameters,
+                f0_bounds=f0_bounds,
+                n_nodes=int(n_f0_nodes),
+            )
+            for parameters in models
+        ],
+        axis=1,
+    )
+    if values.shape != (observations.molecular_report.size, len(models)) or not np.isfinite(values).all():
+        raise ArithmeticError("marginal signal log densities are invalid")
+    return values
+
+
+def _loo_weights_from_marginal_log_densities(log_marginal, prior_weights=None):
+    log_marginal = np.asarray(log_marginal, dtype=float)
+    if log_marginal.ndim != 2 or min(log_marginal.shape) < 1 or not np.isfinite(log_marginal).all():
+        raise ValueError("log_marginal must be a finite nonempty patients-by-models matrix")
+    n_patients, n_models = log_marginal.shape
+    if prior_weights is None:
+        prior = np.full(n_models, 1.0 / n_models, dtype=float)
+    else:
+        prior = np.asarray(prior_weights, dtype=float)
+        if prior.shape != (n_models,) or not np.isfinite(prior).all() or (prior < 0).any():
+            raise ValueError("prior_weights must be a finite nonnegative value per model")
+        if prior.sum() <= 0.0:
+            raise ValueError("prior_weights must have positive total mass")
+        prior = prior / prior.sum()
+    log_prior = np.full(prior.shape, -np.inf, dtype=float)
+    positive_prior = prior > 0.0
+    log_prior[positive_prior] = np.log(prior[positive_prior])
+
+    # Sum explicit peer columns. Subtracting each patient's likelihood from a
+    # cohort total is algebraically equivalent, but can let that patient's own
+    # value affect its weights through floating-point cancellation.
+    peer_log_likelihood = np.stack(
+        [np.sum(np.delete(log_marginal, patient, axis=0), axis=0) for patient in range(n_patients)],
+        axis=0,
+    )
+    unnormalized = peer_log_likelihood + log_prior[None, :]
+    normalized = unnormalized - logsumexp(unnormalized, axis=1, keepdims=True)
+    if not np.isfinite(normalized[positive_prior[None, :].repeat(n_patients, axis=0)]).all():
+        raise ArithmeticError("LOO model weights are invalid")
+    return normalized
+
+
+def loo_signal_predictive_scores(
+    observations: SignalObservations,
+    *,
+    model_parameters=DEFAULT_MODEL_GRID,
+    f0_bounds=F0_REFERENCE_BOUNDS,
+    prior_weights=None,
+    n_f0_nodes=256,
+) -> dict[str, np.ndarray]:
+    """Return LOO-model-mixture and fixed uniform-grid marginal log scores.
+
+    Patient i's candidate score uses model weights from everyone except i. The
+    uniform-grid score uses the same marginal densities and a fixed equal mixture.
+    """
+    observations = _validate_observations(observations)
+    models = _validate_models(model_parameters)
+    log_marginal = marginal_signal_log_densities(
+        observations,
+        model_parameters=models,
+        f0_bounds=f0_bounds,
+        n_f0_nodes=n_f0_nodes,
+    )
+    log_model_weights = _loo_weights_from_marginal_log_densities(log_marginal, prior_weights)
+    loo_score = logsumexp(log_model_weights + log_marginal, axis=1)
+    uniform_score = logsumexp(log_marginal - np.log(len(models)), axis=1)
+    return {
+        "loo_log_predictive_density": loo_score,
+        "uniform_grid_log_predictive_density": uniform_score,
+        "log_model_weights": log_model_weights,
+        "log_marginal_by_model": log_marginal,
+    }
+
+
 def leave_one_out_log_model_weights(
     observations: SignalObservations,
     *,
@@ -72,53 +174,13 @@ def leave_one_out_log_model_weights(
     out under the fixed declared log-uniform population prior.
     """
     observations = _validate_observations(observations)
-    models = tuple(model_parameters)
-    if not models or any(not isinstance(row, SignalModelParameters) for row in models):
-        raise ValueError("model_parameters must be a nonempty sequence of SignalModelParameters")
-    if len(set(models)) != len(models):
-        raise ValueError("model_parameters must not contain duplicates")
-    if isinstance(n_f0_nodes, bool) or int(n_f0_nodes) != n_f0_nodes or n_f0_nodes < 2:
-        raise ValueError("n_f0_nodes must be an integer of at least 2")
-
-    if prior_weights is None:
-        prior = np.full(len(models), 1.0 / len(models), dtype=float)
-    else:
-        prior = np.asarray(prior_weights, dtype=float)
-        if prior.shape != (len(models),) or not np.isfinite(prior).all() or (prior < 0).any():
-            raise ValueError("prior_weights must be a finite nonnegative value per model")
-        if prior.sum() <= 0.0:
-            raise ValueError("prior_weights must have positive total mass")
-        prior = prior / prior.sum()
-    log_prior = np.full(prior.shape, -np.inf, dtype=float)
-    positive_prior = prior > 0.0
-    log_prior[positive_prior] = np.log(prior[positive_prior])
-
-    # Rows are candidate models; columns are patients. Marginalization integrates
-    # out f0, so no hidden simulator values enter peer-based model weighting.
-    log_likelihood = np.stack(
-        [
-            _DEPENDENCE.marginal_signal_log_density(
-                observations,
-                parameters,
-                f0_bounds=f0_bounds,
-                n_nodes=int(n_f0_nodes),
-            )
-            for parameters in models
-        ],
-        axis=0,
+    log_marginal = marginal_signal_log_densities(
+        observations,
+        model_parameters=model_parameters,
+        f0_bounds=f0_bounds,
+        n_f0_nodes=n_f0_nodes,
     )
-    # Sum explicit peer columns. Subtracting each patient's likelihood from a
-    # cohort total is algebraically equivalent, but can let that patient's own
-    # value affect its weights through floating-point cancellation.
-    peer_log_likelihood = np.stack(
-        [
-            np.sum(np.delete(log_likelihood, patient, axis=1), axis=1)
-            for patient in range(observations.molecular_report.size)
-        ],
-        axis=0,
-    )
-    unnormalized = peer_log_likelihood + log_prior[None, :]
-    return unnormalized - logsumexp(unnormalized, axis=1, keepdims=True)
+    return _loo_weights_from_marginal_log_densities(log_marginal, prior_weights)
 
 
 def loo_model_averaged_signal_log_likelihood(
@@ -215,5 +277,7 @@ __all__ = [
     "DEFAULT_MODEL_GRID",
     "LOOModelAveragedBeliefMPC",
     "leave_one_out_log_model_weights",
+    "loo_signal_predictive_scores",
     "loo_model_averaged_signal_log_likelihood",
+    "marginal_signal_log_densities",
 ]

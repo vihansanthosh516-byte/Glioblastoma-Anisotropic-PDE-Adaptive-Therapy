@@ -21,6 +21,8 @@ DEFAULT_MODEL_GRID = _MODULE.DEFAULT_MODEL_GRID
 LOOModelAveragedBeliefMPC = _MODULE.LOOModelAveragedBeliefMPC
 leave_one_out_log_model_weights = _MODULE.leave_one_out_log_model_weights
 loo_model_averaged_signal_log_likelihood = _MODULE.loo_model_averaged_signal_log_likelihood
+loo_signal_predictive_scores = _MODULE.loo_signal_predictive_scores
+marginal_signal_log_densities = _MODULE.marginal_signal_log_densities
 
 
 def _observations():
@@ -74,6 +76,29 @@ def test_zero_prior_weight_stays_exactly_zero_after_loo_update():
     )
     assert np.isneginf(weights[:, 0]).all()
     np.testing.assert_allclose(logsumexp(weights, axis=1), 0.0, atol=1e-12)
+
+
+def test_loo_predictive_scores_match_manual_peer_and_uniform_mixtures():
+    observations = _observations()
+    models = _models()
+    result = loo_signal_predictive_scores(
+        observations, model_parameters=models, f0_bounds=(0.03, 0.8), n_f0_nodes=24
+    )
+    log_marginal = marginal_signal_log_densities(
+        observations, model_parameters=models, f0_bounds=(0.03, 0.8), n_f0_nodes=24
+    )
+    weights = leave_one_out_log_model_weights(
+        observations, model_parameters=models, f0_bounds=(0.03, 0.8), n_f0_nodes=24
+    )
+    np.testing.assert_allclose(
+        result["loo_log_predictive_density"], logsumexp(weights + log_marginal, axis=1)
+    )
+    np.testing.assert_allclose(
+        result["uniform_grid_log_predictive_density"],
+        logsumexp(log_marginal - np.log(len(models)), axis=1),
+    )
+    np.testing.assert_array_equal(result["log_model_weights"], weights)
+    assert np.isfinite(result["loo_log_predictive_density"]).all()
 
 
 def test_single_model_mixture_matches_direct_conditional_likelihood():

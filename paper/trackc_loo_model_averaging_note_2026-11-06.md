@@ -12,10 +12,10 @@ The method uses no latent resistance values, future simulator outcomes, or treat
 
 - Code: `src/214_trackc_loo_model_average.py`.
 - Tests: `tests/test_trackc_loo_model_average.py`.
-- The focused test file passed 7 tests in the required scratch copy. Combined with the existing signal-conditioning, robust-MPC, and paired-benchmark suites, 62 tests passed in scratch.
-- Tests cover leave-one-out isolation (changing a patient's own signal does not change that patient's model weights), row-normalized model weights, exact zero prior mass, equivalence to the direct likelihood for a one-model mixture, invalid inputs, and finite MPC initialization.
+- The focused LOO and predictive-check code passed with the existing signal-conditioning, robust-MPC, and paired-benchmark suites: 66 tests passed in scratch, including a small smoke run of the diagnostic.
+- Tests cover leave-one-out isolation (changing a patient's own signal does not change that patient's model weights), row-normalized model weights, exact zero prior mass, predictive-score mixture identities, invalid inputs, finite MPC initialization, and seed-run guards.
 - A zero prior weight remains exactly zero. Peer likelihood sums explicitly omit the held-out patient to prevent floating-point cancellation from allowing the held-out value to affect its own weight.
-- **Execution note:** one initial 7-test command was accidentally launched from the working tree. The same tests were then rerun in scratch, and the combined 62-test suite passed in scratch. This was synthetic-only and read no patient data; the command-location mistake is recorded here.
+- **Execution note:** one initial 7-test command was accidentally launched from the working tree. The same tests were rerun in scratch, followed by the expanded 66-test suite in scratch. These checks were synthetic-only and read no patient data; the command-location mistake is recorded here.
 
 ## Evidence and limits
 
@@ -25,6 +25,6 @@ The broader frame is not new by itself. Prior work already describes MRI-persona
 
 ## Next gate, before treatment-outcome evaluation
 
-The synthetic leave-one-out predictive-score diagnostic is now frozen in [`trackc_loo_predictive_check_protocol_2026-11-06.md`](trackc_loo_predictive_check_protocol_2026-11-06.md); it has not run. It compares the peer-weighted mixture with a fixed uniform-grid mixture, a prespecified nominal model, a matched conditional-independence model, and the generating-parameter oracle on the same generated cohorts. It uses fresh registered development seeds, includes the `q=0.5` negative control, reports every predeclared regime and sample size, and uses held-out paired-signal log predictive density. If the peer-weighted method does not pass the frozen gate, do not advance it as the primary policy method.
+The synthetic leave-one-out predictive-score diagnostic is frozen and implemented in [`trackc_loo_predictive_check_protocol_2026-11-06.md`](trackc_loo_predictive_check_protocol_2026-11-06.md) and `src/215_trackc_loo_predictive_check.py`; it has only passed a smoke test and the full design has not run. It compares the peer-weighted mixture with a fixed uniform-grid mixture, a prespecified nominal model, a matched conditional-independence model, and the generating-parameter oracle on the same generated cohorts. It uses fresh registered development seeds, includes the `q=0.5` negative control, reports every predeclared regime and sample size, and uses held-out paired-signal log predictive density. If the peer-weighted method does not pass the frozen gate, do not advance it as the primary policy method.
 
 Only if this gate is met should the project freeze a paired policy comparison. That comparison must include both progression definitions, same virtual worlds and scan-noise streams, equal treatment budgets, uncertainty summaries, and clinically named baseline policies. It must report harms and failures as well as favorable regimes. Any positive result remains an in-silico result under the chosen simulator assumptions, not evidence of clinical benefit.
