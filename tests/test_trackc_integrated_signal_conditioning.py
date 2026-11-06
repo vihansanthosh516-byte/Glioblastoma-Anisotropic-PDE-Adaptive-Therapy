@@ -339,6 +339,30 @@ def test_policy_conditions_on_observations_but_not_hidden_true_f0():
     np.testing.assert_array_equal(first.act(0, y), second.act(0, y))
 
 
+def test_serial_burden_scans_add_one_likelihood_each_after_baseline_signals():
+    observations = SignalObservations(np.array([True]), np.array([0.25]))
+    parameters = SignalModelParameters(q=0.85, a=0.5, b=0.4, d=0.6)
+    policy = _small_policy(observations, parameters, ("molecular", "mri"))
+    policy.reset({"sigma": np.array([1e6])}, np.random.default_rng(22))
+
+    baseline_logw = policy.pf.logw.copy()
+    burden = np.maximum(policy.pf.S + policy.pf.R, 1e-300)
+    first_reading = np.array([np.log(np.median(burden[0]))])
+    first_increment = -0.5 * (
+        (first_reading[:, None] - np.log(burden)) / policy.pf.sigma
+    ) ** 2
+    policy._update_visible(0, first_reading)
+    np.testing.assert_array_equal(policy.pf.logw, baseline_logw + first_increment)
+
+    before_second = policy.pf.logw.copy()
+    second_reading = first_reading + 0.1
+    second_increment = -0.5 * (
+        (second_reading[:, None] - np.log(burden)) / policy.pf.sigma
+    ) ** 2
+    policy._update_visible(1, second_reading)
+    np.testing.assert_array_equal(policy.pf.logw, before_second + second_increment)
+
+
 def test_no_signal_policy_matches_base_mpc_with_same_integrated_prior():
     scenarios = tc.draw_scenarios(2, 20261108)
     parameters = SignalModelParameters(q=0.8, a=0.5, b=0.5, d=0.0)
