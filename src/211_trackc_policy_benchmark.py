@@ -125,6 +125,34 @@ def _validate_seed(seed, name: str) -> tuple[int, ...]:
     return tuple(values)
 
 
+def _validate_patient_ids(values, n_patients: int, name: str) -> tuple[str, ...]:
+    """Require ordered, unique synthetic patient IDs for cohort-split auditing."""
+    if isinstance(values, (str, bytes)):
+        raise ValueError(f"{name} must be a sequence of nonempty strings")
+    try:
+        ids = tuple(values)
+    except TypeError as exc:
+        raise ValueError(f"{name} must be a sequence of nonempty strings") from exc
+    if len(ids) != n_patients:
+        raise ValueError(f"{name} must contain one ID per patient")
+    if any(not isinstance(value, str) or not value.strip() for value in ids):
+        raise ValueError(f"{name} must contain nonempty strings")
+    if any(value != value.strip() for value in ids):
+        raise ValueError(f"{name} values must not have leading or trailing whitespace")
+    if len(set(ids)) != len(ids):
+        raise ValueError(f"{name} must contain unique IDs")
+    return ids
+
+
+def _validate_disjoint_patient_ids(selection_ids, evaluation_ids, n_selection, n_evaluation):
+    selection = _validate_patient_ids(selection_ids, n_selection, "selection_patient_ids")
+    evaluation = _validate_patient_ids(evaluation_ids, n_evaluation, "evaluation_patient_ids")
+    overlap = set(selection).intersection(evaluation)
+    if overlap:
+        raise ValueError("selection and evaluation patient IDs must be disjoint")
+    return selection, evaluation
+
+
 def _fingerprint_array_mapping(values: Mapping) -> str:
     """Hash named array inputs with stable key order, dtype, shape, and bytes."""
     if not isinstance(values, Mapping):
@@ -501,14 +529,22 @@ def robust_utility(outcome: Mapping, *, tau_days: float, course_penalty: float) 
 
 
 def _checked_outcome(outcome: Mapping, n_patients: int, course_budget: int) -> dict:
-    needed = ("ttp_baseline", "ttp_rano", "courses", "courses_through_cutoff", "stop_endpoint")
+    needed = (
+        "ttp_baseline", "capped_baseline", "ttp_rano", "capped_rano",
+        "courses", "courses_through_cutoff", "stop_endpoint",
+    )
     if not isinstance(outcome, Mapping) or not all(key in outcome for key in needed):
-        raise ValueError("simulator result must include both endpoints, courses, and stop_endpoint")
+        raise ValueError("simulator result must include both endpoints, censor flags, courses, and stop_endpoint")
     clean = {}
     for key in ("ttp_baseline", "ttp_rano", "courses", "courses_through_cutoff"):
         value = np.asarray(outcome[key], dtype=float)
         if value.shape != (n_patients,) or not np.isfinite(value).all() or (value < 0).any():
             raise ValueError(f"simulator result {key!r} must be finite, non-negative, and match the cohort")
+        clean[key] = value.copy()
+    for key in ("capped_baseline", "capped_rano"):
+        value = np.asarray(outcome[key])
+        if value.shape != (n_patients,) or value.dtype.kind != "b":
+            raise ValueError(f"simulator result {key!r} must be a boolean vector matching the cohort")
         clean[key] = value.copy()
     if (clean["courses"] > course_budget).any() or not np.equal(clean["courses"], np.floor(clean["courses"])).all():
         raise ValueError("simulator course counts violate the shared budget")
@@ -613,30 +649,41 @@ def run_shared_policy_world(
     world_id: str,
     selection_scenarios: Mapping,
     evaluation_scenarios: Mapping,
+    selection_patient_ids: Sequence[str],
+    evaluation_patient_ids: Sequence[str],
     evaluation_observations: SignalObservations,
     model_parameters: Sequence[SignalModelParameters],
     signal_generation_parameters: SignalModelParameters,
     signal_generation_seed,
     signal_generation_mri_template_sha256: str | None,
+    selection_scenario_seed,
+    evaluation_scenario_seed,
     selection_seed,
     q_training_seed,
     evaluation_seed,
     settings: PolicyBenchmarkSettings = PolicyBenchmarkSettings(),
 ) -> dict:
-    """Run a paired, shared-path development comparison in one virtual world.
+    """Run a paired, same-cohort development comparison in one virtual world.
 
     Training and fixed-schedule selection use selection patients only. The LOO signal
     controllers use only unlabeled baseline signals from the evaluation cohort and leave
     each patient's own signal out of that patient's model-weight fit. All arms share the
-    same evaluation cohort, evaluation seed, scan interval, endpoint-stop rule, and budget.
-    The caller must distinguish signal-generator truth/seed from the inference grid.
-    Returned fingerprints identify the exact scenario and observation arrays consumed.
-    This function returns in-memory synthetic outcomes and writes no files.
+    same evaluation cohort, precomputed observation-noise stream, scan interval,
+    endpoint-stop rule, and budget. Each policy has its own action-dependent trajectory;
+    its two endpoint times share that policy's path and course count. The caller must
+    provide disjoint cohort IDs and separate scenario-generation seeds. Those seeds are
+    caller-declared; fingerprints independently identify the scenario and observation
+    arrays actually consumed. The caller must also distinguish signal-generator
+    truth/seed from the inference grid. This function returns in-memory synthetic
+    outcomes and writes no files.
     """
     if not isinstance(world_id, str) or not world_id.strip():
         raise ValueError("world_id must be a nonempty string")
     n_selection = _validate_scenarios(selection_scenarios, "selection_scenarios")
     n_evaluation = _validate_scenarios(evaluation_scenarios, "evaluation_scenarios")
+    selection_ids, evaluation_ids = _validate_disjoint_patient_ids(
+        selection_patient_ids, evaluation_patient_ids, n_selection, n_evaluation
+    )
     generation_seed, mri_template_sha256 = _validate_signal_generation_metadata(
         signal_generation_parameters,
         signal_generation_seed,
@@ -659,12 +706,25 @@ def run_shared_policy_world(
             or (f0 > f0_high).any()
         ):
             raise ValueError(f"{name} contains f0 values outside the declared signal_f0_bounds")
+    selection_scenario_seed_key = _validate_seed(
+        selection_scenario_seed, "selection_scenario_seed"
+    )
+    evaluation_scenario_seed_key = _validate_seed(
+        evaluation_scenario_seed, "evaluation_scenario_seed"
+    )
     selection_seed_key = _validate_seed(selection_seed, "selection_seed")
     q_seed_key = _validate_seed(q_training_seed, "q_training_seed")
     eval_seed_key = _validate_seed(evaluation_seed, "evaluation_seed")
-    all_seeds = {selection_seed_key, q_seed_key, eval_seed_key, (generation_seed,)}
-    if len(all_seeds) != 4:
-        raise ValueError("signal-generation, selection, Q-training, and evaluation seeds must be distinct")
+    all_seeds = {
+        selection_scenario_seed_key,
+        evaluation_scenario_seed_key,
+        selection_seed_key,
+        q_seed_key,
+        eval_seed_key,
+        (generation_seed,),
+    }
+    if len(all_seeds) != 6:
+        raise ValueError("scenario-generation, signal-generation, selection, Q-training, and evaluation seeds must be distinct")
     observations = evaluation_observations
     if not all(hasattr(observations, key) for key in ("molecular_report", "mri_score")):
         raise TypeError("evaluation_observations must provide molecular_report and mri_score")
@@ -679,6 +739,12 @@ def run_shared_policy_world(
     input_fingerprints = {
         "selection_scenarios_sha256": _fingerprint_array_mapping(selection_scenarios),
         "evaluation_scenarios_sha256": _fingerprint_array_mapping(evaluation_scenarios),
+        "selection_patient_ids_sha256": _fingerprint_array_mapping({
+            "patient_ids": np.asarray(selection_ids, dtype=str),
+        }),
+        "evaluation_patient_ids_sha256": _fingerprint_array_mapping({
+            "patient_ids": np.asarray(evaluation_ids, dtype=str),
+        }),
         "evaluation_observations_sha256": _fingerprint_array_mapping({
             "molecular_report": observations.molecular_report,
             "mri_score": observations.mri_score,
@@ -787,9 +853,18 @@ def run_shared_policy_world(
         "signal_generation_in_inference_grid": signal_generation_parameters in models,
         "input_fingerprints": input_fingerprints,
         "seeds": {
+            "selection_scenario_generation": list(selection_scenario_seed_key),
+            "evaluation_scenario_generation": list(evaluation_scenario_seed_key),
             "selection": list(selection_seed_key),
             "q_training": list(q_seed_key),
             "evaluation": list(eval_seed_key),
+        },
+        "scenario_seed_provenance": (
+            "caller-declared; realized scenario arrays are independently fingerprinted"
+        ),
+        "cohorts": {
+            "selection": {"n_patients": n_selection, "patient_ids_sha256": input_fingerprints["selection_patient_ids_sha256"]},
+            "evaluation": {"n_patients": n_evaluation, "patient_ids_sha256": input_fingerprints["evaluation_patient_ids_sha256"]},
         },
         "n_selection_patients": n_selection,
         "n_evaluation_patients": n_evaluation,
@@ -810,7 +885,7 @@ def run_shared_policy_world(
         "selected_baseline_by_family": baseline_selection["winners"],
         "arm_outcomes": arms,
         "primary_paired_contrast": primary,
-        "path_rule": "all arms use one shared treatment path; stop later treatment at the first baseline or RANO-like event; both endpoint times share one course count",
+        "path_rule": "all arms share initial virtual patients, precomputed observation-noise stream, scan schedule, and budget; each arm has its own action-dependent path; both endpoint times share that arm's path and course count; treatment stops at the first baseline or RANO-like event",
         "signal_rule": "LOO arms use only unlabeled evaluation-cohort baseline signals and leave each patient out of their own peer-weight fit",
         "limits": [
             "Development simulation only; no patient treatment effect is estimated.",

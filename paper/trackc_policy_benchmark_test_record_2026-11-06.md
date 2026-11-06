@@ -6,9 +6,15 @@ This run checked synthetic implementation mechanics only. It did not compare pol
 
 Code commit: `871bd3d` (`feat(trackc): add paired shared-endpoint policy benchmark`).
 
+## Interpretation correction (2026-11-06)
+
+The phrase “shared path” below refers to scoring the baseline and RANO-like endpoints on the same path **within one policy**. Different policies produce different action-dependent paths. The paired benchmark gives policies the same initial virtual-patient inputs, precomputed observation-noise stream, scan schedule, and global treatment budget; it does not force their realized disease trajectories to match. The paired utility is calculated per patient as the earlier capped endpoint time minus that policy's courses through the cutoff, then averaged within each world. It is not the smaller of the two cohort-average endpoint times.
+
+The current worktree further adds ordered synthetic-patient IDs, disjoint selection/evaluation validation, ID fingerprints, caller-declared scenario seeds, and retained endpoint-cap flags. This follow-up is verified in the current mechanics record below; it does not retroactively change the historical test evidence below.
+
 ## Implemented and checked
 
-`src/211_trackc_policy_benchmark.py` runs six policies on one virtual evaluation cohort and one shared baseline/RANO-like treatment path:
+`src/211_trackc_policy_benchmark.py` runs six policies on one virtual evaluation cohort. Each policy has its own action-dependent treatment path; the baseline and RANO-like endpoints are measured on that policy's path:
 
 1. Leave-one-out dependence-aware signal MPC.
 2. Matched leave-one-out conditional-independence MPC (`d = 0`).
@@ -45,7 +51,7 @@ After this correction, the six focused scratch suites passed **80 tests in 25.41
 
 The benchmark now defines 9 scan-rule comparators, 4 state-estimation comparators, a 24-cell raw-threshold grid, and a 128-cell filtered-threshold grid taken from existing Track C code. At a full benchmark run, all 165 comparator settings are scored on selection patients using mean robust utility. The scan-rule, state-estimation, raw-threshold, and filtered-threshold family winners are recorded; only the selected cells from the two grids are run on evaluation patients. The other declared baselines are evaluated individually. The fixed-schedule catalog already covers the front-loaded and paced schedule references.
 
-Every comparator uses the configured scan interval, shared two-endpoint path, global treatment budget, and its explicit arm-specific cap. The historical filtered-threshold setting keeps its old fixed configuration and provenance. The policy selection uses only the supplied selection cohort; the function receives no evaluation cohort for selection.
+Every comparator uses the configured scan interval, the same endpoint definitions within its own path, the global treatment budget, and its explicit arm-specific cap. The historical filtered-threshold setting keeps its old fixed configuration and provenance. The policy selection uses only the supplied selection cohort; the function receives no evaluation cohort for selection.
 
 The integration test checks the family winners, saved settings and provenance, arm-specific course cap, shared scan interval, and evaluation of one selected cell from each threshold grid. It checks mechanics on a two-patient synthetic cohort only. It does not compare performance direction or use patient data.
 
@@ -62,6 +68,14 @@ Before adding the raw-threshold grid, 10 focused scratch suites passed 153 tests
 Focused suites: `test_trackc_policy_benchmark.py`, `test_trackc_sim.py`, `test_trackc_qlearning_baseline.py`, `test_trackc_robust_belief_mpc.py`, `test_trackc_integrated_signal_conditioning.py`, `test_trackc_paired_signal_benchmark.py`, `test_trackc_loo_model_average.py`, `test_trackc_policies.py`, `test_trackc_regime.py`, and `test_trackc_scan_endpoint.py`.
 
 ## Limits and next work
+
+### Current mechanics verification after cohort-identity and utility corrections
+
+- The ten focused scratch suites listed above passed **159 tests in 640.91 seconds** after the current code and test files were copied to the scratch tree.
+- SHA-256 comparison matched all **439 Python files** under `src/` and `tests/` before and after the run.
+- New checks cover patientwise worst-endpoint utility (including a counterexample where it differs from the minimum of endpoint means), overlapping selection/evaluation IDs rejected before fitting, unique/canonical IDs, ID and scenario-seed provenance fields, and preservation of endpoint-cap flags.
+- The run used assumed virtual patients only. It did not run a research-scale policy comparison, patient analysis, or sealed evaluation.
+- `graphify update .` completed after the source change.
 
 The harness now contains scan rules, state-estimation policies, and selection across the 24-setting raw-threshold and 128-setting filtered-threshold grids. It still lacks the equal-course fixed-schedule frontier, dose-dense proxy, six-versus-twelve-course landmark comparison, multi-world aggregation, precision target, exact held-out world anchors, and frozen interval method. Resolve these before any research-scale outcome comparison. Selection and evaluation patients from one assumed world support a development comparison only.
 
