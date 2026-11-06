@@ -89,6 +89,75 @@ def test_conditional_independence_control_preserves_candidate_qab_support():
     assert all(row.d == 0.0 for row in control)
 
 
+def test_baseline_catalog_covers_scan_rules_and_state_estimation_with_provenance():
+    settings = benchmark.PolicyBenchmarkSettings(
+        mpc_particles=7,
+        prediction_particles=1,
+        n_f0_nodes=8,
+        forecast_cycles=3,
+        q_episodes=1,
+    )
+
+    catalog = benchmark.baseline_policy_catalog(settings)
+
+    assert "raw_zhang_1.0_0.5" in catalog
+    assert "nadir_k3_on1.25" in catalog
+    assert "resp_k3_th0.75" in catalog
+    assert "filtered_threshold_pilot2" in catalog
+    assert "pf_wide_containment" in catalog
+    assert "pf_tail_trigger_candidate" in catalog
+    assert "pf_holiday_containment" in catalog
+    assert catalog["raw_zhang_1.0_0.5"]["family"] == "scan_rule"
+    assert catalog["pf_wide_containment"]["family"] == "state_estimation"
+    filter_grid = [name for name in catalog if name.startswith("filtered_threshold_grid_")]
+    assert len(filter_grid) == 128
+    assert all(catalog[name]["family"] == "filtered_threshold_grid" for name in filter_grid)
+    assert all(not catalog[name]["evaluate_all"] for name in filter_grid)
+    filtered_settings = {
+        (catalog[name]["factory"]().a_on, catalog[name]["factory"]().a_off,
+         catalog[name]["factory"]().a_R, catalog[name]["factory"]().b)
+        for name in filter_grid
+    }
+    assert len(filtered_settings) == 128
+    raw_grid = [name for name in catalog if name.startswith("raw_threshold_grid_")]
+    assert len(raw_grid) == 24
+    assert all(catalog[name]["family"] == "raw_threshold_grid" for name in raw_grid)
+    assert all(not catalog[name]["evaluate_all"] for name in raw_grid)
+    raw_settings = {
+        (catalog[name]["factory"]().a_on, catalog[name]["factory"]().a_off)
+        for name in raw_grid
+    }
+    assert len(raw_settings) == 24
+    assert "pilot_results.json" in catalog["filtered_threshold_pilot2"]["provenance"]
+    assert all(spec["configuration"] and spec["provenance"] for spec in catalog.values())
+    assert catalog["pf_wide_containment"]["factory"]().n_particles == 7
+
+
+def test_course_cap_wrapper_stops_policy_after_arm_specific_limit():
+    class AlwaysTreat:
+        uses_filter = False
+
+        def reset(self, scenarios, rng):
+            del scenarios, rng
+
+        def act(self, cycle, observations):
+            del cycle
+            return np.ones(observations.shape, dtype=bool)
+
+        def advance(self, cycle, treat):
+            del cycle, treat
+
+    policy = benchmark.CourseCappedPolicy(AlwaysTreat(), max_courses=2)
+    policy.reset({"r": np.ones(1), "sigma": np.ones(1)}, np.random.default_rng(1))
+    decisions = []
+    for cycle in range(4):
+        action = policy.act(cycle, np.zeros(1))
+        decisions.append(bool(action[0]))
+        policy.advance(cycle, action)
+
+    assert decisions == [True, True, False, False]
+
+
 def test_full_policy_harness_runs_all_arms_on_shared_endpoint_path(monkeypatch):
     received_f0_bounds = []
     received_scan_intervals = []
@@ -137,6 +206,21 @@ def test_full_policy_harness_runs_all_arms_on_shared_endpoint_path(monkeypatch):
         forecast_cycles=3,
         q_episodes=1,
     )
+    full_catalog = benchmark.baseline_policy_catalog(settings)
+    test_catalog = {
+        name: spec for name, spec in full_catalog.items()
+        if not name.startswith(("filtered_threshold_grid_", "raw_threshold_grid_"))
+    }
+    filter_grid_rows = [
+        (name, spec) for name, spec in full_catalog.items()
+        if name.startswith("filtered_threshold_grid_")
+    ][:2]
+    raw_grid_rows = [
+        (name, spec) for name, spec in full_catalog.items()
+        if name.startswith("raw_threshold_grid_")
+    ][:2]
+    test_catalog.update(filter_grid_rows + raw_grid_rows)
+    monkeypatch.setattr(benchmark, "baseline_policy_catalog", lambda _settings: test_catalog)
 
     result = benchmark.run_shared_policy_world(
         world_id="tiny-mechanics-test",
@@ -158,7 +242,25 @@ def test_full_policy_harness_runs_all_arms_on_shared_endpoint_path(monkeypatch):
         "selection_best_fixed",
         "standard_six_course",
     }
+    expected.update(
+        name for name, spec in test_catalog.items()
+        if spec["evaluate_all"] or name in {
+            result["selected_baseline_by_family"]["filtered_threshold_grid"]["name"],
+            result["selected_baseline_by_family"]["raw_threshold_grid"]["name"],
+        }
+    )
     assert set(result["arm_outcomes"]) == expected
+    assert set(result["selected_baseline_by_family"]) == {
+        "scan_rule", "state_estimation", "filtered_threshold_grid", "raw_threshold_grid"
+    }
+    assert result["baseline_selection"]["tie_rule"] == "first catalog entry wins exact selection-score ties"
+    assert set(result["baseline_selection"]["scores"]) == set(test_catalog)
+    assert sum(name.startswith("filtered_threshold_grid_") for name in result["arm_outcomes"]) == 1
+    assert sum(name.startswith("raw_threshold_grid_") for name in result["arm_outcomes"]) == 1
+    for family in ("filtered_threshold_grid", "raw_threshold_grid"):
+        assert result["baseline_arm_metadata"][
+            result["selected_baseline_by_family"][family]["name"]
+        ]["evaluated_on_holdout"]
     assert result["primary_paired_contrast"]["robust_utility_difference"].shape == (2,)
     for arm in result["arm_outcomes"].values():
         assert arm["ttp_baseline"].shape == (2,)
@@ -170,7 +272,9 @@ def test_full_policy_harness_runs_all_arms_on_shared_endpoint_path(monkeypatch):
     assert result["analysis_type"] == "synthetic_virtual_world_development"
     assert result["settings"]["signal_f0_bounds"] == tuple(map(float, tc.RANGES["f0"][:2]))
     assert received_f0_bounds == [settings.signal_f0_bounds, settings.signal_f0_bounds]
-    assert len(received_scan_intervals) == settings.q_episodes + 7
+    assert len(received_scan_intervals) == (
+        settings.q_episodes + 1 + len(test_catalog) + len(result["arm_outcomes"])
+    )
     assert all(np.all(interval == settings.scan_every) for interval in received_scan_intervals)
 
 

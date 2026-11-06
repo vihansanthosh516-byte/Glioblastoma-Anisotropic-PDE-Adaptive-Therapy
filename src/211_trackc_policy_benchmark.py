@@ -9,6 +9,7 @@ from __future__ import annotations
 from copy import deepcopy
 from dataclasses import dataclass
 import importlib.util
+import itertools
 from pathlib import Path
 import sys
 from typing import Mapping, Sequence
@@ -187,6 +188,220 @@ class FixedSchedulePolicy:
 
     def advance(self, cycle: int, treatment):
         del cycle, treatment
+
+
+class CourseCappedPolicy:
+    """Apply an arm-specific course cap while preserving its policy interface."""
+
+    def __init__(self, policy, max_courses: int):
+        self.policy = policy
+        self.max_courses = _validate_int(max_courses, "max_courses", 0, tc.BUDGET)
+        self.uses_filter = bool(getattr(policy, "uses_filter", False))
+        self._used = None
+
+    def reset(self, scenarios: Mapping, rng: np.random.Generator):
+        n_patients = _validate_scenarios(scenarios, "scenarios")
+        self._used = np.zeros(n_patients, dtype=np.int16)
+        self.policy.reset(scenarios, rng)
+
+    def act(self, cycle: int, observations: np.ndarray) -> np.ndarray:
+        if self._used is None:
+            raise RuntimeError("policy must be reset before act")
+        proposed = np.asarray(self.policy.act(cycle, observations), dtype=bool)
+        if proposed.shape != self._used.shape:
+            raise ValueError("wrapped policy must return one treatment flag per patient")
+        return proposed & (self._used < self.max_courses)
+
+    def advance(self, cycle: int, treatment: np.ndarray):
+        if self._used is None:
+            raise RuntimeError("policy must be reset before advance")
+        actual = np.asarray(treatment, dtype=bool)
+        if actual.shape != self._used.shape:
+            raise ValueError("advance must receive one delivered-treatment flag per patient")
+        self.policy.advance(cycle, actual)
+        self._used += actual.astype(np.int16)
+
+
+def baseline_policy_catalog(settings: PolicyBenchmarkSettings) -> dict:
+    """Return fixed scan-rule and state-estimation comparators with their provenance."""
+    scan_configurations = {
+        "raw_zhang_1.0_0.5": "RawThreshold(a_on=1.0, a_off=0.5)",
+        "raw_0.6_0.6": "RawThreshold(a_on=0.6, a_off=0.6)",
+        "nadir_k3_on1.25": "NadirContainment(induction=3, a_on=1.25, a_off=1.0)",
+        "nadir_k3_on1.15": "NadirContainment(induction=3, a_on=1.15, a_off=1.0)",
+        "nadir_k6_on1.25": "NadirContainment(induction=6, a_on=1.25, a_off=1.0)",
+        "resp_k3_th0.5": "ResponseGuided(induction=3, theta=0.5)",
+        "resp_k3_th0.75": "ResponseGuided(induction=3, theta=0.75)",
+        "resp_k3_th1.0": "ResponseGuided(induction=3, theta=1.0)",
+        "resp_k6_th0.75": "ResponseGuided(induction=6, theta=0.75)",
+    }
+    established_scan_arms = rg.policy_arms()
+    missing = set(scan_configurations) - set(established_scan_arms)
+    if missing:
+        raise RuntimeError(f"trackc_regime is missing baseline arms: {sorted(missing)}")
+    catalog = {}
+    for name, configuration in scan_configurations.items():
+        factory, max_courses = established_scan_arms[name]
+        catalog[name] = {
+            "factory": factory,
+            "max_courses": max_courses,
+            "family": "scan_rule",
+            "configuration": configuration,
+            "provenance": "src/trackc_regime.py:policy_arms",
+            "evaluate_all": True,
+        }
+
+    catalog.update({
+        "filtered_threshold_pilot2": {
+            "factory": lambda: tc.FilteredThreshold(
+                0.6, 0.3, 0.6, 0.05, n_particles=settings.mpc_particles
+            ),
+            "max_courses": tc.BUDGET,
+            "family": "state_estimation",
+            "configuration": (
+                f"FilteredThreshold(a_on=0.6, a_off=0.3, a_R=0.6, b=0.05, "
+                f"n_particles={settings.mpc_particles})"
+            ),
+            "provenance": (
+                "output/trackc_pilot2/pilot_results.json; fixed historical configuration "
+                "selected on its training draw"
+            ),
+            "evaluate_all": True,
+        },
+        "pf_wide_containment": {
+            "factory": lambda: tc.RiskContainment(
+                0.10, 2, 0.0, True, n_particles=settings.mpc_particles
+            ),
+            "max_courses": tc.BUDGET,
+            "family": "state_estimation",
+            "configuration": (
+                f"RiskContainment(p_star=0.10, horizon=2, wide=True, "
+                f"n_particles={settings.mpc_particles})"
+            ),
+            "provenance": "src/206_trackc_marker_benchmark.py:comparison_policy_specs",
+            "evaluate_all": True,
+        },
+        "pf_tail_trigger_candidate": {
+            "factory": lambda: tc.RiskContainment(
+                0.05, 4, 0.0, True, n_particles=settings.mpc_particles, front=4
+            ),
+            "max_courses": tc.BUDGET,
+            "family": "state_estimation",
+            "configuration": (
+                f"RiskContainment(p_star=0.05, horizon=4, wide=True, front=4, "
+                f"n_particles={settings.mpc_particles})"
+            ),
+            "provenance": "src/206_trackc_marker_benchmark.py:comparison_policy_specs",
+            "evaluate_all": True,
+        },
+        "pf_holiday_containment": {
+            "factory": lambda: tc.HolidayContainment(
+                0.10, 2, front=0, max_run=2, n_particles=settings.mpc_particles
+            ),
+            "max_courses": tc.BUDGET,
+            "family": "state_estimation",
+            "configuration": (
+                f"HolidayContainment(p_star=0.10, horizon=2, max_run=2, "
+                f"n_particles={settings.mpc_particles})"
+            ),
+            "provenance": "src/206_trackc_marker_benchmark.py:comparison_policy_specs",
+            "evaluate_all": True,
+        },
+    })
+    on_off_grid = (
+        (0.6, 0.3), (0.6, 0.5), (0.8, 0.3), (0.8, 0.5),
+        (0.8, 0.7), (1.0, 0.3), (1.0, 0.5), (1.0, 0.7),
+    )
+    resistance_thresholds = (0.6, 0.8, 1.0, 1.1)
+    trigger_probabilities = (0.05, 0.10, 0.20, 0.35)
+    for (a_on, a_off), a_resistance, p_trigger in itertools.product(
+        on_off_grid, resistance_thresholds, trigger_probabilities
+    ):
+        name = (
+            f"filtered_threshold_grid_on{a_on:g}_off{a_off:g}_"
+            f"ar{a_resistance:g}_ptrig{p_trigger:g}"
+        )
+        catalog[name] = {
+            "factory": lambda a_on=a_on, a_off=a_off, a_resistance=a_resistance, p_trigger=p_trigger: (
+                tc.FilteredThreshold(
+                    a_on, a_off, a_resistance, p_trigger,
+                    n_particles=settings.mpc_particles,
+                )
+            ),
+            "max_courses": tc.BUDGET,
+            "family": "filtered_threshold_grid",
+            "configuration": (
+                f"FilteredThreshold(a_on={a_on:g}, a_off={a_off:g}, "
+                f"a_R={a_resistance:g}, b={p_trigger:g}, "
+                f"n_particles={settings.mpc_particles})"
+            ),
+            "provenance": "src/150_trackc_pilot.py:hyb_specs; selection rerun on current selection patients",
+            "evaluate_all": False,
+        }
+    raw_on_off_grid = (
+        (0.6, 0.3), (0.6, 0.4), (0.6, 0.5), (0.8, 0.3),
+        (0.8, 0.5), (0.8, 0.7), (0.9, 0.5), (1.0, 0.3),
+        (1.0, 0.5), (1.0, 0.7), (1.1, 0.7), (1.2, 0.8),
+    )
+    raw_single_grid = (0.6, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95, 1.0, 1.05, 1.1, 1.15, 1.18)
+    raw_configurations = [
+        (f"raw_threshold_grid_on{a_on:g}_off{a_off:g}", a_on, a_off)
+        for a_on, a_off in raw_on_off_grid
+    ] + [
+        (f"raw_threshold_grid_single{threshold:g}", threshold, threshold)
+        for threshold in raw_single_grid
+    ]
+    for name, a_on, a_off in raw_configurations:
+        catalog[name] = {
+            "factory": lambda a_on=a_on, a_off=a_off: tc.RawThreshold(a_on, a_off),
+            "max_courses": tc.BUDGET,
+            "family": "raw_threshold_grid",
+            "configuration": f"RawThreshold(a_on={a_on:g}, a_off={a_off:g})",
+            "provenance": "src/167_trackc_sealed_containment.py:raw_onoff and raw_single families",
+            "evaluate_all": False,
+        }
+    return catalog
+
+
+def select_baseline_policy_families(
+    selection_scenarios: Mapping,
+    *,
+    seed,
+    settings: PolicyBenchmarkSettings,
+    catalog: Mapping | None = None,
+) -> dict:
+    """Select one comparator per predeclared family using selection patients only."""
+    n_patients = _validate_scenarios(selection_scenarios, "selection_scenarios")
+    seed_key = _validate_seed(seed, "baseline selection seed")
+    candidates = baseline_policy_catalog(settings) if catalog is None else dict(catalog)
+    if not candidates:
+        raise ValueError("baseline policy catalog must not be empty")
+    scores = {}
+    for name, spec in candidates.items():
+        family = spec.get("family")
+        if not isinstance(family, str) or not family:
+            raise ValueError(f"baseline {name!r} must have a named family")
+        cap = min(
+            _validate_int(spec["max_courses"], f"{name}.max_courses", 0, tc.BUDGET),
+            settings.course_budget,
+        )
+        policy = CourseCappedPolicy(spec["factory"](), cap)
+        outcome = _evaluate_policy(policy, selection_scenarios, seed_key, settings)
+        scores[name] = float(np.mean(outcome["robust_utility"]))
+
+    winners = {}
+    for name, spec in candidates.items():
+        family = spec["family"]
+        if family not in winners or scores[name] > scores[winners[family]["name"]]:
+            winners[family] = {"name": name, "selection_mean_robust_utility": scores[name]}
+    return {
+        "objective": "mean robust utility on selection patients",
+        "tie_rule": "first catalog entry wins exact selection-score ties",
+        "selection_seed": list(seed_key),
+        "n_selection_patients": n_patients,
+        "scores": scores,
+        "winners": winners,
+    }
 
 
 def conditional_independence_grid(model_parameters: Sequence[SignalModelParameters]):
@@ -403,6 +618,11 @@ def run_shared_policy_world(
     chosen_fixed = select_fixed_schedule(
         selection_scenarios, seed=selection_seed_key, settings=settings
     )
+    baseline_catalog = baseline_policy_catalog(settings)
+    baseline_selection = select_baseline_policy_families(
+        selection_scenarios, seed=selection_seed_key, settings=settings,
+        catalog=baseline_catalog,
+    )
     q_module = _load_source_module("trackc_qlearning_baseline", "207_trackc_qlearning_baseline.py")
     loo_module = _load_source_module("trackc_loo_model_average", "214_trackc_loo_model_average.py")
     mpc = loo_module._MPC
@@ -451,6 +671,14 @@ def run_shared_policy_world(
         "selection_best_fixed": FixedSchedulePolicy(fixed_schedule),
         "standard_six_course": FixedSchedulePolicy(standard_schedule),
     }
+    selected_baseline_names = {
+        row["name"] for row in baseline_selection["winners"].values()
+    }
+    for name, spec in baseline_catalog.items():
+        if not spec["evaluate_all"] and name not in selected_baseline_names:
+            continue
+        cap = min(int(spec["max_courses"]), settings.course_budget)
+        policies[name] = CourseCappedPolicy(spec["factory"](), cap)
     arms = {
         name: _evaluate_policy(policy, evaluation_scenarios, eval_seed_key, settings)
         for name, policy in policies.items()
@@ -477,6 +705,20 @@ def run_shared_policy_world(
         "n_selection_patients": n_selection,
         "n_evaluation_patients": n_evaluation,
         "selected_fixed_schedule": chosen_fixed,
+        "baseline_selection": baseline_selection,
+        "baseline_arm_metadata": {
+            name: {
+                "family": spec["family"],
+                "max_courses": min(int(spec["max_courses"]), settings.course_budget),
+                "configuration": spec["configuration"],
+                "provenance": spec["provenance"],
+                "evaluated_on_holdout": bool(
+                    spec["evaluate_all"] or name in selected_baseline_names
+                ),
+            }
+            for name, spec in baseline_catalog.items()
+        },
+        "selected_baseline_by_family": baseline_selection["winners"],
         "arm_outcomes": arms,
         "primary_paired_contrast": primary,
         "path_rule": "all arms use one shared treatment path; stop later treatment at the first baseline or RANO-like event; both endpoint times share one course count",

@@ -41,8 +41,28 @@ A second audit found that `_evaluate_policy` did not attach `scan_every` to the 
 
 After this correction, the six focused scratch suites passed **80 tests in 25.41 seconds**. SHA-256 matched all seven relevant source/test files. No research-scale outcome comparison was run; the n=2 mechanics test invokes the paths but does not assess performance direction. Earlier research-scale comparisons were not made with this harness.
 
+### Follow-up audit: broader comparator coverage
+
+The benchmark now defines 9 scan-rule comparators, 4 state-estimation comparators, a 24-cell raw-threshold grid, and a 128-cell filtered-threshold grid taken from existing Track C code. At a full benchmark run, all 165 comparator settings are scored on selection patients using mean robust utility. The scan-rule, state-estimation, raw-threshold, and filtered-threshold family winners are recorded; only the selected cells from the two grids are run on evaluation patients. The other declared baselines are evaluated individually. The fixed-schedule catalog already covers the front-loaded and paced schedule references.
+
+Every comparator uses the configured scan interval, shared two-endpoint path, global treatment budget, and its explicit arm-specific cap. The historical filtered-threshold setting keeps its old fixed configuration and provenance. The policy selection uses only the supplied selection cohort; the function receives no evaluation cohort for selection.
+
+The integration test checks the family winners, saved settings and provenance, arm-specific course cap, shared scan interval, and evaluation of one selected cell from each threshold grid. It checks mechanics on a two-patient synthetic cohort only. It does not compare performance direction or use patient data.
+
+Before adding the raw-threshold grid, 10 focused scratch suites passed 153 tests in 647.09 seconds. The benchmark suite passed 8 tests in 27.31 seconds after adding both threshold grids. Final full-suite verification is recorded below.
+
+#### Final mechanics verification after both threshold grids
+
+- The scratch copy ran the 10 focused suites listed below. Result: **153 passed in 642.21 seconds**.
+- SHA-256 comparison matched all **439 Python files** under `src/` and `tests/`: no missing, extra, or different files.
+- `graphify update .` completed after the code changes. It rebuilt the graph with 19,292 nodes, 31,654 edges, and 1,571 communities.
+- The integration test uses a two-patient synthetic cohort and reduces each threshold grid to two settings. It verifies selection/evaluation separation, family-winner reporting, configuration uniqueness in the full catalog, shared scan schedule, and course caps. It does **not** execute all 165 settings on a full selection cohort or compare policy outcomes.
+- No patient data, research-scale outcome comparison, or sealed evaluation was used.
+
+Focused suites: `test_trackc_policy_benchmark.py`, `test_trackc_sim.py`, `test_trackc_qlearning_baseline.py`, `test_trackc_robust_belief_mpc.py`, `test_trackc_integrated_signal_conditioning.py`, `test_trackc_paired_signal_benchmark.py`, `test_trackc_loo_model_average.py`, `test_trackc_policies.py`, `test_trackc_regime.py`, and `test_trackc_scan_endpoint.py`.
+
 ## Limits and next work
 
-The six-arm harness is not the full baseline panel in `trackc_candidate_methods_design_2026-11-04.md`. It does not yet run the scan-rule and state-estimation policies, equal-course fixed-schedule frontier, dose-dense proxy, or six-versus-twelve-course comparison. It also has no multi-world aggregation, precision gate, or frozen outcome protocol. These must be resolved before any policy outcome comparison.
+The harness now contains scan rules, state-estimation policies, and selection across the 24-setting raw-threshold and 128-setting filtered-threshold grids. It still lacks the equal-course fixed-schedule frontier, dose-dense proxy, six-versus-twelve-course landmark comparison, multi-world aggregation, precision target, exact held-out world anchors, and frozen interval method. Resolve these before any research-scale outcome comparison. Selection and evaluation patients from one assumed world support a development comparison only.
 
 All tests use assumed virtual patients. Passing tests establish only that the implemented paths follow their contracts. They do not show that any policy improves treatment utility, describes real biology, is unique, or is better than published methods.
