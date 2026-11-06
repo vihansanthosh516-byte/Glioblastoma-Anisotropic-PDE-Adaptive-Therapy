@@ -324,8 +324,12 @@ def select_fixed_schedule(
 
 def _evaluate_policy(policy, scenarios: Mapping, seed: tuple[int, ...], settings: PolicyBenchmarkSettings) -> dict:
     n_patients = _validate_scenarios(scenarios, "evaluation_scenarios")
+    evaluation_scenarios = _copy_scenarios(scenarios)
+    # The simulator uses all cycles for progression scans when this field is absent.
+    # Set it explicitly so each policy and endpoint uses the configured observation schedule.
+    evaluation_scenarios["scan_every"] = np.full(n_patients, settings.scan_every, dtype=int)
     outcome = tc.simulate_two_endpoints(
-        _copy_scenarios(scenarios), policy, seed=list(seed), stop_endpoint="either",
+        evaluation_scenarios, policy, seed=list(seed), stop_endpoint="either",
         budget=settings.course_budget, course_cutoff_days=settings.tau_days,
     )
     clean = _checked_outcome(outcome, n_patients, settings.course_budget)

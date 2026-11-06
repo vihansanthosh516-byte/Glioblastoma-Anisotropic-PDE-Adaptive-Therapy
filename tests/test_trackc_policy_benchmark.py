@@ -91,7 +91,15 @@ def test_conditional_independence_control_preserves_candidate_qab_support():
 
 def test_full_policy_harness_runs_all_arms_on_shared_endpoint_path(monkeypatch):
     received_f0_bounds = []
+    received_scan_intervals = []
     original_loader = benchmark._load_source_module
+    original_simulator = tc.simulate_two_endpoints
+
+    def recording_simulator(scenarios, *args, **kwargs):
+        received_scan_intervals.append(np.asarray(scenarios.get("scan_every")).copy())
+        return original_simulator(scenarios, *args, **kwargs)
+
+    monkeypatch.setattr(tc, "simulate_two_endpoints", recording_simulator)
 
     def recording_loader(module_name, filename):
         module = original_loader(module_name, filename)
@@ -162,6 +170,8 @@ def test_full_policy_harness_runs_all_arms_on_shared_endpoint_path(monkeypatch):
     assert result["analysis_type"] == "synthetic_virtual_world_development"
     assert result["settings"]["signal_f0_bounds"] == tuple(map(float, tc.RANGES["f0"][:2]))
     assert received_f0_bounds == [settings.signal_f0_bounds, settings.signal_f0_bounds]
+    assert len(received_scan_intervals) == settings.q_episodes + 7
+    assert all(np.all(interval == settings.scan_every) for interval in received_scan_intervals)
 
 
 def test_harness_requires_budget_that_can_include_six_course_comparator():

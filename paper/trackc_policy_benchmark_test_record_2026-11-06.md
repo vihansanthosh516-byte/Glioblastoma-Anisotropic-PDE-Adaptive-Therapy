@@ -35,6 +35,12 @@ A code audit found that the LOO signal controllers used the signal model's broad
 
 The updated six-suite scratch run passed **80 tests in 25.40 seconds**. SHA-256 matched all seven relevant source/test files between the tested copy and working tree. This is implementation evidence only; it does not show policy benefit.
 
+### Follow-up audit: common observation schedule
+
+A second audit found that `_evaluate_policy` did not attach `scan_every` to the evaluation scenarios. The simulator treats a missing field as a scan every 28-day cycle, while the shared Q-learning evaluator explicitly used the configured interval (normally 84 days). Thus the RANO-like endpoint and observation schedule could differ across arms. The benchmark now copies each evaluation cohort and explicitly sets the same configured scan interval before scoring every arm. The regression test records each simulator call during a complete small harness run and verifies that fixed-schedule selection, Q-learning training, and all six evaluation arms receive the same interval. The test failed before the fix and passed after it.
+
+After this correction, the six focused scratch suites passed **80 tests in 25.41 seconds**. SHA-256 matched all seven relevant source/test files. No policy outcomes were run; earlier outcome comparisons were not made with this harness.
+
 ## Limits and next work
 
 The six-arm harness is not the full baseline panel in `trackc_candidate_methods_design_2026-11-04.md`. It does not yet run the scan-rule and state-estimation policies, equal-course fixed-schedule frontier, dose-dense proxy, or six-versus-twelve-course comparison. It also has no multi-world aggregation, precision gate, or frozen outcome protocol. These must be resolved before any policy outcome comparison.
