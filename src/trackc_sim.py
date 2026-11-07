@@ -539,12 +539,19 @@ def simulate_two_endpoints(
     that same trajectory, with no treatment after the chosen stop event. The returned
     course count therefore belongs to the shared path and is not duplicated by endpoint.
 
-    This is a synthetic estimand helper. It leaves :func:`simulate` unchanged. Stop timing
-    uses latent simulator progression, which is an idealized treatment-stop rule: the policy
-    does not receive the hidden event time, and an ongoing 28-day cycle is not interrupted;
-    later cycles receive no treatment after the event. Administrative censoring occurs only
-    at the simulation horizon. Scan noise is pre-drawn before policy initialization, matching
-    the existing simulator contract.
+    ``"observed_two_scan"`` is an alternative, observation-based treatment-stop rule. It
+    stops treatment after two consecutive scheduled, finite scan readings exceed the
+    1.4 x observed-nadir threshold with the observed-baseline floor. It is an assumed
+    noisy-volume trigger, not a clinical RANO assessment. The scored baseline and RANO-like
+    endpoints remain latent simulator outcomes on the resulting treatment path.
+
+    This is a synthetic estimand helper. It leaves :func:`simulate` unchanged. The
+    ``baseline``, ``rano``, and ``either`` modes use latent simulator progression to stop
+    treatment, which is an idealized treatment-stop rule. The ``observed_two_scan`` mode
+    uses only scheduled noisy log-burden readings. An ongoing 28-day cycle is not
+    interrupted; no later course is given after the selected stop event. Administrative
+    censoring occurs only at the simulation horizon. Scan noise is pre-drawn before policy
+    initialization, matching the existing simulator contract.
 
     Optional ``course_cutoff_days`` records courses whose cycle starts before that time in
     ``courses_through_cutoff``. The simulator still reports total delivered courses in
@@ -557,7 +564,7 @@ def simulate_two_endpoints(
     """
     if policy_context not in ("observable", "full"):
         raise ValueError("policy_context must be 'observable' or 'full'")
-    if stop_endpoint not in ("baseline", "rano", "either"):
+    if stop_endpoint not in ("baseline", "rano", "either", "observed_two_scan"):
         raise ValueError(f"unknown stop endpoint {stop_endpoint!r}")
     if course_cutoff_days is not None:
         course_cutoff_days = float(course_cutoff_days)
@@ -592,6 +599,11 @@ def simulate_two_endpoints(
     used = np.zeros(N, int)
     used_through_cutoff = np.zeros(N, int) if course_cutoff_days is not None else None
     hits, total = 0, 0
+    observed_base_log = np.full(N, np.nan)
+    observed_nadir_log = np.full(N, np.nan)
+    observed_positive_scans = np.zeros(N, dtype=int)
+    observed_stop = np.zeros(N, dtype=bool)
+    observed_stop_day = np.full(N, np.nan)
     reset_context = (
         {"sigma": np.asarray(scen["sigma"]).copy()}
         if policy_context == "observable" else scen
@@ -624,10 +636,36 @@ def simulate_two_endpoints(
             y_prev = y
         if scan_every is not None:
             y = np.where(scan, y, np.nan)
+        if stop_endpoint == "observed_two_scan":
+            scheduled = np.broadcast_to(np.asarray(scan, dtype=bool), (N,))
+            finite_scan = scheduled & np.isfinite(y)
+            missing_scan = scheduled & ~np.isfinite(y) & ~observed_stop
+            observed_positive_scans[missing_scan] = 0
+
+            baseline_scan = finite_scan & ~np.isfinite(observed_base_log)
+            observed_base_log[baseline_scan] = y[baseline_scan]
+            observed_nadir_log[baseline_scan] = y[baseline_scan]
+
+            followup_scan = finite_scan & ~baseline_scan & ~observed_stop
+            threshold_log = np.log(RANO_FACTOR) + np.maximum(
+                observed_nadir_log,
+                observed_base_log + np.log(RANO_FLOOR),
+            )
+            positive_scan = followup_scan & (y >= threshold_log)
+            negative_scan = followup_scan & ~positive_scan
+            observed_positive_scans[positive_scan] += 1
+            observed_positive_scans[negative_scan] = 0
+            observed_nadir_log[negative_scan] = np.minimum(
+                observed_nadir_log[negative_scan], y[negative_scan]
+            )
+            newly_stopped = positive_scan & (observed_positive_scans >= 2)
+            observed_stop[newly_stopped] = True
+            observed_stop_day[newly_stopped] = j * CYCLE_DAYS
         treat = policy.act(j, y) & (used < cap)
         stop_event = np.isnan(ttp_baseline) if stop_endpoint == "baseline" else (
             np.isnan(ttp_rano) if stop_endpoint == "rano" else
-            (np.isnan(ttp_baseline) & np.isnan(ttp_rano))
+            (np.isnan(ttp_baseline) & np.isnan(ttp_rano)) if stop_endpoint == "either" else
+            ~observed_stop
         )
         if track_fr and policy.uses_filter:
             lo, hi = policy.pf.fr_interval()
@@ -661,6 +699,8 @@ def simulate_two_endpoints(
         "courses": used,
         "stop_endpoint": stop_endpoint,
     }
+    if stop_endpoint == "observed_two_scan":
+        out["observed_stop_day"] = observed_stop_day
     if used_through_cutoff is not None:
         out["courses_through_cutoff"] = used_through_cutoff
     if track_fr and policy.uses_filter:
