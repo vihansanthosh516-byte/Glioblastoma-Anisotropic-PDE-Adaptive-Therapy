@@ -1,5 +1,7 @@
 # START HERE
 
+- **Track C development seed-schedule preflight (2026-11-07):** `src/trackc_world_schedule.py` checks exact world seed roles, unique world IDs and numeric seeds, and the current seed registry before a proposed Stage 2 development schedule is used. It does not reserve seeds or execute a benchmark. Three synthetic scratch tests passed; the independent-world driver and its frozen protocol remain open.
+
 - **Track C independent-world benchmark draft (2026-11-07):** [`paper/trackc_world_benchmark_protocol_draft_2026-11-07.md`](paper/trackc_world_benchmark_protocol_draft_2026-11-07.md) specifies the candidate minimax contrast, world-level estimand, controls, scan-loss design, and pre-outcome gates. World counts, anchors, precision, inference, fresh seeds, resource limit, and research driver remain open. This is a draft; no outcome run or sealed evaluation is authorized by it.
 
 - **Track C summary contrasts (2026-11-07):** the world-summary prototype can separately summarize the LOO and finite-set minimax versus matched `d=0` contrasts. LOO model weights use other evaluation patients' baseline signals; minimax uses fixed finite model sets. Both summaries are labeled synthetic development, not adopted confirmatory tests. Six scratch tests passed; no policy outcomes were analyzed. Distinct recorded seeds and fingerprints do not prove independence or pairing.
