@@ -1,5 +1,6 @@
 """Synthetic tests for source-agnostic Track B prep. No patient data."""
 import inspect
+from types import SimpleNamespace
 
 import numpy as np
 import pytest
@@ -69,6 +70,20 @@ def test_registration_qc_rejects_nonfinite_or_malformed_transform():
         result = lp.registration_qc(np.asarray(params), 0.95)
         assert result['passed'] is False
         assert result['reasons']
+
+
+@pytest.mark.parametrize('failure_stage', [0, 1])
+def test_registration_optimizer_failure_never_passes_qc(monkeypatch, failure_stage):
+    calls = []
+    def fake_minimize(*args, **kwargs):
+        stage = len(calls)
+        calls.append(stage)
+        return SimpleNamespace(x=np.zeros(6), success=stage != failure_stage)
+    monkeypatch.setattr(lp.optimize, 'minimize', fake_minimize)
+    fixed, support = _phantom((8, 8, 8))
+    result = lp.register_rigid_mri(fixed, fixed, fixed_support=support, spacing_mm=(2, 2, 2))
+    assert result['qc']['passed'] is False
+    assert any('optimizer' in reason for reason in result['qc']['reasons'])
 
 
 def test_registration_uses_no_label_input():

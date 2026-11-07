@@ -119,14 +119,21 @@ def register_rigid_mri(fixed, moving, *, fixed_support, spacing_mm, downsample: 
 
     res = optimize.minimize(cost, np.zeros(6), method="Powell",
                             options={"xtol": 1e-2, "ftol": 1e-4, "maxiter": 2000})
+    coarse_success = bool(res.success)
     # Refine on the full grid from the coarse result.
     res = optimize.minimize(lambda p: -_ncc(f, apply_rigid(m, p, spacing_mm=spacing_mm), sup), res.x,
                             method="Powell", options={"xtol": 1e-3, "ftol": 1e-5, "maxiter": 2000})
     params = np.asarray(res.x, float)
     warped = apply_rigid(m, params, spacing_mm=spacing_mm)
     ncc_before, ncc_after = _ncc(f, m, sup), _ncc(f, warped, sup)
+    qc = registration_qc(params, ncc_after)
+    failed_stages = [name for name, success in (("coarse", coarse_success), ("full", bool(res.success)))
+                     if not success]
+    if failed_stages:
+        qc["passed"] = False
+        qc["reasons"].append("optimizer did not converge: " + ", ".join(failed_stages))
     return {"params": params, "warped": warped, "ncc_before": ncc_before, "ncc_after": ncc_after,
-            "qc": registration_qc(params, ncc_after)}
+            "qc": qc}
 
 
 def registration_qc(params, ncc_after) -> dict:
