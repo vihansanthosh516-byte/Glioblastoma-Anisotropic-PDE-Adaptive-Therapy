@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from src.track_b_transition_estimand import (history_band_counts, summarize_window,
+from src.track_b_transition_estimand import (construct_history_states, history_band_counts, summarize_window,
                                               summarize_patients, bootstrap_patients)
 
 
@@ -65,3 +65,57 @@ def test_bootstrap_refuses_invalid_settings():
     for options in ({'n_resamples': 0}, {'n_resamples': True}, {'seed': -1}):
         with pytest.raises(ValueError):
             bootstrap_patients({'a': [0.0]}, **options)
+
+
+def test_history_states_use_physical_distance_and_cavity():
+    previous = np.zeros((24, 3, 3), dtype=int)
+    middle = np.zeros_like(previous)
+    middle[1, 1, 1] = 3
+    middle[5:24, 1, 1] = 2
+    middle[9, 2, 1] = 4
+    previous[5, 1, 1] = 2
+    state, bands = construct_history_states(previous, middle)
+    assert state[5, 1, 1] == 2
+    assert state[6, 1, 1] == 2  # within 2 mm of prior FLAIR
+    assert state[7, 1, 1] == 1
+    assert state[9, 1, 1] == 0  # within 2 mm of cavity
+    assert bands[6, 1, 1] == 0  # exactly 10 mm
+    assert bands[11, 1, 1] == 1  # exactly 20 mm
+    assert bands[16, 1, 1] == 2  # exactly 30 mm
+    assert bands[17, 1, 1] == 3
+
+
+def test_empty_previous_flair_and_empty_core():
+    previous = np.zeros((5, 5, 5), dtype=int)
+    middle = previous.copy()
+    middle[0, 0, 0] = 1
+    middle[3, 3, 3] = 2
+    state, _ = construct_history_states(previous, middle)
+    assert state[3, 3, 3] == 1
+    middle[0, 0, 0] = 0
+    with pytest.raises(ValueError, match='empty core'):
+        construct_history_states(previous, middle)
+
+
+def test_invalid_history_label_and_shape_rejected():
+    with pytest.raises(ValueError):
+        construct_history_states(np.zeros((2, 2, 2)), np.full((2, 2, 2), 5))
+    with pytest.raises(ValueError):
+        construct_history_states(np.zeros((2, 2)), np.zeros((2, 2)))
+
+
+def test_synthetic_history_to_window_score():
+    previous = np.zeros((8, 8, 8), dtype=int)
+    middle = previous.copy()
+    middle[0, 0, 0] = 1
+    middle[3, 3, 3] = middle[3, 3, 4] = 2
+    previous[3, 3, 3] = 2
+    # Move the new site away from the 2-mm prior dilation.
+    middle[3, 3, 4] = 0
+    middle[3, 5, 3] = 2
+    state, bands = construct_history_states(previous, middle)
+    target = np.zeros_like(previous)
+    target[3, 5, 3] = 3
+    result = summarize_window(state, bands, target, min_voxels=1)
+    assert result['difference'] == 1.0
+    assert result['bands'][0]['n_new'] == result['bands'][0]['n_persistent'] == 1

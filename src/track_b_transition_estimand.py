@@ -1,12 +1,40 @@
 """Synthetic-development calculation for the proposed Duke transition estimand.
 
-Inputs are already registered, history-defined state and distance-band arrays.
-This helper does not establish eligibility, construct masks, or authorize scoring.
+History labels must already be registered to the same 2-mm grid. This helper
+does not perform registration, assess image QC, or authorize scoring.
 State codes are 0 outside risk, 1 newly appearing, and 2 persistent. Band codes
 0--3 represent the four prespecified distance bands. Target codes are 0--4.
 """
 
 import numpy as np
+from scipy.ndimage import distance_transform_edt
+
+
+def construct_history_states(previous_labels, middle_labels):
+    """Build draft risk states and distance bands on a registered 2-mm grid.
+
+    Only history labels are accepted. No support, registration, or QC is inferred.
+    """
+    previous, middle = map(np.asarray, (previous_labels, middle_labels))
+    if previous.ndim != 3 or previous.shape != middle.shape or not previous.size:
+        raise ValueError('history labels must have the same nonempty 3D shape')
+    if not np.isin(previous, [0, 1, 2, 3, 4]).all() or not np.isin(middle, [0, 1, 2, 3, 4]).all():
+        raise ValueError('invalid history label')
+    core = np.isin(middle, [1, 3])
+    if not core.any():
+        raise ValueError('empty core')
+    core_distance = distance_transform_edt(~core, sampling=2.0)
+    excluded = core | (middle == 4)
+    excluded_distance = distance_transform_edt(~excluded, sampling=2.0)
+    risk = (middle == 2) & (excluded_distance > 2.0)
+    previous_flair = previous == 2
+    near_previous = (distance_transform_edt(~previous_flair, sampling=2.0) <= 2.0
+                     if previous_flair.any() else np.zeros(previous.shape, dtype=bool))
+    state = np.zeros(middle.shape, dtype=np.uint8)
+    state[risk & ~near_previous] = 1
+    state[risk & near_previous] = 2
+    bands = np.searchsorted([10.0, 20.0, 30.0], core_distance, side='left').astype(np.uint8)
+    return state, bands
 
 
 def history_band_counts(state, bands, *, min_voxels=10):
