@@ -96,6 +96,26 @@ def execute_prepared_world(prepared, benchmark):
     }}
 
 
+def make_synthetic_executor(*, family, patients_per_cohort, signal_parameters,
+                            model_parameters, settings, benchmark, entries=None):
+    """Compose input preparation and a supplied development benchmark.
+
+    No protocol is adopted, seeds reserved, or results written by this factory.
+    """
+    if not callable(benchmark):
+        raise TypeError("benchmark must be callable")
+
+    def execute(world):
+        prepared = prepare_synthetic_world(
+            world, family=family, patients_per_cohort=patients_per_cohort,
+            signal_parameters=signal_parameters, model_parameters=model_parameters,
+            settings=settings, entries=entries,
+        )
+        return execute_prepared_world(prepared, benchmark)
+
+    return execute
+
+
 def run_development_worlds(worlds, executor, *, entries=None):
     """Preflight and execute supplied worlds sequentially in memory.
 
@@ -121,6 +141,8 @@ def run_development_worlds(worlds, executor, *, entries=None):
                     raise ValueError(f"recorded seed for {role} does not match schedule")
             if result["signal_generation"]["seed"] != world["evaluation_signal"]:
                 raise ValueError("recorded evaluation signal seed does not match schedule")
+            if "world_provenance" in result and result["world_provenance"]["world_generation_seed"] != world["world"]:
+                raise ValueError("recorded world generation seed does not match schedule")
             results.append(result)
         except Exception as exc:
             raise WorldRunError(f"world {world['world_id']} failed after {len(results)} completed worlds") from exc

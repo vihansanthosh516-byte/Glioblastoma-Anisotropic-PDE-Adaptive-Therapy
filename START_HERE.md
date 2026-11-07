@@ -1,5 +1,7 @@
 # START HERE
 
+- **Track C composed synthetic executor (2026-11-07):** `make_synthetic_executor` connects world preparation and the supplied benchmark adapter to the sequential development runner. The runner checks declared world-generation seeds when provenance is present. Ten scratch tests passed, including two generated synthetic worlds with a fake benchmark. This is still an unsealed prototype: no atomic seed reservation, outcome manifest, real benchmark execution, or policy scoring occurred.
+
 - **Track C minimax world-provenance check (2026-11-07):** the minimax world-summary adapter now requires a declared world seed, family, and parameter fingerprint; it rejects repeated world fingerprints, reused seed keys, and mixed world families. Twelve synthetic scratch tests passed. Caller-declared provenance remains unsealed and cannot prove independent generation. No outcomes were run.
 
 - **Track C prepared-world provenance adapter (2026-11-07):** `execute_prepared_world` passes prepared synthetic inputs to a caller-supplied benchmark and attaches the declared world seed, family, and parameter fingerprint to a matching result. Nine scratch tests passed with fake benchmarks. This is not a seal: inputs may be altered, seeds are not reserved, and provenance is not independently verified. No outcomes were run.

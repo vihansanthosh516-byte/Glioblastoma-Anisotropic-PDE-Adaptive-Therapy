@@ -4,7 +4,8 @@ import numpy as np
 import trackc_seed_registry as registry
 import trackc_world_schedule as schedule
 from trackc_integrated_signal_model import SignalModelParameters
-from trackc_world_runner import WorldRunError, run_development_worlds, prepare_synthetic_world, execute_prepared_world
+from trackc_world_runner import (WorldRunError, run_development_worlds, prepare_synthetic_world,
+                                 execute_prepared_world, make_synthetic_executor)
 
 
 def world(name, start):
@@ -108,3 +109,24 @@ def test_prepared_provenance_is_attached_to_matching_fake_benchmark():
         execute_prepared_world(prepared, lambda **kwargs: {"world_id": "different"})
     with pytest.raises(ValueError, match="already contains"):
         execute_prepared_world(prepared, lambda **kwargs: {"world_id": "sample", "world_provenance": {}})
+
+
+def test_composed_runner_builds_and_checks_two_synthetic_worlds():
+    def benchmark(**kwargs):
+        return {"world_id": kwargs["world_id"], "analysis_type": "synthetic_virtual_world_development",
+                "seeds": {
+                    "selection_scenario_generation": [kwargs["selection_scenario_seed"]],
+                    "calibration_scenario_generation": [kwargs["calibration_scenario_seed"]],
+                    "evaluation_scenario_generation": [kwargs["evaluation_scenario_seed"]],
+                    "calibration_signal_generation": [kwargs["calibration_signal_generation_seed"]],
+                    "selection": kwargs["selection_seed"], "q_training": kwargs["q_training_seed"],
+                    "calibration_policy_simulation": kwargs["calibration_seed"],
+                    "evaluation": kwargs["evaluation_seed"], "schedule_mixture_master": kwargs["schedule_mixture_seed"],
+                }, "signal_generation": {"seed": kwargs["signal_generation_seed"]}}
+
+    params = SignalModelParameters(0.7, 0.2, 0.3, 0.1)
+    executor = make_synthetic_executor(family="single", patients_per_cohort=2,
+        signal_parameters=params, model_parameters=(params,), settings="test", benchmark=benchmark, entries=entries())
+    results = run_development_worlds([world("a", 1), world("b", 20)], executor, entries=entries())
+    assert [row["world_provenance"]["world_generation_seed"] for row in results] == [1, 20]
+    assert results[0]["world_provenance"]["world_parameters_sha256"] != results[1]["world_provenance"]["world_parameters_sha256"]
