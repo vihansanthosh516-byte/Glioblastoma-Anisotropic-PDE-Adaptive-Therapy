@@ -417,7 +417,7 @@ class HolidayContainment(RiskContainment):
 
     def reset(self, scen, rng):
         super().reset(scen, rng)
-        self.run = np.zeros(scen["r"].shape, int)
+        self.run = np.zeros(np.asarray(scen["sigma"]).shape, int)
 
     def act(self, j, y):
         return super().act(j, y) & (self.run < self.max_run)
@@ -529,7 +529,7 @@ def simulate(scen, policy, seed, track_fr=False, endpoint="baseline", budget=Non
 
 def simulate_two_endpoints(
     scen, policy, seed, track_fr=False, stop_endpoint="either", budget=None,
-    course_cutoff_days=None,
+    course_cutoff_days=None, policy_context="observable",
 ):
     """Score baseline and RANO-like progression on one treatment trajectory.
 
@@ -549,7 +549,14 @@ def simulate_two_endpoints(
     Optional ``course_cutoff_days`` records courses whose cycle starts before that time in
     ``courses_through_cutoff``. The simulator still reports total delivered courses in
     ``courses`` and applies the selected progression stop rule to both counts.
+
+    By default, ``policy.reset`` receives only the observable ``sigma`` field. Passing
+    ``policy_context="full"`` explicitly exposes the full latent scenario and is intended
+    only for oracle diagnostics. This boundary applies to reset-time access; policies still
+    receive their ordinary scan observations during simulation.
     """
+    if policy_context not in ("observable", "full"):
+        raise ValueError("policy_context must be 'observable' or 'full'")
     if stop_endpoint not in ("baseline", "rano", "either"):
         raise ValueError(f"unknown stop endpoint {stop_endpoint!r}")
     if course_cutoff_days is not None:
@@ -585,7 +592,11 @@ def simulate_two_endpoints(
     used = np.zeros(N, int)
     used_through_cutoff = np.zeros(N, int) if course_cutoff_days is not None else None
     hits, total = 0, 0
-    policy.reset(scen, rng)
+    reset_context = (
+        {"sigma": np.asarray(scen["sigma"]).copy()}
+        if policy_context == "observable" else scen
+    )
+    policy.reset(reset_context, rng)
     y_prev = None
     base0 = nadir = None
     for j in range(N_CYCLES):

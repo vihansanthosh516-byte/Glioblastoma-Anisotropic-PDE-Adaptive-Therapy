@@ -252,6 +252,18 @@ def _validate_scenarios(scenarios: Mapping, name: str) -> int:
     return int(r.size)
 
 
+def _policy_patient_count(context: Mapping, name: str) -> int:
+    """Validate the observable reset context and return its patient count."""
+    if not isinstance(context, Mapping) or "sigma" not in context:
+        raise ValueError(f"{name} must contain observable sigma values")
+    sigma = np.asarray(context["sigma"], dtype=float)
+    if sigma.ndim != 1 or sigma.size == 0:
+        raise ValueError(f"{name} sigma must be a nonempty one-dimensional array")
+    if not np.isfinite(sigma).all() or (sigma <= 0).any():
+        raise ValueError(f"{name} sigma values must be finite and positive")
+    return int(sigma.size)
+
+
 def _copy_scenarios(scenarios: Mapping) -> dict:
     return {key: np.array(value, copy=True) if isinstance(value, np.ndarray) else deepcopy(value)
             for key, value in scenarios.items()}
@@ -285,7 +297,7 @@ class FixedSchedulePolicy:
 
     def reset(self, scen, rng):
         del rng
-        n_patients = len(np.asarray(scen["r"]))
+        n_patients = _policy_patient_count(scen, "policy reset context")
         if self.schedules.shape[0] == 1:
             self._active = np.broadcast_to(self.schedules, (n_patients, tc.N_CYCLES))
         elif self.schedules.shape[0] == n_patients:
@@ -355,7 +367,7 @@ class CourseCappedPolicy:
         self._used = None
 
     def reset(self, scenarios: Mapping, rng: np.random.Generator):
-        n_patients = _validate_scenarios(scenarios, "scenarios")
+        n_patients = _policy_patient_count(scenarios, "policy reset context")
         self._used = np.zeros(n_patients, dtype=np.int16)
         self.policy.reset(scenarios, rng)
 
@@ -676,6 +688,7 @@ def select_fixed_schedule(
         stop_endpoint="either",
         budget=settings.course_budget,
         course_cutoff_days=settings.tau_days,
+        policy_context="observable",
     )
     checked = _checked_outcome(outcome, len(schedule_rows), settings.course_budget)
     utilities = robust_utility(
@@ -728,6 +741,7 @@ def _evaluate_policy(policy, scenarios: Mapping, seed: tuple[int, ...], settings
     outcome = tc.simulate_two_endpoints(
         evaluation_scenarios, policy, seed=list(seed), stop_endpoint="either",
         budget=settings.course_budget, course_cutoff_days=settings.tau_days,
+        policy_context="observable",
     )
     clean = _checked_outcome(outcome, n_patients, settings.course_budget)
     clean["rmst_baseline"] = np.minimum(clean["ttp_baseline"], settings.tau_days)
@@ -1147,6 +1161,11 @@ def run_shared_policy_world(
             ),
         },
         "path_rule": "all arms share initial virtual patients, precomputed observation-noise stream, scan schedule, and budget; each arm has its own action-dependent path; both endpoint times share that arm's path and course count; treatment stops at the first baseline or RANO-like event",
+        "policy_reset_context": {
+            "mode": "observable",
+            "fields_exposed": ["sigma"],
+            "latent_scenario_fields_exposed": False,
+        },
         "signal_rule": "LOO controllers use only unlabeled baseline signals from the cohort being simulated and leave each patient out of their own peer-weight fit; calibration signals set course-use targets, evaluation signals do not set mixtures",
         "limits": [
             "Development simulation only; no patient treatment effect is estimated.",
