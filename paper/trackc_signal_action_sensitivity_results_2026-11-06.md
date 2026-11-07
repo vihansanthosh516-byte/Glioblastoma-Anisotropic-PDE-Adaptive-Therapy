@@ -23,15 +23,17 @@ The full model set selected more than one action pattern across repeated signals
 
 The overall agreement and all pattern counts are descriptive. They show decision sensitivity under these chosen synthetic inputs. They do not show that either plan improves outcomes or that the full set is superior. The controller's planning-value margins are not observed treatment effects.
 
-## Data-handling deviation
+## Output and input-boundary deviations
 
 The result rows contain the latent simulator value `f0`. The frozen protocol did not list it among the saved outputs. The runner used true `f0` to generate signals, then saved it after planning. The controller's reset path receives the scenario object but [RobustBeliefMPC.reset](../src/208_trackc_robust_belief_mpc.py) reads only `sigma` to initialize its filter; the controller conditions prior particles on the generated signals and does not use the scenario's true `f0` value. This output-field deviation does not establish decision leakage, but it permits unplanned post-hoc stratification. No analysis used `f0`; keep the saved result unchanged and do not stratify or select on that field.
+
+A separate interface audit found that the diagnostic called `policy.reset(scenario, ...)` with the full simulator scenario dictionary. That dictionary contains latent values such as `f0`, `r`, `m`, `c`, and `eps`, even though the protocol said the controller would not receive latent truth. Inspection of the current reset path found that it reads `sigma` and initializes its own prior; no use of the other scenario fields was found. This means there is no demonstrated truth-use in the recorded plan choice, but the protocol's input-isolation boundary was not enforced. Treat this as an interface-level protocol deviation. Do not alter or rerun the historical diagnostic; future policy runs must pass a whitelist of observable fields only.
 
 ## Checks and limits
 
 The final focused scratch suites passed 26 tests; one seed-registry evidence test skipped because the scratch copy omitted `output/`. A broader controller/simulator suite passed 127 tests with one such skip before the last manifest-metadata guard change. These tests check code behavior, not scientific benefit.
 
-The result uses four states, one assumed signal-generating parameter set, a dependence value outside the controller grid, and an exact baseline burden. It cannot establish biological validity, clinical value, method uniqueness, or superiority over existing therapy policies. Track A and Track B data remain unlinked; the molecular-to-resistance relation remains a Track C simulation assumption.
+The result uses four states, one assumed signal-generating parameter set, a dependence value outside the controller grid, and an exact baseline burden. Its reset interface was not truth-blinded, and its output includes an unplanned latent field. It cannot establish biological validity, clinical value, method uniqueness, or superiority over existing therapy policies. Track A and Track B data remain unlinked; the molecular-to-resistance relation remains a Track C simulation assumption.
 
 ## Next test
 
