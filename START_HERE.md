@@ -1,5 +1,7 @@
 # START HERE
 
+- **Track C world-summary prototype (2026-11-07):** `src/trackc_world_summary.py` computes paired patient differences within each equally weighted world and a seeded percentile bootstrap over worlds. Five synthetic scratch tests passed. Caller must establish patient pairing and world independence; the helper cannot verify either. It is not wired into a research driver, and its interval and settings are not an adopted scoring protocol. No policy outcomes were analyzed.
+
 - **Track C scan-loss input guard (2026-11-07):** the shared benchmark rejects malformed probabilities, `miss_p_hi` without `miss_p`, and misleading `miss_visible` values. Nonzero scan loss now requires visible missing scans: the legacy repeated-reading path can supply an unseen reading from an unscheduled day. That legacy simulator path remains unchanged and is not permitted for scan-loss benchmark scenarios. The benchmark scratch suite passed 18 tests; no policy outcome study ran.
 
 - **Track C scan-loss design check (2026-11-07):** the MPC's assumed future scan-loss probability affects planning only. Actual simulated scan loss occurs only when the scenario supplies `miss_p`; `miss_p_hi` optionally makes it state-linked. The simulator selects visible missingness by the presence of `miss_visible`, rather than its per-patient values. A future sensitivity protocol must explicitly specify and validate both the planner assumption and scenario fields, including whether missing scans are visible. No outcome comparison was run.
