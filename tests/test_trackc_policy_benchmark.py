@@ -43,6 +43,23 @@ def test_mpc_assumed_future_scan_loss_requires_observed_stop():
     assert settings.mpc_assumed_future_scan_miss_probability == pytest.approx(0.25)
 
 
+def test_scan_loss_scenarios_reject_invalid_or_misleading_inputs():
+    scenario = tc.draw_scenarios(2, seed=1234)
+    for bad in ([-0.1, 0.2], [0.1, 1.1], [0.1, np.nan], [[0.1], [0.2]]):
+        with pytest.raises(ValueError, match="miss_p"):
+            benchmark._validate_scenarios(dict(scenario, miss_p=np.asarray(bad)), "test")
+    with pytest.raises(ValueError, match="requires miss_p"):
+        benchmark._validate_scenarios(dict(scenario, miss_p_hi=np.zeros(2)), "test")
+    for visibility in ([False, False], [True, False], [1, 1]):
+        with pytest.raises(ValueError, match="miss_visible"):
+            benchmark._validate_scenarios(
+                dict(scenario, miss_p=np.zeros(2), miss_visible=np.asarray(visibility)), "test"
+            )
+    assert benchmark._validate_scenarios(
+        dict(scenario, miss_p=np.array([0.0, 1.0]), miss_visible=np.ones(2, dtype=bool)), "test"
+    ) == 2
+
+
 def _quiet_scenario():
     """One slow synthetic patient whose late schedule falls after 730 days."""
     return {

@@ -271,6 +271,17 @@ def _validate_scenarios(scenarios: Mapping, name: str) -> int:
         array = np.asarray(value)
         if array.ndim > 0 and array.shape[0] != r.size:
             raise ValueError(f"{name} scenario field {key!r} has a different patient count")
+    for key in ("miss_p", "miss_p_hi"):
+        if key in scenarios:
+            probability = np.asarray(scenarios[key], dtype=float)
+            if probability.shape != r.shape or not np.isfinite(probability).all() or ((probability < 0) | (probability > 1)).any():
+                raise ValueError(f"{name} {key} must contain one probability in [0, 1] per patient")
+    if "miss_p_hi" in scenarios and "miss_p" not in scenarios:
+        raise ValueError(f"{name} miss_p_hi requires miss_p")
+    if "miss_visible" in scenarios:
+        visible = np.asarray(scenarios["miss_visible"])
+        if "miss_p" not in scenarios or visible.shape != r.shape or visible.dtype.kind != "b" or not visible.all():
+            raise ValueError(f"{name} miss_visible requires miss_p and must be all True; omit it for repeated readings")
     return int(r.size)
 
 
