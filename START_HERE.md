@@ -1,5 +1,7 @@
 # START HERE
 
+- **Track B Bertalan methods check (2026-11-07):** full text confirms the prior 46-patient study used treatment-naive preoperative baseline and selected local recurrence cases; it did not implement the proposed two-history new-versus-persistent FLAIR comparison. Other papers' full methods and patient-level overlap remain unresolved. See [`paper/track_b_flair_transition_prior_art_update_2026-11-07.md`](paper/track_b_flair_transition_prior_art_update_2026-11-07.md). No project patient data were read.
+
 - **Track B FLAIR/ADC prior-art update (2026-11-07):** patient studies already map later enhancement to earlier FLAIR regions and compare ADC, and a 2026 study analyzes longitudinal MRI habitats. The proposed new-versus-persistent FLAIR contrast remains unverified as novel; full methods and cohort overlap need checking. See [`paper/track_b_flair_transition_prior_art_update_2026-11-07.md`](paper/track_b_flair_transition_prior_art_update_2026-11-07.md). No patient data or outcomes were read.
 
 - **Track C development seed capacity (2026-11-07):** registry preflight found 89 free scenario-class seeds in the current Stage 2 block, permitting at most 14 worlds at six seeds each before policy-seed and design constraints. This is not a precision calculation or a reservation. See [`paper/trackc_world_seed_capacity_2026-11-07.md`](paper/trackc_world_seed_capacity_2026-11-07.md). No outcomes were run.
