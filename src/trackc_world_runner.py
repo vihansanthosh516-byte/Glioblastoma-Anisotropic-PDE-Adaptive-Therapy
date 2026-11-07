@@ -5,6 +5,7 @@ import hashlib
 import json
 from numbers import Integral
 
+import numpy as np
 import trackc_calibration as calibration
 from trackc_integrated_signal_model import generate_integrated_signals
 from trackc_world_schedule import validate_development_schedule
@@ -27,7 +28,7 @@ class WorldRunError(RuntimeError):
 
 
 def prepare_synthetic_world(world, *, family, patients_per_cohort, signal_parameters,
-                            model_parameters, settings, entries=None):
+                            model_parameters, settings, scan_loss=None, entries=None):
     """Build one development world's benchmark inputs without scoring policies.
 
     The returned world seed is caller-declared provenance, not proof of generation.
@@ -44,6 +45,25 @@ def prepare_synthetic_world(world, *, family, patients_per_cohort, signal_parame
         role: calibration.draw_patients(latent_world, n, seed=[world[f"{role}_scenario"], 1])
         for role in ("selection", "calibration", "evaluation")
     }
+    loss = None
+    if scan_loss is not None:
+        if not isinstance(scan_loss, dict) or "miss_p" not in scan_loss or set(scan_loss) - {"miss_p", "miss_p_hi"}:
+            raise ValueError("scan_loss must contain miss_p and optionally miss_p_hi")
+        loss = {}
+        for name, value in scan_loss.items():
+            if isinstance(value, (bool, np.bool_)):
+                raise ValueError(f"{name} must be a finite probability")
+            try:
+                probability = float(value)
+            except (TypeError, ValueError, OverflowError) as exc:
+                raise ValueError(f"{name} must be a finite probability") from exc
+            if not np.isfinite(probability) or not 0.0 <= probability <= 1.0:
+                raise ValueError(f"{name} must be a finite probability")
+            loss[name] = probability
+        for scenario in scenarios.values():
+            for name, probability in loss.items():
+                scenario[name] = np.full(n, probability, dtype=float)
+            scenario["miss_visible"] = np.ones(n, dtype=bool)
     observations = {}
     for role in ("calibration", "evaluation"):
         observations[role], _ = generate_integrated_signals(
@@ -70,7 +90,7 @@ def prepare_synthetic_world(world, *, family, patients_per_cohort, signal_parame
         {"family": family, "parameters": latent_world}, sort_keys=True,
         separators=(",", ":"), allow_nan=False,
     ).encode("utf-8")
-    return {"world_generation_seed": world["world"], "family": family,
+    return {"world_generation_seed": world["world"], "family": family, "scan_loss": loss,
             "world_parameters_sha256": hashlib.sha256(world_bytes).hexdigest(),
             "benchmark_kwargs": kwargs}
 
@@ -91,13 +111,14 @@ def execute_prepared_world(prepared, benchmark):
     return {**result, "world_provenance": {
         "world_generation_seed": prepared["world_generation_seed"],
         "family": prepared["family"],
+        "scan_loss": prepared["scan_loss"],
         "world_parameters_sha256": prepared["world_parameters_sha256"],
         "verification": "caller-declared builder provenance; not independently verified",
     }}
 
 
 def make_synthetic_executor(*, family, patients_per_cohort, signal_parameters,
-                            model_parameters, settings, benchmark, entries=None):
+                            model_parameters, settings, benchmark, scan_loss=None, entries=None):
     """Compose input preparation and a supplied development benchmark.
 
     No protocol is adopted, seeds reserved, or results written by this factory.
@@ -109,7 +130,7 @@ def make_synthetic_executor(*, family, patients_per_cohort, signal_parameters,
         prepared = prepare_synthetic_world(
             world, family=family, patients_per_cohort=patients_per_cohort,
             signal_parameters=signal_parameters, model_parameters=model_parameters,
-            settings=settings, entries=entries,
+            settings=settings, scan_loss=scan_loss, entries=entries,
         )
         return execute_prepared_world(prepared, benchmark)
 

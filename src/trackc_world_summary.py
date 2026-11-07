@@ -66,6 +66,10 @@ def summarize_benchmark_worlds(records, *, resamples, seed, contrast="loo"):
             provenance = record.get("world_provenance")
             if not isinstance(provenance, dict):
                 raise ValueError("minimax summary requires world provenance")
+            if "scan_loss" not in provenance:
+                raise ValueError("minimax summary requires scan-loss provenance")
+            if provenance["scan_loss"] != reference.get("world_provenance", {}).get("scan_loss"):
+                raise ValueError("world scan-loss settings differ")
             family = provenance.get("family")
             world_hash = provenance.get("world_parameters_sha256")
             world_seed = provenance.get("world_generation_seed")

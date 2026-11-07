@@ -1,5 +1,7 @@
 # START HERE
 
+- **Track C generated scan-loss scenarios (2026-11-07):** the synthetic-world builder can now apply fixed visible scan-loss probabilities, optionally state-linked, to every cohort. It records the assumed scenario values in world provenance; the minimax summary refuses to pool different scan-loss settings. Seventeen scratch tests passed. These are simulated input mechanics; no outcome comparison or probability choice was made.
+
 - **Track C composed synthetic executor (2026-11-07):** `make_synthetic_executor` connects world preparation and the supplied benchmark adapter to the sequential development runner. The runner checks declared world-generation seeds when provenance is present. Ten scratch tests passed, including two generated synthetic worlds with a fake benchmark. This is still an unsealed prototype: no atomic seed reservation, outcome manifest, real benchmark execution, or policy scoring occurred.
 
 - **Track C minimax world-provenance check (2026-11-07):** the minimax world-summary adapter now requires a declared world seed, family, and parameter fingerprint; it rejects repeated world fingerprints, reused seed keys, and mixed world families. Twelve synthetic scratch tests passed. Caller-declared provenance remains unsealed and cannot prove independent generation. No outcomes were run.

@@ -31,7 +31,7 @@ def test_benchmark_worlds_reject_duplicate_inputs_and_inconsistent_contrast():
     def world(i):
         return {
             "analysis_type": "synthetic_virtual_world_development", "world_id": str(i),
-            "world_provenance": {"family": "single", "world_generation_seed": 400 + i,
+            "world_provenance": {"family": "single", "scan_loss": None, "world_generation_seed": 400 + i,
                                  "world_parameters_sha256": format(1000 + i, "064x")},
             "settings": {"stop": "observed"}, "inference_model_parameters": [{"d": 0}],
             "signal_generation": {"generator": "test", "parameters": {"d": 0.2}, "seed": 100 + i,
@@ -63,6 +63,10 @@ def test_benchmark_worlds_reject_duplicate_inputs_and_inconsistent_contrast():
     second = world(2)
     second["world_provenance"]["family"] = "mixture"
     with pytest.raises(ValueError, match="world families differ"):
+        summarize_benchmark_worlds([first, second], resamples=100, seed=3, contrast="minimax")
+    second = world(2)
+    second["world_provenance"]["scan_loss"] = {"miss_p": 0.2}
+    with pytest.raises(ValueError, match="scan-loss settings differ"):
         summarize_benchmark_worlds([first, second], resamples=100, seed=3, contrast="minimax")
     second = world(2)
     del second["arm_outcomes"]["finite_set_d0_minimax_mpc"]

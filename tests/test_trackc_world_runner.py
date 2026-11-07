@@ -100,7 +100,7 @@ def test_world_fingerprint_changes_when_world_parameters_change(monkeypatch):
 
 
 def test_prepared_provenance_is_attached_to_matching_fake_benchmark():
-    prepared = {"world_generation_seed": 7, "family": "single", "world_parameters_sha256": "a" * 64,
+    prepared = {"world_generation_seed": 7, "family": "single", "scan_loss": None, "world_parameters_sha256": "a" * 64,
                 "benchmark_kwargs": {"world_id": "sample"}}
     result = execute_prepared_world(prepared, lambda **kwargs: {"world_id": kwargs["world_id"]})
     assert result["world_provenance"]["world_parameters_sha256"] == "a" * 64
@@ -130,3 +130,18 @@ def test_composed_runner_builds_and_checks_two_synthetic_worlds():
     results = run_development_worlds([world("a", 1), world("b", 20)], executor, entries=entries())
     assert [row["world_provenance"]["world_generation_seed"] for row in results] == [1, 20]
     assert results[0]["world_provenance"]["world_parameters_sha256"] != results[1]["world_provenance"]["world_parameters_sha256"]
+
+
+def test_scan_loss_is_visible_and_applied_to_every_cohort():
+    params = SignalModelParameters(0.7, 0.2, 0.3, 0.1)
+    options = dict(family="single", patients_per_cohort=2, signal_parameters=params,
+                   model_parameters=(params,), settings="test", entries=entries())
+    prepared = prepare_synthetic_world(world("a", 1), scan_loss={"miss_p": 0.2, "miss_p_hi": 0.7}, **options)
+    assert prepared["scan_loss"] == {"miss_p": 0.2, "miss_p_hi": 0.7}
+    for role in ("selection", "calibration", "evaluation"):
+        scenario = prepared["benchmark_kwargs"][f"{role}_scenarios"]
+        np.testing.assert_array_equal(scenario["miss_p"], [0.2, 0.2])
+        np.testing.assert_array_equal(scenario["miss_p_hi"], [0.7, 0.7])
+        assert scenario["miss_visible"].all()
+    with pytest.raises(ValueError, match="finite probability"):
+        prepare_synthetic_world(world("a", 1), scan_loss={"miss_p": 1.1}, **options)
