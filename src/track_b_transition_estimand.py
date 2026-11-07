@@ -2,6 +2,7 @@
 
 History labels must already be registered to the same 2-mm grid. This helper
 does not perform registration, assess image QC, or authorize scoring.
+It implements the older 2-mm draft, not the distinct 10-mm private Duke run.
 State codes are 0 outside risk, 1 newly appearing, and 2 persistent. Band codes
 0--3 represent the four prespecified distance bands. Target codes are 0--4.
 """
