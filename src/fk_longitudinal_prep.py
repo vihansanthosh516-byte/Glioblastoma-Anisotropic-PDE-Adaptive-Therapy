@@ -131,6 +131,10 @@ def register_rigid_mri(fixed, moving, *, fixed_support, spacing_mm, downsample: 
 
 def registration_qc(params, ncc_after) -> dict:
     """Frozen draft QC: pass only if NCC >= threshold and the transform is within the motion limits."""
+    params = np.asarray(params, dtype=float)
+    if params.shape != (6,) or not np.isfinite(params).all():
+        return {"passed": False, "reasons": ["invalid or nonfinite transform parameters"],
+                "max_rotation_deg": None, "shift_mm": None}
     rot = float(np.max(np.abs(params[:3])))
     shift = float(np.linalg.norm(params[3:]))
     reasons = []

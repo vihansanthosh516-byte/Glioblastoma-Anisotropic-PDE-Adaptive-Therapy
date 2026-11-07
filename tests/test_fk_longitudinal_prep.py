@@ -61,6 +61,16 @@ def test_registration_qc_fails_closed_and_reports_exclusions():
     assert lp.registration_qc(np.zeros(6), float("nan"))["passed"] is False
 
 
+def test_registration_qc_rejects_nonfinite_or_malformed_transform():
+    for params in ([float('nan'), 0, 0, 0, 0, 0],
+                   [0, 0, 0, float('nan'), 0, 0],
+                   [0, 0, 0, float('inf'), 0, 0],
+                   [0, 0, 0]):
+        result = lp.registration_qc(np.asarray(params), 0.95)
+        assert result['passed'] is False
+        assert result['reasons']
+
+
 def test_registration_uses_no_label_input():
     params = list(inspect.signature(lp.register_rigid_mri).parameters)
     assert params == ["fixed", "moving", "fixed_support", "spacing_mm", "downsample"]
