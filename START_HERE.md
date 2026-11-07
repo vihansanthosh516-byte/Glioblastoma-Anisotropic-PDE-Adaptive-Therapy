@@ -1,5 +1,7 @@
 # START HERE
 
+- **Coverage/resampler synthetic comparison (2026-11-07):** the geometric-coverage prototype matched `fk_longitudinal_prep.apply_rigid(..., order=0)` on all-ones arrays for identity, integer translation, and one rotation/translation with unequal spacing. Thirty-three focused scratch tests passed. This checks index-transform compatibility with that same-grid helper only; it does not validate arbitrary NIfTI affines, real registration, or the final Duke resampler. No patient data were read.
+
 - **Registration optimizer status (2026-11-07):** synthetic preparation now marks registration QC failed if either Powell stage reports non-convergence, even when NCC and motion thresholds pass. Earlier code ignored optimizer status. This is a proposed stricter QC rule, not an adopted Duke protocol amendment; prior LUMIERE freeze hashes remain historical. Thirty focused synthetic tests passed. No patient data were read.
 
 - **Registration QC correction (2026-11-07):** `fk_longitudinal_prep.registration_qc` now rejects non-finite or malformed transform parameters; previously NaN rotation or translation could pass comparison checks. Twenty-eight focused synthetic scratch tests passed. This changes the code hash recorded by the historical LUMIERE QC draft; that hash must not be treated as current or silently replaced. No Duke protocol is frozen, and no patient data were read.

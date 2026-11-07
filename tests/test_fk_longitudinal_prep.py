@@ -6,6 +6,7 @@ import numpy as np
 import pytest
 
 from src import fk_longitudinal_prep as lp
+from src.track_b_transition_estimand import geometric_coverage
 
 
 def _v(pid, week, usable=True, order=0):
@@ -89,3 +90,22 @@ def test_registration_optimizer_failure_never_passes_qc(monkeypatch, failure_sta
 def test_registration_uses_no_label_input():
     params = list(inspect.signature(lp.register_rigid_mri).parameters)
     assert params == ["fixed", "moving", "fixed_support", "spacing_mm", "downsample"]
+
+
+@pytest.mark.parametrize('params,spacing', [
+    ([0, 0, 0, 0, 0, 0], (2, 2, 2)),
+    ([0, 0, 0, 2, -2, 0], (2, 2, 2)),
+    ([4, -6, 8, 1.2, -2.1, 0.4], (1, 2, 3)),
+])
+def test_coverage_matches_existing_rigid_label_resampler(params, spacing):
+    shape = (12, 10, 8)
+    center = (np.array(shape) - 1) / 2
+    rotation = lp._rotation(params[:3])
+    scale = np.diag(spacing)
+    matrix = np.linalg.inv(scale) @ rotation @ scale
+    offset = center + np.array(params[3:]) / spacing - matrix @ center
+    affine = np.eye(4)
+    affine[:3, :3], affine[:3, 3] = matrix, offset
+    coverage = geometric_coverage(shape, shape, affine)
+    reference = lp.apply_rigid(np.ones(shape), params, spacing_mm=spacing, order=0).astype(bool)
+    np.testing.assert_array_equal(coverage, reference)
