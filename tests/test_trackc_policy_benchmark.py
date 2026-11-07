@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import importlib.util
 import inspect
+from copy import deepcopy
 from pathlib import Path
 import sys
 
@@ -13,6 +14,7 @@ REPO = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO / "src"))
 
 import trackc_sim as tc  # noqa: E402
+from trackc_world_summary import summarize_benchmark_worlds  # noqa: E402
 from trackc_integrated_signal_model import (  # noqa: E402
     SignalModelParameters,
     generate_integrated_signals,
@@ -383,6 +385,20 @@ def test_full_policy_harness_runs_all_arms_on_shared_endpoint_path(monkeypatch):
         schedule_mixture_seed=[2026110620],
         settings=settings,
         include_ambiguity_controller=True,
+    )
+
+    # Exercise the adapter with the actual result schema. This copied record is
+    # synthetic test data, not evidence of two independent simulated worlds.
+    copied = deepcopy(result)
+    copied["world_id"] = "copied-schema-test"
+    for index, key in enumerate(("selection_scenarios_sha256", "calibration_scenarios_sha256", "evaluation_scenarios_sha256")):
+        copied["input_fingerprints"][key] = format(100 + index, "064x")
+    copied["seeds"] = {key: [int(x) + 1000000 for x in value] for key, value in copied["seeds"].items()}
+    copied["signal_generation"]["seed"] += 1000000
+    summary = summarize_benchmark_worlds([result, copied], resamples=100, seed=42)
+    assert summary["n_worlds"] == 2
+    assert summary["equal_world_mean_difference"] == pytest.approx(
+        result["primary_paired_contrast"]["robust_utility_difference"].mean()
     )
 
     expected = {
