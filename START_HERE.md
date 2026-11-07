@@ -1,5 +1,7 @@
 # START HERE
 
+- **Private Duke saved-record consistency (2026-11-07):** result and frozen cohort contain the same unique patient/window pairs and patient set. Every saved band checked obeys the frozen minimum-count rule; saved fractions, differences and minimum-count weights are internally consistent. This validates saved-record consistency, not source segmentation values or spatial accuracy. No images or masks were reopened; private records remain outside Git.
+
 - **Private Duke result arithmetic audit (2026-11-07):** read-only recomputation from the saved private window and patient summaries exactly matched recorded window weighting, within-patient averaging, overall mean, and seeded patient-bootstrap interval. This checks aggregation of saved outputs only; it does not validate image registration, coverage, labels, cohort selection, or clinical meaning. No images or masks were reopened; private records remain outside Git.
 
 - **Duke estimand mismatch (2026-11-07):** the completed private 2026-11-04 run used a 10-mm previous-FLAIR dilation and excluded regions within 10 mm of middle core, with its own three distance bands. The newer `track_b_transition_estimand.py` prototype follows the older 2-mm draft and is **not** an implementation or replication of that scored analysis. Preliminary code inspection confirms the private script resampled outside-field target voxels to zero, so unmeasured target coverage is a possible limitation of its result; impact is unknown. Do not rerun or tune on that exposed outcome. Full audit and rights review remain open.
