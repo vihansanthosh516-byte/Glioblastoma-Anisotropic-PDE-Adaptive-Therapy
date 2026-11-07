@@ -186,6 +186,36 @@ def test_shared_training_uses_earliest_endpoint_on_one_path(monkeypatch):
     assert captured["scenarios"]["scan_every"] == 1
 
 
+def test_observed_stop_training_uses_observed_terminal_and_full_endpoint_score(monkeypatch):
+    captured = {}
+
+    def fake_simulate_two_endpoints(scenarios, policy, seed, *, stop_endpoint, budget):
+        captured["stop_endpoint"] = stop_endpoint
+        policy.reset(scenarios, np.random.default_rng(seed))
+        for cycle in range(9):
+            action = policy.act(cycle, np.array([0.0]))
+            policy.advance(cycle, action)
+        return {
+            "ttp_baseline": np.array([500.0]),
+            "ttp_rano": np.array([200.0]),
+            "courses": np.array([1]),
+            "observed_stop_day": np.array([56.0]),
+        }
+
+    monkeypatch.setattr(qlearn.tc, "simulate_two_endpoints", fake_simulate_two_endpoints)
+    fitted = qlearn.train_q_learning_shared_endpoints(
+        {"r": np.array([0.01])}, episodes=1, course_cap=1, course_penalty=0.0,
+        scan_every=1, tau_days=365.0, learning_rate=1.0, epsilon=0.0,
+        min_epsilon=0.0, seed=[5, 8], stop_endpoint="observed_two_scan",
+    )
+
+    event_state = qlearn.bin_state(2, 0.0, 0.0, 0, course_cap=1)
+    after_stop_state = qlearn.bin_state(3, 0.0, 0.0, 0, course_cap=1)
+    assert captured["stop_endpoint"] == "observed_two_scan"
+    assert fitted.q_values[event_state + (0,)] == 200.0
+    assert fitted.q_values[after_stop_state + (0,)] == 0.0
+
+
 def test_shared_evaluator_forwards_scan_and_budget(monkeypatch):
     policy = qlearn.QTablePolicy(
         np.zeros(qlearn.q_shape(course_cap=2)), course_cap=2, scan_every=4

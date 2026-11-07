@@ -219,11 +219,13 @@ def test_fixed_schedule_controls_expose_six_and_twelve_course_references():
 def test_full_policy_harness_runs_all_arms_on_shared_endpoint_path(monkeypatch):
     received_f0_bounds = []
     received_scan_intervals = []
+    received_stop_endpoints = []
     original_loader = benchmark._load_source_module
     original_simulator = tc.simulate_two_endpoints
 
     def recording_simulator(scenarios, *args, **kwargs):
         received_scan_intervals.append(np.asarray(scenarios.get("scan_every")).copy())
+        received_stop_endpoints.append(kwargs.get("stop_endpoint"))
         return original_simulator(scenarios, *args, **kwargs)
 
     monkeypatch.setattr(tc, "simulate_two_endpoints", recording_simulator)
@@ -262,6 +264,7 @@ def test_full_policy_harness_runs_all_arms_on_shared_endpoint_path(monkeypatch):
     generation_parameters = SignalModelParameters(q=0.6, a=0.2, b=0.4, d=0.3)
     settings = benchmark.PolicyBenchmarkSettings(
         course_budget=12,
+        stop_endpoint="observed_two_scan",
         tau_days=84.0,
         n_f0_nodes=8,
         mpc_particles=2,
@@ -337,6 +340,7 @@ def test_full_policy_harness_runs_all_arms_on_shared_endpoint_path(monkeypatch):
         if row["status"] == "evaluated"
     }
     assert set(result["arm_outcomes"]) == expected | matched_arm_names
+    assert received_stop_endpoints and set(received_stop_endpoints) == {"observed_two_scan"}
     assert set(result["calibration_course_use"]) == set(result["matched_fixed_schedule_controls"])
     for policy_name, control in result["matched_fixed_schedule_controls"].items():
         assert control["calibration_mean_courses"] == pytest.approx(
@@ -398,6 +402,7 @@ def test_full_policy_harness_runs_all_arms_on_shared_endpoint_path(monkeypatch):
         assert (arm["courses_through_cutoff"] <= arm["courses"]).all()
         assert (arm["courses"] <= settings.course_budget).all()
     assert result["analysis_type"] == "synthetic_virtual_world_development"
+    assert result["settings"]["stop_endpoint"] == "observed_two_scan"
     assert result["settings"]["signal_f0_bounds"] == tuple(map(float, tc.RANGES["f0"][:2]))
     assert result["signal_generation"] == {
         "generator": "trackc_integrated_signal_model.generate_integrated_signals",

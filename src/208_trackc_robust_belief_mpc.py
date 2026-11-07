@@ -88,7 +88,9 @@ class RobustBeliefMPC:
         prediction_particles: posterior draws used by the planner per patient.
         forecast_cycles: local forecast length. Must be a multiple of ``scan_every``;
             the selected scan-interval pattern repeats throughout this window.
-        stop_endpoint: treatment stops at ``baseline``, ``rano``, or the first of either.
+        stop_endpoint: treatment stops at ``baseline``, ``rano``, the first of either, or
+            the observed two-positive-scan rule. The observed rule uses noisy scan values
+            to stop treatment; latent endpoint forecasts remain part of planning utility.
         ranges: optional parameter prior passed to ``ParticleFilter``.
 
     Benchmarking: ``evaluate_robust_belief_mpc`` applies the policy's scan interval and
@@ -117,8 +119,8 @@ class RobustBeliefMPC:
         self.n_particles = _as_int(n_particles, "n_particles")
         self.prediction_particles = _as_int(prediction_particles, "prediction_particles")
         self.forecast_cycles = _as_int(forecast_cycles, "forecast_cycles")
-        if stop_endpoint not in ("baseline", "rano", "either"):
-            raise ValueError("stop_endpoint must be baseline, rano, or either")
+        if stop_endpoint not in ("baseline", "rano", "either", "observed_two_scan"):
+            raise ValueError("stop_endpoint must be baseline, rano, either, or observed_two_scan")
         self.stop_endpoint = stop_endpoint
         if not 1 <= self.scan_every <= 4:
             raise ValueError("scan_every must be between 1 and 4 cycles")
@@ -154,6 +156,11 @@ class RobustBeliefMPC:
         # The RANO nadir starts at the first observed burden, not the unconditioned prior.
         # It remains NaN until a patient has a usable observation.
         self.nadir_est = np.full(self.n, np.nan, dtype=float)
+        self.observed_baseline_log = np.full(self.n, np.nan, dtype=float)
+        self.observed_nadir_log = np.full(self.n, np.nan, dtype=float)
+        self.observed_positive_scan_count = np.zeros(self.n, dtype=int)
+        self.observed_stopped = np.zeros(self.n, dtype=bool)
+        self._planning_observation_noise = None
 
     def _update_visible(self, j, y):
         """Update only rows with an actual reading; missing rows get no likelihood or resample."""
@@ -171,6 +178,24 @@ class RobustBeliefMPC:
         if resample.size:
             self.pf._resample_move(resample, j, w[resample])
         return seen
+
+    def _update_observed_stop(self, y):
+        if self.stop_endpoint != "observed_two_scan":
+            return
+        (
+            self.observed_baseline_log,
+            self.observed_nadir_log,
+            self.observed_positive_scan_count,
+            self.observed_stopped,
+            _newly_stopped,
+        ) = tc.update_observed_two_scan_state(
+            y,
+            np.ones(self.n, dtype=bool),
+            self.observed_baseline_log,
+            self.observed_nadir_log,
+            self.observed_positive_scan_count,
+            self.observed_stopped,
+        )
 
     def _sample_posterior(self, rows):
         """Draw a small weighted posterior sample for bounded planning."""
@@ -198,16 +223,41 @@ class RobustBeliefMPC:
         """Predict both endpoint times on one shared treatment path."""
         theta = state["theta"]
         S, R = state["S"].copy(), state["R"].copy()
+        burden = S + R
         B0 = theta["B0"]
         ttp_base = t_base_now.copy()
         ttp_rano = t_rano_now.copy()
         courses = np.zeros_like(ttp_base, dtype=float)
         nadir = np.minimum(nadir_start[:, None], B0)
+        observed_stopped = None
+        observed_baseline = None
+        observed_nadir = None
+        observed_positive_count = None
+        observation_noise = None
+        if self.stop_endpoint == "observed_two_scan":
+            observed_baseline = np.broadcast_to(self.observed_baseline_log[rows, None], burden.shape).copy()
+            observed_nadir = np.broadcast_to(
+                self.observed_nadir_log[rows, None], burden.shape
+            ).copy()
+            observed_positive_count = np.broadcast_to(
+                self.observed_positive_scan_count[rows, None], burden.shape
+            ).copy()
+            observed_stopped = np.broadcast_to(
+                self.observed_stopped[rows, None], burden.shape
+            ).copy()
+            if self._planning_observation_noise is not None:
+                observation_noise = self._planning_observation_noise[rows]
+            else:
+                observation_noise = np.zeros(
+                    (rows.size, burden.shape[1], self.forecast_cycles + 1), dtype=float
+                )
 
         for h in range(self.forecast_cycles):
             cycle = j + h
             on = bool(pattern[h % self.scan_every])
-            if self.stop_endpoint == "baseline":
+            if self.stop_endpoint == "observed_two_scan":
+                still_treat = ~observed_stopped
+            elif self.stop_endpoint == "baseline":
                 still_treat = np.isnan(ttp_base)
             elif self.stop_endpoint == "rano":
                 still_treat = np.isnan(ttp_rano)
@@ -230,6 +280,22 @@ class RobustBeliefMPC:
                 hit = np.isnan(ttp_rano) & (B_rano >= threshold)
                 ttp_rano[hit] = (h + 1) * tc.CYCLE_DAYS
                 nadir = np.minimum(nadir, B_rano)
+                if self.stop_endpoint == "observed_two_scan":
+                    predicted_reading = np.log(np.maximum(S + R, 1e-300)) + observation_noise[:, :, h + 1]
+                    (
+                        observed_baseline,
+                        observed_nadir,
+                        observed_positive_count,
+                        observed_stopped,
+                        _newly_stopped,
+                    ) = tc.update_observed_two_scan_state(
+                        predicted_reading,
+                        True,
+                        observed_baseline,
+                        observed_nadir,
+                        observed_positive_count,
+                        observed_stopped,
+                    )
 
         forecast_days = self.forecast_cycles * tc.CYCLE_DAYS
         ttp_base = np.where(np.isnan(ttp_base), forecast_days, ttp_base)
@@ -258,6 +324,17 @@ class RobustBeliefMPC:
         else:
             t_rano_now = np.full(burden.shape, np.nan)
 
+        self._planning_observation_noise = None
+        if self.stop_endpoint == "observed_two_scan":
+            noise = self.rng.standard_normal(
+                (rows.size, self.prediction_particles, self.forecast_cycles + 1)
+            )
+            noise *= self.pf.sigma[rows, 0][:, None, None]
+            self._planning_observation_noise = np.zeros(
+                (self.n, self.prediction_particles, self.forecast_cycles + 1), dtype=float
+            )
+            self._planning_observation_noise[rows] = noise
+
         # Current scan updates the observable nadir estimate. Use that updated value for
         # future predictions; nadir_prev is only for the current scan's RANO call.
         nadir_start = self.nadir_est[rows].copy()
@@ -281,6 +358,7 @@ class RobustBeliefMPC:
         if not 0 <= j < tc.N_CYCLES:
             raise ValueError(f"cycle index must be in [0, {tc.N_CYCLES - 1}]")
         if j % self.scan_every == 0:
+            self._update_observed_stop(y)
             visible = self._update_visible(j, y)
             if visible.size:
                 nadir_prev = self.nadir_est[visible].copy()
@@ -291,8 +369,14 @@ class RobustBeliefMPC:
                     np.minimum(nadir_prev, burden_mean[visible]),
                     burden_mean[visible],
                 )
-                self._replan(visible, j, nadir_prev)
-        return self.plan[:, j].copy() & (self.used < self.budget)
+                active_mask = ~self.observed_stopped[visible]
+                active = visible[active_mask]
+                if active.size:
+                    self._replan(active, j, nadir_prev[active_mask])
+        action = self.plan[:, j].copy() & (self.used < self.budget)
+        if self.stop_endpoint == "observed_two_scan":
+            action &= ~self.observed_stopped
+        return action
 
     def advance(self, j, treat):
         """Record applied courses and propagate the filter under known past actions."""

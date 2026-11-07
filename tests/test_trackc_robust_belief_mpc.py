@@ -246,6 +246,71 @@ def test_invalid_scan_or_forecast_dimensions_are_rejected():
         RobustBeliefMPC(scan_every=3, forecast_cycles=4)
 
 
+def test_observed_two_scan_planner_ignores_latent_stop_times(monkeypatch):
+    policy = RobustBeliefMPC(
+        scan_every=1,
+        budget=4,
+        course_penalty=5.0,
+        n_particles=8,
+        prediction_particles=1,
+        forecast_cycles=3,
+        stop_endpoint="observed_two_scan",
+    )
+    policy.reset(_scenarios(n=1), np.random.default_rng(20261106))
+    policy.observed_baseline_log[:] = 0.0
+    policy.observed_nadir_log[:] = 0.0
+    policy._planning_observation_noise = np.zeros((1, 1, 4))
+    calls = []
+
+    def deterministic_growth(S, R, theta, treat, t0, *, prog_level=None, ttp=None):
+        cycle = int(t0 // tc.CYCLE_DAYS)
+        calls.append(np.asarray(treat, dtype=bool).copy())
+        if cycle == 0:
+            return np.full_like(S, 1.50), np.zeros_like(R)
+        return S, R
+
+    monkeypatch.setattr(tc, "run_cycle", deterministic_growth)
+    theta = {
+        "r": np.array([[0.01]]),
+        "m": np.array([[6.0]]),
+        "f0": np.array([[0.05]]),
+        "c": np.array([[0.0]]),
+        "eps": np.array([[0.0]]),
+        "B0": np.array([[1.0]]),
+        "a_sr": np.array([[1.0]]),
+        "a_rs": np.array([[1.0]]),
+    }
+    policy.used = np.array([0])
+    policy._forecast_pattern(
+        {"S": np.array([[0.95]]), "R": np.array([[0.05]]), "theta": theta},
+        rows=np.array([0]),
+        j=0,
+        pattern=np.array([True]),
+        nadir_start=np.array([1.0]),
+        # The hidden events have already happened, but must not stop the treatment
+        # forecast when the configured executor uses observed scans.
+        t_base_now=np.array([[0.0]]),
+        t_rano_now=np.array([[0.0]]),
+    )
+
+    assert [bool(action[0, 0]) for action in calls] == [True, True, False]
+
+
+def test_observed_stop_state_blocks_current_course_after_confirmation():
+    policy = _policy()
+    policy.stop_endpoint = "observed_two_scan"
+    policy.reset(_scenarios(n=1), np.random.default_rng(20261107))
+    policy.plan[0, 2] = True
+    policy.observed_baseline_log[0] = 0.0
+    policy.observed_nadir_log[0] = 0.0
+    policy.observed_positive_scan_count[0] = 1
+
+    action = policy.act(2, np.array([np.log(1.5)]))
+
+    assert policy.observed_stopped.tolist() == [True]
+    assert action.tolist() == [False]
+
+
 @pytest.mark.parametrize(
     "kwargs",
     [

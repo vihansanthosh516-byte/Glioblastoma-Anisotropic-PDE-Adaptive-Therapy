@@ -1,6 +1,6 @@
 # Observation-based treatment stop rule proposal (2026-11-06)
 
-**Status: proposed; not yet wired into the policy benchmark.** This proposal changes how simulated treatment stops. It does not change the project title, patient-data analyses, or Track A/B results.
+**Status: proposed and wired as an opt-in development setting; not adopted as the primary rule.** The benchmark default remains `stop_endpoint="either"`. This proposal changes only how simulated treatment stops. It does not change the project title, patient-data analyses, or Track A/B results.
 
 ## Why change it
 
@@ -19,19 +19,24 @@ The baseline and RANO-like progression outcomes remain latent simulator outcomes
 ## Evidence and code status
 
 - Added to `src/trackc_sim.py` as an opt-in mode. Existing `baseline`, `rano`, and `either` modes remain available.
-- Added three tests for two-scan confirmation timing, missing-scan handling, and independence from the hidden progression threshold.
+- Added a shared stop-state helper used by both the simulator and belief-MPC forecasts, so execution and planning use the same threshold and missing-scan rule.
+- Added the setting to `PolicyBenchmarkSettings`. Fixed-schedule selection, baseline selection, Q-learning training, belief-MPC candidate paths, calibration, evaluation, result validation, and saved settings now receive the same selected stop rule. A mismatch is rejected.
+- Q-learning no longer truncates observed-stop training at latent endpoint times. It assigns endpoint reward at the observed stop or the restricted horizon and applies course costs through that point.
+- Belief MPC forecasts noisy future scans with common noise draws across candidate treatment patterns, updates the same two-scan state, and stops each candidate path from that observed state. Forecasting assumes future scans are present; missing-scan prediction is not modeled by MPC.
+- Added tests for helper behavior, hidden-event independence in MPC stopping, observed-stop Q-learning termination, and consistent end-to-end benchmark propagation.
 - Scratch verification: **62 tests passed in 599.02 seconds** across the new stop-rule tests, `test_trackc_sim.py`, and `test_trackc_scan_endpoint.py`. SHA-256 matched the four copied simulator source modules. No outcome benchmark, patient-data analysis, or sealed evaluation ran.
 - After a docstring-only clarification, the three new tests passed again in **2.23 seconds**; SHA-256 matched the simulator source and all three copied test files.
-- Benchmark-compatibility check: **16 tests passed in 71.36 seconds**; SHA-256 matched ten copied Track C source modules. The active benchmark still exercised its existing `either` mode.
-- The active policy benchmark still uses `stop_endpoint="either"`. Its controller planning, Q-learning training, schedule selection, evaluator validation, and output metadata have not yet been changed to use the new rule.
+- Latest scratch verification: **71 tests passed in 75.57 seconds** across `test_trackc_observed_stop.py`, `test_trackc_qlearning_baseline.py`, `test_trackc_robust_belief_mpc.py`, `test_trackc_robust_signal_ambiguity.py`, and `test_trackc_policy_benchmark.py`. The end-to-end benchmark test used two patients and tiny settings to test wiring; it is a mechanics check, not a research result. Hash comparison against the scratch copy remains to be recorded.
+- Broader default-path regression check: **80 tests passed in 1,331.23 seconds** across `test_trackc_sim.py`, `test_trackc_scan_endpoint.py`, `test_trackc_policy_context.py`, `test_trackc_loo_model_average.py`, and `test_trackc_integrated_policy_utils.py` in the same scratch worktree. SHA-256 matched all nine copied source/test files.
+- No research-scale multi-world outcome evaluation, held-out analysis, patient-data analysis, or sealed run was performed. Existing default behavior remains `either` unless the caller explicitly selects `observed_two_scan`.
 
-## Required before any policy outcome comparison
+## Required before a research-scale outcome comparison
 
 1. Decide whether this observable trigger is the primary execution rule. Keep latent-oracle stopping as a labeled sensitivity analysis only.
-2. Pass the same stop rule through policy training, candidate-action simulation, comparator selection, fixed-schedule selection, and held-out evaluation. Refuse a run if one arm uses a different rule.
-3. Test that policy resets and action selection never receive latent progression times or hidden parameters. Test that changing only hidden endpoint thresholds cannot change actions or treatment stops under the observable rule.
-4. Freeze the trigger, scan interval, missing-scan behavior, endpoint estimands, utility weight, world-level precision target, uncertainty intervals, multiplicity rule, and fresh seed blocks before outcome scoring.
-5. Report results across every predeclared signal anchor, including harm. Do not change settings to seek a positive result.
+2. Freeze the trigger, scan interval, missing-scan behavior, endpoint estimands, utility weight, world-level precision target, uncertainty intervals, multiplicity rule, and fresh seed blocks before outcome scoring.
+3. Decide how MPC should represent future missing scans or state clearly that its forecast assumes complete follow-up; add sensitivity checks for that assumption.
+4. Add the registered independent-world precision and held-out scoring path. Report results across every predeclared signal anchor, including harm.
+5. Do not change settings after viewing outcomes to seek a positive result. A positive or negative outcome must come from the frozen comparison.
 
 ## Research-position check
 

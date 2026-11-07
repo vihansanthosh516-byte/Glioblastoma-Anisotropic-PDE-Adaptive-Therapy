@@ -324,20 +324,25 @@ def train_q_learning_shared_endpoints(
     learning_rate: float = 0.1, discount: float = 1.0,
     epsilon: float = 0.25, epsilon_decay: float = 0.98,
     min_epsilon: float = 0.02, seed: int = 0,
+    stop_endpoint: str = "either",
 ) -> QTablePolicy:
     """Fit Q-learning to both endpoints on the simulator's shared treatment path.
 
-    Training episodes use ``simulate_two_endpoints(..., stop_endpoint="either")``.
-    The terminal reward is the earlier of baseline and RANO-like progression,
-    restricted at ``tau_days``, minus the course penalty for treatments delivered
-    through that event or the restriction horizon. Selection scenarios only are
-    accepted by this function; callers must keep evaluation scenarios separate.
+    Training episodes use the requested shared treatment-stop rule. For latent-stop
+    modes, the terminal reward is assigned at the first endpoint event. For
+    ``observed_two_scan``, hidden endpoint times do not truncate learning: treatment
+    follows the observed two-scan stop rule, endpoint utility is scored through
+    ``tau_days``, and the terminal reward is assigned at the observed stop or the
+    restriction horizon. Selection scenarios only are accepted by this function;
+    callers must keep evaluation scenarios separate.
 
     This is a simulation baseline, not a replication of Yauney & Shah (2018),
     a patient-specific model, or a clinical treatment policy.
     """
     cap = _check_course_cap(course_cap)
     scans = _check_scan_every(scan_every)
+    if stop_endpoint not in ("baseline", "rano", "either", "observed_two_scan"):
+        raise ValueError("stop_endpoint must be baseline, rano, either, or observed_two_scan")
     if isinstance(episodes, bool) or int(episodes) != episodes or int(episodes) < 1:
         raise ValueError("episodes must be a positive integer")
     if not np.isfinite(course_penalty) or course_penalty < 0:
@@ -360,7 +365,7 @@ def train_q_learning_shared_endpoints(
         learner = _ExploringPolicy(q, course_cap=cap, scan_every=scans, epsilon=current_epsilon)
         sim_seed = [*seed_components, episode]
         outcome = tc.simulate_two_endpoints(
-            training_scenarios, learner, sim_seed, stop_endpoint="either", budget=cap
+            training_scenarios, learner, sim_seed, stop_endpoint=stop_endpoint, budget=cap
         )
         if not learner._state_history:
             raise RuntimeError("simulator produced no policy transitions")
@@ -385,8 +390,25 @@ def train_q_learning_shared_endpoints(
                 raise ValueError("shared-endpoint course counts must match the training patients")
 
         effective_ttp = np.minimum(np.minimum(ttp_baseline, ttp_rano), float(tau_days))
-        terminal_steps = np.ceil(effective_ttp / tc.CYCLE_DAYS - 1e-12).astype(int) - 1
-        terminal_steps = np.clip(terminal_steps, 0, n_steps - 1)
+        if stop_endpoint == "observed_two_scan":
+            if "observed_stop_day" not in outcome:
+                raise ValueError("observed-stop training requires observed_stop_day outcomes")
+            observed_stop_day = np.asarray(outcome["observed_stop_day"], dtype=float)
+            if observed_stop_day.shape != (n_patients,) or np.isinf(observed_stop_day).any():
+                raise ValueError("observed_stop_day must be a matching vector of finite values or NaN")
+            if np.any(observed_stop_day[np.isfinite(observed_stop_day)] < 0):
+                raise ValueError("observed_stop_day values must be non-negative")
+            last_tau_step = int(np.ceil(float(tau_days) / tc.CYCLE_DAYS - 1e-12)) - 1
+            last_tau_step = int(np.clip(last_tau_step, 0, n_steps - 1))
+            observed_steps = np.full(n_patients, last_tau_step, dtype=int)
+            has_observed_stop = np.isfinite(observed_stop_day)
+            observed_steps[has_observed_stop] = np.rint(
+                observed_stop_day[has_observed_stop] / tc.CYCLE_DAYS
+            ).astype(int)
+            terminal_steps = np.clip(np.minimum(observed_steps, last_tau_step), 0, n_steps - 1)
+        else:
+            terminal_steps = np.ceil(effective_ttp / tc.CYCLE_DAYS - 1e-12).astype(int) - 1
+            terminal_steps = np.clip(terminal_steps, 0, n_steps - 1)
         for patient in range(n_patients):
             terminal_step = int(terminal_steps[patient])
             for step in range(terminal_step, -1, -1):
@@ -406,13 +428,19 @@ def train_q_learning_shared_endpoints(
     return QTablePolicy(q, course_cap=cap, scan_every=scans)
 
 
-def evaluate_q_policy_shared_endpoints(evaluation_scenarios: Mapping, policy: QTablePolicy, seed):
+def evaluate_q_policy_shared_endpoints(
+    evaluation_scenarios: Mapping,
+    policy: QTablePolicy,
+    seed,
+    *,
+    stop_endpoint: str = "either",
+):
     """Evaluate a frozen Q policy on one shared path for both progression endpoints."""
     if not isinstance(policy, QTablePolicy):
         raise TypeError("policy must be a fitted QTablePolicy")
     eval_scenarios = dict(evaluation_scenarios)
     eval_scenarios["scan_every"] = policy.scan_every
     return tc.simulate_two_endpoints(
-        eval_scenarios, policy, seed, stop_endpoint="either", budget=policy.course_cap
+        eval_scenarios, policy, seed, stop_endpoint=stop_endpoint, budget=policy.course_cap
     )
 

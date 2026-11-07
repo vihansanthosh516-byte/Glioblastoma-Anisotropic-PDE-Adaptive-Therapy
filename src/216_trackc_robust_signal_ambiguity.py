@@ -246,6 +246,16 @@ class SignalAmbiguityBeliefMPC(_MPC.RobustBeliefMPC):
             return super()._replan(rows, j, previous_nadir[0])
 
         scores = np.empty((len(self.model_filters), self.patterns.shape[0], rows.size), dtype=float)
+        self._planning_observation_noise = None
+        if self.stop_endpoint == "observed_two_scan":
+            noise = self.rng.standard_normal(
+                (rows.size, self.prediction_particles, self.forecast_cycles + 1)
+            )
+            noise *= self.model_filters[0].sigma[rows, 0][:, None, None]
+            self._planning_observation_noise = np.zeros(
+                (self.n, self.prediction_particles, self.forecast_cycles + 1), dtype=float
+            )
+            self._planning_observation_noise[rows] = noise
         uniforms = keyed_stratified_uniforms(
             self._prediction_seed,
             rows,
@@ -297,6 +307,7 @@ class SignalAmbiguityBeliefMPC(_MPC.RobustBeliefMPC):
         if not 0 <= j < tc.N_CYCLES:
             raise ValueError(f"cycle index must be in [0, {tc.N_CYCLES - 1}]")
         if j % self.scan_every == 0:
+            self._update_observed_stop(y)
             visible = self._update_visible(j, y)
             if visible.size:
                 nadir_prev = self.model_nadir_est[:, visible].copy()
@@ -308,8 +319,14 @@ class SignalAmbiguityBeliefMPC(_MPC.RobustBeliefMPC):
                         np.minimum(nadir_prev[model_index], burden_mean[visible]),
                         burden_mean[visible],
                     )
-                self._replan(visible, j, nadir_prev)
-        return self.plan[:, j].copy() & (self.used < self.budget)
+                active_mask = ~self.observed_stopped[visible]
+                active = visible[active_mask]
+                if active.size:
+                    self._replan(active, j, nadir_prev[:, active_mask])
+        action = self.plan[:, j].copy() & (self.used < self.budget)
+        if self.stop_endpoint == "observed_two_scan":
+            action &= ~self.observed_stopped
+        return action
 
     def advance(self, j, treat):
         """Apply same realized action and propagate every model-specific filter."""

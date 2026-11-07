@@ -77,3 +77,37 @@ def test_hidden_progression_threshold_does_not_control_observed_stop():
     assert np.array_equal(low_threshold["courses"], high_threshold["courses"])
     assert np.array_equal(low_threshold["observed_stop_day"], high_threshold["observed_stop_day"])
     assert low_threshold["ttp_baseline"][0] < high_threshold["ttp_baseline"][0]
+
+
+def test_shared_observed_stop_state_resets_only_on_scheduled_missing_scans():
+    baseline, nadir, count, stopped, newly = tc.update_observed_two_scan_state(
+        readings=np.array([0.0]),
+        scheduled=True,
+        observed_baseline_log=np.array([np.nan]),
+        observed_nadir_log=np.array([np.nan]),
+        positive_scan_count=np.array([0]),
+        stopped=np.array([False]),
+    )
+    assert baseline[0] == nadir[0] == 0.0
+    assert count.tolist() == [0]
+    assert not stopped[0] and not newly[0]
+
+    first_positive = np.log(1.5)
+    baseline, nadir, count, stopped, newly = tc.update_observed_two_scan_state(
+        first_positive, True, baseline, nadir, count, stopped
+    )
+    assert count.tolist() == [1]
+    assert not stopped[0] and not newly[0]
+
+    # A NaN at an unscheduled cycle does not change the confirmation count.
+    _, _, count, stopped, _ = tc.update_observed_two_scan_state(
+        np.nan, False, baseline, nadir, count, stopped
+    )
+    assert count.tolist() == [1]
+
+    # A missing scheduled scan resets the two-scan confirmation sequence.
+    _, _, count, stopped, _ = tc.update_observed_two_scan_state(
+        np.nan, True, baseline, nadir, count, stopped
+    )
+    assert count.tolist() == [0]
+    assert not stopped[0]

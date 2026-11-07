@@ -44,6 +44,7 @@ def _load_source_module(module_name: str, filename: str):
 @dataclass(frozen=True)
 class PolicyBenchmarkSettings:
     scan_every: int = 3
+    stop_endpoint: str = "either"
     course_budget: int = tc.BUDGET
     tau_days: float = 730.0
     course_penalty: float = 5.0
@@ -60,6 +61,10 @@ class PolicyBenchmarkSettings:
 
     def __post_init__(self):
         _validate_int(self.scan_every, "scan_every", 1, 4)
+        if self.stop_endpoint not in ("baseline", "rano", "either", "observed_two_scan"):
+            raise ValueError(
+                "stop_endpoint must be baseline, rano, either, or observed_two_scan"
+            )
         _validate_int(self.course_budget, "course_budget", 1, tc.BUDGET)
         _validate_int(self.n_f0_nodes, "n_f0_nodes", 8, 100_000)
         _validate_int(self.mpc_particles, "mpc_particles", 2, 100_000)
@@ -615,7 +620,13 @@ def robust_utility(outcome: Mapping, *, tau_days: float, course_penalty: float) 
     return np.minimum(np.minimum(baseline, tau), np.minimum(rano, tau)) - cost * courses
 
 
-def _checked_outcome(outcome: Mapping, n_patients: int, course_budget: int) -> dict:
+def _checked_outcome(
+    outcome: Mapping,
+    n_patients: int,
+    course_budget: int,
+    *,
+    expected_stop_endpoint: str = "either",
+) -> dict:
     needed = (
         "ttp_baseline", "capped_baseline", "ttp_rano", "capped_rano",
         "courses", "courses_through_cutoff", "stop_endpoint",
@@ -638,9 +649,20 @@ def _checked_outcome(outcome: Mapping, n_patients: int, course_budget: int) -> d
     if ((clean["courses_through_cutoff"] > clean["courses"]).any()
             or not np.equal(clean["courses_through_cutoff"], np.floor(clean["courses_through_cutoff"])).all()):
         raise ValueError("restricted course counts must be integers no greater than total courses")
-    if outcome["stop_endpoint"] != "either":
-        raise ValueError("all arms must use stop_endpoint='either'")
-    clean["stop_endpoint"] = "either"
+    if outcome["stop_endpoint"] != expected_stop_endpoint:
+        raise ValueError(
+            f"all arms must use stop_endpoint={expected_stop_endpoint!r}"
+        )
+    clean["stop_endpoint"] = expected_stop_endpoint
+    if expected_stop_endpoint == "observed_two_scan":
+        stop_day = np.asarray(outcome.get("observed_stop_day"), dtype=float)
+        if stop_day.shape != (n_patients,) or np.isinf(stop_day).any():
+            raise ValueError(
+                "observed-stop outcomes must include finite-or-NaN observed_stop_day values"
+            )
+        if np.any(stop_day[np.isfinite(stop_day)] < 0):
+            raise ValueError("observed_stop_day values must be non-negative")
+        clean["observed_stop_day"] = stop_day.copy()
     return clean
 
 
@@ -685,12 +707,17 @@ def select_fixed_schedule(
         flat_scenarios,
         FixedSchedulePolicy(schedule_rows),
         seed=list(seed_key),
-        stop_endpoint="either",
+        stop_endpoint=settings.stop_endpoint,
         budget=settings.course_budget,
         course_cutoff_days=settings.tau_days,
         policy_context="observable",
     )
-    checked = _checked_outcome(outcome, len(schedule_rows), settings.course_budget)
+    checked = _checked_outcome(
+        outcome,
+        len(schedule_rows),
+        settings.course_budget,
+        expected_stop_endpoint=settings.stop_endpoint,
+    )
     utilities = robust_utility(
         checked, tau_days=settings.tau_days, course_penalty=settings.course_penalty
     ).reshape(len(schedule_array), n_patients)
@@ -739,11 +766,16 @@ def _evaluate_policy(policy, scenarios: Mapping, seed: tuple[int, ...], settings
     # Set it explicitly so each policy and endpoint uses the configured observation schedule.
     evaluation_scenarios["scan_every"] = np.full(n_patients, settings.scan_every, dtype=int)
     outcome = tc.simulate_two_endpoints(
-        evaluation_scenarios, policy, seed=list(seed), stop_endpoint="either",
+        evaluation_scenarios, policy, seed=list(seed), stop_endpoint=settings.stop_endpoint,
         budget=settings.course_budget, course_cutoff_days=settings.tau_days,
         policy_context="observable",
     )
-    clean = _checked_outcome(outcome, n_patients, settings.course_budget)
+    clean = _checked_outcome(
+        outcome,
+        n_patients,
+        settings.course_budget,
+        expected_stop_endpoint=settings.stop_endpoint,
+    )
     clean["rmst_baseline"] = np.minimum(clean["ttp_baseline"], settings.tau_days)
     clean["rmst_rano"] = np.minimum(clean["ttp_rano"], settings.tau_days)
     clean["robust_utility"] = robust_utility(
@@ -906,6 +938,7 @@ def run_shared_policy_world(
         course_penalty=settings.course_penalty,
         scan_every=settings.scan_every,
         tau_days=settings.tau_days,
+        stop_endpoint=settings.stop_endpoint,
         learning_rate=settings.q_learning_rate,
         discount=1.0,
         epsilon=settings.q_epsilon,
@@ -921,7 +954,7 @@ def run_shared_policy_world(
         "n_particles": settings.mpc_particles,
         "prediction_particles": settings.prediction_particles,
         "forecast_cycles": settings.forecast_cycles,
-        "stop_endpoint": "either",
+        "stop_endpoint": settings.stop_endpoint,
         "ranges": mpc.INTEGRATED_BELIEF_RANGES,
     }
     def make_signal_policies(signal_observations):

@@ -527,6 +527,60 @@ def simulate(scen, policy, seed, track_fr=False, endpoint="baseline", budget=Non
     return out
 
 
+def update_observed_two_scan_state(
+    readings,
+    scheduled,
+    observed_baseline_log,
+    observed_nadir_log,
+    positive_scan_count,
+    stopped,
+):
+    """Apply the shared two-positive-scan treatment-stop rule to log-volume readings.
+
+    Inputs may have any matching broadcastable shape. A scheduled missing or non-finite
+    reading resets the confirmation count. Unscheduled positions do not alter state.
+    The first finite scheduled reading sets baseline and nadir; later negative readings
+    reset confirmation and may lower nadir. The returned arrays are copies.
+    """
+    y = np.asarray(readings, dtype=float)
+    try:
+        y, scan, baseline, nadir, count, was_stopped = np.broadcast_arrays(
+            y,
+            np.asarray(scheduled, dtype=bool),
+            np.asarray(observed_baseline_log, dtype=float),
+            np.asarray(observed_nadir_log, dtype=float),
+            np.asarray(positive_scan_count, dtype=int),
+            np.asarray(stopped, dtype=bool),
+        )
+    except ValueError as exc:
+        raise ValueError("observed stop state arrays must be broadcast-compatible") from exc
+    baseline = baseline.copy()
+    nadir = nadir.copy()
+    count = count.copy()
+    was_stopped = was_stopped.copy()
+
+    missing = scan & ~np.isfinite(y) & ~was_stopped
+    count[missing] = 0
+
+    finite_scan = scan & np.isfinite(y) & ~was_stopped
+    first_scan = finite_scan & ~np.isfinite(baseline)
+    baseline[first_scan] = y[first_scan]
+    nadir[first_scan] = y[first_scan]
+
+    followup = finite_scan & ~first_scan
+    threshold = np.log(RANO_FACTOR) + np.maximum(
+        nadir, baseline + np.log(RANO_FLOOR)
+    )
+    positive = followup & (y >= threshold)
+    negative = followup & ~positive
+    count[positive] += 1
+    count[negative] = 0
+    nadir[negative] = np.minimum(nadir[negative], y[negative])
+    newly_stopped = positive & (count >= 2)
+    was_stopped[newly_stopped] = True
+    return baseline, nadir, count, was_stopped, newly_stopped
+
+
 def simulate_two_endpoints(
     scen, policy, seed, track_fr=False, stop_endpoint="either", budget=None,
     course_cutoff_days=None, policy_context="observable",
@@ -637,29 +691,20 @@ def simulate_two_endpoints(
         if scan_every is not None:
             y = np.where(scan, y, np.nan)
         if stop_endpoint == "observed_two_scan":
-            scheduled = np.broadcast_to(np.asarray(scan, dtype=bool), (N,))
-            finite_scan = scheduled & np.isfinite(y)
-            missing_scan = scheduled & ~np.isfinite(y) & ~observed_stop
-            observed_positive_scans[missing_scan] = 0
-
-            baseline_scan = finite_scan & ~np.isfinite(observed_base_log)
-            observed_base_log[baseline_scan] = y[baseline_scan]
-            observed_nadir_log[baseline_scan] = y[baseline_scan]
-
-            followup_scan = finite_scan & ~baseline_scan & ~observed_stop
-            threshold_log = np.log(RANO_FACTOR) + np.maximum(
+            (
+                observed_base_log,
                 observed_nadir_log,
-                observed_base_log + np.log(RANO_FLOOR),
+                observed_positive_scans,
+                observed_stop,
+                newly_stopped,
+            ) = update_observed_two_scan_state(
+                y,
+                scan,
+                observed_base_log,
+                observed_nadir_log,
+                observed_positive_scans,
+                observed_stop,
             )
-            positive_scan = followup_scan & (y >= threshold_log)
-            negative_scan = followup_scan & ~positive_scan
-            observed_positive_scans[positive_scan] += 1
-            observed_positive_scans[negative_scan] = 0
-            observed_nadir_log[negative_scan] = np.minimum(
-                observed_nadir_log[negative_scan], y[negative_scan]
-            )
-            newly_stopped = positive_scan & (observed_positive_scans >= 2)
-            observed_stop[newly_stopped] = True
             observed_stop_day[newly_stopped] = j * CYCLE_DAYS
         treat = policy.act(j, y) & (used < cap)
         stop_event = np.isnan(ttp_baseline) if stop_endpoint == "baseline" else (
