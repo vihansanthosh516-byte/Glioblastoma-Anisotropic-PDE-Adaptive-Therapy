@@ -45,6 +45,7 @@ def _load_source_module(module_name: str, filename: str):
 class PolicyBenchmarkSettings:
     scan_every: int = 3
     stop_endpoint: str = "either"
+    mpc_assumed_future_scan_miss_probability: float = 0.0
     course_budget: int = tc.BUDGET
     tau_days: float = 730.0
     course_penalty: float = 5.0
@@ -65,6 +66,22 @@ class PolicyBenchmarkSettings:
             raise ValueError(
                 "stop_endpoint must be baseline, rano, either, or observed_two_scan"
             )
+        miss_probability = self.mpc_assumed_future_scan_miss_probability
+        if isinstance(miss_probability, (bool, np.bool_)):
+            raise ValueError("mpc_assumed_future_scan_miss_probability must be finite and between 0 and 1")
+        try:
+            miss_probability = float(miss_probability)
+        except (TypeError, ValueError, OverflowError) as exc:
+            raise ValueError(
+                "mpc_assumed_future_scan_miss_probability must be finite and between 0 and 1"
+            ) from exc
+        if not np.isfinite(miss_probability) or not (0.0 <= miss_probability <= 1.0):
+            raise ValueError("mpc_assumed_future_scan_miss_probability must be finite and between 0 and 1")
+        if miss_probability > 0.0 and self.stop_endpoint != "observed_two_scan":
+            raise ValueError(
+                "mpc_assumed_future_scan_miss_probability requires observed_two_scan stopping rule"
+            )
+        object.__setattr__(self, "mpc_assumed_future_scan_miss_probability", miss_probability)
         _validate_int(self.course_budget, "course_budget", 1, tc.BUDGET)
         _validate_int(self.n_f0_nodes, "n_f0_nodes", 8, 100_000)
         _validate_int(self.mpc_particles, "mpc_particles", 2, 100_000)
@@ -955,6 +972,9 @@ def run_shared_policy_world(
         "prediction_particles": settings.prediction_particles,
         "forecast_cycles": settings.forecast_cycles,
         "stop_endpoint": settings.stop_endpoint,
+        "assumed_future_scan_miss_probability": (
+            settings.mpc_assumed_future_scan_miss_probability
+        ),
         "ranges": mpc.INTEGRATED_BELIEF_RANGES,
     }
     def make_signal_policies(signal_observations):

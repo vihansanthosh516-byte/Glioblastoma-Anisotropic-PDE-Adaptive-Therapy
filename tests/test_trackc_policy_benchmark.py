@@ -33,6 +33,16 @@ def test_ambiguity_controller_is_opt_in_by_default():
     assert parameter.default is False
 
 
+def test_mpc_assumed_future_scan_loss_requires_observed_stop():
+    with pytest.raises(ValueError, match="requires observed_two_scan"):
+        benchmark.PolicyBenchmarkSettings(mpc_assumed_future_scan_miss_probability=0.1)
+    settings = benchmark.PolicyBenchmarkSettings(
+        stop_endpoint="observed_two_scan",
+        mpc_assumed_future_scan_miss_probability=0.25,
+    )
+    assert settings.mpc_assumed_future_scan_miss_probability == pytest.approx(0.25)
+
+
 def _quiet_scenario():
     """One slow synthetic patient whose late schedule falls after 730 days."""
     return {
@@ -220,6 +230,7 @@ def test_full_policy_harness_runs_all_arms_on_shared_endpoint_path(monkeypatch):
     received_f0_bounds = []
     received_scan_intervals = []
     received_stop_endpoints = []
+    received_future_scan_miss_probabilities = []
     original_loader = benchmark._load_source_module
     original_simulator = tc.simulate_two_endpoints
 
@@ -237,6 +248,9 @@ def test_full_policy_harness_runs_all_arms_on_shared_endpoint_path(monkeypatch):
 
             def recording_controller(*args, **kwargs):
                 received_f0_bounds.append(tuple(kwargs["f0_bounds"]))
+                received_future_scan_miss_probabilities.append(
+                    kwargs["assumed_future_scan_miss_probability"]
+                )
                 return original_controller(*args, **kwargs)
 
             monkeypatch.setattr(module, "LOOModelAveragedBeliefMPC", recording_controller)
@@ -265,6 +279,7 @@ def test_full_policy_harness_runs_all_arms_on_shared_endpoint_path(monkeypatch):
     settings = benchmark.PolicyBenchmarkSettings(
         course_budget=12,
         stop_endpoint="observed_two_scan",
+        mpc_assumed_future_scan_miss_probability=0.25,
         tau_days=84.0,
         n_f0_nodes=8,
         mpc_particles=2,
@@ -341,6 +356,8 @@ def test_full_policy_harness_runs_all_arms_on_shared_endpoint_path(monkeypatch):
     }
     assert set(result["arm_outcomes"]) == expected | matched_arm_names
     assert received_stop_endpoints and set(received_stop_endpoints) == {"observed_two_scan"}
+    assert received_future_scan_miss_probabilities
+    assert set(received_future_scan_miss_probabilities) == {0.25}
     assert set(result["calibration_course_use"]) == set(result["matched_fixed_schedule_controls"])
     for policy_name, control in result["matched_fixed_schedule_controls"].items():
         assert control["calibration_mean_courses"] == pytest.approx(
@@ -403,6 +420,7 @@ def test_full_policy_harness_runs_all_arms_on_shared_endpoint_path(monkeypatch):
         assert (arm["courses"] <= settings.course_budget).all()
     assert result["analysis_type"] == "synthetic_virtual_world_development"
     assert result["settings"]["stop_endpoint"] == "observed_two_scan"
+    assert result["settings"]["mpc_assumed_future_scan_miss_probability"] == pytest.approx(0.25)
     assert result["settings"]["signal_f0_bounds"] == tuple(map(float, tc.RANGES["f0"][:2]))
     assert result["signal_generation"] == {
         "generator": "trackc_integrated_signal_model.generate_integrated_signals",

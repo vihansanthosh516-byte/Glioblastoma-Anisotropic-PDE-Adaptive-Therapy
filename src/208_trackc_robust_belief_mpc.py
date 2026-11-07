@@ -91,6 +91,10 @@ class RobustBeliefMPC:
         stop_endpoint: treatment stops at ``baseline``, ``rano``, the first of either, or
             the observed two-positive-scan rule. The observed rule uses noisy scan values
             to stop treatment; latent endpoint forecasts remain part of planning utility.
+        assumed_future_scan_miss_probability: fixed iid probability that a scheduled scan
+            in an MPC forecast is unavailable. It affects forecasts only, uses common
+            missingness draws across candidate patterns, and is allowed only for the
+            observed two-scan stopping rule. Zero preserves the complete-follow-up forecast.
         ranges: optional parameter prior passed to ``ParticleFilter``.
 
     Benchmarking: ``evaluate_robust_belief_mpc`` applies the policy's scan interval and
@@ -111,6 +115,7 @@ class RobustBeliefMPC:
         prediction_particles=16,
         forecast_cycles=6,
         stop_endpoint="either",
+        assumed_future_scan_miss_probability=0.0,
         ranges=None,
     ):
         self.scan_every = _as_int(scan_every, "scan_every")
@@ -122,6 +127,23 @@ class RobustBeliefMPC:
         if stop_endpoint not in ("baseline", "rano", "either", "observed_two_scan"):
             raise ValueError("stop_endpoint must be baseline, rano, either, or observed_two_scan")
         self.stop_endpoint = stop_endpoint
+        if isinstance(assumed_future_scan_miss_probability, (bool, np.bool_)):
+            raise ValueError("assumed_future_scan_miss_probability must be finite and between 0 and 1")
+        try:
+            assumed_future_scan_miss_probability = float(assumed_future_scan_miss_probability)
+        except (TypeError, ValueError, OverflowError) as exc:
+            raise ValueError(
+                "assumed_future_scan_miss_probability must be finite and between 0 and 1"
+            ) from exc
+        if not np.isfinite(assumed_future_scan_miss_probability) or not (
+            0.0 <= assumed_future_scan_miss_probability <= 1.0
+        ):
+            raise ValueError("assumed_future_scan_miss_probability must be finite and between 0 and 1")
+        if assumed_future_scan_miss_probability > 0.0 and stop_endpoint != "observed_two_scan":
+            raise ValueError(
+                "assumed_future_scan_miss_probability requires observed_two_scan stopping rule"
+            )
+        self.assumed_future_scan_miss_probability = assumed_future_scan_miss_probability
         if not 1 <= self.scan_every <= 4:
             raise ValueError("scan_every must be between 1 and 4 cycles")
         if not 1 <= self.budget <= tc.BUDGET:
@@ -161,6 +183,7 @@ class RobustBeliefMPC:
         self.observed_positive_scan_count = np.zeros(self.n, dtype=int)
         self.observed_stopped = np.zeros(self.n, dtype=bool)
         self._planning_observation_noise = None
+        self._planning_scan_available = None
 
     def _update_visible(self, j, y):
         """Update only rows with an actual reading; missing rows get no likelihood or resample."""
@@ -282,6 +305,12 @@ class RobustBeliefMPC:
                 nadir = np.minimum(nadir, B_rano)
                 if self.stop_endpoint == "observed_two_scan":
                     predicted_reading = np.log(np.maximum(S + R, 1e-300)) + observation_noise[:, :, h + 1]
+                    if self._planning_scan_available is not None:
+                        predicted_reading = np.where(
+                            self._planning_scan_available[rows, :, h + 1],
+                            predicted_reading,
+                            np.nan,
+                        )
                     (
                         observed_baseline,
                         observed_nadir,
@@ -325,6 +354,7 @@ class RobustBeliefMPC:
             t_rano_now = np.full(burden.shape, np.nan)
 
         self._planning_observation_noise = None
+        self._planning_scan_available = None
         if self.stop_endpoint == "observed_two_scan":
             noise = self.rng.standard_normal(
                 (rows.size, self.prediction_particles, self.forecast_cycles + 1)
@@ -334,6 +364,17 @@ class RobustBeliefMPC:
                 (self.n, self.prediction_particles, self.forecast_cycles + 1), dtype=float
             )
             self._planning_observation_noise[rows] = noise
+            self._planning_scan_available = np.ones(
+                (self.n, self.prediction_particles, self.forecast_cycles + 1), dtype=bool
+            )
+            missing_probability = self.assumed_future_scan_miss_probability
+            if missing_probability >= 1.0:
+                self._planning_scan_available[rows] = False
+            elif missing_probability > 0.0:
+                available = self.rng.random(
+                    (rows.size, self.prediction_particles, self.forecast_cycles + 1)
+                ) >= missing_probability
+                self._planning_scan_available[rows] = available
 
         # Current scan updates the observable nadir estimate. Use that updated value for
         # future predictions; nadir_prev is only for the current scan's RANO call.

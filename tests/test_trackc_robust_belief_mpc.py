@@ -311,6 +311,98 @@ def test_observed_stop_state_blocks_current_course_after_confirmation():
     assert action.tolist() == [False]
 
 
+def test_forecast_scan_missing_probability_is_validated():
+    with pytest.raises(ValueError, match="between 0 and 1"):
+        RobustBeliefMPC(
+            stop_endpoint="observed_two_scan",
+            assumed_future_scan_miss_probability=1.01,
+        )
+    with pytest.raises(ValueError, match="requires observed_two_scan"):
+        RobustBeliefMPC(assumed_future_scan_miss_probability=0.1)
+
+
+def test_future_scan_missing_draws_are_common_across_candidate_patterns(monkeypatch):
+    policy = RobustBeliefMPC(
+        scan_every=1,
+        budget=4,
+        n_particles=8,
+        prediction_particles=4,
+        forecast_cycles=3,
+        stop_endpoint="observed_two_scan",
+        assumed_future_scan_miss_probability=0.5,
+    )
+    policy.reset(_scenarios(n=1), np.random.default_rng(20261108))
+    seen_missing = []
+    original_update = tc.update_observed_two_scan_state
+
+    def record_update(readings, scheduled, *state):
+        seen_missing.append(np.isnan(np.asarray(readings)).copy())
+        return original_update(readings, scheduled, *state)
+
+    monkeypatch.setattr(tc, "update_observed_two_scan_state", record_update)
+    policy._replan(np.array([0]), 0, np.array([np.nan]))
+
+    assert len(seen_missing) == 6
+    for scan_index in range(3):
+        np.testing.assert_array_equal(seen_missing[scan_index], seen_missing[scan_index + 3])
+    assert any(mask.any() for mask in seen_missing)
+    assert any((~mask).any() for mask in seen_missing)
+
+
+def test_probability_one_marks_every_forecast_scan_missing(monkeypatch):
+    policy = RobustBeliefMPC(
+        scan_every=1,
+        n_particles=8,
+        prediction_particles=4,
+        forecast_cycles=3,
+        stop_endpoint="observed_two_scan",
+        assumed_future_scan_miss_probability=1.0,
+    )
+    policy.reset(_scenarios(n=1), np.random.default_rng(20261110))
+    all_missing = []
+    stop_states = []
+    original_update = tc.update_observed_two_scan_state
+
+    def record_update(readings, scheduled, *state):
+        got = original_update(readings, scheduled, *state)
+        all_missing.append(np.isnan(np.asarray(readings)).all())
+        stop_states.append(got[3].copy())
+        return got
+
+    monkeypatch.setattr(tc, "update_observed_two_scan_state", record_update)
+    policy._replan(np.array([0]), 0, np.array([np.nan]))
+
+    assert not policy._planning_scan_available[0].any()
+    assert len(all_missing) == 6 and all(all_missing)
+    assert all(not stopped.any() for stopped in stop_states)
+
+
+def test_zero_forecast_missing_probability_preserves_seeded_plan():
+    scen = _scenarios(n=1)
+    policies = [
+        RobustBeliefMPC(
+            scan_every=1,
+            n_particles=8,
+            prediction_particles=4,
+            forecast_cycles=3,
+            stop_endpoint="observed_two_scan",
+        ),
+        RobustBeliefMPC(
+            scan_every=1,
+            n_particles=8,
+            prediction_particles=4,
+            forecast_cycles=3,
+            stop_endpoint="observed_two_scan",
+            assumed_future_scan_miss_probability=0.0,
+        ),
+    ]
+    for policy in policies:
+        policy.reset(scen, np.random.default_rng(20261109))
+        policy._replan(np.array([0]), 0, np.array([np.nan]))
+
+    np.testing.assert_array_equal(policies[0].plan, policies[1].plan)
+
+
 @pytest.mark.parametrize(
     "kwargs",
     [

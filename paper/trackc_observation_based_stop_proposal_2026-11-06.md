@@ -34,7 +34,7 @@ The baseline and RANO-like progression outcomes remain latent simulator outcomes
 
 1. Decide whether this observable trigger is the primary execution rule. Keep latent-oracle stopping as a labeled sensitivity analysis only.
 2. Freeze the trigger, scan interval, missing-scan behavior, endpoint estimands, utility weight, world-level precision target, uncertainty intervals, multiplicity rule, and fresh seed blocks before outcome scoring.
-3. Decide how MPC should represent future missing scans or state clearly that its forecast assumes complete follow-up; add sensitivity checks for that assumption.
+3. The MPC now has an opt-in iid future-scan-missingness assumption, shared across candidate schedules. Before any outcome comparison, choose its values using development worlds only and test mismatch against state-linked missingness. The default remains complete future follow-up.
 4. Add the registered independent-world precision and held-out scoring path. Report results across every predeclared signal anchor, including harm.
 5. Do not change settings after viewing outcomes to seek a positive result. A positive or negative outcome must come from the frozen comparison.
 
@@ -43,3 +43,9 @@ The baseline and RANO-like progression outcomes remain latent simulator outcomes
 The umbrella combination remains established prior art. M4RL combines a multiscale GBM biology model with reinforcement-learning drug scheduling ([Liu et al., 2025](https://pmc.ncbi.nlm.nih.gov/articles/PMC13155510/)); a 2026 preprint combines reaction-diffusion, learned correction, adaptive updating, and treatment-schedule MPC ([Liu et al., 2026](https://arxiv.org/abs/2607.13877)); and a 2026 preprint studies robust treatment-policy learning under model and measurement uncertainty in prostate-cancer simulation ([Xie et al., 2026](https://arxiv.org/abs/2610.22336)). A 2026 GBM immunotherapy systems paper is a conceptual review, not a validated treatment algorithm ([Chen et al., 2026](https://pmc.ncbi.nlm.nih.gov/articles/PMC13349897/)).
 
 The narrower dependence-aware molecular-like/MRI-like policy question remains a possible distinction, not a verified novelty claim. Its signal-to-resistance relationship is simulated, and its prior predictive gate failed. This stop-rule improvement addresses simulator observability and fairness; it does not establish novelty, superiority, treatment benefit, or a positive result.
+
+## Proposed MPC missing-scan sensitivity (2026-11-06)
+
+`RobustBeliefMPC` accepts `assumed_future_scan_miss_probability`; the paired benchmark exposes it as `mpc_assumed_future_scan_miss_probability`. For each replan, the MPC samples future scan availability under this fixed iid probability and reuses the same availability draws across candidate treatment patterns. A missing simulated scan resets two-scan confirmation. The setting is valid only with `stop_endpoint="observed_two_scan"`.
+
+The default is `0.0`, which assumes complete future follow-up and preserves the seeded treatment plan. The setting does not read the scenario's hidden `miss_p` or `miss_p_hi`. A value of `1.0` makes all future forecast scans unavailable. This is a planner assumption, not a learned patient-specific missingness model. It does not represent state-dependent or informative missed scans inside the forecast. It remains opt-in and proposed; no policy outcome comparison has used it.
