@@ -1,5 +1,7 @@
 # START HERE
 
+- **Track C synthetic-world input builder (2026-11-07):** `prepare_synthetic_world` now creates separate selection, calibration and evaluation inputs from a preflighted development seed schedule and records the caller-declared world seed. Seven synthetic scratch tests passed. It builds inputs only: seeds are not reserved, the world parameters are not yet fingerprinted, and no benchmark or outcome scoring ran. The full research driver and protocol remain open.
+
 - **Track C multi-world orchestration prototype (2026-11-07):** `src/trackc_world_runner.py` preflights a development seed schedule, calls an injected executor sequentially, checks returned IDs and recorded stream seeds, and stops on a failure without returning partial results. Six fake-executor/schedule scratch tests passed. It neither reserves seeds nor writes manifests, and the benchmark record does not verify the world-generation seed. It is not a research driver or authorization to score outcomes.
 
 - **Track C development seed-schedule preflight (2026-11-07):** `src/trackc_world_schedule.py` checks exact world seed roles, unique world IDs and numeric seeds, and the current seed registry before a proposed Stage 2 development schedule is used. It does not reserve seeds or execute a benchmark. Three synthetic scratch tests passed; the independent-world driver and its frozen protocol remain open.

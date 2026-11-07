@@ -1,6 +1,10 @@
 """Development-only orchestration prototype; no seeds are reserved here."""
 from __future__ import annotations
 
+from numbers import Integral
+
+import trackc_calibration as calibration
+from trackc_integrated_signal_model import generate_integrated_signals
 from trackc_world_schedule import validate_development_schedule
 
 _SEED_MAP = {
@@ -18,6 +22,49 @@ _SEED_MAP = {
 
 class WorldRunError(RuntimeError):
     """A world failed; no partial result collection is returned."""
+
+
+def prepare_synthetic_world(world, *, family, patients_per_cohort, signal_parameters,
+                            model_parameters, settings, entries=None):
+    """Build one development world's benchmark inputs without scoring policies.
+
+    The returned world seed is caller-declared provenance, not proof of generation.
+    Seed preflight is not an atomic reservation. No files are read or written.
+    """
+    validate_development_schedule([world], entries=entries)
+    if family not in ("single", "mixture"):
+        raise ValueError("family must be single or mixture")
+    if isinstance(patients_per_cohort, bool) or not isinstance(patients_per_cohort, Integral) or patients_per_cohort < 2:
+        raise ValueError("patients_per_cohort must be an integer of at least 2")
+    n = int(patients_per_cohort)
+    latent_world = calibration.draw_worlds(1, seed=world["world"], family=family)[0]
+    scenarios = {
+        role: calibration.draw_patients(latent_world, n, seed=[world[f"{role}_scenario"], 1])
+        for role in ("selection", "calibration", "evaluation")
+    }
+    observations = {}
+    for role in ("calibration", "evaluation"):
+        observations[role], _ = generate_integrated_signals(
+            n, q=signal_parameters.q, a=signal_parameters.a, b=signal_parameters.b,
+            d=signal_parameters.d, seed=world[f"{role}_signal"], f0=scenarios[role]["f0"],
+        )
+    kwargs = {
+        "world_id": world["world_id"],
+        **{f"{role}_scenarios": scenarios[role] for role in scenarios},
+        **{f"{role}_patient_ids": tuple(f"{world['world_id']}-{role}-{i:06d}" for i in range(n)) for role in scenarios},
+        "calibration_observations": observations["calibration"],
+        "evaluation_observations": observations["evaluation"],
+        "model_parameters": tuple(model_parameters), "signal_generation_parameters": signal_parameters,
+        "signal_generation_seed": world["evaluation_signal"],
+        "calibration_signal_generation_seed": world["calibration_signal"],
+        "signal_generation_mri_template_sha256": None,
+        **{f"{role}_scenario_seed": world[f"{role}_scenario"] for role in scenarios},
+        "selection_seed": [world["selection_policy"]], "q_training_seed": [world["q_training"]],
+        "calibration_seed": [world["calibration_policy"]], "evaluation_seed": [world["evaluation_policy"]],
+        "schedule_mixture_seed": [world["schedule_mixture"]], "settings": settings,
+        "include_ambiguity_controller": True,
+    }
+    return {"world_generation_seed": world["world"], "family": family, "benchmark_kwargs": kwargs}
 
 
 def run_development_worlds(worlds, executor, *, entries=None):

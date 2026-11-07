@@ -1,8 +1,10 @@
 import pytest
+import numpy as np
 
 import trackc_seed_registry as registry
 import trackc_world_schedule as schedule
-from trackc_world_runner import WorldRunError, run_development_worlds
+from trackc_integrated_signal_model import SignalModelParameters
+from trackc_world_runner import WorldRunError, run_development_worlds, prepare_synthetic_world
 
 
 def world(name, start):
@@ -56,3 +58,20 @@ def test_bad_record_stops_later_worlds():
         run_development_worlds(worlds, execute, entries=entries())
     assert isinstance(error.value.__cause__, ValueError)
     assert calls == ["a", "b"]
+
+
+def test_prepares_reproducible_disjoint_synthetic_inputs_without_scoring():
+    w = world("a", 1)
+    options = dict(family="single", patients_per_cohort=2,
+                   signal_parameters=SignalModelParameters(0.7, 0.2, 0.3, 0.1),
+                   model_parameters=(SignalModelParameters(0.7, 0.2, 0.3, 0.1),),
+                   settings="synthetic-settings", entries=entries())
+    first = prepare_synthetic_world(w, **options)
+    second = prepare_synthetic_world(w, **options)
+    assert first["world_generation_seed"] == w["world"]
+    a, b = first["benchmark_kwargs"], second["benchmark_kwargs"]
+    np.testing.assert_array_equal(a["evaluation_scenarios"]["f0"], b["evaluation_scenarios"]["f0"])
+    assert not set(a["selection_patient_ids"]) & set(a["evaluation_patient_ids"])
+    assert a["signal_generation_seed"] == w["evaluation_signal"]
+    assert a["calibration_signal_generation_seed"] == w["calibration_signal"]
+    assert a["include_ambiguity_controller"] is True
