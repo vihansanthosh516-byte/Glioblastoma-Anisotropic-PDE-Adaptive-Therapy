@@ -32,13 +32,17 @@ def test_benchmark_worlds_reject_duplicate_inputs_and_inconsistent_contrast():
         return {
             "analysis_type": "synthetic_virtual_world_development", "world_id": str(i),
             "settings": {"stop": "observed"}, "inference_model_parameters": [{"d": 0}],
-            "signal_generation": {"parameters": {"d": 0.2}, "seed": 100 + i},
+            "signal_generation": {"generator": "test", "parameters": {"d": 0.2}, "seed": 100 + i,
+                                  "f0_source": "evaluation_scenarios['f0']", "mri_template_sha256": None},
+            "calibration_signal_generation": {"generator": "test", "parameters": {"d": 0.2},
+                                              "f0_source": "calibration_scenarios['f0']"},
             "input_fingerprints": {name: format(i * 3 + j, "064x") for j, name in enumerate(
                 ("selection_scenarios_sha256", "calibration_scenarios_sha256", "evaluation_scenarios_sha256"))},
             "seeds": {"selection": [200 + i], "evaluation": [300 + i]},
             "arm_outcomes": {"loo_dependence_aware_mpc": {"robust_utility": [1, 2]},
                              "loo_conditional_independence_mpc": {"robust_utility": [0, 0]}},
-            "primary_paired_contrast": {"robust_utility_difference": [1, 2]},
+            "primary_paired_contrast": {"contrast": "loo_dependence_aware_mpc minus loo_conditional_independence_mpc",
+                                        "robust_utility_difference": [1, 2]},
             "n_evaluation_patients": 2,
         }
 
@@ -51,4 +55,12 @@ def test_benchmark_worlds_reject_duplicate_inputs_and_inconsistent_contrast():
     second = world(2)
     second["primary_paired_contrast"]["robust_utility_difference"] = [2, 2]
     with pytest.raises(ValueError, match="primary contrast"):
+        summarize_benchmark_worlds([first, second], resamples=100, seed=3)
+    second = world(2)
+    second["signal_generation"]["mri_template_sha256"] = "f" * 64
+    with pytest.raises(ValueError, match="mri_template_sha256 differs"):
+        summarize_benchmark_worlds([first, second], resamples=100, seed=3)
+    second = world(2)
+    second["calibration_signal_generation"]["parameters"] = {"d": 0.9}
+    with pytest.raises(ValueError, match="calibration and evaluation"):
         summarize_benchmark_worlds([first, second], resamples=100, seed=3)

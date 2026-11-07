@@ -61,8 +61,16 @@ def summarize_benchmark_worlds(records, *, resamples, seed):
         for key in ("settings", "inference_model_parameters"):
             if record[key] != reference[key]:
                 raise ValueError(f"world {key} differs")
-        if record["signal_generation"]["parameters"] != reference["signal_generation"]["parameters"]:
-            raise ValueError("world signal-generation parameters differ")
+        for key in ("generator", "parameters", "f0_source", "mri_template_sha256"):
+            if record["signal_generation"][key] != reference["signal_generation"][key]:
+                raise ValueError(f"world signal-generation {key} differs")
+        if record["signal_generation"]["f0_source"] != "evaluation_scenarios['f0']":
+            raise ValueError("unexpected evaluation signal source")
+        calibration_signal = record["calibration_signal_generation"]
+        if calibration_signal["generator"] != record["signal_generation"]["generator"] or calibration_signal["parameters"] != record["signal_generation"]["parameters"]:
+            raise ValueError("calibration and evaluation signal generation differ")
+        if calibration_signal["f0_source"] != "calibration_scenarios['f0']":
+            raise ValueError("unexpected calibration signal source")
         for key in ("selection_scenarios_sha256", "calibration_scenarios_sha256", "evaluation_scenarios_sha256"):
             fingerprint = record["input_fingerprints"][key]
             if not isinstance(fingerprint, str) or len(fingerprint) != 64 or any(c not in "0123456789abcdef" for c in fingerprint):
@@ -82,6 +90,8 @@ def summarize_benchmark_worlds(records, *, resamples, seed):
         if candidate.ndim != 1 or candidate.shape != comparator.shape or candidate.size != record["n_evaluation_patients"]:
             raise ValueError("world outcome arrays do not match the evaluation cohort")
         recorded_difference = np.asarray(record["primary_paired_contrast"]["robust_utility_difference"], dtype=float)
+        if record["primary_paired_contrast"]["contrast"] != "loo_dependence_aware_mpc minus loo_conditional_independence_mpc":
+            raise ValueError("unexpected primary contrast")
         if recorded_difference.shape != candidate.shape or not np.array_equal(recorded_difference, candidate - comparator):
             raise ValueError("recorded primary contrast does not match paired outcomes")
         candidates.append(candidate)
