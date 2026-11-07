@@ -1,6 +1,8 @@
 """Development-only orchestration prototype; no seeds are reserved here."""
 from __future__ import annotations
 
+import hashlib
+import json
 from numbers import Integral
 
 import trackc_calibration as calibration
@@ -64,7 +66,13 @@ def prepare_synthetic_world(world, *, family, patients_per_cohort, signal_parame
         "schedule_mixture_seed": [world["schedule_mixture"]], "settings": settings,
         "include_ambiguity_controller": True,
     }
-    return {"world_generation_seed": world["world"], "family": family, "benchmark_kwargs": kwargs}
+    world_bytes = json.dumps(
+        {"family": family, "parameters": latent_world}, sort_keys=True,
+        separators=(",", ":"), allow_nan=False,
+    ).encode("utf-8")
+    return {"world_generation_seed": world["world"], "family": family,
+            "world_parameters_sha256": hashlib.sha256(world_bytes).hexdigest(),
+            "benchmark_kwargs": kwargs}
 
 
 def run_development_worlds(worlds, executor, *, entries=None):

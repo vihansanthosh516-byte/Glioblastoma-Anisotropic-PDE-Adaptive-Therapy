@@ -69,9 +69,30 @@ def test_prepares_reproducible_disjoint_synthetic_inputs_without_scoring():
     first = prepare_synthetic_world(w, **options)
     second = prepare_synthetic_world(w, **options)
     assert first["world_generation_seed"] == w["world"]
+    assert len(first["world_parameters_sha256"]) == 64
+    assert first["world_parameters_sha256"] == second["world_parameters_sha256"]
     a, b = first["benchmark_kwargs"], second["benchmark_kwargs"]
     np.testing.assert_array_equal(a["evaluation_scenarios"]["f0"], b["evaluation_scenarios"]["f0"])
     assert not set(a["selection_patient_ids"]) & set(a["evaluation_patient_ids"])
     assert a["signal_generation_seed"] == w["evaluation_signal"]
     assert a["calibration_signal_generation_seed"] == w["calibration_signal"]
     assert a["include_ambiguity_controller"] is True
+
+
+def test_world_fingerprint_changes_when_world_parameters_change(monkeypatch):
+    import trackc_world_runner as runner
+    original = runner.calibration.draw_worlds
+
+    def changed(*args, **kwargs):
+        generated = original(*args, **kwargs)
+        generated[0]["c"] += 0.001
+        return generated
+
+    options = dict(family="single", patients_per_cohort=2,
+                   signal_parameters=SignalModelParameters(0.7, 0.2, 0.3, 0.1),
+                   model_parameters=(SignalModelParameters(0.7, 0.2, 0.3, 0.1),),
+                   settings="synthetic-settings", entries=entries())
+    baseline = prepare_synthetic_world(world("a", 1), **options)
+    monkeypatch.setattr(runner.calibration, "draw_worlds", changed)
+    modified = prepare_synthetic_world(world("a", 1), **options)
+    assert baseline["world_parameters_sha256"] != modified["world_parameters_sha256"]
