@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from src.track_b_transition_estimand import (construct_history_states, history_band_counts, geometric_coverage, target_field_coverage, summarize_window,
+from src.track_b_transition_estimand import (construct_history_states, history_band_counts, geometric_coverage, output_to_input_affine, target_field_coverage, summarize_window,
                                               summarize_patients, bootstrap_patients)
 
 
@@ -178,3 +178,32 @@ def test_geometric_coverage_refuses_bad_mapping():
             geometric_coverage((2, 2, 2), (2, 2, 2), transform)
     with pytest.raises(ValueError):
         geometric_coverage((2, 0, 2), (2, 2, 2), np.eye(4))
+
+
+def test_physical_affines_map_output_to_moving_indices():
+    moving = np.diag([2., 3., 4., 1.])
+    moving[:3, 3] = [10., -3., 4.]
+    fixed = np.diag([1., 2., 2., 1.])
+    fixed[:3, 3] = [12., 1., 8.]
+    moving_to_fixed = np.eye(4)
+    moving_to_fixed[:3, 3] = [2., 1., -4.]
+    mapping = output_to_input_affine(moving, fixed, moving_to_fixed)
+    fixed_index = np.array([4., 3., 2., 1.])
+    # Fixed world = (16,7,12); inverse motion = (14,6,16);
+    # inverse moving affine = (2,3,3).
+    np.testing.assert_allclose(mapping @ fixed_index, [2, 3, 3, 1])
+
+
+def test_physical_affines_reject_singular_and_invalid_homogeneous():
+    bad_bottom = np.eye(4)
+    bad_bottom[3, 0] = 1
+    for bad in (np.zeros((4, 4)), bad_bottom, np.eye(3), np.full((4, 4), np.nan)):
+        with pytest.raises(ValueError):
+            output_to_input_affine(bad, np.eye(4), np.eye(4))
+
+
+def test_physical_rotation_uses_inverse_registration():
+    moving_to_fixed = np.eye(4)
+    moving_to_fixed[:2, :2] = [[0, -1], [1, 0]]
+    mapping = output_to_input_affine(np.eye(4), np.eye(4), moving_to_fixed)
+    np.testing.assert_allclose(mapping @ [0, 2, 1, 1], [2, 0, 1, 1])

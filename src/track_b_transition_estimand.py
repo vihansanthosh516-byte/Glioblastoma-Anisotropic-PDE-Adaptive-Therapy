@@ -55,6 +55,23 @@ def history_band_counts(state, bands, *, min_voxels=10):
     return result
 
 
+def output_to_input_affine(moving_affine, fixed_affine, moving_to_fixed):
+    """Map fixed output indices to moving input indices via physical coordinates.
+
+    Affines map voxel centers to a shared physical coordinate system; the
+    registration transform maps moving physical points to fixed physical points.
+    """
+    matrices = [np.asarray(value, dtype=float) for value in
+                (moving_affine, fixed_affine, moving_to_fixed)]
+    for matrix in matrices:
+        if (matrix.shape != (4, 4) or not np.isfinite(matrix).all()
+                or not np.allclose(matrix[3], [0, 0, 0, 1])
+                or np.linalg.matrix_rank(matrix[:3, :3]) < 3):
+            raise ValueError('invalid homogeneous affine')
+    moving, fixed, transform = matrices
+    return np.linalg.solve(moving, np.linalg.solve(transform, fixed))
+
+
 def geometric_coverage(moving_shape, output_shape, output_to_input):
     """Resample a geometric all-ones field using scipy nearest-neighbor rules.
 

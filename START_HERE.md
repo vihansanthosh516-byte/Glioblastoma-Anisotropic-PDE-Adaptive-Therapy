@@ -1,5 +1,7 @@
 # START HERE
 
+- **Physical affine prototype (2026-11-07):** `output_to_input_affine` maps fixed-grid voxel indices through inverse moving-to-fixed physical registration and the inverse moving affine. Thirty-six focused scratch tests passed, including unequal spacing, translated origins, a 90-degree rotation, and invalid matrices. This is not a registration optimizer or a complete Duke resampler; physical coordinate conventions and NIfTI units still require pipeline validation. No patient data were read.
+
 - **Coverage/resampler synthetic comparison (2026-11-07):** the geometric-coverage prototype matched `fk_longitudinal_prep.apply_rigid(..., order=0)` on all-ones arrays for identity, integer translation, and one rotation/translation with unequal spacing. Thirty-three focused scratch tests passed. This checks index-transform compatibility with that same-grid helper only; it does not validate arbitrary NIfTI affines, real registration, or the final Duke resampler. No patient data were read.
 
 - **Registration optimizer status (2026-11-07):** synthetic preparation now marks registration QC failed if either Powell stage reports non-convergence, even when NCC and motion thresholds pass. Earlier code ignored optimizer status. This is a proposed stricter QC rule, not an adopted Duke protocol amendment; prior LUMIERE freeze hashes remain historical. Thirty focused synthetic tests passed. No patient data were read.
