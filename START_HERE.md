@@ -1,5 +1,7 @@
 # START HERE
 
+- **Track C development seed capacity (2026-11-07):** registry preflight found 89 free scenario-class seeds in the current Stage 2 block, permitting at most 14 worlds at six seeds each before policy-seed and design constraints. This is not a precision calculation or a reservation. See [`paper/trackc_world_seed_capacity_2026-11-07.md`](paper/trackc_world_seed_capacity_2026-11-07.md). No outcomes were run.
+
 - **Track C generated scan-loss scenarios (2026-11-07):** the synthetic-world builder can now apply fixed visible scan-loss probabilities, optionally state-linked, to every cohort. It records the assumed scenario values in world provenance; the minimax summary refuses to pool different scan-loss settings. Seventeen scratch tests passed. These are simulated input mechanics; no outcome comparison or probability choice was made.
 
 - **Track C composed synthetic executor (2026-11-07):** `make_synthetic_executor` connects world preparation and the supplied benchmark adapter to the sequential development runner. The runner checks declared world-generation seeds when provenance is present. Ten scratch tests passed, including two generated synthetic worlds with a fake benchmark. This is still an unsealed prototype: no atomic seed reservation, outcome manifest, real benchmark execution, or policy scoring occurred.
