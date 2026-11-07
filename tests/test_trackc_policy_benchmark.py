@@ -50,6 +50,13 @@ def test_scan_loss_scenarios_reject_invalid_or_misleading_inputs():
             benchmark._validate_scenarios(dict(scenario, miss_p=np.asarray(bad)), "test")
     with pytest.raises(ValueError, match="requires miss_p"):
         benchmark._validate_scenarios(dict(scenario, miss_p_hi=np.zeros(2)), "test")
+    with pytest.raises(ValueError, match="requires visible missing scans"):
+        benchmark._validate_scenarios(dict(scenario, miss_p=np.array([0.0, 0.2])), "test")
+    with pytest.raises(ValueError, match="requires visible missing scans"):
+        benchmark._validate_scenarios(
+            dict(scenario, miss_p=np.zeros(2), miss_p_hi=np.array([0.0, 0.2])), "test"
+        )
+    assert benchmark._validate_scenarios(dict(scenario, miss_p=np.zeros(2)), "test") == 2
     for visibility in ([False, False], [True, False], [1, 1]):
         with pytest.raises(ValueError, match="miss_visible"):
             benchmark._validate_scenarios(

@@ -278,10 +278,15 @@ def _validate_scenarios(scenarios: Mapping, name: str) -> int:
                 raise ValueError(f"{name} {key} must contain one probability in [0, 1] per patient")
     if "miss_p_hi" in scenarios and "miss_p" not in scenarios:
         raise ValueError(f"{name} miss_p_hi requires miss_p")
+    if "miss_p" in scenarios and "miss_visible" not in scenarios and (
+        np.any(np.asarray(scenarios["miss_p"], dtype=float) > 0)
+        or ("miss_p_hi" in scenarios and np.any(np.asarray(scenarios["miss_p_hi"], dtype=float) > 0))
+    ):
+        raise ValueError(f"{name} nonzero scan loss requires visible missing scans")
     if "miss_visible" in scenarios:
         visible = np.asarray(scenarios["miss_visible"])
         if "miss_p" not in scenarios or visible.shape != r.shape or visible.dtype.kind != "b" or not visible.all():
-            raise ValueError(f"{name} miss_visible requires miss_p and must be all True; omit it for repeated readings")
+            raise ValueError(f"{name} miss_visible requires miss_p and must be all True")
     return int(r.size)
 
 

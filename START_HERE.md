@@ -1,6 +1,6 @@
 # START HERE
 
-- **Track C scan-loss input guard (2026-11-07):** the shared benchmark now rejects out-of-range or malformed `miss_p`/`miss_p_hi`, `miss_p_hi` without `miss_p`, and `miss_visible` values other than an all-true Boolean patient array. Omit `miss_visible` for the simulator's repeated-reading behavior. This preserves legacy simulator behavior while preventing misleading benchmark inputs. The benchmark scratch suite passed 18 tests; no policy outcome study ran.
+- **Track C scan-loss input guard (2026-11-07):** the shared benchmark rejects malformed probabilities, `miss_p_hi` without `miss_p`, and misleading `miss_visible` values. Nonzero scan loss now requires visible missing scans: the legacy repeated-reading path can supply an unseen reading from an unscheduled day. That legacy simulator path remains unchanged and is not permitted for scan-loss benchmark scenarios. The benchmark scratch suite passed 18 tests; no policy outcome study ran.
 
 - **Track C scan-loss design check (2026-11-07):** the MPC's assumed future scan-loss probability affects planning only. Actual simulated scan loss occurs only when the scenario supplies `miss_p`; `miss_p_hi` optionally makes it state-linked. The simulator selects visible missingness by the presence of `miss_visible`, rather than its per-patient values. A future sensitivity protocol must explicitly specify and validate both the planner assumption and scenario fields, including whether missing scans are visible. No outcome comparison was run.
 
