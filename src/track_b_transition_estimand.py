@@ -55,6 +55,22 @@ def history_band_counts(state, bands, *, min_voxels=10):
     return result
 
 
+def target_field_coverage(state, bands, target_valid, *, min_voxels=10):
+    """Count risk voxels outside target geometric coverage; no target labels used.
+
+    Caller supplies an independently computed coverage mask from the target grid
+    and registration transform. This diagnostic does not validate that mask.
+    """
+    state, bands, target_valid = map(np.asarray, (state, bands, target_valid))
+    eligible = history_band_counts(state, bands, min_voxels=min_voxels)
+    if target_valid.shape != state.shape or target_valid.dtype != np.bool_:
+        raise ValueError('target_valid must be a same-shape boolean mask')
+    return [{**row,
+             'new_outside': int(np.count_nonzero((state == 1) & (bands == row['band']) & ~target_valid)),
+             'persistent_outside': int(np.count_nonzero((state == 2) & (bands == row['band']) & ~target_valid))}
+            for row in eligible]
+
+
 def summarize_window(state, bands, target, *, min_voxels=10):
     """Return matched-band contrast and target-label counts, or None if ineligible."""
     state, bands, target = map(np.asarray, (state, bands, target))

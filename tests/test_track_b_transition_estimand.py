@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from src.track_b_transition_estimand import (construct_history_states, history_band_counts, summarize_window,
+from src.track_b_transition_estimand import (construct_history_states, history_band_counts, target_field_coverage, summarize_window,
                                               summarize_patients, bootstrap_patients)
 
 
@@ -140,3 +140,22 @@ def test_label_zero_sensitivity_valid_difference():
     assert result['difference'] == pytest.approx(0.5)
     assert result['label_zero_sensitivity']['difference'] == pytest.approx(1.0)
     assert result['label_zero_sensitivity']['incomplete_bands'] == []
+
+
+def test_target_field_coverage_keeps_distinct_history_groups():
+    state = np.array([1, 1, 2, 2, 1, 2])
+    bands = np.array([0, 0, 0, 0, 1, 1])
+    valid = np.array([True, False, True, True, False, True])
+    rows = target_field_coverage(state, bands, valid, min_voxels=1)
+    assert rows[0]['new_outside'] == 1
+    assert rows[0]['persistent_outside'] == 0
+    assert rows[1]['new_outside'] == 1
+    assert rows[1]['persistent_outside'] == 0
+    assert rows[0]['n_new'] == rows[0]['n_persistent'] == 2
+
+
+def test_target_field_coverage_refuses_invalid_mask():
+    state, bands = np.array([1, 2]), np.array([0, 0])
+    for valid in (np.array([1, 1]), np.array([True])):
+        with pytest.raises(ValueError):
+            target_field_coverage(state, bands, valid, min_voxels=1)
