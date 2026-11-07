@@ -1,5 +1,7 @@
 # START HERE
 
+- **Track C summary contrasts (2026-11-07):** the world-summary prototype can separately summarize the LOO and finite-set minimax versus matched `d=0` contrasts. LOO model weights use other evaluation patients' baseline signals; minimax uses fixed finite model sets. Both summaries are labeled synthetic development, not adopted confirmatory tests. Six scratch tests passed; no policy outcomes were analyzed. Distinct recorded seeds and fingerprints do not prove independence or pairing.
+
 - **Track C benchmark-summary adapter (2026-11-07):** `summarize_benchmark_worlds` accepts existing synthetic benchmark results, checks matching settings and signal models, rejects repeated scenario fingerprints or seed keys, and verifies the recorded primary contrast against both policy arrays before world-level resampling. Six scratch tests passed. Distinct hashes and seeds cannot prove independent worlds or patient pairing; the adapter is a development prototype, not an adopted analysis or a research driver. No outcomes were analyzed.
 
 - **Track C world-summary prototype (2026-11-07):** `src/trackc_world_summary.py` computes paired patient differences within each equally weighted world and a seeded percentile bootstrap over worlds. Five synthetic scratch tests passed. Caller must establish patient pairing and world independence; the helper cannot verify either. It is not wired into a research driver, and its interval and settings are not an adopted scoring protocol. No policy outcomes were analyzed.

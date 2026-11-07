@@ -40,7 +40,9 @@ def test_benchmark_worlds_reject_duplicate_inputs_and_inconsistent_contrast():
                 ("selection_scenarios_sha256", "calibration_scenarios_sha256", "evaluation_scenarios_sha256"))},
             "seeds": {"selection": [200 + i], "evaluation": [300 + i]},
             "arm_outcomes": {"loo_dependence_aware_mpc": {"robust_utility": [1, 2]},
-                             "loo_conditional_independence_mpc": {"robust_utility": [0, 0]}},
+                             "loo_conditional_independence_mpc": {"robust_utility": [0, 0]},
+                             "finite_set_minimax_mpc": {"robust_utility": [3, 4]},
+                             "finite_set_d0_minimax_mpc": {"robust_utility": [1, 1]}},
             "primary_paired_contrast": {"contrast": "loo_dependence_aware_mpc minus loo_conditional_independence_mpc",
                                         "robust_utility_difference": [1, 2]},
             "n_evaluation_patients": 2,
@@ -49,6 +51,14 @@ def test_benchmark_worlds_reject_duplicate_inputs_and_inconsistent_contrast():
     first, second = world(1), world(2)
     result = summarize_benchmark_worlds([first, second], resamples=100, seed=3)
     assert result["equal_world_mean_difference"] == pytest.approx(1.5)
+    assert result["weight_source"] == "evaluation cohort peers"
+    minimax = summarize_benchmark_worlds([first, second], resamples=100, seed=3, contrast="minimax")
+    assert minimax["equal_world_mean_difference"] == pytest.approx(2.5)
+    assert minimax["weight_source"] == "fixed finite model sets"
+    del second["arm_outcomes"]["finite_set_d0_minimax_mpc"]
+    with pytest.raises(ValueError, match="required minimax arms"):
+        summarize_benchmark_worlds([first, second], resamples=100, seed=3, contrast="minimax")
+    second = world(2)
     second["input_fingerprints"]["evaluation_scenarios_sha256"] = first["input_fingerprints"]["evaluation_scenarios_sha256"]
     with pytest.raises(ValueError, match="fingerprint reused"):
         summarize_benchmark_worlds([first, second], resamples=100, seed=3)
