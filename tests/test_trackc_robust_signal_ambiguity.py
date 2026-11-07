@@ -56,11 +56,12 @@ def _policy(models):
     )
 
 
-def test_multiple_models_share_missing_future_scans_across_patterns(monkeypatch):
+@pytest.mark.parametrize("probability", [0.5, 1.0])
+def test_multiple_models_share_missing_future_scans_across_patterns(monkeypatch, probability):
     policy = SignalAmbiguityBeliefMPC(
         _observations(), model_parameters=_models(), scan_every=1, budget=2,
         n_particles=16, prediction_particles=4, forecast_cycles=2,
-        stop_endpoint="observed_two_scan", assumed_future_scan_miss_probability=1.0,
+        stop_endpoint="observed_two_scan", assumed_future_scan_miss_probability=probability,
     )
     policy.reset(tc.draw_scenarios(2, 1234), np.random.default_rng(42))
     readings = []
@@ -73,7 +74,13 @@ def test_multiple_models_share_missing_future_scans_across_patterns(monkeypatch)
     monkeypatch.setattr(tc, "update_observed_two_scan_state", record)
     policy._replan(np.array([0, 1]), 0, np.full((3, 2), np.nan))
     assert len(readings) == 3 * 2 * 2
-    assert all(mask.all() for mask in readings)
+    for index, mask in enumerate(readings):
+        np.testing.assert_array_equal(mask, readings[index % 2])
+    if probability == 1.0:
+        assert all(mask.all() for mask in readings)
+    else:
+        assert any(mask.any() for mask in readings)
+        assert any((~mask).any() for mask in readings)
 
 
 def test_maximin_action_uses_worst_model_and_first_index_for_ties():
