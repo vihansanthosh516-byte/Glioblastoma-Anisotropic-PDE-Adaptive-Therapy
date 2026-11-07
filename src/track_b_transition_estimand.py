@@ -82,7 +82,20 @@ def summarize_window(state, bands, target, *, min_voxels=10):
     total = sum(row['matched_count'] for row in rows)
     for row in rows:
         row['weight'] = row['matched_count'] / total
-    return {'difference': sum(row['weight'] * row['difference'] for row in rows), 'bands': rows}
+    incomplete = []
+    sensitivity = 0.0
+    for row in rows:
+        new_count = row['n_new'] - row['new_labels'][0]
+        persistent_count = row['n_persistent'] - row['persistent_labels'][0]
+        if not new_count or not persistent_count:
+            incomplete.append(row['band'])
+            continue
+        new_rate = (row['new_labels'][1] + row['new_labels'][3]) / new_count
+        persistent_rate = (row['persistent_labels'][1] + row['persistent_labels'][3]) / persistent_count
+        sensitivity += row['weight'] * (new_rate - persistent_rate)
+    return {'difference': sum(row['weight'] * row['difference'] for row in rows), 'bands': rows,
+            'label_zero_sensitivity': {'difference': None if incomplete else sensitivity,
+                                       'incomplete_bands': incomplete}}
 
 
 def summarize_patients(patient_windows):

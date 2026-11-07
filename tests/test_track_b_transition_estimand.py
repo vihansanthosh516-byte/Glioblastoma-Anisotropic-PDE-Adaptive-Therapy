@@ -119,3 +119,24 @@ def test_synthetic_history_to_window_score():
     result = summarize_window(state, bands, target, min_voxels=1)
     assert result['difference'] == 1.0
     assert result['bands'][0]['n_new'] == result['bands'][0]['n_persistent'] == 1
+
+
+def test_descriptive_label_zero_sensitivity_keeps_history_weights():
+    state = np.array([1, 1, 2, 2, 1, 2])
+    bands = np.array([0, 0, 0, 0, 1, 1])
+    target = np.array([1, 0, 0, 2, 0, 3])
+    result = summarize_window(state, bands, target, min_voxels=1)
+    # New denominator in band 1 becomes zero: sensitivity is incomplete,
+    # rather than silently dropping a history-selected band.
+    assert result['label_zero_sensitivity']['difference'] is None
+    assert result['label_zero_sensitivity']['incomplete_bands'] == [1]
+
+
+def test_label_zero_sensitivity_valid_difference():
+    state = np.array([1, 1, 2, 2])
+    bands = np.zeros(4, dtype=int)
+    target = np.array([1, 0, 2, 0])
+    result = summarize_window(state, bands, target, min_voxels=1)
+    assert result['difference'] == pytest.approx(0.5)
+    assert result['label_zero_sensitivity']['difference'] == pytest.approx(1.0)
+    assert result['label_zero_sensitivity']['incomplete_bands'] == []
