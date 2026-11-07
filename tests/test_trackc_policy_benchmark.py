@@ -67,6 +67,37 @@ def test_scan_loss_scenarios_reject_invalid_or_misleading_inputs():
     ) == 2
 
 
+def test_benchmark_blocks_legacy_repeated_reading_from_unseen_cycle():
+    class RecordPolicy:
+        uses_filter = False
+
+        def reset(self, scen, rng):
+            self.readings = []
+
+        def act(self, cycle, y):
+            self.readings.append(y.copy())
+            return np.zeros(1, dtype=bool)
+
+        def advance(self, cycle, treat):
+            pass
+
+    scenario = tc.draw_scenarios(1, seed=1234)
+    scenario.update(scan_every=np.array([3]), sigma_true=np.zeros(1), miss_p=np.array([0.5]))
+    seed = next(
+        value for value in range(1000)
+        if (lambda u: u[0, 1] >= 0.5 and u[0, 2] >= 0.5 and u[0, 3] < 0.5)(
+            np.random.default_rng([value, 1]).random((1, tc.N_CYCLES))
+        )
+    )
+    policy = RecordPolicy()
+    tc.simulate_two_endpoints(scenario, policy, seed, stop_endpoint="observed_two_scan")
+    assert np.isnan(policy.readings[1][0]) and np.isnan(policy.readings[2][0])
+    assert np.isfinite(policy.readings[3][0])
+    assert policy.readings[3][0] != policy.readings[0][0]
+    with pytest.raises(ValueError, match="requires visible missing scans"):
+        benchmark._validate_scenarios(scenario, "test")
+
+
 def _quiet_scenario():
     """One slow synthetic patient whose late schedule falls after 730 days."""
     return {
