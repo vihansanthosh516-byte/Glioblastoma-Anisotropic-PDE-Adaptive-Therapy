@@ -1,0 +1,58 @@
+import pytest
+
+import trackc_seed_registry as registry
+import trackc_world_schedule as schedule
+from trackc_world_runner import WorldRunError, run_development_worlds
+
+
+def world(name, start):
+    values = {role: start + i for i, role in enumerate(schedule.SCENARIO_ROLES)}
+    values.update({role: 1001 + start + i for i, role in enumerate(schedule.POLICY_ROLES)})
+    return {"world_id": name, **values}
+
+
+def fake_result(w):
+    mapping = {
+        "selection_scenario": "selection_scenario_generation", "calibration_scenario": "calibration_scenario_generation",
+        "evaluation_scenario": "evaluation_scenario_generation", "calibration_signal": "calibration_signal_generation",
+        "selection_policy": "selection", "q_training": "q_training", "calibration_policy": "calibration_policy_simulation",
+        "evaluation_policy": "evaluation", "schedule_mixture": "schedule_mixture_master",
+    }
+    return {"world_id": w["world_id"], "analysis_type": "synthetic_virtual_world_development",
+            "seeds": {key: [w[role]] for role, key in mapping.items()},
+            "signal_generation": {"seed": w["evaluation_signal"]}}
+
+
+def entries():
+    return [registry._entry("reserved", "dev", "reserved", [(1, 1000)], [], purpose="stage2_dev")]
+
+
+def test_runs_all_preflighted_worlds_in_order():
+    worlds = [world("a", 1), world("b", 20)]
+    assert [r["world_id"] for r in run_development_worlds(worlds, fake_result, entries=entries())] == ["a", "b"]
+
+
+def test_preflight_failure_prevents_any_execution():
+    worlds = [world("a", 1), world("b", 20)]
+    worlds[1]["world"] = worlds[0]["world"]
+    calls = []
+    with pytest.raises(ValueError, match="reused"):
+        run_development_worlds(worlds, lambda w: calls.append(w), entries=entries())
+    assert not calls
+
+
+def test_bad_record_stops_later_worlds():
+    worlds = [world("a", 1), world("b", 20), world("c", 40)]
+    calls = []
+
+    def execute(w):
+        calls.append(w["world_id"])
+        result = fake_result(w)
+        if w["world_id"] == "b":
+            result["seeds"]["evaluation"] = [0]
+        return result
+
+    with pytest.raises(WorldRunError, match="world b failed after 1") as error:
+        run_development_worlds(worlds, execute, entries=entries())
+    assert isinstance(error.value.__cause__, ValueError)
+    assert calls == ["a", "b"]

@@ -1,5 +1,7 @@
 # START HERE
 
+- **Track C multi-world orchestration prototype (2026-11-07):** `src/trackc_world_runner.py` preflights a development seed schedule, calls an injected executor sequentially, checks returned IDs and recorded stream seeds, and stops on a failure without returning partial results. Six fake-executor/schedule scratch tests passed. It neither reserves seeds nor writes manifests, and the benchmark record does not verify the world-generation seed. It is not a research driver or authorization to score outcomes.
+
 - **Track C development seed-schedule preflight (2026-11-07):** `src/trackc_world_schedule.py` checks exact world seed roles, unique world IDs and numeric seeds, and the current seed registry before a proposed Stage 2 development schedule is used. It does not reserve seeds or execute a benchmark. Three synthetic scratch tests passed; the independent-world driver and its frozen protocol remain open.
 
 - **Track C independent-world benchmark draft (2026-11-07):** [`paper/trackc_world_benchmark_protocol_draft_2026-11-07.md`](paper/trackc_world_benchmark_protocol_draft_2026-11-07.md) specifies the candidate minimax contrast, world-level estimand, controls, scan-loss design, and pre-outcome gates. World counts, anchors, precision, inference, fresh seeds, resource limit, and research driver remain open. This is a draft; no outcome run or sealed evaluation is authorized by it.
