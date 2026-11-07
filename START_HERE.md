@@ -1,5 +1,7 @@
 # START HERE
 
+- **Track C independent-world benchmark draft (2026-11-07):** [`paper/trackc_world_benchmark_protocol_draft_2026-11-07.md`](paper/trackc_world_benchmark_protocol_draft_2026-11-07.md) specifies the candidate minimax contrast, world-level estimand, controls, scan-loss design, and pre-outcome gates. World counts, anchors, precision, inference, fresh seeds, resource limit, and research driver remain open. This is a draft; no outcome run or sealed evaluation is authorized by it.
+
 - **Track C summary contrasts (2026-11-07):** the world-summary prototype can separately summarize the LOO and finite-set minimax versus matched `d=0` contrasts. LOO model weights use other evaluation patients' baseline signals; minimax uses fixed finite model sets. Both summaries are labeled synthetic development, not adopted confirmatory tests. Six scratch tests passed; no policy outcomes were analyzed. Distinct recorded seeds and fingerprints do not prove independence or pairing.
 
 - **Track C benchmark-summary adapter (2026-11-07):** `summarize_benchmark_worlds` accepts existing synthetic benchmark results, checks matching settings and signal models, rejects repeated scenario fingerprints or seed keys, and verifies the recorded primary contrast against both policy arrays before world-level resampling. Six scratch tests passed. Distinct hashes and seeds cannot prove independent worlds or patient pairing; the adapter is a development prototype, not an adopted analysis or a research driver. No outcomes were analyzed.
