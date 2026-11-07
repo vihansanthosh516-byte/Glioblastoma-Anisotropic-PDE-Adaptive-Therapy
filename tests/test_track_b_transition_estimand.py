@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from src.track_b_transition_estimand import (construct_history_states, history_band_counts, target_field_coverage, summarize_window,
+from src.track_b_transition_estimand import (construct_history_states, history_band_counts, geometric_coverage, target_field_coverage, summarize_window,
                                               summarize_patients, bootstrap_patients)
 
 
@@ -159,3 +159,22 @@ def test_target_field_coverage_refuses_invalid_mask():
     for valid in (np.array([1, 1]), np.array([True])):
         with pytest.raises(ValueError):
             target_field_coverage(state, bands, valid, min_voxels=1)
+
+
+def test_geometric_coverage_identity_and_translation():
+    identity = np.eye(4)
+    covered = geometric_coverage((4, 3, 2), (4, 3, 2), identity)
+    assert covered.dtype == np.bool_
+    assert covered.all()
+    identity[0, 3] = 1  # fixed output index maps to moving input index + 1
+    shifted = geometric_coverage((4, 3, 2), (4, 3, 2), identity)
+    assert shifted[:3].all()
+    assert not shifted[3].any()
+
+
+def test_geometric_coverage_refuses_bad_mapping():
+    for transform in (np.zeros((4, 4)), np.full((4, 4), np.nan), np.eye(3)):
+        with pytest.raises(ValueError):
+            geometric_coverage((2, 2, 2), (2, 2, 2), transform)
+    with pytest.raises(ValueError):
+        geometric_coverage((2, 0, 2), (2, 2, 2), np.eye(4))

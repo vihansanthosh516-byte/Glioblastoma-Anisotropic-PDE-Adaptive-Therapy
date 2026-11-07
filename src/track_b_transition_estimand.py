@@ -7,7 +7,7 @@ State codes are 0 outside risk, 1 newly appearing, and 2 persistent. Band codes
 """
 
 import numpy as np
-from scipy.ndimage import distance_transform_edt
+from scipy.ndimage import affine_transform, distance_transform_edt
 
 
 def construct_history_states(previous_labels, middle_labels):
@@ -53,6 +53,27 @@ def history_band_counts(state, bands, *, min_voxels=10):
         if min(n_new, n_persistent) >= min_voxels:
             result.append({'band': band, 'n_new': n_new, 'n_persistent': n_persistent})
     return result
+
+
+def geometric_coverage(moving_shape, output_shape, output_to_input):
+    """Resample a geometric all-ones field using scipy nearest-neighbor rules.
+
+    The matrix maps output indices to input indices, not physical coordinates.
+    The caller must supply the exact transform and grids used for label resampling.
+    """
+    def valid_shape(shape):
+        return (len(shape) == 3 and all(isinstance(x, (int, np.integer))
+                and not isinstance(x, (bool, np.bool_)) and x > 0 for x in shape))
+    if not valid_shape(moving_shape) or not valid_shape(output_shape):
+        raise ValueError('shapes must contain three positive integers')
+    matrix = np.asarray(output_to_input, dtype=float)
+    if (matrix.shape != (4, 4) or not np.isfinite(matrix).all()
+            or not np.allclose(matrix[3], [0, 0, 0, 1])
+            or np.linalg.matrix_rank(matrix[:3, :3]) < 3):
+        raise ValueError('invalid output-to-input affine')
+    return affine_transform(np.ones(moving_shape, dtype=np.uint8), matrix[:3, :3],
+                            offset=matrix[:3, 3], output_shape=tuple(output_shape),
+                            order=0, mode='constant', cval=0, prefilter=False).astype(bool)
 
 
 def target_field_coverage(state, bands, target_valid, *, min_voxels=10):
