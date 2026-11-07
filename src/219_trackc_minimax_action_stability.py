@@ -58,7 +58,6 @@ def _load_sibling(name: str, filename: str):
 
 
 _SIM = _load_sibling("trackc_sim_for_action_stability", "trackc_sim.py")
-_SIGNALS = _load_sibling("trackc_signals_for_action_stability", "trackc_integrated_signal_model.py")
 _AMBIGUITY = _load_sibling("trackc_ambiguity_for_action_stability", "216_trackc_robust_signal_ambiguity.py")
 
 
@@ -66,7 +65,7 @@ def build_model_sets():
     """Return declared 81-model grid and its matched 27-model d=0 subset."""
     levels = (-0.5, 0.0, 0.5)
     full = tuple(
-        _SIGNALS.SignalModelParameters(q, a, b, d)
+        _AMBIGUITY.SignalModelParameters(q, a, b, d)
         for q, a, b, d in itertools.product((0.5, 0.7, 0.9), levels, levels, levels)
     )
     d0 = tuple(model for model in full if model.d == 0.0)
@@ -294,7 +293,7 @@ def run_diagnostic(manifest):
     scenario = _SIM.draw_scenarios(1, seed=SCENARIO_SEED)
     rows = []
     for anchor, report, mri_score in ANCHORS:
-        observations = _SIGNALS.SignalObservations(
+        observations = _AMBIGUITY.SignalObservations(
             molecular_report=np.asarray([report], dtype=bool),
             mri_score=np.asarray([mri_score], dtype=float),
         )
