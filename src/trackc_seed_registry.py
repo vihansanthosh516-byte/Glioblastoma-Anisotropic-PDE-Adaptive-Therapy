@@ -345,6 +345,15 @@ ENTRIES = [
            note="Pre-run manifest written before the diagnostic. This run records treatment-plan choices and "
                 "predicted planning values only; it does not score policy outcomes or patient benefit.",
            policy=[(930000001, 930000004)]),
+    _entry("220", "paired-signal action-sensitivity diagnostic", "dev_used",
+           [(20262000, 20262067)], [],
+           [("output/trackc_signal_action_sensitivity_20261106_v2/manifest.json",
+             "pre_run_synthetic_action_sensitivity_manifest"),
+            ("output/trackc_signal_action_sensitivity_20261106_v2/diagnostic.json",
+             "synthetic_signal_action_sensitivity_result")],
+           note="Stage 2 synthetic action-sensitivity run; scenario and signal seeds are consumed at run start. "
+                "This records treatment-plan choices only, not policy outcomes or patient benefit.",
+           policy=[(930001001, 930001002)]),
 ]
 ENTRIES.append(_reserved_stage2_dev(ENTRIES))
 ENTRIES.append(_entry("restart", "Stage 3 sealed run (restart plan)", "reserved", [(20262300, 20262499)],

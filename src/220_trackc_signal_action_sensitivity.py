@@ -34,7 +34,7 @@ INTERPRETATION_RULE = (
     "Report whether action patterns vary across generated paired-signal replicates and whether full_81 "
     "and matched_d0_27 agree. No pass rule, method selection, treatment outcome, or positive claim is allowed."
 )
-OUT_DIR = ROOT / "output" / "trackc_signal_action_sensitivity_20261106"
+OUT_DIR = ROOT / "output" / "trackc_signal_action_sensitivity_20261106_v2"
 MANIFEST_PATH = OUT_DIR / "manifest.json"
 RESULT_PATH = OUT_DIR / "diagnostic.json"
 PROTOCOL_PATH = ROOT / "paper" / "trackc_signal_action_sensitivity_protocol_2026-11-06.md"

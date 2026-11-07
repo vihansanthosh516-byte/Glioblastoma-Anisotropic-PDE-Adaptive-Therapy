@@ -21,6 +21,25 @@ sys.modules[SPEC.name] = DIAGNOSTIC
 SPEC.loader.exec_module(DIAGNOSTIC)
 
 
+def _prepared_manifest():
+    current = DIAGNOSTIC.build_manifest_unchecked()
+    return {
+        "record_type": "pre_run_synthetic_action_sensitivity_manifest",
+        "protocol_status": "prepared",
+        "created_utc": "2026-11-06T00:00:00+00:00",
+        "script_id": DIAGNOSTIC.SCRIPT_ID,
+        "project_title": DIAGNOSTIC.PROJECT_TITLE,
+        **current,
+        "seed_allocation_check": {
+            "purpose": "stage2_dev",
+            "scenario_range_free_at_prepare": True,
+            "policy_range_free_at_prepare": True,
+        },
+        "interpretation_rule": DIAGNOSTIC.INTERPRETATION_RULE,
+        "outcome_metrics_included": False,
+    }
+
+
 def _rows():
     return [
         {"state_id": "s1", "signal_replicate": 0, "model_set": "full_81", "pattern": "100"},
@@ -95,8 +114,9 @@ def test_design_uses_unique_frozen_development_seeds_and_expected_size():
 
 
 def test_manifest_freezes_design_and_source_hashes():
-    manifest = DIAGNOSTIC.build_manifest()
+    manifest = _prepared_manifest()
 
+    assert DIAGNOSTIC.OUT_DIR.name == "trackc_signal_action_sensitivity_20261106_v2"
     assert manifest["protocol_status"] == "prepared"
     assert manifest["settings"]["synthetic_state_count"] == 4
     assert manifest["settings"]["full_model_count"] == 81
@@ -106,15 +126,21 @@ def test_manifest_freezes_design_and_source_hashes():
 
 
 def test_manifest_refuses_a_seed_collision(monkeypatch):
-    registry = DIAGNOSTIC._seed_registry_module()
-    monkeypatch.setattr(registry, "check_free", lambda **kwargs: ["collision"])
+    class FakeRegistry:
+        ENTRIES = []
+
+        @staticmethod
+        def check_free(**kwargs):
+            return ["collision"]
+
+    monkeypatch.setattr(DIAGNOSTIC, "_seed_registry_module", lambda: FakeRegistry)
 
     with pytest.raises(ValueError, match="seed allocation failed"):
         DIAGNOSTIC.build_manifest()
 
 
 def test_prepared_manifest_refuses_changed_project_title():
-    manifest = DIAGNOSTIC.build_manifest()
+    manifest = _prepared_manifest()
     manifest["project_title"] = "different project"
 
     with pytest.raises(ValueError, match="project_title"):
@@ -122,7 +148,7 @@ def test_prepared_manifest_refuses_changed_project_title():
 
 
 def test_prepared_manifest_refuses_changed_outcome_declaration():
-    manifest = DIAGNOSTIC.build_manifest()
+    manifest = _prepared_manifest()
     manifest["outcome_metrics_included"] = True
 
     with pytest.raises(ValueError, match="outcome_metrics_included"):

@@ -2,6 +2,8 @@
 
 **Status: frozen Stage 2 development diagnostic.** This checks whether generated paired signals change the finite-set minimax controller's first plan in a small set of synthetic states. It does not score treatment outcomes, estimate patient benefit, or test clinical value. It changes no patient-data scope and makes no method-selection rule.
 
+**Pre-run record correction:** An initial manifest was written before the final source-hash and metadata checks were added. No controller plan was computed from it. The initial manifest remains at `output/trackc_signal_action_sensitivity_20261106/manifest.json` and must not be used. The active manifest and result paths are under `output/trackc_signal_action_sensitivity_20261106_v2/`; commit the final manifest and seed allocation before running.
+
 ## Question
 
 Across four synthetic virtual-patient states, do repeated paired molecular-like and MRI-like signal draws change the three-cycle action pattern selected by the full 81-model minimax controller? How often do its plans match the model set that fixes residual dependence `d=0` while retaining the same `q/a/b` support?

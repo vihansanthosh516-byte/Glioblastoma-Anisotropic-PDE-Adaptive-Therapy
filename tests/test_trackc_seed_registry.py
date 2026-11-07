@@ -159,3 +159,18 @@ def test_cross_stream_seed_number_reuse_is_detected():
         {"kind": "scenario-policy", "range": [42, 42], "scripts": ["mpc", "sim"]}
     ]
     assert reg.check_free(policy=(42, 42), entries=[scenario])
+
+
+def test_signal_action_sensitivity_seed_allocation_is_registered():
+    entries = [entry for entry in reg.ENTRIES if entry["script"] == "220"]
+
+    assert len(entries) == 1
+    entry = entries[0]
+    assert entry["status"] == "dev_used"
+    assert entry["scenario_seeds"] == [[20262000, 20262067]]
+    assert entry["policy_seeds"] == [[930001001, 930001002]]
+    assert entry["noise_keys"] == []
+    assert ["output/trackc_signal_action_sensitivity_20261106_v2/manifest.json",
+            "pre_run_synthetic_action_sensitivity_manifest"] in entry["evidence"]
+    assert ["output/trackc_signal_action_sensitivity_20261106_v2/diagnostic.json",
+            "synthetic_signal_action_sensitivity_result"] in entry["evidence"]
