@@ -339,6 +339,12 @@ ENTRIES = [
                 "were saved or inspected. Exact elapsed seconds, settings, environment, hashes, and seed map are in "
                 "the manifest.",
            policy=[(20261958, 20261962), (20261969, 20261973)]),
+    _entry("219", "finite-set minimax action-sampling stability diagnostic", "dev_used",
+           [(20261990, 20261990)], [],
+           [("output/trackc_minimax_action_stability_20261106/diagnostic.json", '"protocol_status": "completed"')],
+           note="Pre-run manifest written before the diagnostic. This run records treatment-plan choices and "
+                "predicted planning values only; it does not score policy outcomes or patient benefit.",
+           policy=[(930000001, 930000004)]),
 ]
 ENTRIES.append(_reserved_stage2_dev(ENTRIES))
 ENTRIES.append(_entry("restart", "Stage 3 sealed run (restart plan)", "reserved", [(20262300, 20262499)],
