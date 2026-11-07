@@ -4,7 +4,7 @@ import numpy as np
 import trackc_seed_registry as registry
 import trackc_world_schedule as schedule
 from trackc_integrated_signal_model import SignalModelParameters
-from trackc_world_runner import WorldRunError, run_development_worlds, prepare_synthetic_world
+from trackc_world_runner import WorldRunError, run_development_worlds, prepare_synthetic_world, execute_prepared_world
 
 
 def world(name, start):
@@ -96,3 +96,15 @@ def test_world_fingerprint_changes_when_world_parameters_change(monkeypatch):
     monkeypatch.setattr(runner.calibration, "draw_worlds", changed)
     modified = prepare_synthetic_world(world("a", 1), **options)
     assert baseline["world_parameters_sha256"] != modified["world_parameters_sha256"]
+
+
+def test_prepared_provenance_is_attached_to_matching_fake_benchmark():
+    prepared = {"world_generation_seed": 7, "family": "single", "world_parameters_sha256": "a" * 64,
+                "benchmark_kwargs": {"world_id": "sample"}}
+    result = execute_prepared_world(prepared, lambda **kwargs: {"world_id": kwargs["world_id"]})
+    assert result["world_provenance"]["world_parameters_sha256"] == "a" * 64
+    assert result["world_provenance"]["world_generation_seed"] == 7
+    with pytest.raises(ValueError, match="world ID"):
+        execute_prepared_world(prepared, lambda **kwargs: {"world_id": "different"})
+    with pytest.raises(ValueError, match="already contains"):
+        execute_prepared_world(prepared, lambda **kwargs: {"world_id": "sample", "world_provenance": {}})

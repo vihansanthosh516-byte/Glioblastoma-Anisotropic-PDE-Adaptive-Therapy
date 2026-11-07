@@ -1,8 +1,10 @@
 # START HERE
 
+- **Track C prepared-world provenance adapter (2026-11-07):** `execute_prepared_world` passes prepared synthetic inputs to a caller-supplied benchmark and attaches the declared world seed, family, and parameter fingerprint to a matching result. Nine scratch tests passed with fake benchmarks. This is not a seal: inputs may be altered, seeds are not reserved, and provenance is not independently verified. No outcomes were run.
+
 - **Track C world-parameter fingerprint (2026-11-07):** the synthetic input builder now returns a SHA-256 of the generated family and world parameters, alongside the caller-declared world seed. Eight scratch tests passed. The fingerprint is not yet sealed into benchmark output and does not prove seed-to-world provenance or independence. No policy outcomes were run.
 
-- **Track C synthetic-world input builder (2026-11-07):** `prepare_synthetic_world` now creates separate selection, calibration and evaluation inputs from a preflighted development seed schedule and records the caller-declared world seed. Seven synthetic scratch tests passed. It builds inputs only: seeds are not reserved, the world parameters are not yet fingerprinted, and no benchmark or outcome scoring ran. The full research driver and protocol remain open.
+- **Track C synthetic-world input builder (2026-11-07):** `prepare_synthetic_world` creates separate selection, calibration and evaluation inputs from a preflighted development seed schedule, records the caller-declared world seed, and fingerprints the generated world parameters. Seeds are not reserved. No benchmark or outcome scoring ran. The full research driver and protocol remain open.
 
 - **Track C multi-world orchestration prototype (2026-11-07):** `src/trackc_world_runner.py` preflights a development seed schedule, calls an injected executor sequentially, checks returned IDs and recorded stream seeds, and stops on a failure without returning partial results. Six fake-executor/schedule scratch tests passed. It neither reserves seeds nor writes manifests, and the benchmark record does not verify the world-generation seed. It is not a research driver or authorization to score outcomes.
 

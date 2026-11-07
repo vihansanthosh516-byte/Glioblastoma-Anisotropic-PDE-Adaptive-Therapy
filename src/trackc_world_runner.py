@@ -75,6 +75,27 @@ def prepare_synthetic_world(world, *, family, patients_per_cohort, signal_parame
             "benchmark_kwargs": kwargs}
 
 
+def execute_prepared_world(prepared, benchmark):
+    """Run a caller-supplied benchmark and attach declared world provenance.
+
+    This helper does not reserve seeds, seal inputs, or authorize outcome scoring.
+    The attached hash identifies prepared parameters; it is not independent proof.
+    """
+    if not callable(benchmark):
+        raise TypeError("benchmark must be callable")
+    result = benchmark(**prepared["benchmark_kwargs"])
+    if not isinstance(result, dict) or result.get("world_id") != prepared["benchmark_kwargs"]["world_id"]:
+        raise ValueError("benchmark result does not match prepared world ID")
+    if "world_provenance" in result:
+        raise ValueError("benchmark result already contains world provenance")
+    return {**result, "world_provenance": {
+        "world_generation_seed": prepared["world_generation_seed"],
+        "family": prepared["family"],
+        "world_parameters_sha256": prepared["world_parameters_sha256"],
+        "verification": "caller-declared builder provenance; not independently verified",
+    }}
+
+
 def run_development_worlds(worlds, executor, *, entries=None):
     """Preflight and execute supplied worlds sequentially in memory.
 
