@@ -1,7 +1,8 @@
 import numpy as np
 import pytest
 
-from src.track_b_transition_estimand import summarize_window, summarize_patients
+from src.track_b_transition_estimand import (history_band_counts, summarize_window,
+                                              summarize_patients, bootstrap_patients)
 
 
 def test_weighted_bands_and_label_distribution():
@@ -42,3 +43,25 @@ def test_invalid_patient_results_rejected():
     for value in ({}, {'a': []}, {'a': [float('nan')]}, {'a': [1.1]}):
         with pytest.raises(ValueError):
             summarize_patients(value)
+
+
+def test_history_eligibility_requires_no_target():
+    state = np.array([1, 1, 2, 2, 1, 2])
+    bands = np.array([0, 0, 0, 0, 1, 1])
+    rows = history_band_counts(state, bands, min_voxels=2)
+    assert rows == [{'band': 0, 'n_new': 2, 'n_persistent': 2}]
+    assert history_band_counts(state, bands, min_voxels=3) == []
+
+
+def test_bootstrap_resamples_patient_means_not_windows():
+    data = {'b': [-1.0], 'a': [1.0, 1.0, 1.0]}
+    result = bootstrap_patients(data, n_resamples=10000, seed=20261104)
+    assert result['mean'] == 0
+    assert result['interval'] == (-1.0, 1.0)
+    assert result == bootstrap_patients(dict(reversed(list(data.items()))), n_resamples=10000, seed=20261104)
+
+
+def test_bootstrap_refuses_invalid_settings():
+    for options in ({'n_resamples': 0}, {'n_resamples': True}, {'seed': -1}):
+        with pytest.raises(ValueError):
+            bootstrap_patients({'a': [0.0]}, **options)
