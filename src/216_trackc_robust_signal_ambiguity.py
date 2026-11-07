@@ -247,6 +247,7 @@ class SignalAmbiguityBeliefMPC(_MPC.RobustBeliefMPC):
 
         scores = np.empty((len(self.model_filters), self.patterns.shape[0], rows.size), dtype=float)
         self._planning_observation_noise = None
+        self._planning_scan_available = None
         if self.stop_endpoint == "observed_two_scan":
             noise = self.rng.standard_normal(
                 (rows.size, self.prediction_particles, self.forecast_cycles + 1)
@@ -256,6 +257,16 @@ class SignalAmbiguityBeliefMPC(_MPC.RobustBeliefMPC):
                 (self.n, self.prediction_particles, self.forecast_cycles + 1), dtype=float
             )
             self._planning_observation_noise[rows] = noise
+            self._planning_scan_available = np.ones(
+                (self.n, self.prediction_particles, self.forecast_cycles + 1), dtype=bool
+            )
+            probability = self.assumed_future_scan_miss_probability
+            if probability >= 1.0:
+                self._planning_scan_available[rows] = False
+            elif probability > 0.0:
+                self._planning_scan_available[rows] = self.rng.random(
+                    (rows.size, self.prediction_particles, self.forecast_cycles + 1)
+                ) >= probability
         uniforms = keyed_stratified_uniforms(
             self._prediction_seed,
             rows,

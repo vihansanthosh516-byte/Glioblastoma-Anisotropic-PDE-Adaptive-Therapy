@@ -56,6 +56,26 @@ def _policy(models):
     )
 
 
+def test_multiple_models_share_missing_future_scans_across_patterns(monkeypatch):
+    policy = SignalAmbiguityBeliefMPC(
+        _observations(), model_parameters=_models(), scan_every=1, budget=2,
+        n_particles=16, prediction_particles=4, forecast_cycles=2,
+        stop_endpoint="observed_two_scan", assumed_future_scan_miss_probability=1.0,
+    )
+    policy.reset(tc.draw_scenarios(2, 1234), np.random.default_rng(42))
+    readings = []
+    original = tc.update_observed_two_scan_state
+
+    def record(values, scheduled, *state):
+        readings.append(np.isnan(values).copy())
+        return original(values, scheduled, *state)
+
+    monkeypatch.setattr(tc, "update_observed_two_scan_state", record)
+    policy._replan(np.array([0, 1]), 0, np.full((3, 2), np.nan))
+    assert len(readings) == 3 * 2 * 2
+    assert all(mask.all() for mask in readings)
+
+
 def test_maximin_action_uses_worst_model_and_first_index_for_ties():
     values = np.asarray([[4.0, 7.0, 2.0], [5.0, 3.0, 2.0]])
     assert maximin_action_index(values) == 0
