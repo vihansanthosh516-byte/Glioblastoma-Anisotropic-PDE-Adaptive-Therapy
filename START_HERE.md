@@ -1,5 +1,7 @@
 # START HERE
 
+- **Private Duke provenance audit (2026-11-07):** recorded timestamps place the private analysis freeze before the result record. The saved analysis script matches the result's SHA-256; the historical registration source matches Git revision `41ebe42`. The current registration file differs because of later QC fixes. Timestamps and hashes document recorded file provenance; they do not independently prove when target voxels were first read or validate registration quality. No images or masks were reopened.
+
 - **Private Duke saved-record consistency (2026-11-07):** result and frozen cohort contain the same unique patient/window pairs and patient set. Every saved band checked obeys the frozen minimum-count rule; saved fractions, differences and minimum-count weights are internally consistent. This validates saved-record consistency, not source segmentation values or spatial accuracy. No images or masks were reopened; private records remain outside Git.
 
 - **Private Duke result arithmetic audit (2026-11-07):** read-only recomputation from the saved private window and patient summaries exactly matched recorded window weighting, within-patient averaging, overall mean, and seeded patient-bootstrap interval. This checks aggregation of saved outputs only; it does not validate image registration, coverage, labels, cohort selection, or clinical meaning. No images or masks were reopened; private records remain outside Git.
