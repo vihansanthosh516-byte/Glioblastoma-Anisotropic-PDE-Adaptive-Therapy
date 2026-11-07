@@ -1,5 +1,7 @@
 # START HERE
 
+- **Track C benchmark-summary adapter (2026-11-07):** `summarize_benchmark_worlds` accepts existing synthetic benchmark results, checks matching settings and signal models, rejects repeated scenario fingerprints or seed keys, and verifies the recorded primary contrast against both policy arrays before world-level resampling. Six scratch tests passed. Distinct hashes and seeds cannot prove independent worlds or patient pairing; the adapter is a development prototype, not an adopted analysis or a research driver. No outcomes were analyzed.
+
 - **Track C world-summary prototype (2026-11-07):** `src/trackc_world_summary.py` computes paired patient differences within each equally weighted world and a seeded percentile bootstrap over worlds. Five synthetic scratch tests passed. Caller must establish patient pairing and world independence; the helper cannot verify either. It is not wired into a research driver, and its interval and settings are not an adopted scoring protocol. No policy outcomes were analyzed.
 
 - **Track C scan-loss input guard (2026-11-07):** the shared benchmark rejects malformed probabilities, `miss_p_hi` without `miss_p`, and misleading `miss_visible` values. Nonzero scan loss now requires visible missing scans: the legacy repeated-reading path can supply an unseen reading from an unscheduled day. That legacy simulator path remains unchanged and is not permitted for scan-loss benchmark scenarios. The benchmark scratch suite passed 18 tests; no policy outcome study ran.

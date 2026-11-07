@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from trackc_world_summary import paired_world_summary
+from trackc_world_summary import paired_world_summary, summarize_benchmark_worlds
 
 
 def test_equal_world_summary_and_seeded_interval():
@@ -25,3 +25,30 @@ def test_equal_world_summary_and_seeded_interval():
 def test_invalid_pairs_are_rejected(candidate, comparator, ids):
     with pytest.raises(ValueError):
         paired_world_summary(candidate, comparator, ids, resamples=10, seed=1)
+
+
+def test_benchmark_worlds_reject_duplicate_inputs_and_inconsistent_contrast():
+    def world(i):
+        return {
+            "analysis_type": "synthetic_virtual_world_development", "world_id": str(i),
+            "settings": {"stop": "observed"}, "inference_model_parameters": [{"d": 0}],
+            "signal_generation": {"parameters": {"d": 0.2}, "seed": 100 + i},
+            "input_fingerprints": {name: format(i * 3 + j, "064x") for j, name in enumerate(
+                ("selection_scenarios_sha256", "calibration_scenarios_sha256", "evaluation_scenarios_sha256"))},
+            "seeds": {"selection": [200 + i], "evaluation": [300 + i]},
+            "arm_outcomes": {"loo_dependence_aware_mpc": {"robust_utility": [1, 2]},
+                             "loo_conditional_independence_mpc": {"robust_utility": [0, 0]}},
+            "primary_paired_contrast": {"robust_utility_difference": [1, 2]},
+            "n_evaluation_patients": 2,
+        }
+
+    first, second = world(1), world(2)
+    result = summarize_benchmark_worlds([first, second], resamples=100, seed=3)
+    assert result["equal_world_mean_difference"] == pytest.approx(1.5)
+    second["input_fingerprints"]["evaluation_scenarios_sha256"] = first["input_fingerprints"]["evaluation_scenarios_sha256"]
+    with pytest.raises(ValueError, match="fingerprint reused"):
+        summarize_benchmark_worlds([first, second], resamples=100, seed=3)
+    second = world(2)
+    second["primary_paired_contrast"]["robust_utility_difference"] = [2, 2]
+    with pytest.raises(ValueError, match="primary contrast"):
+        summarize_benchmark_worlds([first, second], resamples=100, seed=3)

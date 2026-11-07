@@ -40,3 +40,58 @@ def paired_world_summary(candidate, comparator, world_ids, *, resamples, seed):
         "resamples": int(resamples),
         "seed": seed,
     }
+
+
+def summarize_benchmark_worlds(records, *, resamples, seed):
+    """Summarize the existing primary contrast with duplicate-input checks.
+
+    Matching recorded settings and distinct fingerprints are necessary checks,
+    not proof that independently generated worlds or patient pairings are valid.
+    """
+    records = tuple(records)
+    if len(records) < 2:
+        raise ValueError("at least two benchmark worlds are required")
+    reference = records[0]
+    candidates, comparators, world_ids = [], [], []
+    seen_fingerprints = set()
+    seen_seed_keys = set()
+    for record in records:
+        if record["analysis_type"] != "synthetic_virtual_world_development":
+            raise ValueError("all records must be synthetic development worlds")
+        for key in ("settings", "inference_model_parameters"):
+            if record[key] != reference[key]:
+                raise ValueError(f"world {key} differs")
+        if record["signal_generation"]["parameters"] != reference["signal_generation"]["parameters"]:
+            raise ValueError("world signal-generation parameters differ")
+        for key in ("selection_scenarios_sha256", "calibration_scenarios_sha256", "evaluation_scenarios_sha256"):
+            fingerprint = record["input_fingerprints"][key]
+            if not isinstance(fingerprint, str) or len(fingerprint) != 64 or any(c not in "0123456789abcdef" for c in fingerprint):
+                raise ValueError("invalid scenario fingerprint")
+            if fingerprint in seen_fingerprints:
+                raise ValueError("scenario fingerprint reused")
+            seen_fingerprints.add(fingerprint)
+        seed_keys = [tuple(value) for value in record["seeds"].values()]
+        seed_keys.append((record["signal_generation"]["seed"],))
+        for seed_key in seed_keys:
+            if not seed_key or seed_key in seen_seed_keys:
+                raise ValueError("seed key reused or empty")
+            seen_seed_keys.add(seed_key)
+        arms = record["arm_outcomes"]
+        candidate = np.asarray(arms["loo_dependence_aware_mpc"]["robust_utility"], dtype=float)
+        comparator = np.asarray(arms["loo_conditional_independence_mpc"]["robust_utility"], dtype=float)
+        if candidate.ndim != 1 or candidate.shape != comparator.shape or candidate.size != record["n_evaluation_patients"]:
+            raise ValueError("world outcome arrays do not match the evaluation cohort")
+        recorded_difference = np.asarray(record["primary_paired_contrast"]["robust_utility_difference"], dtype=float)
+        if recorded_difference.shape != candidate.shape or not np.array_equal(recorded_difference, candidate - comparator):
+            raise ValueError("recorded primary contrast does not match paired outcomes")
+        candidates.append(candidate)
+        comparators.append(comparator)
+        world_ids.append(record["world_id"])
+    try:
+        candidate_matrix = np.stack(candidates)
+        comparator_matrix = np.stack(comparators)
+    except ValueError as exc:
+        raise ValueError("worlds must have equal evaluation cohort sizes") from exc
+    result = paired_world_summary(candidate_matrix, comparator_matrix, world_ids, resamples=resamples, seed=seed)
+    result["checks_limit"] = "Distinct recorded seeds and hashes do not prove independence or pairing."
+    return result
