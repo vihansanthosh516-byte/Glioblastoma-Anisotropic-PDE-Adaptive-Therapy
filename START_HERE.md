@@ -1,5 +1,7 @@
 # START HERE
 
+- **Track C minimax world-provenance check (2026-11-07):** the minimax world-summary adapter now requires a declared world seed, family, and parameter fingerprint; it rejects repeated world fingerprints, reused seed keys, and mixed world families. Twelve synthetic scratch tests passed. Caller-declared provenance remains unsealed and cannot prove independent generation. No outcomes were run.
+
 - **Track C prepared-world provenance adapter (2026-11-07):** `execute_prepared_world` passes prepared synthetic inputs to a caller-supplied benchmark and attaches the declared world seed, family, and parameter fingerprint to a matching result. Nine scratch tests passed with fake benchmarks. This is not a seal: inputs may be altered, seeds are not reserved, and provenance is not independently verified. No outcomes were run.
 
 - **Track C world-parameter fingerprint (2026-11-07):** the synthetic input builder now returns a SHA-256 of the generated family and world parameters, alongside the caller-declared world seed. Eight scratch tests passed. The fingerprint is not yet sealed into benchmark output and does not prove seed-to-world provenance or independence. No policy outcomes were run.

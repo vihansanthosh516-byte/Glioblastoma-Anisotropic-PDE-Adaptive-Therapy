@@ -57,9 +57,31 @@ def summarize_benchmark_worlds(records, *, resamples, seed, contrast="loo"):
     candidates, comparators, world_ids = [], [], []
     seen_fingerprints = set()
     seen_seed_keys = set()
+    seen_world_hashes = set()
+    reference_family = None
     for record in records:
         if record["analysis_type"] != "synthetic_virtual_world_development":
             raise ValueError("all records must be synthetic development worlds")
+        if contrast == "minimax":
+            provenance = record.get("world_provenance")
+            if not isinstance(provenance, dict):
+                raise ValueError("minimax summary requires world provenance")
+            family = provenance.get("family")
+            world_hash = provenance.get("world_parameters_sha256")
+            world_seed = provenance.get("world_generation_seed")
+            if family not in ("single", "mixture"):
+                raise ValueError("invalid world family")
+            if reference_family is None:
+                reference_family = family
+            elif family != reference_family:
+                raise ValueError("world families differ")
+            if not isinstance(world_hash, str) or len(world_hash) != 64 or any(c not in "0123456789abcdef" for c in world_hash):
+                raise ValueError("invalid world parameter fingerprint")
+            if world_hash in seen_world_hashes:
+                raise ValueError("world parameter fingerprint reused")
+            seen_world_hashes.add(world_hash)
+            if isinstance(world_seed, (bool, np.bool_)) or not isinstance(world_seed, (int, np.integer)) or world_seed < 0:
+                raise ValueError("invalid world generation seed")
         for key in ("settings", "inference_model_parameters"):
             if record[key] != reference[key]:
                 raise ValueError(f"world {key} differs")
@@ -82,6 +104,8 @@ def summarize_benchmark_worlds(records, *, resamples, seed, contrast="loo"):
             seen_fingerprints.add(fingerprint)
         seed_keys = [tuple(value) for value in record["seeds"].values()]
         seed_keys.append((record["signal_generation"]["seed"],))
+        if contrast == "minimax":
+            seed_keys.append((int(world_seed),))
         for seed_key in seed_keys:
             if not seed_key or seed_key in seen_seed_keys:
                 raise ValueError("seed key reused or empty")

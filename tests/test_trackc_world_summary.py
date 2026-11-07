@@ -31,6 +31,8 @@ def test_benchmark_worlds_reject_duplicate_inputs_and_inconsistent_contrast():
     def world(i):
         return {
             "analysis_type": "synthetic_virtual_world_development", "world_id": str(i),
+            "world_provenance": {"family": "single", "world_generation_seed": 400 + i,
+                                 "world_parameters_sha256": format(1000 + i, "064x")},
             "settings": {"stop": "observed"}, "inference_model_parameters": [{"d": 0}],
             "signal_generation": {"generator": "test", "parameters": {"d": 0.2}, "seed": 100 + i,
                                   "f0_source": "evaluation_scenarios['f0']", "mri_template_sha256": None},
@@ -55,6 +57,14 @@ def test_benchmark_worlds_reject_duplicate_inputs_and_inconsistent_contrast():
     minimax = summarize_benchmark_worlds([first, second], resamples=100, seed=3, contrast="minimax")
     assert minimax["equal_world_mean_difference"] == pytest.approx(2.5)
     assert minimax["weight_source"] == "fixed finite model sets"
+    second["world_provenance"]["world_parameters_sha256"] = first["world_provenance"]["world_parameters_sha256"]
+    with pytest.raises(ValueError, match="world parameter fingerprint reused"):
+        summarize_benchmark_worlds([first, second], resamples=100, seed=3, contrast="minimax")
+    second = world(2)
+    second["world_provenance"]["family"] = "mixture"
+    with pytest.raises(ValueError, match="world families differ"):
+        summarize_benchmark_worlds([first, second], resamples=100, seed=3, contrast="minimax")
+    second = world(2)
     del second["arm_outcomes"]["finite_set_d0_minimax_mpc"]
     with pytest.raises(ValueError, match="required minimax arms"):
         summarize_benchmark_worlds([first, second], resamples=100, seed=3, contrast="minimax")
