@@ -93,6 +93,17 @@ def test_fixed_schedule_and_course_cap_policies_accept_sigma_only_context():
     assert holiday.run.shape == (2,)
 
 
+def test_course_cap_strips_extra_scenario_fields_before_reset():
+    scen = tc.draw_scenarios(2, seed=881011)
+    policy = ResetKeyRecorder()
+    capped = benchmark.CourseCappedPolicy(policy, max_courses=2)
+
+    capped.reset(scen, np.random.default_rng(881012))
+
+    assert policy.reset_keys == {"sigma"}
+    np.testing.assert_array_equal(policy.sigma_received, scen["sigma"])
+
+
 def test_benchmark_evaluation_requests_observation_only_context(monkeypatch):
     captured = {}
 

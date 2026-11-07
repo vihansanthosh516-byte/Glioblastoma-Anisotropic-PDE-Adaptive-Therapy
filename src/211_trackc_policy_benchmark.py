@@ -369,7 +369,7 @@ class CourseCappedPolicy:
     def reset(self, scenarios: Mapping, rng: np.random.Generator):
         n_patients = _policy_patient_count(scenarios, "policy reset context")
         self._used = np.zeros(n_patients, dtype=np.int16)
-        self.policy.reset(scenarios, rng)
+        self.policy.reset({"sigma": np.asarray(scenarios["sigma"]).copy()}, rng)
 
     def act(self, cycle: int, observations: np.ndarray) -> np.ndarray:
         if self._used is None:
