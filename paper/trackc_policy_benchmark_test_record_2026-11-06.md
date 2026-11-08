@@ -132,4 +132,8 @@ Coverage remains unvalidated at the planned world counts. Westphal and Zapf's si
 
 Focused scratch tests cover deterministic family ordering, the two-family positive rule, a non-passing family, a missed precision target, and invalid inputs. The suite passed **22 tests in 0.13 seconds** in `C:\Users\vihan\AppData\Local\Temp\trackc-max-t-8lsunbxt`. SHA-256 matched all **467 files** under `src/` and `tests/` before and after the test run. No policy outcomes were run.
 
-\n
+### Follow-up: predeclared max-T coverage screen (2026-11-08)
+
+The outcome-blind method screen is specified in [`trackc_max_t_coverage_audit_protocol_2026-11-08.md`](trackc_max_t_coverage_audit_protocol_2026-11-08.md) and implemented in `src/trackc_max_t_coverage_audit.py`. It covers six predeclared pairs of known distributions, 5/10/14/20 worlds per family, 2,000 Monte Carlo repetitions per cell, and 2,000 bootstrap resamples per repetition. It passes only if every 95% Wilson lower bound for joint coverage is at least 0.93 and no inference fails. It records false-positive rates for the two-lower-bounds-above-zero rule. The full audit has not run.
+
+The two focused scratch suites passed **30 tests in 0.26 seconds**. SHA-256 matched all **469 files** under `src/` and `tests/` before and after. This was mechanics testing only. No coverage cell was evaluated, no Track C policy outcome was run, and no patient data were used.
