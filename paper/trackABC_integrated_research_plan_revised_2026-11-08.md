@@ -1,14 +1,13 @@
-# Research Plan and Current Project Record
+# Integrating Tumor Biology and Longitudinal MRI for Glioblastoma Progression Modeling and In-Silico Therapy Optimization
 
-## Project title
-
-**Integrating Tumor Biology and Longitudinal MRI for Glioblastoma Progression Modeling and In-Silico Therapy Optimization**
+**Research Plan and Current Project Record**
 
 **Project year:** 2026–2027
-
 **Plan version:** 2026-11-08
 
-## Project summary
+## Rationale
+
+### Project summary
 
 This project studies glioblastoma (GBM) through three separate research tracks and a synthetic treatment-policy simulation. Track A analyzes regional gene expression and donor-held-out prediction. Track B analyzes longitudinal MRI labels and spatial transitions. Track C includes an observational analysis of MGMT methylation and overall survival, plus mathematical simulation of tumor growth and treatment policies. The integrated study uses synthetic virtual patients to test whether modeling dependence between two imperfect signals changes simulated policy utility.
 
@@ -16,7 +15,7 @@ Track A, Track B, and Track C do not share a verified patient-level linkage or a
 
 The project aims to identify conditions in which a dependence-aware controller improves robust simulated utility over a matched conditional-independence controller. Its positive-result rule is specified below. The rule will be applied only after the inference procedure is independently reviewed and passes outcome-blind synthetic validation. A positive result is an empirical outcome to test, not a guaranteed result.
 
-## 1. Scientific scope and interpretation
+### Scientific scope and interpretation
 
 1. **Track A** measures expression patterns in sampled tumor regions. The A5 labels are author-supplied MRI-marked sampling-point labels, and the analyzed expression is mixed-cell. A5 performance is not resistance-prediction accuracy.
 2. **Track B** measures MRI-defined tissue and label transitions. A transition or recurrence label is not a direct measure of temozolomide (TMZ) resistance. A treatment-associated interpretation requires verified patient-level exposure and clinical chronology; even then, it is a radiographic proxy.
@@ -24,7 +23,7 @@ The project aims to identify conditions in which a dependence-aware controller i
 4. **Track C simulation and the integrated study** use assumed latent tumor states, treatment effects, signal quality, and signal dependence. Their outcomes apply to the specified simulated worlds.
 5. The project will not label a donor or patient TMZ-sensitive or TMZ-resistant from expression or MRI alone. It will not recommend treatment for a person or claim clinical benefit from simulated policy differences.
 
-## 2. Research record to date
+### Research record to date
 
 These results describe analyses already recorded for this project. They do not change the project’s hypotheses or success rules.
 
@@ -54,7 +53,7 @@ The project has simulator, particle-filter, controller, signal-likelihood, and w
 
 The current primary simulated contrast is a finite-set dependence-aware minimax controller versus a matched minimax controller with residual dependence parameter d=0. No policy outcome comparison has run under this final contrast. An outcome-blind synthetic screen of the proposed observed-SE max-T intervals completed on 2026-11-08 and failed its predeclared coverage criterion: all 24 cells missed the Wilson-lower-bound threshold; observed joint coverage ranged from 70.05% to 93.2% for nominal 95% intervals. The helper is not eligible for policy evaluation or a positive claim. See the [coverage-screen protocol](trackc_max_t_coverage_audit_protocol_2026-11-08.md) and [result](trackc_max_t_coverage_audit_result_2026-11-08.md).
 
-## 3. Rationale and prior art
+### Prior art
 
 GBM changes across tumor regions and over time. Single-cell expression can characterize sampled regional biology; longitudinal MRI can characterize radiographic change; mathematical models can represent tumor growth and treatment assumptions. These measurements answer different questions and are not interchangeable.
 
@@ -64,7 +63,15 @@ The 2026 PREDICT-GBM publication presents a multicenter platform and longitudina
 
 The project’s narrow question is whether uncertainty about dependence between two imperfect, simulated proxy signals changes treatment-policy utility in the declared synthetic worlds. The targeted prior-art review has not verified that this exact contrast is new, and it is not a systematic review. The project will avoid “first,” “unique,” or broad novelty claims.
 
-## 4. Research questions and hypotheses
+### Expected contribution and limits
+
+The project’s contribution is a carefully specified comparison of dependence-aware and conditional-independence treatment policies under declared synthetic assumptions, informed—but not calibrated—by separate molecular and imaging analyses. Its value depends on transparent assumptions, validated implementation, sound uncertainty estimates, and a comparison that meets its predeclared precision rule.
+
+The project will not claim a new clinical treatment, a patient-level digital twin, validated patient-specific resistance, causal MGMT treatment benefit, or clinical benefit from simulated utility. A positive simulation result would support only the specified policy contrast in the specified synthetic worlds and would motivate later validation.
+
+## Research Questions, Hypotheses, or Engineering Goals
+
+### Research questions and hypotheses
 
 ### Track A — regional expression and prediction
 
@@ -98,7 +105,7 @@ The project’s narrow question is whether uncertainty about dependence between 
 
 When molecular-like and MRI-like proxy signals are generated jointly from the same simulated resistant-tumor state, does explicitly modeling their residual dependence improve robust simulated treatment utility over the matched conditional-independence policy? This is a simulation hypothesis, not a claim about patient benefit.
 
-## 5. Engineering goals and expected outcomes
+### Engineering goals and expected outcomes
 
 1. Preserve the frozen Track A analysis and its original success rule.
 2. Keep Track A, Track B, the CGGA analysis, and simulation evidence on their own cohorts, endpoints, and interpretation scales.
@@ -109,7 +116,9 @@ When molecular-like and MRI-like proxy signals are generated jointly from the sa
 
 Expected project outputs are: a reproducible account of the completed Track A work; a clearly bounded exploratory Track B transition analysis and any independently eligible forecast comparison; an observational CGGA report; and, if all synthetic validation and execution gates pass, a synthetic policy comparison. No output is a clinical treatment recommendation.
 
-## 6. Materials and data sources
+## Procedures
+
+### Materials and data sources
 
 - **Computing:** Windows 11 workstation with Python 3.14.4 and 32 GB RAM. Record processor, thread settings, operating system, package versions, and runtime for each future sealed run.
 - **Track A:** Yu et al. single-cell RNA data and sample metadata (GEO GSE117891; Yu et al., 2020); Table S1 point labels; GBmap annotation metadata; Ivy GAP (GSE107559); Angers (E-MTAB-5092); E-MTAB-8743; and the Ntafoulis et al. (2023) supplementary viability-correlation panel.
@@ -119,7 +128,7 @@ Expected project outputs are: a reproducible account of the completed Track A wo
 - **Aggregate model checks:** published aggregate RTOG 0525 and GEINO 14-01 results may be used for endpoint-compatible checks (Gilbert et al., 2013; Balaña et al., 2020). They are not patient-level dose-response data.
 - **Physical materials:** none. The project uses no cells, animals, chemicals, experimental drugs, or participant recruitment.
 
-## 7. Procedures
+### Track procedures
 
 ### Track A — expression and regional biology
 
@@ -202,7 +211,33 @@ Compare the finite-set dependence-aware minimax controller with the matched fini
 
 At each replan, score all eight treatment/no-treatment patterns over three 28-day cycles, forecast six cycles (168 days) without terminal value, apply the first three-cycle block, and replan at the next scheduled scan. Break ties by the fixed action order favoring fewer courses. A modeled course treats for five days; the total cap is 12 courses. The primary scan interval is 84 days, with 28-, 56-, and 112-day scan intervals and visible scan loss as sensitivity scenarios. The primary visible scan-loss probability is zero; 0.10 is the declared sensitivity. The synthetic observable stop proxy stops after two consecutive visible noisy readings reach at least 1.4 times the lowest earlier observed volume, with a floor of 0.10 times observed starting volume; a missing scan resets confirmation. This is not formal RANO. The configuration’s policy library also includes no-signal, development-selected fixed schedules, simple scan-based controls, and burden-only Q-learning. The latter is not a same-information primary comparator. Oracle policies use hidden simulated parameters and are diagnostic only.
 
-## 8. Outcomes, statistics, and positive-result rule
+### Simulation sampling, randomness, and reproducibility
+
+1. Generate continuous world axes with scrambled Latin hypercube sampling and one named seed per world. Use the dimension order and transformations in the v2 configuration. Assign `(μ,ν)` pairs from the lexicographically ordered 3×3 grid, permute with the world-parameter stream, and take the declared number of worlds.
+2. Generate patient parameters using a separate scrambled Latin hypercube with configured dimension order `(r,m,f0,B0,c,ε)`. Assign observation noise from `{0.05,0.10,0.20}` in balanced counts using a separate stream.
+3. Use `numpy.random.Generator(PCG64DXSM)`. Derive each numeric seed as the little-endian integer from the first eight bytes of SHA-256 over `trackABC-integrated-v2|stage|family|world_id|stream_name`. The current seed file defines stream roles; numeric seeds are not yet materialized or reserved.
+4. Keep world generation, selection, calibration, evaluation, molecular signal, MRI signal, observation noise, candidate policy, comparator policy, secondary policy, and bootstrap streams distinct. Materialize the seed table, check collisions against the registry, and reserve it before a sealed run.
+5. Share common random inputs across paired policies. Record cohort and world identifiers, input and model hashes, parameter fingerprints, package versions, environment, failures, missing arms, fallbacks, exclusions, and all prespecified sensitivities.
+6. Complete the research-scale driver, exact cohort/world counts, outcome-blind timing and precision plan, runtime cap, clean-install check, and review of the alternative interval method before generating policy outcomes. Existing development seeds and outcomes are not evaluation data.
+
+The current seed-capacity note identifies 89 free scenario-class seeds in the relevant development block, corresponding to at most 14 worlds at six seeds per world before policy seeds and other design constraints. This is not a precision calculation or a reservation. The final count will come from the written outcome-blind planning rule.
+
+### Project sequence
+
+1. Preserve the completed Track A analyses and their original frozen rules.
+2. Complete any planned Track A extensions only under dated amendments and with no reuse of the held-out A5 results for model tuning.
+3. Keep the completed Duke transition analysis exploratory. Resolve source, registration, coverage, label, and chronology questions before any additional patient-level interpretation; use a separate eligible cohort for confirmation.
+4. Report the CGGA association and diagnostics as an observational OS analysis.
+5. Finish and review the Track C simulation protocol, inference method, independent-world driver, seed table, precision plan, and runtime gate using synthetic data only.
+6. Seal the evaluation configuration and source, then run the predeclared policy comparison once with the positive rule above. Preserve all results, including null or comparator-favoring results.
+
+## Risk and Safety
+
+Tracks A and B use existing human-derived research data. The project recruits or contacts no participants and administers no treatment or laboratory drug assay. Keep identifiers, restricted files, and any disallowed derived outputs in access-controlled storage. The exact accepted Duke terms and school or competition conditions govern every further use and sharing decision. If permitted use of a derived summary is unclear, do not use or share it; the integrated simulation can use its standard-normal MRI-like fallback.
+
+Do not reopen patient images, masks, ADC maps, or patient-level records for the integrated simulation. It receives only allowed aggregate context or synthetic signals. Long computations will be run on a ventilated surface with the computer connected to power.
+
+## Data Analysis
 
 ### Track A
 
@@ -228,38 +263,6 @@ The second measure is a scan-sampled latent-burden proxy, not clinical RANO. Def
 The primary contrast is candidate utility minus matched `d=0` utility, paired within each independent world and averaged equally across worlds. Keep single-response and mixture-response families separate. The positive rule requires both simultaneous adjusted lower confidence bounds to exceed zero and both interval half-widths to be no more than 14 simulated days.
 
 The observed-SE max-T proposal is not used: its predeclared coverage screen failed. Before policy outcomes are generated, an alternative simultaneous inference method must be chosen, independently reviewed, frozen in a dated protocol, and validated on fresh outcome-blind synthetic data that reflect the intended world-level dependence structure. If no method meets its coverage and precision requirements at feasible world counts, report descriptive estimates with their stated uncertainty or report the comparison as inconclusive. Do not alter the positive rule after outcome access.
-
-## 9. Simulation sampling, randomness, and reproducibility
-
-1. Generate continuous world axes with scrambled Latin hypercube sampling and one named seed per world. Use the dimension order and transformations in the v2 configuration. Assign `(μ,ν)` pairs from the lexicographically ordered 3×3 grid, permute with the world-parameter stream, and take the declared number of worlds.
-2. Generate patient parameters using a separate scrambled Latin hypercube with configured dimension order `(r,m,f0,B0,c,ε)`. Assign observation noise from `{0.05,0.10,0.20}` in balanced counts using a separate stream.
-3. Use `numpy.random.Generator(PCG64DXSM)`. Derive each numeric seed as the little-endian integer from the first eight bytes of SHA-256 over `trackABC-integrated-v2|stage|family|world_id|stream_name`. The current seed file defines stream roles; numeric seeds are not yet materialized or reserved.
-4. Keep world generation, selection, calibration, evaluation, molecular signal, MRI signal, observation noise, candidate policy, comparator policy, secondary policy, and bootstrap streams distinct. Materialize the seed table, check collisions against the registry, and reserve it before a sealed run.
-5. Share common random inputs across paired policies. Record cohort and world identifiers, input and model hashes, parameter fingerprints, package versions, environment, failures, missing arms, fallbacks, exclusions, and all prespecified sensitivities.
-6. Complete the research-scale driver, exact cohort/world counts, outcome-blind timing and precision plan, runtime cap, clean-install check, and review of the alternative interval method before generating policy outcomes. Existing development seeds and outcomes are not evaluation data.
-
-The current seed-capacity note identifies 89 free scenario-class seeds in the relevant development block, corresponding to at most 14 worlds at six seeds per world before policy seeds and other design constraints. This is not a precision calculation or a reservation. The final count will come from the written outcome-blind planning rule.
-
-## 10. Data use, privacy, and risk
-
-Tracks A and B use existing human-derived research data. The project recruits or contacts no participants and administers no treatment or laboratory drug assay. Keep identifiers, restricted files, and any disallowed derived outputs in access-controlled storage. The exact accepted Duke terms and school or competition conditions govern every further use and sharing decision. If permitted use of a derived summary is unclear, do not use or share it; the integrated simulation can use its standard-normal MRI-like fallback.
-
-Do not reopen patient images, masks, ADC maps, or patient-level records for the integrated simulation. It receives only allowed aggregate context or synthetic signals. Long computations will be run on a ventilated surface with the computer connected to power.
-
-## 11. Project sequence
-
-1. Preserve the completed Track A analyses and their original frozen rules.
-2. Complete any planned Track A extensions only under dated amendments and with no reuse of the held-out A5 results for model tuning.
-3. Keep the completed Duke transition analysis exploratory. Resolve source, registration, coverage, label, and chronology questions before any additional patient-level interpretation; use a separate eligible cohort for confirmation.
-4. Report the CGGA association and diagnostics as an observational OS analysis.
-5. Finish and review the Track C simulation protocol, inference method, independent-world driver, seed table, precision plan, and runtime gate using synthetic data only.
-6. Seal the evaluation configuration and source, then run the predeclared policy comparison once with the positive rule above. Preserve all results, including null or comparator-favoring results.
-
-## 12. Expected contribution and limits
-
-The project’s contribution is a carefully specified comparison of dependence-aware and conditional-independence treatment policies under declared synthetic assumptions, informed—but not calibrated—by separate molecular and imaging analyses. Its value depends on transparent assumptions, validated implementation, sound uncertainty estimates, and a comparison that meets its predeclared precision rule.
-
-The project will not claim a new clinical treatment, a patient-level digital twin, validated patient-specific resistance, causal MGMT treatment benefit, or clinical benefit from simulated utility. A positive simulation result would support only the specified policy contrast in the specified synthetic worlds and would motivate later validation.
 
 ## References
 
