@@ -1,27 +1,29 @@
-# Track A 121-gene response proxy mapping gate
+# Track A TMZ-response proxy mapping gate and amended run
 
-**Date:** 2026-11-07  
-**Protocol commit:** `168af12`  
-**Status:** original 121-gene run stopped before scoring. On 2026-11-08, the user approved a separate 119-of-121 mapped-gene amendment. The original protocol remains unchanged; the amended analysis has not been scored.
+**Date:** 2026-11-08
+**Original protocol commit:** `168af12`
+**Current status:** the original 121-gene analysis stopped under its exact-mapping rule. The user approved a separate 119-of-121 exploratory amendment. The amended score completed on the six strict A5 donors; the original A5 classifier, result, and figures remain unchanged.
 
-See [`trackA_tmz_response_119of121_amendment_2026-11-08.md`](trackA_tmz_response_119of121_amendment_2026-11-08.md). The new runner uses the original source panel and exact symbols only. It omits `AF131215.2` and `PPIAP22` without substitution, records 119/121 coverage, and writes to a separate result path. The original A5 classifier, result, and figures remain unchanged.
+## Original 121-gene exact-mapping check
 
-The first real invocation on 2026-11-08 passed the source seals and loaded the frozen A5 data, then stopped before scoring because the loader returned the six strict plus two lenient donors. No result file was written and no proxy score was calculated; counts for those eight loader donors were read. The corrected runner now explicitly filters to the six strict donors and rejects unexpected IDs. Its 11-file amendment manifest verifies in scratch, where all 9 focused tests pass. Commit the correction before the one exploratory score.
-
-## Check
-
-The frozen proxy runner verified its seven-file SHA-256 manifest, loaded the frozen A5 count matrix, and compared the 121 source-panel symbols with the matrix's 24,990 gene identifiers. Exact mapping found 119 genes and missed two:
+The frozen 121-gene panel was compared with the A5 matrix's gene identifiers. Exact mapping found 119 genes and missed two:
 
 - `AF131215.2`
 - `PPIAP22`
 
-The second symbol is the official NCBI gene symbol for PPIAP22, Gene ID 653214; the NCBI record lists `PPIA3L` and `PPIAL3` as alternate names. None of those three names occurs in the A5 matrix. The first source symbol is associated with Ensembl identifier `ENSG00000255310`; neither that identifier nor `AF131215.2` occurs in the A5 matrix. These cross-references do not supply counts for absent genes.
+The second symbol is the official NCBI gene symbol for PPIAP22, Gene ID 653214; the NCBI record lists `PPIA3L` and `PPIAL3` as alternate names. None of those three names occurs in the A5 matrix. The first source symbol is associated with Ensembl identifier `ENSG00000255310`; neither that identifier nor `AF131215.2` occurs in the matrix. These cross-references do not provide counts for the absent genes. The original 121-gene attempt therefore stopped before scoring.
 
-## Outcome
+## Amended 119-of-121 analysis
 
-The runner stopped under the frozen exact-mapping rule. It did not calculate donor scores, matched-control scores, or a sign-flip result. `output/trackA_tmz_response_proxy/result.json` was not created. No A5 model, endpoint, result, or figure changed. The A5 count matrix was loaded locally for the mapping check; no count values were saved or reported.
+The 2026-11-08 amendment uses exact matrix symbols for the 119 mapped genes, retains their original in-vitro viability directions, omits the two absent symbols without substitution, and reports 119/121 coverage. The score is an exploratory mixed-cell expression proxy, not a validated response predictor and not measured patient-specific TMZ sensitivity or resistance.
 
-No gene was substituted, imputed, or dropped. A 119-gene score would be a different proxy and is not authorized by the frozen 121-gene protocol. Any alternative would need a new dated protocol before scoring. The proxy therefore remains unavailable for this matrix under the current rule.
+The first runner invocation passed the source seals and loaded the frozen A5 data, then stopped before scoring because the loader returned the six strict plus two lenient donors. It read count values for those eight loader donors but wrote no result and calculated no proxy score. The corrected runner explicitly selects only GS1, GS2, GS3, GS5, GS6, and GS13, and rejects unexpected donor IDs. Its 11-file seal verified after commit `d91259e`; all 9 focused synthetic tests passed in a scratch copy.
+
+The completed result is saved locally and remains uncommitted at `output/trackA_tmz_response_proxy_119of121/result.json`. Its six donor-level paired differences split evenly by direction, and the mean is near zero and within the expression-matched control distribution. This shows no consistent regional shift in the proxy. Exact metrics, all six donor values, and control summaries are in the local result file. The main limits are the small six-donor cohort, two omitted panel genes, mixed-cell expression, an in-vitro-derived direction set, and no matched patient drug-response outcome.
+
+The amendment remains byte-frozen as the pre-score protocol. Its status paragraph records the state at freeze time; this mapping-gate record reports the later completed run.
+
+No gene was substituted or imputed. The amended result did not tune A5, change its frozen five-of-six rule, alter any A5 output, or change any figure. The result JSON remains local and uncommitted.
 
 ## Sources
 
