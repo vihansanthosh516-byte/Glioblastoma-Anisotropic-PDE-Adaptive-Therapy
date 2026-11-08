@@ -1,6 +1,6 @@
 # Track A TMZ-response proxy amendment: 119 of 121 mapped genes
 
-**Status:** adopted by the user on 2026-11-08. The 119-of-121 implementation and hash manifest are prepared; 8 focused synthetic tests pass in a scratch copy. The analysis remains unscored until this freeze is committed. No proxy values have been calculated.
+**Status:** adopted by the user on 2026-11-08. The first invocation stopped before scoring because the frozen A5 loader returned six strict plus two lenient donors; the amended scorer now filters to the exact six strict donors and rejects unexpected IDs. After this correction, 9 focused synthetic tests passed in a scratch copy. No proxy values have been calculated; the corrected source freeze must be committed before rerunning.
 
 ## Reason for amendment
 
@@ -10,7 +10,7 @@ The two excluded source symbols are `AF131215.2` (sensitivity-associated) and `P
 
 ## Frozen score
 
-- Retain the same six A5 donors, cell and point joins, labels, QC filters, minimum cell counts, donor-level pseudobulk calculation, transcriptome-wide expression ranking, paired Core-minus-Periphery contrast, exact donor sign-flip procedure, and 1,000 expression-matched control panels from the original protocol.
+- Retain the same six A5 donors, cell and point joins, labels, QC filters, minimum cell counts, donor-level pseudobulk calculation, transcriptome-wide expression ranking, paired Core-minus-Periphery contrast, exact donor sign-flip procedure, and 1,000 expression-matched control panels from the original protocol. The frozen A5 loader may return its six strict and two lenient donors together; the amended scorer will explicitly subset the six strict primary donors before any score calculation. GS11 and GS12 will not enter this score.
 - Use the original Ntafoulis et al. viability-correlation directions and equal weighting for the 119 exact-mapped genes. The mapped panel contains 47 positive-coefficient and 72 negative-coefficient genes.
 - Record source-panel coverage as **119/121 exact matrix symbols** and list both omitted symbols in the result. Matched controls will have 119 genes, with the same 47/72 direction counts.
 - If any missing symbol differs from the two named symbols, any duplicate identifier appears, or any original cohort/data gate fails, stop without writing a result.

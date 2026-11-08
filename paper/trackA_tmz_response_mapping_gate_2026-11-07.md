@@ -6,7 +6,7 @@
 
 See [`trackA_tmz_response_119of121_amendment_2026-11-08.md`](trackA_tmz_response_119of121_amendment_2026-11-08.md). The new runner uses the original source panel and exact symbols only. It omits `AF131215.2` and `PPIAP22` without substitution, records 119/121 coverage, and writes to a separate result path. The original A5 classifier, result, and figures remain unchanged.
 
-The runner and synthetic tests are implemented. Its 11-file amendment SHA-256 manifest verifies in a scratch copy, where all 8 amendment tests pass. The code, amendment, manifest, and status records are ready to commit before the one exploratory score; no proxy values have been calculated.
+The first real invocation on 2026-11-08 passed the source seals and loaded the frozen A5 data, then stopped before scoring because the loader returned the six strict plus two lenient donors. No result file was written and no proxy score was calculated; counts for those eight loader donors were read. The corrected runner now explicitly filters to the six strict donors and rejects unexpected IDs. Its 11-file amendment manifest verifies in scratch, where all 9 focused tests pass. Commit the correction before the one exploratory score.
 
 ## Check
 

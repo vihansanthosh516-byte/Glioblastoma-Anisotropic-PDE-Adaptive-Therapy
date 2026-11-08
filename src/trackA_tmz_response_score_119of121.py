@@ -8,6 +8,8 @@ from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 from typing import Any
 
+import numpy as np
+
 from src import trackA_tmz_response_score as base
 
 
@@ -19,6 +21,7 @@ EXPECTED_UNMAPPED_SYMBOLS = ("AF131215.2", "PPIAP22")
 EXPECTED_MAPPED_SIZE = 119
 EXPECTED_MAPPED_POSITIVE = 47
 EXPECTED_MAPPED_NEGATIVE = 72
+EXPECTED_LENIENT_LOADER_DONORS = ("GS11", "GS12")
 AMENDMENT_SEAL_FILES = (
     "paper/trackA_tmz_response_121_gene_panel_2026-11-07.tsv",
     "paper/trackA_tmz_response_score_protocol_2026-11-07.md",
@@ -104,11 +107,36 @@ def run_proxy_analysis(output_path: Path = OUTPUT_PATH) -> dict[str, Any]:
     amendment_hashes = verify_amendment_freeze()
     panel = base.read_panel()
     dataset, donors, flow, input_hashes = base._load_frozen_a5_dataset()
+    if tuple(donors) != base.PRIMARY_DONORS:
+        raise base.ProxyStop(f"A5 primary donor list differs from the amendment: {donors}")
+    loaded_donors = np.asarray(dataset.donors, dtype=str)
+    loaded_labels = np.asarray(dataset.labels)
+    loaded_counts = np.asarray(dataset.counts)
+    if (
+        loaded_counts.ndim != 2
+        or loaded_donors.ndim != 1
+        or loaded_labels.ndim != 1
+        or loaded_counts.shape[0] != len(loaded_donors)
+        or len(loaded_labels) != len(loaded_donors)
+    ):
+        raise base.ProxyStop("A5 loader returned arrays with inconsistent cell rows")
+    loaded_donor_set = set(loaded_donors.tolist())
+    allowed_loader_donors = set(donors) | set(EXPECTED_LENIENT_LOADER_DONORS)
+    unexpected_donors = sorted(loaded_donor_set - allowed_loader_donors)
+    if unexpected_donors:
+        raise base.ProxyStop(f"Unexpected donor IDs from A5 loader: {unexpected_donors}")
+    missing_primary_donors = sorted(set(donors) - loaded_donor_set)
+    if missing_primary_donors:
+        raise base.ProxyStop(f"A5 loader is missing primary donors: {missing_primary_donors}")
+    primary_keep = np.isin(loaded_donors, donors)
+    primary_donors = loaded_donors[primary_keep]
+    if set(primary_donors.tolist()) != set(donors):
+        raise base.ProxyStop("Could not isolate the exact six primary donors before scoring")
     mapped_panel, missing = map_panel_to_matrix(panel, dataset.gene_ids)
     result = base.compute_proxy_scores(
-        dataset.counts,
-        dataset.donors,
-        dataset.labels,
+        loaded_counts[primary_keep],
+        primary_donors,
+        loaded_labels[primary_keep],
         dataset.gene_ids,
         mapped_panel,
     )
@@ -146,7 +174,13 @@ def run_proxy_analysis(output_path: Path = OUTPUT_PATH) -> dict[str, Any]:
         "original_panel_sha256": base.sha256_file(base.PANEL_PATH),
         "original_protocol_sha256": base.sha256_file(base.PROTOCOL_PATH),
         "a5_input_hashes": input_hashes,
-        "a5_cell_flow": {key: value for key, value in flow.items() if key != "input_hashes"},
+        "a5_cell_flow": {
+            "loader_scope": "The frozen A5 loader may return the six strict primary donors plus GS11/GS12; scoring uses only the six strict primary donors.",
+            "loaded_donors": sorted(loaded_donor_set),
+            "scored_donors": list(donors),
+            "scored_cells": int(primary_keep.sum()),
+            "loader_flow": {key: value for key, value in flow.items() if key != "input_hashes"},
+        },
         "source_supplement_pmcid": "PMC10575865",
         "source_supplement_sha256": base.SOURCE_SUPPLEMENT_SHA256,
         "source_supplement_md5": base.SOURCE_SUPPLEMENT_MD5,

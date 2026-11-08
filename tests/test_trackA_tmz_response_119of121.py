@@ -137,7 +137,15 @@ def test_run_records_119_of_121_coverage_and_never_overwrites(tmp_path, monkeypa
     panel = base.read_panel()
     gene_ids = [row["gene_symbol"] for row in panel if row["gene_symbol"] not in proxy119.EXPECTED_UNMAPPED_SYMBOLS]
     gene_ids.extend(f"BG{i}" for i in range(130))
-    dataset = SimpleNamespace(counts=np.zeros((240, len(gene_ids))), donors=(), labels=(), gene_ids=gene_ids)
+    loaded_donors = np.asarray(
+        [donor for donor in (*base.PRIMARY_DONORS, *proxy119.EXPECTED_LENIENT_LOADER_DONORS) for _ in (0, 1)]
+    )
+    dataset = SimpleNamespace(
+        counts=np.zeros((len(loaded_donors), len(gene_ids))),
+        donors=loaded_donors,
+        labels=np.tile(np.asarray((1, 0), dtype=np.int64), len(loaded_donors) // 2),
+        gene_ids=gene_ids,
+    )
     monkeypatch.setattr(base, "verify_freeze", lambda: {"baseline": "hash"})
     monkeypatch.setattr(proxy119, "verify_amendment_freeze", lambda: {"amendment": "hash"})
     monkeypatch.setattr(base, "_load_frozen_a5_dataset", lambda: (dataset, base.PRIMARY_DONORS, {}, {"A5": "hash"}))
@@ -149,8 +157,10 @@ def test_run_records_119_of_121_coverage_and_never_overwrites(tmp_path, monkeypa
     monkeypatch.setattr(proxy119, "AMENDMENT_FREEZE_PATH", amendment_freeze)
     observed = {}
 
-    def fake_compute(_counts, _donors, _labels, _gene_ids, mapped_panel):
+    def fake_compute(_counts, scoring_donors, _labels, _gene_ids, mapped_panel):
         observed["panel"] = mapped_panel
+        observed["donors"] = set(np.asarray(scoring_donors, dtype=str).tolist())
+        observed["cell_count"] = len(scoring_donors)
         return {"status": "complete_exploratory", "score": {}, "matched_controls": {}}
 
     monkeypatch.setattr(base, "compute_proxy_scores", fake_compute)
@@ -162,7 +172,35 @@ def test_run_records_119_of_121_coverage_and_never_overwrites(tmp_path, monkeypa
     assert result["panel"]["coverage"] == "119/121 exact matrix symbols"
     assert result["panel"]["unmapped_source_symbols"] == list(proxy119.EXPECTED_UNMAPPED_SYMBOLS)
     assert len(observed["panel"]) == 119
+    assert observed["donors"] == set(base.PRIMARY_DONORS)
+    assert observed["cell_count"] == len(base.PRIMARY_DONORS) * 2
+    assert result["provenance"]["a5_cell_flow"]["loaded_donors"] == sorted(
+        {*base.PRIMARY_DONORS, *proxy119.EXPECTED_LENIENT_LOADER_DONORS}
+    )
+    assert result["provenance"]["a5_cell_flow"]["scored_donors"] == list(base.PRIMARY_DONORS)
+    assert result["provenance"]["a5_cell_flow"]["scored_cells"] == len(base.PRIMARY_DONORS) * 2
     assert json.loads(output.read_text(encoding="utf-8"))["panel"] == result["panel"]
 
     with pytest.raises(ProxyStop, match="Refusing to overwrite existing result"):
         proxy119.run_proxy_analysis(output_path=output)
+
+
+def test_unexpected_loader_donor_stops_before_score(tmp_path, monkeypatch):
+    panel = base.read_panel()
+    gene_ids = [row["gene_symbol"] for row in panel if row["gene_symbol"] not in proxy119.EXPECTED_UNMAPPED_SYMBOLS]
+    loaded_donors = np.asarray((*base.PRIMARY_DONORS, "GS99"), dtype=str)
+    dataset = SimpleNamespace(
+        counts=np.zeros((len(loaded_donors), len(gene_ids))),
+        donors=loaded_donors,
+        labels=np.zeros(len(loaded_donors), dtype=np.int64),
+        gene_ids=gene_ids,
+    )
+    monkeypatch.setattr(base, "verify_freeze", lambda: {"baseline": "hash"})
+    monkeypatch.setattr(proxy119, "verify_amendment_freeze", lambda: {"amendment": "hash"})
+    monkeypatch.setattr(base, "_load_frozen_a5_dataset", lambda: (dataset, base.PRIMARY_DONORS, {}, {"A5": "hash"}))
+    monkeypatch.setattr(base, "compute_proxy_scores", lambda *_args: pytest.fail("score computed for unexpected donor"))
+    output = tmp_path / "result.json"
+
+    with pytest.raises(ProxyStop, match="Unexpected donor IDs from A5 loader"):
+        proxy119.run_proxy_analysis(output_path=output)
+    assert not output.exists()
