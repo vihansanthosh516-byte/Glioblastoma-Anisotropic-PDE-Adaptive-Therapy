@@ -2,7 +2,11 @@
 
 **Date:** 2026-11-07  
 **Protocol commit:** `168af12`  
-**Status:** stopped before scoring; frozen rules unchanged
+**Status:** original 121-gene run stopped before scoring. On 2026-11-08, the user approved a separate 119-of-121 mapped-gene amendment. The original protocol remains unchanged; the amended analysis has not been scored.
+
+See [`trackA_tmz_response_119of121_amendment_2026-11-08.md`](trackA_tmz_response_119of121_amendment_2026-11-08.md). The new runner uses the original source panel and exact symbols only. It omits `AF131215.2` and `PPIAP22` without substitution, records 119/121 coverage, and writes to a separate result path. The original A5 classifier, result, and figures remain unchanged.
+
+The runner and synthetic tests are implemented. Its 11-file amendment SHA-256 manifest verifies in a scratch copy, where all 8 amendment tests pass. The code, amendment, manifest, and status records are ready to commit before the one exploratory score; no proxy values have been calculated.
 
 ## Check
 
