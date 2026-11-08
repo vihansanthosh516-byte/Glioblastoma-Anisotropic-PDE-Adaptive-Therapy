@@ -2,7 +2,7 @@
 
 ## What a new researcher can and cannot reproduce now
 
-The scientific question, simulation equations, signal-generating model, controller contrast, progression outcomes, and reporting rule are described in the master plan and [`configs/trackABC_integrated_v1.json`](../../configs/trackABC_integrated_v1.json). The project map identifies the existing implementation, tests, and records for each track.
+The scientific question, simulation equations, signal-generating model, controller contrast, progression outcomes, and reporting rule are described in the master plan and [`configs/trackABC_integrated_v2.json`](../../configs/trackABC_integrated_v2.json). The project map identifies the existing implementation, tests, and records for each track.
 
 The integrated study is **not yet an executable or frozen evaluation package**. The current project has prototypes, but no research-scale driver that executes the full multi-world design. The virtual-patient cohort size, development and evaluation world counts, final materialized seed list, runtime limit, input manifest, and clean-install check still must be completed before evaluation. These are explicit gates, not numbers to guess or fill after seeing results. A new researcher can reconstruct the method and implement the planned workflow now; they cannot yet reproduce a final integrated result exactly.
 
@@ -10,7 +10,7 @@ The integrated study is **not yet an executable or frozen evaluation package**. 
 
 1. Read [`START_HERE.md`](../../START_HERE.md), this guide, the integrated master plan, and the track hubs.
 2. Create a clean Windows environment with Python 3.14.4. Install the pinned packages from [`requirements-win-py314.lock.txt`](requirements-win-py314.lock.txt). The lock is a snapshot of the existing project `.venv`; `uv pip check` found all 152 packages compatible in that environment. A clean install on a second machine has not yet been verified.
-3. Review the exact dataset and agreement terms. Start from [`trackABC_input_manifest_v1.csv`](../../configs/trackABC_input_manifest_v1.csv), which records the A5 aggregate's SHA-256 and leaves Duke out while rights are unresolved. Add rows from [`trackABC_input_manifest_template.csv`](../../configs/trackABC_input_manifest_template.csv) only for inputs whose use is documented and allowed. Keep restricted agreements, paths, identifiers, and disallowed derived outputs outside Git.
+3. Review the exact dataset and agreement terms. Start from [`trackABC_input_manifest_v2.csv`](../../configs/trackABC_input_manifest_v2.csv), which records the A5 aggregate's SHA-256 and leaves Duke out while rights are unresolved. Add rows from [`trackABC_input_manifest_template.csv`](../../configs/trackABC_input_manifest_template.csv) only for inputs whose use is documented and allowed. Keep restricted agreements, paths, identifiers, and disallowed derived outputs outside Git.
 4. Implement the research-scale driver using the settings file. Do not use archived development outcomes as evaluation data.
 5. Resolve the pre-evaluation gates below, materialize and reserve the seed table, freeze the config and source hashes, and only then generate evaluation outcomes.
 6. Run the frozen analysis once. Preserve all failures, missing arms, negative results, and any precision-gate failure.
@@ -54,13 +54,13 @@ Generate continuous world axes with `scipy.stats.qmc.LatinHypercube(scramble=Tru
 
 ## Seed table
 
-[`trackABC_seed_streams_v1.csv`](../../configs/trackABC_seed_streams_v1.csv) defines the names and order-independent key for each random stream. The integer seed is the little-endian value of the first eight bytes of `SHA256(UTF8("trackABC-integrated-v1|stage|family|world_id|stream_name"))`; initialize `numpy.random.Generator(numpy.random.PCG64DXSM(seed))`. Before use, materialize every numeric seed into a dated table, check duplicates and collisions against `src/trackc_seed_registry.py`, and add the appropriate reservation. The CSV currently contains role templates, not allocated or consumed seeds.
+[`trackABC_seed_streams_v2.csv`](../../configs/trackABC_seed_streams_v2.csv) defines the names and order-independent key for each random stream. The integer seed is the little-endian value of the first eight bytes of `SHA256(UTF8("trackABC-integrated-v2|stage|family|world_id|stream_name"))`; initialize `numpy.random.Generator(numpy.random.PCG64DXSM(seed))`. Before use, materialize every numeric seed into a dated table, check duplicates and collisions against `src/trackc_seed_registry.py`, and add the appropriate reservation. The CSV currently contains role templates, not allocated or consumed seeds.
 
 Development, selection, calibration, evaluation, molecular signal, MRI signal, observation noise, each policy, and world bootstrap must use distinct stream names. Within a world, all policies must receive the same patients, latent parameter draws, baseline signals, scan schedule, and common noise draws wherever a paired comparison requires them. Never use an existing Stage 3 sealed reservation for development.
 
 ## Input checksums and use rights
 
-The integrated input manifest at [`configs/trackABC_input_manifest_v1.csv`](../../configs/trackABC_input_manifest_v1.csv) currently records the A5 aggregate result file's SHA-256 and size. It does not include a Duke-derived summary. The run manifest will hash only the exact allowed aggregate files that the run reads. Record SHA-256, file size, source record, license/permission basis, content type, and allowed use. Dataset rights and article rights are separate. The Duke agreement and record terms govern every Duke-derived quantity; if derived-summary rights are unclear, omit the Duke summary and use the standard-normal MRI-like fallback. Do not hash, copy, or reopen raw patient scans, masks, ADC maps, or private patient records for this phase.
+The integrated input manifest at [`configs/trackABC_input_manifest_v2.csv`](../../configs/trackABC_input_manifest_v2.csv) retains the A5 aggregate file hash for provenance only; observed A5 metrics do not set q_signal or otherwise parameterize the integrated model. It does not include a Duke-derived summary. The run manifest will hash only the exact allowed aggregate files that the run reads. Record SHA-256, file size, source record, license/permission basis, content type, and allowed use. Dataset rights and article rights are separate. The Duke agreement and record terms govern every Duke-derived quantity; if derived-summary rights are unclear, omit the Duke summary and use the standard-normal MRI-like fallback. Do not hash, copy, or reopen raw patient scans, masks, ADC maps, or private patient records for this phase.
 
 ## Items to lock before evaluation
 

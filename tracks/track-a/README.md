@@ -2,7 +2,7 @@
 
 ## Current role
 
-Track A is a completed exploratory single-cell analysis. Its frozen A5 candidate did not meet its five-of-six donor success rule. The integrated phase will use only its archived donor-level balanced-accuracy values as **assumed signal-reliability settings** in a synthetic model. They are not drug-resistance measurements, a clinical assay, or malignant-cell truth.
+Track A is a completed exploratory single-cell analysis. Its frozen A5 candidate did not meet its five-of-six donor success rule. The integrated phase uses Track A as conceptual motivation for a molecular-like channel. It uses a declared synthetic signal-quality grid, not observed A5 metrics, as q_signal settings. Neither the expression labels nor the synthetic channel are drug-resistance measurements.
 
 ## Primary records
 
