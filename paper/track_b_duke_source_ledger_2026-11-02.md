@@ -1,4 +1,16 @@
-# Track B Duke rights and approval ledger (2026-11-02)
+# Track B Duke rights and approval ledger (historical 2026-11-02; current addendum 2026-11-08)
+
+## Current addendum (2026-11-08)
+
+The user reports full access to the restricted dataset and has authorized project work with it. This is user-reported access; no written access notice or copy of the accepted agreement is saved in the project.
+
+The current [Zenodo record](https://zenodo.org/records/20548528) still marks the files restricted. It lists two access terms: CC BY-NC-ND 4.0, or a separate Duke custom license. The user has not identified which option governs this copy. The record currently lists 289.7 GB, 61 patients, and 503 sessions; the 136.3 GB size below was the page value captured on 2026-11-02 and is historical.
+
+The [CC BY-NC-ND 4.0 legal code](https://creativecommons.org/licenses/by-nc-nd/4.0/legalcode.en) permits creating and reproducing adapted material for noncommercial purposes, but not sharing adapted material under that license. Whether this project's forecasts, model weights, figures, or summary tables count as adapted material is not determined here. The custom Duke license text and the accepted option are not on file. Local analysis authorization does not establish public redistribution rights.
+
+Private records document that this project already read Duke target masks and scored a transition analysis on 2026-11-04. That cohort and endpoint are exposed, not fresh confirmation. This addendum involved no new patient-data read, analysis, or contact.
+
+Everything below is a historical snapshot from 2026-11-02. Its statements that access was pending, that no data had been downloaded or opened, its 136.3 GB record size, and its no-go decision are not current status.
 
 Term note: this ledger says **sessions** (a scan date with its images and mask). Other project files say scans or visits; they mean the same unit here, but that is not checked.
 
