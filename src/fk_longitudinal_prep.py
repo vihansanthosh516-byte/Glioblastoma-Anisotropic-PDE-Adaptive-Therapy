@@ -100,6 +100,31 @@ def apply_rigid(volume, params, *, spacing_mm, order=1):
     return ndimage.affine_transform(vol, matrix, offset=offset, order=order, mode="constant", cval=0.0)
 
 
+def moving_points_to_fixed(points, params, *, shape, spacing_mm):
+    """Map moving-grid landmark indices into the fixed grid for ``apply_rigid`` params.
+
+    ``apply_rigid`` defines the fixed-output-to-moving-input sampling map used by
+    ``scipy.ndimage.affine_transform``. Landmark points therefore use its inverse.
+    """
+    points = np.asarray(points, dtype=float)
+    params = np.asarray(params, dtype=float)
+    shape = np.asarray(shape)
+    spacing = np.asarray(spacing_mm, dtype=float)
+    if points.ndim != 2 or points.shape[1] != 3 or not np.isfinite(points).all():
+        raise ValueError("points must be a finite N-by-3 array")
+    if params.shape != (6,) or not np.isfinite(params).all():
+        raise ValueError("params must contain six finite rigid-transform values")
+    if shape.shape != (3,) or not np.issubdtype(shape.dtype, np.integer) or (shape < 1).any():
+        raise ValueError("shape must contain three positive integers")
+    if spacing.shape != (3,) or not np.isfinite(spacing).all() or (spacing <= 0).any():
+        raise ValueError("spacing_mm must contain three positive finite values")
+    rotation = _rotation(params[:3])
+    matrix = np.diag(1.0 / spacing) @ rotation @ np.diag(spacing)
+    centre = (shape.astype(float) - 1.0) / 2.0
+    offset = centre + params[3:] / spacing - matrix @ centre
+    return np.linalg.solve(matrix, (points - offset).T).T
+
+
 def register_rigid_mri(fixed, moving, *, fixed_support, spacing_mm, downsample: int = 2) -> dict:
     """MRI-only rigid registration of ``moving`` onto ``fixed`` by maximising NCC inside ``fixed_support``.
 

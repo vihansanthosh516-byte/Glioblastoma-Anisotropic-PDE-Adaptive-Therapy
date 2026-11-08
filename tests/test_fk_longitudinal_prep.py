@@ -54,6 +54,27 @@ def test_registration_recovers_known_rigid_motion_and_passes_qc():
     assert out["ncc_after"] > 0.95 and out["qc"]["passed"]
 
 
+def test_moving_landmarks_map_back_through_inverse_sampling_transform():
+    shape = (20, 18, 16)
+    spacing = (1.0, 2.0, 3.0)
+    params = np.array([0.0, 0.0, 90.0, 2.0, -4.0, 3.0])
+    fixed_points = np.array([[4.0, 5.0, 6.0], [12.0, 10.0, 7.0], [8.5, 8.0, 9.0]])
+    scale = np.diag(spacing)
+    matrix = np.linalg.inv(scale) @ lp._rotation(params[:3]) @ scale
+    centre = (np.array(shape, dtype=float) - 1) / 2
+    offset = centre + params[3:] / spacing - matrix @ centre
+    moving_points = (matrix @ fixed_points.T).T + offset
+    recovered = lp.moving_points_to_fixed(moving_points, params, shape=shape, spacing_mm=spacing)
+    np.testing.assert_allclose(recovered, fixed_points, atol=1e-10)
+
+
+def test_moving_landmark_transform_rejects_bad_inputs():
+    with pytest.raises(ValueError, match="N-by-3"):
+        lp.moving_points_to_fixed([1, 2, 3], np.zeros(6), shape=(4, 4, 4), spacing_mm=(1, 1, 1))
+    with pytest.raises(ValueError, match="params"):
+        lp.moving_points_to_fixed([[1, 2, 3]], np.zeros(5), shape=(4, 4, 4), spacing_mm=(1, 1, 1))
+
+
 def test_registration_qc_fails_closed_and_reports_exclusions():
     bad = lp.registration_qc(np.array([0, 0, 25.0, 0, 0, 0]), 0.5)
     assert not bad["passed"] and len(bad["reasons"]) == 2
