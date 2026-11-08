@@ -85,6 +85,7 @@ def prepare_synthetic_world(world, *, family, patients_per_cohort, signal_parame
         "calibration_seed": [world["calibration_policy"]], "evaluation_seed": [world["evaluation_policy"]],
         "schedule_mixture_seed": [world["schedule_mixture"]], "settings": settings,
         "include_ambiguity_controller": True,
+        "primary_contrast": "minimax",
     }
     world_bytes = json.dumps(
         {"family": family, "parameters": latent_world}, sort_keys=True,

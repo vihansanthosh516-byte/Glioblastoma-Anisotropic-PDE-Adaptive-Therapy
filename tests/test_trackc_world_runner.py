@@ -78,6 +78,7 @@ def test_prepares_reproducible_disjoint_synthetic_inputs_without_scoring():
     assert a["signal_generation_seed"] == w["evaluation_signal"]
     assert a["calibration_signal_generation_seed"] == w["calibration_signal"]
     assert a["include_ambiguity_controller"] is True
+    assert a["primary_contrast"] == "minimax"
 
 
 def test_world_fingerprint_changes_when_world_parameters_change(monkeypatch):

@@ -1,5 +1,7 @@
 # Track C paired-policy benchmark test record (2026-11-06)
 
+**Current-status correction (2026-11-08):** The integrated world runner selects the finite-set minimax versus matched `d = 0` minimax contrast as primary. Older sections below document prior LOO-primary mechanics and are superseded for the integrated v2 path; LOO remains a separately reported contrast.
+
 ## Scope
 
 This run checked synthetic implementation mechanics only. It did not compare policy outcomes for research, read patient data, or authorize a sealed evaluation.
@@ -102,6 +104,14 @@ The focused scratch run passed **22 tests in 58.57 seconds** across `test_trackc
 Remaining limits: the project has not run the benchmark at research scale or across held-out virtual worlds. It still needs exact world-anchor enforcement, a precision target, a frozen interval method, and registered development seeds before outcome comparison. The broad project title remains unchanged; this mechanics work does not establish global uniqueness, biological validity, clinical benefit, or superiority.
 
 All tests use assumed virtual patients. Passing tests establish only that the implemented paths follow their contracts. They do not show that any policy improves treatment utility, describes real biology, is unique, or is better than published methods.
+
+### Follow-up: primary-contrast alignment (2026-11-08)
+
+The integrated v2 configuration names finite-set minimax versus its matched `d = 0` control as the primary contrast. The benchmark previously always wrote the LOO contrast into `primary_paired_contrast`, while the world runner also ran the finite-set arms and labeled them exploratory. That output label conflicted with the integrated protocol even though no result had been scored for a research comparison.
+
+The runner now accepts an explicit primary contrast. The integrated world runner selects `minimax`; the benchmark records both minimax and LOO contrasts separately and writes the chosen one to `primary_paired_contrast`. World summaries infer the recorded primary contrast when callers omit `contrast`, reject mixed primary labels, and still allow explicit secondary LOO summaries. The minimax summary checks recorded paired differences against the underlying candidate and control arrays.
+
+The three focused scratch suites passed **34 tests in 48.87 seconds**. Before and after tests, SHA-256 matched all **351 source files** and **116 test files** between the worktree and scratch copy. The first rerun exposed a missing provenance fixture in the synthetic adapter test; the fixture was corrected, then the suites passed. No policy outcomes were generated or inspected, and the integrated evaluation remains unfrozen.
 
 ### Full Track C suite after manifest-test fixture repair (2026-11-06)
 

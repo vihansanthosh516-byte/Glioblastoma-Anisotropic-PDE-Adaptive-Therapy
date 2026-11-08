@@ -45,18 +45,37 @@ def test_benchmark_worlds_reject_duplicate_inputs_and_inconsistent_contrast():
                              "loo_conditional_independence_mpc": {"robust_utility": [0, 0]},
                              "finite_set_minimax_mpc": {"robust_utility": [3, 4]},
                              "finite_set_d0_minimax_mpc": {"robust_utility": [1, 1]}},
-            "primary_paired_contrast": {"contrast": "loo_dependence_aware_mpc minus loo_conditional_independence_mpc",
-                                        "robust_utility_difference": [1, 2]},
+            "primary_contrast_name": "minimax",
+            "paired_contrasts": {
+                "loo": {"contrast": "loo_dependence_aware_mpc minus loo_conditional_independence_mpc",
+                        "candidate_arm": "loo_dependence_aware_mpc", "control_arm": "loo_conditional_independence_mpc",
+                        "robust_utility_difference": [1, 2]},
+                "minimax": {"contrast": "finite_set_minimax_mpc minus finite_set_d0_minimax_mpc",
+                            "candidate_arm": "finite_set_minimax_mpc", "control_arm": "finite_set_d0_minimax_mpc",
+                            "robust_utility_difference": [2, 3]},
+            },
+            "primary_paired_contrast": {"contrast": "finite_set_minimax_mpc minus finite_set_d0_minimax_mpc",
+                                        "candidate_arm": "finite_set_minimax_mpc", "control_arm": "finite_set_d0_minimax_mpc",
+                                        "robust_utility_difference": [2, 3]},
             "n_evaluation_patients": 2,
         }
 
     first, second = world(1), world(2)
     result = summarize_benchmark_worlds([first, second], resamples=100, seed=3)
-    assert result["equal_world_mean_difference"] == pytest.approx(1.5)
-    assert result["weight_source"] == "evaluation cohort peers"
+    assert result["equal_world_mean_difference"] == pytest.approx(2.5)
+    assert result["primary_contrast_name"] == "minimax"
+    assert result["weight_source"] == "fixed finite model sets"
+    loo = summarize_benchmark_worlds([first, second], resamples=100, seed=3, contrast="loo")
+    assert loo["equal_world_mean_difference"] == pytest.approx(1.5)
+    assert loo["weight_source"] == "evaluation cohort peers"
     minimax = summarize_benchmark_worlds([first, second], resamples=100, seed=3, contrast="minimax")
     assert minimax["equal_world_mean_difference"] == pytest.approx(2.5)
     assert minimax["weight_source"] == "fixed finite model sets"
+    assert minimax["primary_contrast_name"] == "minimax"
+    mixed_primary = world(2)
+    mixed_primary["primary_contrast_name"] = "loo"
+    with pytest.raises(ValueError, match="inconsistent primary contrast names"):
+        summarize_benchmark_worlds([first, mixed_primary], resamples=100, seed=3)
     second["world_provenance"]["world_parameters_sha256"] = first["world_provenance"]["world_parameters_sha256"]
     with pytest.raises(ValueError, match="world parameter fingerprint reused"):
         summarize_benchmark_worlds([first, second], resamples=100, seed=3, contrast="minimax")
@@ -77,9 +96,9 @@ def test_benchmark_worlds_reject_duplicate_inputs_and_inconsistent_contrast():
     with pytest.raises(ValueError, match="fingerprint reused"):
         summarize_benchmark_worlds([first, second], resamples=100, seed=3)
     second = world(2)
-    second["primary_paired_contrast"]["robust_utility_difference"] = [2, 2]
-    with pytest.raises(ValueError, match="primary contrast"):
-        summarize_benchmark_worlds([first, second], resamples=100, seed=3)
+    second["paired_contrasts"]["loo"]["robust_utility_difference"] = [2, 2]
+    with pytest.raises(ValueError, match="recorded loo paired difference"):
+        summarize_benchmark_worlds([first, second], resamples=100, seed=3, contrast="loo")
     second = world(2)
     second["signal_generation"]["mri_template_sha256"] = "f" * 64
     with pytest.raises(ValueError, match="mri_template_sha256 differs"):

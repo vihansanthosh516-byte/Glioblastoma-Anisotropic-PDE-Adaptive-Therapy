@@ -843,6 +843,7 @@ def run_shared_policy_world(
     schedule_mixture_seed,
     settings: PolicyBenchmarkSettings = PolicyBenchmarkSettings(),
     include_ambiguity_controller: bool = False,
+    primary_contrast: str = "loo",
 ) -> dict:
     """Run a three-cohort development comparison in one virtual world.
 
@@ -855,6 +856,10 @@ def run_shared_policy_world(
     """
     if not isinstance(world_id, str) or not world_id.strip():
         raise ValueError("world_id must be a nonempty string")
+    if primary_contrast not in ("loo", "minimax"):
+        raise ValueError("primary_contrast must be loo or minimax")
+    if primary_contrast == "minimax" and not include_ambiguity_controller:
+        raise ValueError("minimax primary contrast requires the finite-set controllers")
     n_selection = _validate_scenarios(selection_scenarios, "selection_scenarios")
     n_calibration = _validate_scenarios(calibration_scenarios, "calibration_scenarios")
     n_evaluation = _validate_scenarios(evaluation_scenarios, "evaluation_scenarios")
@@ -1111,14 +1116,32 @@ def run_shared_policy_world(
                 arms[policy_name]["robust_utility"] - mixture_outcome["robust_utility"]
             ),
         }
-    candidate = arms["loo_dependence_aware_mpc"]
-    control = arms["loo_conditional_independence_mpc"]
-    primary = {
-        "contrast": "loo_dependence_aware_mpc minus loo_conditional_independence_mpc",
-        "robust_utility_difference": candidate["robust_utility"] - control["robust_utility"],
-        "rmst_baseline_difference": candidate["rmst_baseline"] - control["rmst_baseline"],
-        "rmst_rano_difference": candidate["rmst_rano"] - control["rmst_rano"],
+    def make_paired_contrast(candidate_name, control_name, label):
+        candidate = arms[candidate_name]
+        control = arms[control_name]
+        return {
+            "contrast": label,
+            "candidate_arm": candidate_name,
+            "control_arm": control_name,
+            "robust_utility_difference": candidate["robust_utility"] - control["robust_utility"],
+            "rmst_baseline_difference": candidate["rmst_baseline"] - control["rmst_baseline"],
+            "rmst_rano_difference": candidate["rmst_rano"] - control["rmst_rano"],
+        }
+
+    paired_contrasts = {
+        "loo": make_paired_contrast(
+            "loo_dependence_aware_mpc",
+            "loo_conditional_independence_mpc",
+            "loo_dependence_aware_mpc minus loo_conditional_independence_mpc",
+        )
     }
+    if include_ambiguity_controller:
+        paired_contrasts["minimax"] = make_paired_contrast(
+            "finite_set_minimax_mpc",
+            "finite_set_d0_minimax_mpc",
+            "finite_set_minimax_mpc minus finite_set_d0_minimax_mpc",
+        )
+    primary = paired_contrasts[primary_contrast]
     if primary["robust_utility_difference"].shape != (n_evaluation,):
         raise ArithmeticError("primary paired contrast does not match the evaluation cohort")
     return {
@@ -1207,12 +1230,17 @@ def run_shared_policy_world(
             for name, outcome in calibration_arms.items()
         },
         "matched_fixed_schedule_controls": matched_schedule_controls,
+        "primary_contrast_name": primary_contrast,
+        "paired_contrasts": paired_contrasts,
         "primary_paired_contrast": primary,
         "exploratory_controller": {
             "name": "finite_set_minimax_mpc",
             "included": bool(include_ambiguity_controller),
             "model_set_size": len(models),
-            "role": "additional development arm; excluded from frozen primary contrast",
+            "role": (
+                "primary synthetic development candidate" if primary_contrast == "minimax"
+                else "additional development arm; not the selected primary contrast"
+            ),
             "interpretation": (
                 "not evaluated" if not include_ambiguity_controller else
                 "synthetic development outcome only; no clinical or superiority claim"
@@ -1223,7 +1251,10 @@ def run_shared_policy_world(
             "included": bool(include_ambiguity_controller),
             "model_set_size": len(ci_models),
             "dependence_rule": "same q/a/b support as the full set, with d fixed to 0",
-            "role": "matched d=0 minimax control; excluded from frozen primary contrast",
+            "role": (
+                "matched primary control" if primary_contrast == "minimax"
+                else "matched additional development control; not the selected primary contrast"
+            ),
             "interpretation": (
                 "not evaluated" if not include_ambiguity_controller else
                 "synthetic development outcome only; no clinical or superiority claim"

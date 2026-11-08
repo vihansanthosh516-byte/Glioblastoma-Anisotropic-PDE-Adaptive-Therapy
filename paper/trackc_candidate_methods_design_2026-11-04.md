@@ -1,6 +1,6 @@
 # Track C candidate-method and baseline protocol (draft, 2026-11-04)
 
-**Status note (2026-11-06):** This is still a draft; no outcome evaluation has run. The endpoint-specific treatment paths and course counts described in the original version are superseded by the integrated plan's shared-path rule: treatment stops after the first simulated event under either endpoint, and both times use one course count. The event uses latent simulator state, so this is an idealized treatment-stop rule, not a clinical stopping rule. See `paper/trackABC_integrated_research_plan_submission_short_2026-11-05.md` for the current proposed wording.
+**Status note (2026-11-08):** This is a historical candidate draft; no outcome evaluation has run under its proposed tests. Its LOO dependence-aware contrast is not the integrated v2 primary. The current v2 primary is finite-set minimax versus a matched finite-set minimax controller with `d = 0`, as named in `configs/trackABC_integrated_v2.json`. The benchmark retains LOO as a separate comparator. The endpoint-specific treatment paths and course counts described in the original version are superseded by the integrated plan's shared-path rule: treatment stops at the first simulated event under either endpoint, and both times use one course count. The event uses latent simulator state, so this is an idealized treatment-stop rule, not a clinical stopping rule. See `paper/trackABC_integrated_research_plan_submission_2026-11-07.md` for current proposed wording.
 
 ## Why these candidates
 

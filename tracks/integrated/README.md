@@ -22,3 +22,5 @@ In synthetic glioblastoma-like worlds, will a finite-set dependence-aware minima
 ## Status
 
 Design is detailed but not frozen for evaluation. The final world count and virtual-patient cohort sizes still require an outcome-blind feasibility/precision step; the research-scale driver and exact seed materialization remain future gates. No patient-level Duke or Track A data will be read to fill those gaps.
+
+The current benchmark path records the finite-set minimax versus matched `d = 0` minimax contrast as primary, in line with `trackABC_integrated_v2.json`. LOO signal-model contrast remains separate. Contract tests passed in a scratch copy; no policy outcome comparison ran.

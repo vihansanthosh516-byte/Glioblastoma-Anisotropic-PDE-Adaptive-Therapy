@@ -385,20 +385,34 @@ def test_full_policy_harness_runs_all_arms_on_shared_endpoint_path(monkeypatch):
         schedule_mixture_seed=[2026110620],
         settings=settings,
         include_ambiguity_controller=True,
+        primary_contrast="minimax",
     )
 
     # Exercise the adapter with the actual result schema. This copied record is
     # synthetic test data, not evidence of two independent simulated worlds.
+    result["world_provenance"] = {
+        "family": "single",
+        "scan_loss": None,
+        "world_generation_seed": 900001,
+        "world_parameters_sha256": "c" * 64,
+    }
     copied = deepcopy(result)
     copied["world_id"] = "copied-schema-test"
+    copied["world_provenance"] = {
+        "family": "single",
+        "scan_loss": None,
+        "world_generation_seed": 900002,
+        "world_parameters_sha256": "d" * 64,
+    }
     for index, key in enumerate(("selection_scenarios_sha256", "calibration_scenarios_sha256", "evaluation_scenarios_sha256")):
         copied["input_fingerprints"][key] = format(100 + index, "064x")
     copied["seeds"] = {key: [int(x) + 1000000 for x in value] for key, value in copied["seeds"].items()}
     copied["signal_generation"]["seed"] += 1000000
     summary = summarize_benchmark_worlds([result, copied], resamples=100, seed=42)
     assert summary["n_worlds"] == 2
+    assert summary["primary_contrast_name"] == "minimax"
     assert summary["equal_world_mean_difference"] == pytest.approx(
-        result["primary_paired_contrast"]["robust_utility_difference"].mean()
+        result["paired_contrasts"]["minimax"]["robust_utility_difference"].mean()
     )
 
     expected = {
@@ -459,13 +473,18 @@ def test_full_policy_harness_runs_all_arms_on_shared_endpoint_path(monkeypatch):
         assert result["baseline_arm_metadata"][
             result["selected_baseline_by_family"][family]["name"]
         ]["evaluated_on_holdout"]
+    assert result["primary_contrast_name"] == "minimax"
     assert result["primary_paired_contrast"]["robust_utility_difference"].shape == (2,)
     assert result["primary_paired_contrast"]["contrast"] == (
+        "finite_set_minimax_mpc minus finite_set_d0_minimax_mpc"
+    )
+    assert result["paired_contrasts"]["loo"]["contrast"] == (
         "loo_dependence_aware_mpc minus loo_conditional_independence_mpc"
     )
+    assert result["paired_contrasts"]["minimax"]["robust_utility_difference"].shape == (2,)
     assert result["exploratory_controller"]["included"] is True
     assert result["exploratory_controller"]["model_set_size"] == 2
-    assert "excluded from frozen primary contrast" in result["exploratory_controller"]["role"]
+    assert result["exploratory_controller"]["role"] == "primary synthetic development candidate"
     assert result["exploratory_d0_controller"]["included"] is True
     assert result["exploratory_d0_controller"]["model_set_size"] == len(
         benchmark.conditional_independence_grid(models)
@@ -473,7 +492,7 @@ def test_full_policy_harness_runs_all_arms_on_shared_endpoint_path(monkeypatch):
     assert result["exploratory_d0_controller"]["dependence_rule"] == (
         "same q/a/b support as the full set, with d fixed to 0"
     )
-    assert "excluded from frozen primary contrast" in result["exploratory_d0_controller"]["role"]
+    assert result["exploratory_d0_controller"]["role"] == "matched primary control"
     assert set(result["arm_outcomes"]["finite_set_minimax_mpc"]) >= {
         "ttp_baseline", "ttp_rano", "courses", "robust_utility"
     }
@@ -531,6 +550,21 @@ def test_full_policy_harness_runs_all_arms_on_shared_endpoint_path(monkeypatch):
         + len(result["calibration_course_use"]) + len(result["arm_outcomes"])
     )
     assert all(np.all(interval == settings.scan_every) for interval in received_scan_intervals)
+
+
+def test_minimax_primary_requires_including_finite_set_controllers():
+    required = {
+        name: None
+        for name, parameter in inspect.signature(benchmark.run_shared_policy_world).parameters.items()
+        if parameter.default is inspect.Parameter.empty
+    }
+    required.update({
+        "world_id": "missing-minimax-arms",
+        "include_ambiguity_controller": False,
+        "primary_contrast": "minimax",
+    })
+    with pytest.raises(ValueError, match="requires the finite-set controllers"):
+        benchmark.run_shared_policy_world(**required)
 
 
 def test_harness_rejects_overlapping_synthetic_patient_ids_before_policy_fit(monkeypatch):

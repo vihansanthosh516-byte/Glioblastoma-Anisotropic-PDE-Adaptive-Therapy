@@ -3,6 +3,7 @@
 ## Track navigation and integrated handoff
 
 - Use [`tracks/README.md`](tracks/README.md) to navigate Track A, Track B, Track C, and the integrated phase. The hubs group links without moving existing `src/`, `tests/`, `data/`, `output/`, or `paper/` files.
+- **Track C contrast alignment (2026-11-08):** the integrated v2 protocol names finite-set minimax versus matched `d = 0` minimax as primary. The integrated world runner selects that contrast; LOO remains separate. No policy outcome comparison ran. See [`trackc_policy_benchmark_test_record_2026-11-06.md`](paper/trackc_policy_benchmark_test_record_2026-11-06.md).
 - The complete plan is [`paper/trackABC_integrated_research_plan_master_2026-11-07.md`](paper/trackABC_integrated_research_plan_master_2026-11-07.md); the shorter submission copy is [`paper/trackABC_integrated_research_plan_submission_2026-11-07.md`](paper/trackABC_integrated_research_plan_submission_2026-11-07.md).
 - The submission copy is also available as [Word](paper/trackABC_integrated_research_plan_submission_2026-11-07.docx).
 - The machine-readable settings are in [`configs/trackABC_integrated_v2.json`](configs/trackABC_integrated_v2.json). See [`tracks/shared/HANDOFF_AND_REPRODUCIBILITY.md`](tracks/shared/HANDOFF_AND_REPRODUCIBILITY.md) for the seed rules, likelihood, particle updates, input rights, environment snapshot, and unresolved run gates. The integrated benchmark is not yet frozen or authorized for evaluation.

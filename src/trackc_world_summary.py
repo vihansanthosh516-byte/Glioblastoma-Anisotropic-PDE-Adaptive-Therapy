@@ -42,17 +42,24 @@ def paired_world_summary(candidate, comparator, world_ids, *, resamples, seed):
     }
 
 
-def summarize_benchmark_worlds(records, *, resamples, seed, contrast="loo"):
+def summarize_benchmark_worlds(records, *, resamples, seed, contrast=None):
     """Summarize a declared LOO or finite-set minimax development contrast.
 
     Matching recorded settings and distinct fingerprints are necessary checks,
     not proof that independently generated worlds or patient pairings are valid.
+    When ``contrast`` is omitted, use the contrast explicitly marked primary in
+    every record; legacy records without that field default to the LOO contrast.
     """
     records = tuple(records)
-    if contrast not in ("loo", "minimax"):
-        raise ValueError("contrast must be loo or minimax")
     if len(records) < 2:
         raise ValueError("at least two benchmark worlds are required")
+    if contrast is None:
+        primary_names = {record.get("primary_contrast_name", "loo") for record in records}
+        if len(primary_names) != 1:
+            raise ValueError("benchmark worlds have inconsistent primary contrast names")
+        contrast = primary_names.pop()
+    if contrast not in ("loo", "minimax"):
+        raise ValueError("contrast must be loo or minimax")
     reference = records[0]
     candidates, comparators, world_ids = [], [], []
     seen_fingerprints = set()
@@ -122,12 +129,24 @@ def summarize_benchmark_worlds(records, *, resamples, seed, contrast="loo"):
         comparator = np.asarray(arms[arm_names[1]]["robust_utility"], dtype=float)
         if candidate.ndim != 1 or candidate.shape != comparator.shape or candidate.size != record["n_evaluation_patients"]:
             raise ValueError("world outcome arrays do not match the evaluation cohort")
-        if contrast == "loo":
-            recorded_difference = np.asarray(record["primary_paired_contrast"]["robust_utility_difference"], dtype=float)
-            if record["primary_paired_contrast"]["contrast"] != "loo_dependence_aware_mpc minus loo_conditional_independence_mpc":
-                raise ValueError("unexpected primary contrast")
+        expected_labels = {
+            "loo": "loo_dependence_aware_mpc minus loo_conditional_independence_mpc",
+            "minimax": "finite_set_minimax_mpc minus finite_set_d0_minimax_mpc",
+        }
+        paired = record.get("paired_contrasts", {}).get(contrast)
+        if paired is None and record.get("primary_contrast_name") == contrast:
+            paired = record.get("primary_paired_contrast")
+        if paired is None and contrast == "loo":
+            # Read legacy records that stored only the LOO primary contrast.
+            paired = record.get("primary_paired_contrast")
+        if paired is not None:
+            if paired.get("contrast") != expected_labels[contrast]:
+                raise ValueError(f"unexpected {contrast} contrast")
+            if paired.get("candidate_arm") not in (None, arm_names[0]) or paired.get("control_arm") not in (None, arm_names[1]):
+                raise ValueError(f"unexpected {contrast} contrast arms")
+            recorded_difference = np.asarray(paired["robust_utility_difference"], dtype=float)
             if recorded_difference.shape != candidate.shape or not np.array_equal(recorded_difference, candidate - comparator):
-                raise ValueError("recorded primary contrast does not match paired outcomes")
+                raise ValueError(f"recorded {contrast} paired difference does not match arm outcomes")
         candidates.append(candidate)
         comparators.append(comparator)
         world_ids.append(record["world_id"])
@@ -138,6 +157,7 @@ def summarize_benchmark_worlds(records, *, resamples, seed, contrast="loo"):
         raise ValueError("worlds must have equal evaluation cohort sizes") from exc
     result = paired_world_summary(candidate_matrix, comparator_matrix, world_ids, resamples=resamples, seed=seed)
     result["contrast"] = contrast
+    result["primary_contrast_name"] = contrast
     result["role"] = "synthetic development; not an adopted confirmatory analysis"
     result["weight_source"] = "evaluation cohort peers" if contrast == "loo" else "fixed finite model sets"
     result["checks_limit"] = "Distinct recorded seeds and hashes do not prove independence or pairing."
