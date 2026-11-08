@@ -207,3 +207,51 @@ def test_physical_rotation_uses_inverse_registration():
     moving_to_fixed[:2, :2] = [[0, -1], [1, 0]]
     mapping = output_to_input_affine(np.eye(4), np.eye(4), moving_to_fixed)
     np.testing.assert_allclose(mapping @ [0, 2, 1, 1], [2, 0, 1, 1])
+
+
+def test_geometric_coverage_matches_nibabel_physical_resampling():
+    nib = pytest.importorskip('nibabel')
+    from nibabel.processing import resample_from_to
+
+    def rotation(axis, angle):
+        c, s = np.cos(angle), np.sin(angle)
+        if axis == 'x':
+            return np.array([[1., 0., 0.], [0., c, -s], [0., s, c]])
+        if axis == 'y':
+            return np.array([[c, 0., s], [0., 1., 0.], [-s, 0., c]])
+        return np.array([[c, -s, 0.], [s, c, 0.], [0., 0., 1.]])
+
+    moving_shape = (7, 6, 5)
+    output_shape = (9, 8, 6)
+    moving_affine = np.eye(4)
+    moving_affine[:3, :3] = np.diag([1.7, 2.2, 3.0])
+    moving_affine[:3, 3] = [-8., 4., 11.]
+    fixed_affine = np.eye(4)
+    fixed_affine[:3, :3] = rotation('z', .23) @ np.diag([1.3, 1.8, 2.5])
+    fixed_affine[:3, 3] = [-4., 2., 8.]
+    moving_to_fixed = np.eye(4)
+    moving_to_fixed[:3, :3] = rotation('y', .17) @ rotation('x', -.11)
+    moving_to_fixed[:3, 3] = [2.1, -1.5, .7]
+
+    cases = [(moving_shape, output_shape, moving_affine, fixed_affine, moving_to_fixed)]
+
+    translated_moving = np.eye(4)
+    translated_moving[:3, :3] = np.diag([2., 1.5, 1.])
+    translated_moving[:3, 3] = [3., -5., 7.]
+    translated_fixed = np.eye(4)
+    translated_fixed[:3, 3] = [2., -7., 6.]
+    translation = np.eye(4)
+    translation[:3, 3] = [.5, 1., -1.]
+    cases.append(((6, 7, 8), (8, 7, 6), translated_moving,
+                  translated_fixed, translation))
+
+    for src_shape, dst_shape, src_affine, dst_affine, transform in cases:
+        output_to_input = output_to_input_affine(src_affine, dst_affine, transform)
+        actual = geometric_coverage(src_shape, dst_shape, output_to_input)
+
+        # The registration maps moving-world coordinates to fixed-world coordinates.
+        registered = nib.Nifti1Image(
+            np.ones(src_shape, dtype=np.uint8), transform @ src_affine)
+        resampled = resample_from_to(
+            registered, (dst_shape, dst_affine), order=0).get_fdata() > 0.5
+        np.testing.assert_array_equal(actual, resampled)
