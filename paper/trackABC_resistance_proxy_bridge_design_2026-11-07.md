@@ -1,6 +1,6 @@
 # Track A–B resistance-proxy bridge design
 
-**Status:** Proposed design note. It does not change the frozen Track A A5 analysis, authorize new patient-data reads, or authorize a sealed Track C evaluation.
+**Status:** Proposed design note. The separate Track A 119/121 expression proxy has been calculated as an exploratory aggregate score; it does not change the frozen A5 analysis. This note does not authorize new patient-data reads or a sealed Track C evaluation.
 
 ## Decision from the literature review
 
@@ -11,8 +11,8 @@ The project can test **resistance-associated proxies**. It must not call those p
 ## Track A: molecular resistance-associated proxy
 
 1. Preserve the frozen A5 Core-versus-Periphery classifier and its success rule. Do not reinterpret A5 AURC as resistance accuracy.
-2. Use the frozen 121-gene overlap panel from Ntafoulis et al. (2023), Supplementary file 1, `Correlation_cell_Overlap`. This is a fixed response-associated gene set, not a validated predictor. Use the original Spearman-correlation signs against in-vitro viability at 100 μM TMZ; do not use the paper's separate survival-validation hits as response-score weights. The complete panel and score rules are in `paper/trackA_tmz_response_121_gene_panel_2026-11-07.tsv` and `paper/trackA_tmz_response_score_protocol_2026-11-07.md`.
-3. Sum raw counts into donor-by-region pseudobulks and calculate the frozen transcriptome-percentile direction score. Report all six paired donor differences with 1,000 expression-matched gene-set controls and the exploratory exact donor-level sign-flip calculation. Do not treat cells as independent donors or label donors clinically TMZ-sensitive or resistant.
+2. Use the fixed 121-gene overlap panel from Ntafoulis et al. (2023), Supplementary file 1, `Correlation_cell_Overlap`, with the approved exact-symbol mapping rule: score the 119 genes present in the A5 matrix, report 119/121 coverage, and omit `AF131215.2` and `PPIAP22` without substitution. This is a fixed response-associated gene set, not a validated predictor. Use the original Spearman-correlation signs against in-vitro viability at 100 μM TMZ; do not use the paper's separate survival-validation hits as response-score weights. The source panel and frozen score rules are in `paper/trackA_tmz_response_121_gene_panel_2026-11-07.tsv`, `paper/trackA_tmz_response_score_protocol_2026-11-07.md`, and `paper/trackA_tmz_response_119of121_amendment_2026-11-08.md`.
+3. Sum raw counts into donor-by-region pseudobulks and calculate the frozen transcriptome-percentile direction score. Report all six paired donor differences with 1,000 expression-matched gene-set controls and the exploratory exact donor-level sign-flip calculation. The completed local, uncommitted exploratory output is `output/trackA_tmz_response_proxy_119of121/result.json`: the six donor directions split 3/3, the mean Core-minus-Periphery score was -0.00109, and the two-sided exact sign-flip p-value was 0.96875. This does not support a consistent regional shift. Do not treat cells as independent donors or label donors clinically TMZ-sensitive or resistant.
 4. Use MGMT promoter-status metadata only if the donor-to-sample join and assay provenance are verified. Treat it as a resistance-associated biomarker, not as observed drug response.
 5. Label the output **molecular resistance-associated proxy**. It cannot establish which donor’s tumor is TMZ-sensitive or resistant.
 

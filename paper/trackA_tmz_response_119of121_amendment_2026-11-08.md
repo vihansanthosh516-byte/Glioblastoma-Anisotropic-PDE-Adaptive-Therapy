@@ -1,6 +1,8 @@
 # Track A TMZ-response proxy amendment: 119 of 121 mapped genes
 
-**Status:** adopted by the user on 2026-11-08. The first invocation stopped before scoring because the frozen A5 loader returned six strict plus two lenient donors; the amended scorer now filters to the exact six strict donors and rejects unexpected IDs. After this correction, 9 focused synthetic tests passed in a scratch copy. No proxy values have been calculated; the corrected source freeze must be committed before rerunning.
+**Protocol status at freeze:** adopted by the user on 2026-11-08. The first invocation stopped before scoring because the frozen A5 loader returned six strict plus two lenient donors; the amended scorer filters to the exact six strict donors and rejects unexpected IDs. After this correction, 9 focused synthetic tests passed in a scratch copy. At the time of the frozen protocol version, no proxy values had yet been calculated.
+
+**Post-run record (2026-11-08):** The 119/121 exploratory score is recorded locally and remains uncommitted at `output/trackA_tmz_response_proxy_119of121/result.json` for the six strict donors. The mean paired Core-minus-Periphery score was -0.00109; donor directions split 3 positive and 3 negative; the exact two-sided donor sign-flip p-value was 0.96875. The observed mean was at the 36.5th percentile of the descriptive matched-control means. This shows no consistent regional shift in this small exploratory analysis. It remains an expression proxy associated with in-vitro TMZ viability, not a measured or patient-specific drug response. The result record's `amendment_sha256` is `31ba941c679054ab1be86394e2fe9eb10451f4db81e93dc95b8424d527ad46b6`, the hash of the frozen amendment bytes used by the run. This post-run note changes status documentation only; the frozen scoring rules and A5 results remain unchanged.
 
 ## Reason for amendment
 
@@ -20,7 +22,7 @@ The two excluded source symbols are `AF131215.2` (sensitivity-associated) and `P
 
 This score is an exploratory mixed-cell expression proxy associated with in-vitro TMZ viability. It is not a measured drug response, validated predictor, clinical resistance label, or matched patient-specific response. Do not use it to tune A5, calibrate Track C, link Track A donors to Duke patients, or claim treatment benefit.
 
-The new result, if produced, will be written to `output/trackA_tmz_response_proxy_119of121/result.json`. The original output path and all A5 results and figures remain unchanged. The new runner will refuse to overwrite an existing result and will record both the original A5 freeze and this amendment's file hashes.
+The exploratory result is written to `output/trackA_tmz_response_proxy_119of121/result.json`. The original output path and all A5 results and figures remain unchanged. The runner refuses to overwrite an existing result and records both the original A5 freeze and the amendment hash used for scoring.
 
 ## Source
 
