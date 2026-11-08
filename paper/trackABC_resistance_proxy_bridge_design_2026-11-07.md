@@ -11,8 +11,8 @@ The project can test **resistance-associated proxies**. It must not call those p
 ## Track A: molecular resistance-associated proxy
 
 1. Preserve the frozen A5 Core-versus-Periphery classifier and its success rule. Do not reinterpret A5 AURC as resistance accuracy.
-2. As a separate exploratory analysis, select one published TMZ-response-associated expression signature before scoring any new expression comparison. Record its gene list, source, direction, and feature-mapping rule in a dated amendment.
-3. Compute the frozen signature score within Core and Periphery samples, then summarize paired differences at the donor level. Use expression-matched gene-set controls and report all six donors. Do not treat cells as independent donors.
+2. Use the frozen 121-gene overlap panel from Ntafoulis et al. (2023), Supplementary file 1, `Correlation_cell_Overlap`. This is a fixed response-associated gene set, not a validated predictor. Use the original Spearman-correlation signs against in-vitro viability at 100 μM TMZ; do not use the paper's separate survival-validation hits as response-score weights. The complete panel and score rules are in `paper/trackA_tmz_response_121_gene_panel_2026-11-07.tsv` and `paper/trackA_tmz_response_score_protocol_2026-11-07.md`.
+3. Sum raw counts into donor-by-region pseudobulks and calculate the frozen transcriptome-percentile direction score. Report all six paired donor differences with 1,000 expression-matched gene-set controls and the exploratory exact donor-level sign-flip calculation. Do not treat cells as independent donors or label donors clinically TMZ-sensitive or resistant.
 4. Use MGMT promoter-status metadata only if the donor-to-sample join and assay provenance are verified. Treat it as a resistance-associated biomarker, not as observed drug response.
 5. Label the output **molecular resistance-associated proxy**. It cannot establish which donor’s tumor is TMZ-sensitive or resistant.
 
