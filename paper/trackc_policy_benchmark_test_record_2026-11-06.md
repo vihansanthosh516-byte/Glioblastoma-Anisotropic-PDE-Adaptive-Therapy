@@ -121,3 +121,15 @@ The three focused scratch suites passed **34 tests in 48.87 seconds**. Before an
 - The first full run exposed two stale unit-test fixtures that hard-coded seed ranges no longer reserved for the test purpose. The manifest implementation was unchanged; the unit tests now use small synthetic seed values and a mocked registry, while the separate registry suite continues to exercise the real registry.
 - SHA-256 comparison matched all **340 source files and 103 test files** between the scratch copy and worktree, excluding `__pycache__`.
 - These remain mechanics tests only. No research-scale policy outcomes, patient data, or sealed evaluation were run.
+
+### Follow-up: family-level max-T interval proposal (2026-11-08)
+
+`src/trackc_world_summary.py` now provides a development helper for the two response-family contrasts named in the integrated v2 configuration. It accepts one equal-weight world-level mean difference per independent world and family, resamples worlds separately within each family, holds each observed family standard error fixed, and uses the higher empirical quantile of the maximum absolute centered bootstrap statistic. The reported intervals are symmetric around each observed family mean.
+
+This is an **observed-SE max-T bootstrap proposal**, not a bootstrap-t method. It assumes independent world samples across response families; fingerprints cannot prove that assumption. It has not received independent statistical review and is not frozen. The helper is not wired into a research-scale driver or result writer. No policy outcomes were run or inspected.
+
+Coverage remains unvalidated at the planned world counts. Westphal and Zapf's simulation study found small-sample error inflation for maxT in diagnostic-accuracy co-primary endpoint settings; those endpoints differ from Track C's world-level utility means, so the finding is a caution rather than direct evidence about this helper ([paper](https://pmc.ncbi.nlm.nih.gov/articles/PMC11025299/)).
+
+Focused scratch tests cover deterministic family ordering, the two-family positive rule, a non-passing family, a missed precision target, and invalid inputs. The suite passed **22 tests in 0.13 seconds** in `C:\Users\vihan\AppData\Local\Temp\trackc-max-t-8lsunbxt`. SHA-256 matched all **467 files** under `src/` and `tests/` before and after the test run. No policy outcomes were run.
+
+\n

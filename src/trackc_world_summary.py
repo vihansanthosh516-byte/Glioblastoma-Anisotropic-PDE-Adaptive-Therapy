@@ -4,6 +4,8 @@ This development helper does not define an adopted scoring protocol.
 """
 from __future__ import annotations
 
+from collections.abc import Mapping
+
 import numpy as np
 
 
@@ -27,8 +29,10 @@ def paired_world_summary(candidate, comparator, world_ids, *, resamples, seed):
         raise ValueError("world identifiers must be unique nonempty strings")
     if isinstance(resamples, (bool, np.bool_)) or not isinstance(resamples, (int, np.integer)) or resamples < 2:
         raise ValueError("resamples must be an integer of at least 2")
+    if isinstance(seed, (bool, np.bool_)) or not isinstance(seed, (int, np.integer)) or seed < 0:
+        raise ValueError("seed must be a nonnegative integer")
     differences = (candidate - comparator).mean(axis=1)
-    rng = np.random.default_rng(seed)
+    rng = np.random.Generator(np.random.PCG64DXSM(seed))
     boot = differences[rng.integers(0, n_worlds, size=(resamples, n_worlds))].mean(axis=1)
     return {
         "n_worlds": n_worlds,
@@ -38,7 +42,8 @@ def paired_world_summary(candidate, comparator, world_ids, *, resamples, seed):
         "bootstrap_percentile_95": np.quantile(boot, [0.025, 0.975]),
         "bootstrap_unit": "world",
         "resamples": int(resamples),
-        "seed": seed,
+        "seed": int(seed),
+        "rng": "numpy.random.Generator(PCG64DXSM)",
     }
 
 
@@ -162,3 +167,112 @@ def summarize_benchmark_worlds(records, *, resamples, seed, contrast=None):
     result["weight_source"] = "evaluation cohort peers" if contrast == "loo" else "fixed finite model sets"
     result["checks_limit"] = "Distinct recorded seeds and hashes do not prove independence or pairing."
     return result
+
+
+def simultaneous_max_t_world_intervals(
+    world_differences_by_family,
+    *,
+    resamples,
+    seed,
+    confidence_level=0.95,
+    precision_target_half_width=14.0,
+):
+    """Build familywise intervals from equal-weight, paired world means.
+
+    Each input vector contains one candidate-minus-control patient-macro mean per
+    independent world. Candidate and control must use the same patients within a
+    world. Resampling occurs within response family at the world level. The max-T
+    statistic uses each observed family standard error as its studentizer; the
+    reported symmetric intervals use the higher empirical quantile of the max
+    absolute centered bootstrap statistics.
+    """
+    if not isinstance(world_differences_by_family, Mapping) or len(world_differences_by_family) < 2:
+        raise ValueError("at least two response families are required")
+    if isinstance(resamples, (bool, np.bool_)) or not isinstance(resamples, (int, np.integer)) or resamples < 2:
+        raise ValueError("resamples must be an integer of at least 2")
+    if isinstance(seed, (bool, np.bool_)) or not isinstance(seed, (int, np.integer)) or seed < 0:
+        raise ValueError("seed must be a nonnegative integer")
+    try:
+        confidence_level = float(confidence_level)
+        precision_target_half_width = float(precision_target_half_width)
+    except (TypeError, ValueError, OverflowError) as exc:
+        raise ValueError("confidence and precision settings must be numeric") from exc
+    if not np.isfinite(confidence_level) or not 0.0 < confidence_level < 1.0:
+        raise ValueError("confidence_level must lie strictly between 0 and 1")
+    if not np.isfinite(precision_target_half_width) or precision_target_half_width <= 0.0:
+        raise ValueError("precision_target_half_width must be finite and positive")
+
+    family_names = tuple(world_differences_by_family)
+    if any(not isinstance(family, str) or not family.strip() for family in family_names):
+        raise ValueError("response family names must be nonempty strings")
+    expected_families = {"single-response", "mixture-response"}
+    if set(family_names) != expected_families:
+        raise ValueError("families must be exactly single-response and mixture-response")
+
+    family_values = {}
+    family_statistics = []
+    family_estimates = {}
+    family_standard_errors = {}
+    for index, family in enumerate(sorted(family_names)):
+        values = np.asarray(world_differences_by_family[family], dtype=float)
+        if values.ndim != 1 or values.size < 2 or not np.isfinite(values).all():
+            raise ValueError(f"{family} must contain at least two finite world differences")
+        with np.errstate(over="ignore", invalid="ignore"):
+            estimate = float(values.mean())
+            standard_error = float(values.std(ddof=1) / np.sqrt(values.size))
+        if not np.isfinite(estimate) or not np.isfinite(standard_error) or standard_error <= 0.0:
+            raise ValueError(f"{family} world differences must have nonzero variance")
+        rng = np.random.Generator(np.random.PCG64DXSM(np.random.SeedSequence([int(seed), index])))
+        indices = rng.integers(0, values.size, size=(int(resamples), values.size))
+        bootstrap_means = values[indices].mean(axis=1)
+        family_statistics.append(np.abs((bootstrap_means - estimate) / standard_error))
+        family_values[family] = values.copy()
+        family_estimates[family] = estimate
+        family_standard_errors[family] = standard_error
+
+    max_statistics = np.max(np.stack(family_statistics, axis=1), axis=1)
+    critical_value = float(np.quantile(max_statistics, confidence_level, method="higher"))
+    intervals = {}
+    for family, values in family_values.items():
+        estimate = family_estimates[family]
+        standard_error = family_standard_errors[family]
+        half_width = critical_value * standard_error
+        intervals[family] = {
+            "n_worlds": int(values.size),
+            "world_mean_differences": values.tolist(),
+            "equal_world_mean_difference": estimate,
+            "standard_error": standard_error,
+            "adjusted_lower": estimate - half_width,
+            "adjusted_upper": estimate + half_width,
+            "adjusted_half_width": half_width,
+            "precision_pass": bool(half_width <= precision_target_half_width),
+        }
+
+    all_positive = all(row["adjusted_lower"] > 0.0 for row in intervals.values())
+    precision_pass = all(row["precision_pass"] for row in intervals.values())
+    if all_positive and precision_pass:
+        decision = "pass_if_adopted"
+    elif not precision_pass:
+        decision = "inconclusive_precision_target_missed"
+    else:
+        decision = "does_not_pass_positive_rule"
+    return {
+        "method": "world-resampled observed-SE max-T bootstrap",
+        "resampling_unit": "one paired candidate-control patient-mean difference per independent world; worlds resampled separately within each response family",
+        "dependence_assumption": "World samples are independent within and across response families; fingerprints alone cannot establish this.",
+        "critical_value_rule": "higher empirical quantile of the max absolute centered bootstrap statistic",
+        "interval_rule": "equal-world mean plus or minus max-T critical value times observed standard error",
+        "confidence_level": confidence_level,
+        "resamples": int(resamples),
+        "seed": int(seed),
+        "protocol_status": "proposal_not_frozen",
+        "rng": "numpy.random.Generator(PCG64DXSM) with family-index SeedSequence streams",
+        "precision_target_half_width_unit": "simulated days",
+        "max_t_critical_value": critical_value,
+        "precision_target_half_width": precision_target_half_width,
+        "all_adjusted_lower_bounds_above_zero": bool(all_positive),
+        "precision_pass": bool(precision_pass),
+        "decision": decision,
+        "intervals_by_family": intervals,
+        "interpretation_limit": "Synthetic response-family inference only; intervals do not validate the simulator or imply patient benefit.",
+    }

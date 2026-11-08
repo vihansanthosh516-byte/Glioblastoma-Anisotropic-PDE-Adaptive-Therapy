@@ -74,3 +74,9 @@ The integrated input manifest at [`configs/trackABC_input_manifest_v2.csv`](../.
 ## Do not interpret as
 
 The integrated study is a synthetic comparison under declared assumptions. It cannot establish a clinical treatment benefit, a resistance biomarker, patient-level fusion, or superiority over all published methods. Track A and Track B findings remain prior exploratory evidence; Track C development results remain exposed development evidence.
+
+## Current integrated Track C status (2026-11-08)
+
+The world-summary module contains a proposed observed-SE max-T interval helper for the two primary response-family contrasts. It resamples independent world-level paired differences separately by family, holds observed standard errors fixed, and uses the higher empirical quantile of the maximum absolute centered statistic. It assumes independent world samples across families; fingerprints cannot prove this. This is not a bootstrap-t procedure. Coverage has not been checked at planned world counts. One adjacent diagnostic-accuracy study reported small-sample maxT error inflation; its endpoints differ, so it is a caution only ([Westphal and Zapf, 2024](https://pmc.ncbi.nlm.nih.gov/articles/PMC11025299/)). The helper has not received independent statistical review and is not wired into a research-scale driver. The configuration marks the method as proposed and not frozen. No policy outcomes have been run with it. World counts, cohort sizes, seed reservation, runtime limits, and the research-scale driver remain open.
+
+\n

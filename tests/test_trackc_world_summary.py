@@ -1,7 +1,11 @@
 import numpy as np
 import pytest
 
-from trackc_world_summary import paired_world_summary, summarize_benchmark_worlds
+from trackc_world_summary import (
+    paired_world_summary,
+    simultaneous_max_t_world_intervals,
+    summarize_benchmark_worlds,
+)
 
 
 def test_equal_world_summary_and_seeded_interval():
@@ -14,6 +18,7 @@ def test_equal_world_summary_and_seeded_interval():
     assert first["equal_world_mean_difference"] == pytest.approx(7 / 3)
     np.testing.assert_array_equal(first["bootstrap_percentile_95"], second["bootstrap_percentile_95"])
     assert first["bootstrap_unit"] == "world"
+    assert first["rng"] == "numpy.random.Generator(PCG64DXSM)"
 
 
 @pytest.mark.parametrize("candidate,comparator,ids", [
@@ -25,6 +30,12 @@ def test_equal_world_summary_and_seeded_interval():
 def test_invalid_pairs_are_rejected(candidate, comparator, ids):
     with pytest.raises(ValueError):
         paired_world_summary(candidate, comparator, ids, resamples=10, seed=1)
+
+
+@pytest.mark.parametrize("seed", [-1, True, 1.5])
+def test_invalid_world_bootstrap_seed_is_rejected(seed):
+    with pytest.raises(ValueError, match="seed must be a nonnegative integer"):
+        paired_world_summary([[1.0], [2.0]], [[0.0], [0.0]], ["a", "b"], resamples=10, seed=seed)
 
 
 def test_benchmark_worlds_reject_duplicate_inputs_and_inconsistent_contrast():
@@ -107,3 +118,79 @@ def test_benchmark_worlds_reject_duplicate_inputs_and_inconsistent_contrast():
     second["calibration_signal_generation"]["parameters"] = {"d": 0.9}
     with pytest.raises(ValueError, match="calibration and evaluation"):
         summarize_benchmark_worlds([first, second], resamples=100, seed=3)
+
+
+def test_max_t_world_intervals_are_seeded_and_order_independent():
+    single = np.linspace(8.0, 12.0, 40)
+    mixture = np.linspace(5.0, 9.0, 40)
+    first = simultaneous_max_t_world_intervals(
+        {"single-response": single, "mixture-response": mixture},
+        resamples=2000,
+        seed=20261108,
+        precision_target_half_width=14,
+    )
+    reversed_order = simultaneous_max_t_world_intervals(
+        {"mixture-response": mixture, "single-response": single},
+        resamples=2000,
+        seed=20261108,
+        precision_target_half_width=14,
+    )
+
+    assert first["method"] == "world-resampled observed-SE max-T bootstrap"
+    assert first["decision"] == "pass_if_adopted"
+    assert first["all_adjusted_lower_bounds_above_zero"] is True
+    assert first["precision_pass"] is True
+    assert first["rng"].startswith("numpy.random.Generator(PCG64DXSM)")
+    assert "independent within and across" in first["dependence_assumption"]
+    assert first["precision_target_half_width_unit"] == "simulated days"
+    assert first["max_t_critical_value"] == reversed_order["max_t_critical_value"]
+    assert first["intervals_by_family"] == reversed_order["intervals_by_family"]
+
+
+def test_max_t_requires_both_families_to_pass_positive_rule():
+    result = simultaneous_max_t_world_intervals(
+        {
+            "single-response": np.linspace(8.0, 12.0, 40),
+            "mixture-response": np.linspace(-6.0, -2.0, 40),
+        },
+        resamples=1000,
+        seed=7,
+    )
+    assert result["precision_pass"] is True
+    assert result["all_adjusted_lower_bounds_above_zero"] is False
+    assert result["decision"] == "does_not_pass_positive_rule"
+
+
+def test_max_t_marks_failed_precision_target_inconclusive():
+    result = simultaneous_max_t_world_intervals(
+        {
+            "single-response": np.linspace(-100.0, 100.0, 40),
+            "mixture-response": np.linspace(-90.0, 110.0, 40),
+        },
+        resamples=1000,
+        seed=8,
+        precision_target_half_width=14,
+    )
+    assert result["precision_pass"] is False
+    assert result["decision"] == "inconclusive_precision_target_missed"
+    assert all(not row["precision_pass"] for row in result["intervals_by_family"].values())
+
+
+@pytest.mark.parametrize(
+    "families,kwargs",
+    [
+        ({"single-response": [1.0, 2.0]}, {"resamples": 10, "seed": 1}),
+        ({"single-response": [1.0, 2.0], "mixture-response": [1.0, 2.0]}, {"resamples": True, "seed": 1}),
+        ({"single-response": [1.0, 2.0], "mixture-response": [1.0, 2.0]}, {"resamples": 10, "seed": -1}),
+        ({"single-response": [1.0, 2.0], "mixture-response": [1.0, 2.0]}, {"resamples": 10, "seed": 1, "confidence_level": 1.0}),
+        ({"single-response": [1.0], "mixture-response": [1.0, 2.0]}, {"resamples": 10, "seed": 1}),
+        ({"single-response": [1.0, 2.0], "mixture-response": [1.0, np.nan]}, {"resamples": 10, "seed": 1}),
+        ({"single-response": [1.0, 1.0], "mixture-response": [1.0, 2.0]}, {"resamples": 10, "seed": 1}),
+        ({"single-response": [1.0, 2.0], 3: [1.0, 2.0]}, {"resamples": 10, "seed": 1}),
+        ({"single-response": [1.0, 2.0], "other": [1.0, 2.0]}, {"resamples": 10, "seed": 1}),
+        ({"single-response": [1.0, 2.0], "mixture-response": [1.0, 2.0], "other": [1.0, 2.0]}, {"resamples": 10, "seed": 1}),
+    ],
+)
+def test_max_t_rejects_invalid_inputs(families, kwargs):
+    with pytest.raises(ValueError):
+        simultaneous_max_t_world_intervals(families, **kwargs)
