@@ -1,0 +1,26 @@
+# Track A — expression and regional biology
+
+## Current role
+
+Track A is a completed exploratory single-cell analysis. Its frozen A5 candidate did not meet its five-of-six donor success rule. The integrated phase will use only its archived donor-level balanced-accuracy values as **assumed signal-reliability settings** in a synthetic model. They are not drug-resistance measurements, a clinical assay, or malignant-cell truth.
+
+## Primary records
+
+- [Frozen Yu et al. A5 protocol](../../paper/trackA_yu2020/PROTOCOL.md)
+- [A5 execution audit](../../paper/trackA_execution_audit_20261031.md)
+- [A5 null-result record](../../paper/trackA_null_result.md)
+- [Novelty decision](../../paper/trackA_novelty_decision_20261101.md)
+- [Alternate-cohort screen](../../paper/trackA_alternate_dataset_plan_20261101.md)
+- [Integrated plan](../../paper/trackABC_integrated_research_plan_master_2026-11-07.md)
+
+## Main implementation and checks
+
+- `src/189_trackA_yu2020_lodo.py` — nested donor-held-out A5 analysis.
+- `src/151_trackA_donor_table.py`, `src/157_trackA_composition_audit.py`, `src/trackA_identity.py` — donor and composition checks.
+- `tests/test_trackA_identity.py`, `tests/test_trackA_donor_table.py`, `tests/test_trackA_composition_audit.py`, `tests/test_trackA_runner_helpers_synthetic.py` — focused checks.
+- `paper/trackA_yu2020/` — frozen protocol and donor list.
+- `output/trackA_yu2020/` and `output/trackA_composition_audit/` — saved records; read the protocol and audit before interpreting them.
+
+## Interpretation boundary
+
+The A5 labels are author-supplied MRI-marked sampling-point labels and the analyzed expression is mixed-cell. A5 failed its frozen donor-level success rule. It does not support malignant-cell-specific, resistance, causal, or independent external-confirmation claims. Deferred analyses and alternate-cohort leads remain deferred unless a dated amendment changes scope.

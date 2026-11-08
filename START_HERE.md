@@ -1,5 +1,11 @@
 # START HERE
 
+## Track navigation and integrated handoff
+
+- Use [`tracks/README.md`](tracks/README.md) to navigate Track A, Track B, Track C, and the integrated phase. The hubs group links without moving existing `src/`, `tests/`, `data/`, `output/`, or `paper/` files.
+- The complete plan is [`paper/trackABC_integrated_research_plan_master_2026-11-07.md`](paper/trackABC_integrated_research_plan_master_2026-11-07.md); the shorter submission copy is [`paper/trackABC_integrated_research_plan_submission_2026-11-07.md`](paper/trackABC_integrated_research_plan_submission_2026-11-07.md).
+- The machine-readable settings are in [`configs/trackABC_integrated_v1.json`](configs/trackABC_integrated_v1.json). See [`tracks/shared/HANDOFF_AND_REPRODUCIBILITY.md`](tracks/shared/HANDOFF_AND_REPRODUCIBILITY.md) for the seed rules, likelihood, particle updates, input rights, environment snapshot, and unresolved run gates. The integrated benchmark is not yet frozen or authorized for evaluation.
+
 - **Additional private Duke exposure (2026-11-07):** private saved records report completed exploratory destination-label/label-0 analyses that reopened target masks, plus post-hoc distance, interval, and registration summaries computed from saved scores. These are exposed exploratory analyses, not fresh confirmation. A separate ADC memory preflight record is marked incomplete and says no ADC, FLAIR, or target voxels were read during that preflight; this alone does not establish the status of every possible ADC analysis. These records need independent provenance and methods review. No images or masks were reopened in this inventory; private records remain outside Git.
 
 - **Private Duke provenance audit (2026-11-07):** recorded timestamps place the private analysis freeze before the result record. The saved analysis script matches the result's SHA-256; the historical registration source matches Git revision `41ebe42`. The current registration file differs because of later QC fixes. Timestamps and hashes document recorded file provenance; they do not independently prove when target voxels were first read or validate registration quality. No images or masks were reopened.

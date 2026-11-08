@@ -1,0 +1,5 @@
+input_id,source,local_path,content_type,integrated_role,sha256,rights_record,allowed_use,status
+trackA_A5_aggregate,GEO GSE117891 plus saved A5 result,output/trackA_yu2020/result.json,aggregate JSON,six q_signal stress-test assumptions,,public dataset terms plus project output provenance,simulation setting only,hash and provenance review required before use
+trackB_Duke_aggregate,Zenodo 20548528 plus accepted agreement,PRIVATE_LOCAL_ONLY,approved aggregate only,Duke summary may inform history-only MRI scale,,accepted agreement controls; record terms must also be checked,aggregate only if expressly permitted,omit if rights are unclear
+trackB_Duke_agreement,accepted data-use agreement,PRIVATE_LOCAL_ONLY,agreement document,permission basis for any Duke-derived aggregate,,agreement and record terms,local review only,never commit document or private path
+trackC_model_spec,project simulator and benchmark code,src/trackc_sim.py; src/trackc_integrated_signal_model.py; src/216_trackc_robust_signal_ambiguity.py,source code,synthetic model and policy,,project source revision,simulation code only,code hashes recorded in the pre-run seal
