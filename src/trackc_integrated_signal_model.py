@@ -313,8 +313,8 @@ def _normal_positive_probability(mean, variance):
     """Return P(N(mean, variance) >= 0), including deterministic limits."""
     mean = np.asarray(mean, dtype=float)
     variance = float(variance)
-    if variance <= 1e-14:
-        return np.where(mean > 0.0, 1.0, np.where(mean < 0.0, 0.0, 0.5))
+    if variance <= 0.0:
+        return np.where(mean >= 0.0, 1.0, 0.0)
     return ndtr(mean / np.sqrt(variance))
 
 

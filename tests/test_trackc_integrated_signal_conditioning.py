@@ -17,6 +17,7 @@ from trackc_integrated_signal_model import (
     F0_REFERENCE_BOUNDS,
     SignalModelParameters,
     SignalObservations,
+    _normal_positive_probability,
     f0_to_resistance_score,
     generate_integrated_signals,
     integrated_signal_log_likelihood,
@@ -45,6 +46,11 @@ def test_f0_reference_score_is_monotone_and_covers_calibration_envelope():
     assert scores[-1] > 5.0
     assert low == pytest.approx(0.001 * np.exp(-0.7))
     assert high == pytest.approx(0.9)
+
+
+def test_degenerate_biology_probability_matches_nonnegative_threshold():
+    probability = _normal_positive_probability(np.array([-1.0, 0.0, 1.0]), 0.0)
+    np.testing.assert_array_equal(probability, np.array([0.0, 1.0, 1.0]))
 
 
 def test_generator_uses_supplied_f0_for_both_signal_channels():
