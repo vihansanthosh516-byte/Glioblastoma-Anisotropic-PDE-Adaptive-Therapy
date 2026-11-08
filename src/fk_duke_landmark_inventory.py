@@ -16,6 +16,8 @@ import zipfile
 from collections import Counter, defaultdict
 from pathlib import Path
 
+import numpy as np
+
 
 _LANDMARK_PATH = re.compile(
     r"(?:^|/)Patient(?P<patient>\d+)/Patient(?P<file_patient>\d+)_scan(?P<scan>\d+)_"
@@ -74,6 +76,7 @@ def _read_landmark_member(archive, info, volume_shape):
                 points.append(point)
     duplicate_count = len(points) - len(set(points))
     return {
+        "points": points,
         "point_count": len(points),
         "invalid_coordinate_rows": invalid,
         "fractional_coordinate_rows": fractional,
@@ -82,14 +85,26 @@ def _read_landmark_member(archive, info, volume_shape):
     }
 
 
-def build_landmark_inventory(archive_path, *, volume_shape=(182, 218, 182)) -> dict:
-    """Return aggregate checks for paired landmark CSVs; no images or masks are opened."""
+def build_landmark_inventory(
+    archive_path, *, volume_shape=(182, 218, 182), permutation_replicates=1000, seed=20261108
+) -> dict:
+    """Return aggregate landmark checks; no images or masks are opened.
+
+    The row-order diagnostic compares observed same-row distances with shuffled
+    within-patient, within-zone pairings. It is an input-structure diagnostic,
+    not proof that any particular points are anatomically identical.
+    """
     archive_path = Path(archive_path)
     if not archive_path.is_file():
         raise FileNotFoundError(f"archive does not exist: {archive_path}")
     if (len(volume_shape) != 3 or any(isinstance(value, bool) or not isinstance(value, int) or value < 1
                                       for value in volume_shape)):
         raise ValueError("volume_shape must contain three positive integers")
+    if (isinstance(permutation_replicates, bool) or not isinstance(permutation_replicates, int)
+            or permutation_replicates < 1):
+        raise ValueError("permutation_replicates must be a positive integer")
+    if isinstance(seed, bool) or not isinstance(seed, int) or seed < 0:
+        raise ValueError("seed must be a nonnegative integer")
 
     try:
         with zipfile.ZipFile(archive_path, "r") as archive:
@@ -177,6 +192,89 @@ def build_landmark_inventory(archive_path, *, volume_shape=(182, 218, 182)) -> d
                         else:
                             far_pair_count_mismatches += 1
 
+            rng = np.random.default_rng(seed)
+            row_order_diagnostics = []
+            row_order_pairs_seen = 0
+            row_order_pairs_skipped_count_mismatch = 0
+            row_order_pairs_skipped_coordinate_issues = 0
+            row_order_pairs_skipped_duplicates = 0
+            row_order_pairs_skipped_too_few_points = 0
+            for patient in sorted(patients):
+                for zone in _ZONES:
+                    before = groups.get((patient, "preoperative", zone))
+                    after = groups.get((patient, "recurrence", zone))
+                    if before is None or after is None:
+                        continue
+                    row_order_pairs_seen += 1
+                    if before["point_count"] != after["point_count"]:
+                        row_order_pairs_skipped_count_mismatch += 1
+                        continue
+                    if any(
+                        record["invalid_coordinate_rows"] or record["out_of_bounds_rows"]
+                        for record in (before, after)
+                    ):
+                        row_order_pairs_skipped_coordinate_issues += 1
+                        continue
+                    if before["duplicate_points"] or after["duplicate_points"]:
+                        row_order_pairs_skipped_duplicates += 1
+                        continue
+                    baseline = np.asarray(before["points"], dtype=float)
+                    recurrence = np.asarray(after["points"], dtype=float)
+                    if len(baseline) < 2:
+                        row_order_pairs_skipped_too_few_points += 1
+                        continue
+                    observed_median = float(np.median(np.linalg.norm(baseline - recurrence, axis=1)))
+                    shuffled_medians = np.empty(permutation_replicates, dtype=float)
+                    for index in range(permutation_replicates):
+                        order = np.arange(len(recurrence))
+                        permutation = rng.permutation(len(recurrence))
+                        while np.array_equal(permutation, order):
+                            permutation = rng.permutation(len(recurrence))
+                        shuffled = recurrence[permutation]
+                        shuffled_medians[index] = np.median(np.linalg.norm(baseline - shuffled, axis=1))
+                    shuffled_median = float(np.median(shuffled_medians))
+                    row_order_diagnostics.append((observed_median, shuffled_median))
+
+            if row_order_diagnostics:
+                observed_values = np.asarray([row[0] for row in row_order_diagnostics], dtype=float)
+                shuffled_values = np.asarray([row[1] for row in row_order_diagnostics], dtype=float)
+                valid_ratios = shuffled_values > 0
+                ratio = (float(np.median(observed_values[valid_ratios] / shuffled_values[valid_ratios]))
+                         if np.any(valid_ratios) else None)
+                row_order_summary = {
+                    "patient_zone_pairs_seen": row_order_pairs_seen,
+                    "patient_zone_pair_count": len(row_order_diagnostics),
+                    "pairs_skipped_count_mismatch": row_order_pairs_skipped_count_mismatch,
+                    "pairs_skipped_coordinate_issues": row_order_pairs_skipped_coordinate_issues,
+                    "pairs_skipped_duplicate_points": row_order_pairs_skipped_duplicates,
+                    "pairs_skipped_fewer_than_two_points": row_order_pairs_skipped_too_few_points,
+                    "median_row_order_distance_voxels": float(np.median(observed_values)),
+                    "median_shuffled_distance_voxels": float(np.median(shuffled_values)),
+                    "median_row_order_to_shuffle_ratio": ratio,
+                    "pairs_with_zero_shuffled_median": int(np.count_nonzero(~valid_ratios)),
+                    "fraction_row_order_median_below_shuffled_median": float(np.mean(observed_values < shuffled_values)),
+                    "identity_permutations_excluded": True,
+                    "permutation_replicates_per_pair": permutation_replicates,
+                    "seed": seed,
+                }
+            else:
+                row_order_summary = {
+                    "patient_zone_pairs_seen": row_order_pairs_seen,
+                    "patient_zone_pair_count": 0,
+                    "pairs_skipped_count_mismatch": row_order_pairs_skipped_count_mismatch,
+                    "pairs_skipped_coordinate_issues": row_order_pairs_skipped_coordinate_issues,
+                    "pairs_skipped_duplicate_points": row_order_pairs_skipped_duplicates,
+                    "pairs_skipped_fewer_than_two_points": row_order_pairs_skipped_too_few_points,
+                    "median_row_order_distance_voxels": None,
+                    "median_shuffled_distance_voxels": None,
+                    "median_row_order_to_shuffle_ratio": None,
+                    "pairs_with_zero_shuffled_median": 0,
+                    "fraction_row_order_median_below_shuffled_median": None,
+                    "identity_permutations_excluded": True,
+                    "permutation_replicates_per_pair": permutation_replicates,
+                    "seed": seed,
+                }
+
             return {
                 "archive_landmark_csv_count": files_seen,
                 "unparsed_landmark_path_count": unparsed_landmark_files,
@@ -194,6 +292,7 @@ def build_landmark_inventory(archive_path, *, volume_shape=(182, 218, 182)) -> d
                     f"{visit}_{zone}": _summary(point_counts[(visit, zone)])
                     for visit in _VISITS for zone in _ZONES
                 },
+                "row_order_pairing_diagnostic": row_order_summary,
                 "coordinate_quality_totals": {
                     "invalid_coordinate_rows": issue_totals["invalid_coordinate_rows"],
                     "fractional_coordinate_rows": issue_totals["fractional_coordinate_rows"],

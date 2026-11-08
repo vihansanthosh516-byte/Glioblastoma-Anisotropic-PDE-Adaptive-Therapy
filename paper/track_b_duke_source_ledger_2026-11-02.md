@@ -8,7 +8,15 @@ The current [Zenodo record](https://zenodo.org/records/20548528) still marks the
 
 The [CC BY-NC-ND 4.0 legal code](https://creativecommons.org/licenses/by-nc-nd/4.0/legalcode.en) permits creating and reproducing adapted material for noncommercial purposes, but not sharing adapted material under that license. Whether this project's forecasts, model weights, figures, or summary tables count as adapted material is not determined here. The custom Duke license text and the accepted option are not on file. Local analysis authorization does not establish public redistribution rights.
 
-Private records document that this project already read Duke target masks and scored a transition analysis on 2026-11-04. That cohort and endpoint are exposed, not fresh confirmation. This addendum involved no new patient-data read, analysis, or contact.
+Private records document that this project already read Duke target masks and scored a transition analysis on 2026-11-04. That cohort and endpoint are exposed, not fresh confirmation. The 2026-11-02 source/license recheck involved no new data read. The 2026-11-08 landmark follow-up is recorded below.
+
+### Landmark-pair follow-up (2026-11-08)
+
+The current [Zenodo record](https://zenodo.org/records/20548528) says the example preoperative and recurrence landmark files list the same matching positions. The [author guide](https://github.com/deshanyang/GBM-DIR-QA) says sessions are not longitudinally registered and recommends applying a rigid or affine transform to the landmark coordinates. The CSVs have no point-ID field, so the row mapping is not directly encoded.
+
+An aggregate local diagnostic compared same-row coordinate distances with seeded non-identity row permutations for paired near/far sets. Its measurements remain in the ignored local record `output/track_b_duke_landmark_pairing_diagnostic_20261108.json` pending review of derived-output terms. The diagnostic may support row-order consistency with the source description, but it cannot prove point identity or registration accuracy. Coordinates were compared before registration, so the measurements are not target-registration error. The record contains no patient IDs or coordinates.
+
+The 2026-11-08 follow-up read landmark-coordinate CSV bodies only. It did not open MRI or segmentation voxel arrays, select or freeze a cohort, compute target-registration error, or make contact. Derived-output sharing terms remain unresolved; keep the aggregate local.
 
 Everything below is a historical snapshot from 2026-11-02. Its statements that access was pending, that no data had been downloaded or opened, its 136.3 GB record size, and its no-go decision are not current status.
 
