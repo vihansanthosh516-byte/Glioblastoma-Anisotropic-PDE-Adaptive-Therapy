@@ -84,6 +84,8 @@ python src/phase15_virtual_trial.py \
 pytest tests/ -q  # scratch copy only; never the working tree
 ```
 
+For a scratch run, set `PYTHONPATH` to the scratch copy's `src` directory before invoking pytest. Some Track C tests import project modules by their top-level names (for example, `trackc_seed_registry`), so a scratch copy without this path setting fails during test collection even when the code is present. On Windows PowerShell, from the scratch project root, use `$env:PYTHONPATH = (Join-Path (Get-Location) "src")` before `py -3.14 -m pytest ...`.
+
 Static inventory checked 2026-10-19: 18 test files and 117 test functions (including calculator tests test1-test7). The static count is separate from execution; the latest audit-fix scratch run passed 119 test cases with 13 warnings in 27.74 s (`paper/codex_audit2/fix_progress.md`). Ledger 2bo is an author-reported historical 101-test result assembled across multiple runs with partial data; its transcripts are absent. The prior audit reports 108 passed/13 warnings in a Git-backed scratch clone (`paper/codex_audit_report.md`, section E). Modules include: `test_inverse_estimation`, `test_joint_inverse_estimation`, `test_robust_mpc`, `test_spatial_metrics`, `test_multiomic_fusion`, `test_hybrid_controller`, `test_mu_glioma_loader`, `test_retrospective_validation`, `test_treatment_models`, `test_baselines`, `test_metrics_stats`, `test_no_leakage`, `test_run_manifest`, `test_solver`, `test_solver_monotone`, `test_rano_calc`.
 
 ## Docker (Track B + C)

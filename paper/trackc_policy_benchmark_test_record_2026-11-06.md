@@ -2,6 +2,10 @@
 
 **Current-status correction (2026-11-08):** The integrated world runner selects the finite-set minimax versus matched `d = 0` minimax contrast as primary. Older sections below document prior LOO-primary mechanics and are superseded for the integrated v2 path; LOO remains a separately reported contrast.
 
+## Scratch verification (2026-11-08)
+
+An additional synthetic-only check ran `test_trackc_world_runner.py`, `test_trackc_integrated_signal_conditioning.py`, and `test_trackc_policy_benchmark.py` in a scratch copy of `src/` and `tests/`, with `PYTHONPATH` set to the scratch `src/` directory. **53 tests passed in 65.96 seconds.** SHA-256 comparison found zero differences between the scratch and working-tree `src/` and `tests/` files after the run. The first attempt omitted `PYTHONPATH` and stopped during collection with `ModuleNotFoundError: trackc_seed_registry`; that was a scratch-environment setup failure, not a test result. These tests check implementation mechanics and signal conditioning only. They do not validate model assumptions, statistical coverage, policy performance, or clinical benefit. No policy outcome comparison or patient data was used.
+
 ## Scope
 
 This run checked synthetic implementation mechanics only. It did not compare policy outcomes for research, read patient data, or authorize a sealed evaluation.
