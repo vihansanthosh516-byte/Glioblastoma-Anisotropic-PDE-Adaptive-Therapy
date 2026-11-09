@@ -44,7 +44,7 @@ def _load_source_module(module_name: str, filename: str):
 @dataclass(frozen=True)
 class PolicyBenchmarkSettings:
     scan_every: int = 3
-    stop_endpoint: str = "either"
+    stop_endpoint: str = "observed_two_scan"
     mpc_assumed_future_scan_miss_probability: float = 0.0
     course_budget: int = tc.BUDGET
     tau_days: float = 730.0
@@ -62,10 +62,8 @@ class PolicyBenchmarkSettings:
 
     def __post_init__(self):
         _validate_int(self.scan_every, "scan_every", 1, 4)
-        if self.stop_endpoint not in ("baseline", "rano", "either", "observed_two_scan"):
-            raise ValueError(
-                "stop_endpoint must be baseline, rano, either, or observed_two_scan"
-            )
+        if self.stop_endpoint != "observed_two_scan":
+            raise ValueError("integrated v2 requires stop_endpoint='observed_two_scan'")
         miss_probability = self.mpc_assumed_future_scan_miss_probability
         if isinstance(miss_probability, (bool, np.bool_)):
             raise ValueError("mpc_assumed_future_scan_miss_probability must be finite and between 0 and 1")
@@ -77,10 +75,6 @@ class PolicyBenchmarkSettings:
             ) from exc
         if not np.isfinite(miss_probability) or not (0.0 <= miss_probability <= 1.0):
             raise ValueError("mpc_assumed_future_scan_miss_probability must be finite and between 0 and 1")
-        if miss_probability > 0.0 and self.stop_endpoint != "observed_two_scan":
-            raise ValueError(
-                "mpc_assumed_future_scan_miss_probability requires observed_two_scan stopping rule"
-            )
         object.__setattr__(self, "mpc_assumed_future_scan_miss_probability", miss_probability)
         _validate_int(self.course_budget, "course_budget", 1, tc.BUDGET)
         _validate_int(self.n_f0_nodes, "n_f0_nodes", 8, 100_000)

@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import importlib.util
 import inspect
+import json
 from copy import deepcopy
 from pathlib import Path
 import sys
@@ -36,13 +37,26 @@ def test_ambiguity_controller_is_opt_in_by_default():
 
 
 def test_mpc_assumed_future_scan_loss_requires_observed_stop():
-    with pytest.raises(ValueError, match="requires observed_two_scan"):
-        benchmark.PolicyBenchmarkSettings(mpc_assumed_future_scan_miss_probability=0.1)
+    with pytest.raises(ValueError, match="integrated v2 requires"):
+        benchmark.PolicyBenchmarkSettings(
+            stop_endpoint="either", mpc_assumed_future_scan_miss_probability=0.1
+        )
     settings = benchmark.PolicyBenchmarkSettings(
         stop_endpoint="observed_two_scan",
         mpc_assumed_future_scan_miss_probability=0.25,
     )
     assert settings.mpc_assumed_future_scan_miss_probability == pytest.approx(0.25)
+
+
+def test_integrated_stop_rule_matches_machine_readable_config():
+    config_path = REPO / "configs" / "trackABC_integrated_v2.json"
+    config = json.loads(config_path.read_text(encoding="utf-8"))
+    declared = config["simulation_clock_and_treatment"]["stop_endpoint_code"]
+
+    assert declared == "observed_two_scan"
+    assert benchmark.PolicyBenchmarkSettings().stop_endpoint == declared
+    with pytest.raises(ValueError, match="integrated v2 requires"):
+        benchmark.PolicyBenchmarkSettings(stop_endpoint="either")
 
 
 def test_scan_loss_scenarios_reject_invalid_or_misleading_inputs():
