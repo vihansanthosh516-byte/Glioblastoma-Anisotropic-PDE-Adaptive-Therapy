@@ -163,7 +163,8 @@ def generate_integrated_signals(
     a: float,
     b: float,
     d: float,
-    seed: int,
+    seed: int | None = None,
+    rng: np.random.Generator | None = None,
     f0: np.ndarray | None = None,
     mri_template: np.ndarray | None = None,
 ) -> tuple[SignalObservations, SignalTruth]:
@@ -191,15 +192,20 @@ def generate_integrated_signals(
     """
     if isinstance(n, (bool, np.bool_)) or not isinstance(n, Integral) or n < 1:
         raise ValueError("n must be a positive integer")
-    if isinstance(seed, (bool, np.bool_)) or not isinstance(seed, Integral) or seed < 0:
-        raise ValueError("seed must be a non-negative integer")
+    if rng is None:
+        if isinstance(seed, (bool, np.bool_)) or not isinstance(seed, Integral) or seed < 0:
+            raise ValueError("seed must be a non-negative integer when rng is not supplied")
+        rng = np.random.default_rng(int(seed))
+    elif seed is not None:
+        raise ValueError("provide either seed or rng, not both")
+    elif not isinstance(rng, np.random.Generator):
+        raise TypeError("rng must be a numpy.random.Generator")
 
     q = _bounded_probability(q, "q")
     a = _bounded_coefficient(a, "a")
     b = _bounded_coefficient(b, "b")
     d = _bounded_coefficient(d, "d")
 
-    rng = np.random.default_rng(int(seed))
     if f0 is None:
         resistance_z = rng.standard_normal(int(n))
     else:

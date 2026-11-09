@@ -1,43 +1,51 @@
 stage,family,world_id,stream_name,seed_derivation_key,status
-development,single-response,{world_id},world_parameters,trackABC-integrated-v2|development|single-response|{world_id}|world_parameters,not materialized
-development,single-response,{world_id},selection_cohort,trackABC-integrated-v2|development|single-response|{world_id}|selection_cohort,not materialized
-development,single-response,{world_id},calibration_cohort,trackABC-integrated-v2|development|single-response|{world_id}|calibration_cohort,not materialized
-development,single-response,{world_id},evaluation_cohort,trackABC-integrated-v2|development|single-response|{world_id}|evaluation_cohort,not materialized
-development,single-response,{world_id},molecular_signal,trackABC-integrated-v2|development|single-response|{world_id}|molecular_signal,not materialized
-development,single-response,{world_id},mri_signal,trackABC-integrated-v2|development|single-response|{world_id}|mri_signal,not materialized
-development,single-response,{world_id},observation_noise,trackABC-integrated-v2|development|single-response|{world_id}|observation_noise,not materialized
-development,single-response,{world_id},candidate_policy,trackABC-integrated-v2|development|single-response|{world_id}|candidate_policy,not materialized
-development,single-response,{world_id},d0_policy,trackABC-integrated-v2|development|single-response|{world_id}|d0_policy,not materialized
-development,single-response,{world_id},secondary_policy,trackABC-integrated-v2|development|single-response|{world_id}|secondary_policy,not materialized
-evaluation,single-response,{world_id},world_parameters,trackABC-integrated-v2|evaluation|single-response|{world_id}|world_parameters,not materialized
-evaluation,single-response,{world_id},selection_cohort,trackABC-integrated-v2|evaluation|single-response|{world_id}|selection_cohort,not materialized
-evaluation,single-response,{world_id},calibration_cohort,trackABC-integrated-v2|evaluation|single-response|{world_id}|calibration_cohort,not materialized
-evaluation,single-response,{world_id},evaluation_cohort,trackABC-integrated-v2|evaluation|single-response|{world_id}|evaluation_cohort,not materialized
-evaluation,single-response,{world_id},molecular_signal,trackABC-integrated-v2|evaluation|single-response|{world_id}|molecular_signal,not materialized
-evaluation,single-response,{world_id},mri_signal,trackABC-integrated-v2|evaluation|single-response|{world_id}|mri_signal,not materialized
-evaluation,single-response,{world_id},observation_noise,trackABC-integrated-v2|evaluation|single-response|{world_id}|observation_noise,not materialized
-evaluation,single-response,{world_id},candidate_policy,trackABC-integrated-v2|evaluation|single-response|{world_id}|candidate_policy,not materialized
-evaluation,single-response,{world_id},d0_policy,trackABC-integrated-v2|evaluation|single-response|{world_id}|d0_policy,not materialized
-evaluation,single-response,{world_id},secondary_policy,trackABC-integrated-v2|evaluation|single-response|{world_id}|secondary_policy,not materialized
-development,mixture-response,{world_id},world_parameters,trackABC-integrated-v2|development|mixture-response|{world_id}|world_parameters,not materialized
-development,mixture-response,{world_id},selection_cohort,trackABC-integrated-v2|development|mixture-response|{world_id}|selection_cohort,not materialized
-development,mixture-response,{world_id},calibration_cohort,trackABC-integrated-v2|development|mixture-response|{world_id}|calibration_cohort,not materialized
-development,mixture-response,{world_id},evaluation_cohort,trackABC-integrated-v2|development|mixture-response|{world_id}|evaluation_cohort,not materialized
-development,mixture-response,{world_id},molecular_signal,trackABC-integrated-v2|development|mixture-response|{world_id}|molecular_signal,not materialized
-development,mixture-response,{world_id},mri_signal,trackABC-integrated-v2|development|mixture-response|{world_id}|mri_signal,not materialized
-development,mixture-response,{world_id},observation_noise,trackABC-integrated-v2|development|mixture-response|{world_id}|observation_noise,not materialized
-development,mixture-response,{world_id},candidate_policy,trackABC-integrated-v2|development|mixture-response|{world_id}|candidate_policy,not materialized
-development,mixture-response,{world_id},d0_policy,trackABC-integrated-v2|development|mixture-response|{world_id}|d0_policy,not materialized
-development,mixture-response,{world_id},secondary_policy,trackABC-integrated-v2|development|mixture-response|{world_id}|secondary_policy,not materialized
-evaluation,mixture-response,{world_id},world_parameters,trackABC-integrated-v2|evaluation|mixture-response|{world_id}|world_parameters,not materialized
-evaluation,mixture-response,{world_id},selection_cohort,trackABC-integrated-v2|evaluation|mixture-response|{world_id}|selection_cohort,not materialized
-evaluation,mixture-response,{world_id},calibration_cohort,trackABC-integrated-v2|evaluation|mixture-response|{world_id}|calibration_cohort,not materialized
-evaluation,mixture-response,{world_id},evaluation_cohort,trackABC-integrated-v2|evaluation|mixture-response|{world_id}|evaluation_cohort,not materialized
-evaluation,mixture-response,{world_id},molecular_signal,trackABC-integrated-v2|evaluation|mixture-response|{world_id}|molecular_signal,not materialized
-evaluation,mixture-response,{world_id},mri_signal,trackABC-integrated-v2|evaluation|mixture-response|{world_id}|mri_signal,not materialized
-evaluation,mixture-response,{world_id},observation_noise,trackABC-integrated-v2|evaluation|mixture-response|{world_id}|observation_noise,not materialized
-evaluation,mixture-response,{world_id},candidate_policy,trackABC-integrated-v2|evaluation|mixture-response|{world_id}|candidate_policy,not materialized
-evaluation,mixture-response,{world_id},d0_policy,trackABC-integrated-v2|evaluation|mixture-response|{world_id}|d0_policy,not materialized
-evaluation,mixture-response,{world_id},secondary_policy,trackABC-integrated-v2|evaluation|mixture-response|{world_id}|secondary_policy,not materialized
-development,both,all,world_bootstrap,trackABC-integrated-v2|development|both|all|world_bootstrap,not materialized
-evaluation,both,all,world_bootstrap,trackABC-integrated-v2|evaluation|both|all|world_bootstrap,not materialized
+development,single-response,{world_id},world_parameters,"world[""world""]",template_not_materialized_or_reserved
+development,single-response,{world_id},selection_cohort,"world[""selection_scenario""]",template_not_materialized_or_reserved
+development,single-response,{world_id},calibration_cohort,"world[""calibration_scenario""]",template_not_materialized_or_reserved
+development,single-response,{world_id},evaluation_cohort,"world[""evaluation_scenario""]",template_not_materialized_or_reserved
+development,single-response,{world_id},sigma_assignment_child,"SeedSequence([world['world'], 0x5349474D])",template_not_materialized_or_reserved
+development,single-response,{world_id},calibration_joint_signal,"world[""calibration_signal""]",template_not_materialized_or_reserved
+development,single-response,{world_id},evaluation_joint_signal,"world[""evaluation_signal""]",template_not_materialized_or_reserved
+development,single-response,{world_id},selection_policy,"world[""selection_policy""]",template_not_materialized_or_reserved
+development,single-response,{world_id},q_training,"world[""q_training""]",template_not_materialized_or_reserved
+development,single-response,{world_id},calibration_policy,"world[""calibration_policy""]",template_not_materialized_or_reserved
+development,single-response,{world_id},shared_evaluation_noise_and_policy_rng,"world[""evaluation_policy""]",template_not_materialized_or_reserved
+development,single-response,{world_id},schedule_mixture,"world[""schedule_mixture""]",template_not_materialized_or_reserved
+development,mixture-response,{world_id},world_parameters,"world[""world""]",template_not_materialized_or_reserved
+development,mixture-response,{world_id},selection_cohort,"world[""selection_scenario""]",template_not_materialized_or_reserved
+development,mixture-response,{world_id},calibration_cohort,"world[""calibration_scenario""]",template_not_materialized_or_reserved
+development,mixture-response,{world_id},evaluation_cohort,"world[""evaluation_scenario""]",template_not_materialized_or_reserved
+development,mixture-response,{world_id},sigma_assignment_child,"SeedSequence([world['world'], 0x5349474D])",template_not_materialized_or_reserved
+development,mixture-response,{world_id},calibration_joint_signal,"world[""calibration_signal""]",template_not_materialized_or_reserved
+development,mixture-response,{world_id},evaluation_joint_signal,"world[""evaluation_signal""]",template_not_materialized_or_reserved
+development,mixture-response,{world_id},selection_policy,"world[""selection_policy""]",template_not_materialized_or_reserved
+development,mixture-response,{world_id},q_training,"world[""q_training""]",template_not_materialized_or_reserved
+development,mixture-response,{world_id},calibration_policy,"world[""calibration_policy""]",template_not_materialized_or_reserved
+development,mixture-response,{world_id},shared_evaluation_noise_and_policy_rng,"world[""evaluation_policy""]",template_not_materialized_or_reserved
+development,mixture-response,{world_id},schedule_mixture,"world[""schedule_mixture""]",template_not_materialized_or_reserved
+development,both,all,world_bootstrap,separate_registered_bootstrap_seed,template_not_materialized_or_reserved
+evaluation,single-response,{world_id},world_parameters,"world[""world""]",template_not_materialized_or_reserved
+evaluation,single-response,{world_id},selection_cohort,"world[""selection_scenario""]",template_not_materialized_or_reserved
+evaluation,single-response,{world_id},calibration_cohort,"world[""calibration_scenario""]",template_not_materialized_or_reserved
+evaluation,single-response,{world_id},evaluation_cohort,"world[""evaluation_scenario""]",template_not_materialized_or_reserved
+evaluation,single-response,{world_id},sigma_assignment_child,"SeedSequence([world['world'], 0x5349474D])",template_not_materialized_or_reserved
+evaluation,single-response,{world_id},calibration_joint_signal,"world[""calibration_signal""]",template_not_materialized_or_reserved
+evaluation,single-response,{world_id},evaluation_joint_signal,"world[""evaluation_signal""]",template_not_materialized_or_reserved
+evaluation,single-response,{world_id},selection_policy,"world[""selection_policy""]",template_not_materialized_or_reserved
+evaluation,single-response,{world_id},q_training,"world[""q_training""]",template_not_materialized_or_reserved
+evaluation,single-response,{world_id},calibration_policy,"world[""calibration_policy""]",template_not_materialized_or_reserved
+evaluation,single-response,{world_id},shared_evaluation_noise_and_policy_rng,"world[""evaluation_policy""]",template_not_materialized_or_reserved
+evaluation,single-response,{world_id},schedule_mixture,"world[""schedule_mixture""]",template_not_materialized_or_reserved
+evaluation,mixture-response,{world_id},world_parameters,"world[""world""]",template_not_materialized_or_reserved
+evaluation,mixture-response,{world_id},selection_cohort,"world[""selection_scenario""]",template_not_materialized_or_reserved
+evaluation,mixture-response,{world_id},calibration_cohort,"world[""calibration_scenario""]",template_not_materialized_or_reserved
+evaluation,mixture-response,{world_id},evaluation_cohort,"world[""evaluation_scenario""]",template_not_materialized_or_reserved
+evaluation,mixture-response,{world_id},sigma_assignment_child,"SeedSequence([world['world'], 0x5349474D])",template_not_materialized_or_reserved
+evaluation,mixture-response,{world_id},calibration_joint_signal,"world[""calibration_signal""]",template_not_materialized_or_reserved
+evaluation,mixture-response,{world_id},evaluation_joint_signal,"world[""evaluation_signal""]",template_not_materialized_or_reserved
+evaluation,mixture-response,{world_id},selection_policy,"world[""selection_policy""]",template_not_materialized_or_reserved
+evaluation,mixture-response,{world_id},q_training,"world[""q_training""]",template_not_materialized_or_reserved
+evaluation,mixture-response,{world_id},calibration_policy,"world[""calibration_policy""]",template_not_materialized_or_reserved
+evaluation,mixture-response,{world_id},shared_evaluation_noise_and_policy_rng,"world[""evaluation_policy""]",template_not_materialized_or_reserved
+evaluation,mixture-response,{world_id},schedule_mixture,"world[""schedule_mixture""]",template_not_materialized_or_reserved
+evaluation,both,all,world_bootstrap,separate_registered_bootstrap_seed,template_not_materialized_or_reserved

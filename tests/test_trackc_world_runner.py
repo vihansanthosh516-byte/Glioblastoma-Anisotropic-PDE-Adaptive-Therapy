@@ -89,11 +89,11 @@ def test_prepares_reproducible_disjoint_synthetic_inputs_without_scoring():
 
 def test_world_fingerprint_changes_when_world_parameters_change(monkeypatch):
     import trackc_world_runner as runner
-    original = runner.calibration.draw_worlds
+    original = runner.integrated_sampler.draw_world_parameters
 
-    def changed(*args, **kwargs):
-        generated = original(*args, **kwargs)
-        generated[0]["c"] += 0.001
+    def changed(family, seed):
+        generated = original(family, seed)
+        generated["B0_center"] += 0.001
         return generated
 
     options = dict(family="single", patients_per_cohort=2,
@@ -101,17 +101,21 @@ def test_world_fingerprint_changes_when_world_parameters_change(monkeypatch):
                    model_parameters=(SignalModelParameters(0.7, 0.2, 0.3, 0.1),),
                    settings=v2_settings(), entries=entries())
     baseline = prepare_synthetic_world(world("a", 1), **options)
-    monkeypatch.setattr(runner.calibration, "draw_worlds", changed)
+    monkeypatch.setattr(runner.integrated_sampler, "draw_world_parameters", changed)
     modified = prepare_synthetic_world(world("a", 1), **options)
     assert baseline["world_parameters_sha256"] != modified["world_parameters_sha256"]
 
 
 def test_prepared_provenance_is_attached_to_matching_fake_benchmark():
-    prepared = {"world_generation_seed": 7, "family": "single", "scan_loss": None, "world_parameters_sha256": "a" * 64,
+    prepared = {"world_generation_seed": 7, "family": "single", "scan_loss": None,
+                "world_parameters_sha256": "a" * 64, "world_parameters": {"q_signal": 0.7},
+                "sigma_assignment": {"counts": {"0.05": 1}},
                 "benchmark_kwargs": {"world_id": "sample"}}
     result = execute_prepared_world(prepared, lambda **kwargs: {"world_id": kwargs["world_id"]})
     assert result["world_provenance"]["world_parameters_sha256"] == "a" * 64
     assert result["world_provenance"]["world_generation_seed"] == 7
+    assert result["world_provenance"]["world_parameters"] == {"q_signal": 0.7}
+    assert result["world_provenance"]["sigma_assignment"]["counts"] == {"0.05": 1}
     with pytest.raises(ValueError, match="world ID"):
         execute_prepared_world(prepared, lambda **kwargs: {"world_id": "different"})
     with pytest.raises(ValueError, match="already contains"):
@@ -158,8 +162,8 @@ def test_refuses_world_when_treatment_stop_differs_from_integrated_protocol(monk
     import trackc_world_runner as runner
 
     monkeypatch.setattr(
-        runner.calibration,
-        "draw_worlds",
+        runner.integrated_sampler,
+        "draw_world_parameters",
         lambda *a, **k: pytest.fail("world generated before guard"),
     )
     params = SignalModelParameters(0.7, 0.2, 0.3, 0.1)
@@ -167,3 +171,16 @@ def test_refuses_world_when_treatment_stop_differs_from_integrated_protocol(monk
                    model_parameters=(params,), settings=v2_settings("either"), entries=entries())
     with pytest.raises(ValueError, match="requires stop_endpoint='observed_two_scan'"):
         prepare_synthetic_world(world("a", 1), **options)
+
+
+def test_world_specific_q_signal_overrides_caller_q_as_declared():
+    params = SignalModelParameters(0.5, 0.2, 0.3, 0.1)
+    options = dict(
+        family="single", patients_per_cohort=2, signal_parameters=params,
+        model_parameters=(params,), settings=v2_settings(), entries=entries(),
+    )
+    prepared = prepare_synthetic_world(world("a", 1), **options)
+    generated = prepared["benchmark_kwargs"]["signal_generation_parameters"]
+    assert generated.q == prepared["world_parameters"]["q_signal"]
+    assert generated.q in (0.6, 0.7, 0.8, 0.9)
+    assert generated.q != params.q
