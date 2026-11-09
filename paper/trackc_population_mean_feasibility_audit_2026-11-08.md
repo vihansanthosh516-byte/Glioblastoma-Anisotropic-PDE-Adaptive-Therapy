@@ -48,6 +48,16 @@ The integrated configuration is not an execution seal, and the development runne
 - The configuration puts `c` in the patient axes. `trackc_calibration.draw_worlds` includes `c` among world axes, and `draw_patients` assigns the same `c` value to every patient in that world.
 - The configuration specifies a per-world `q_signal` draw from `{0.6, 0.7, 0.8, 0.9}`. The prototype receives fixed `signal_parameters` from its caller and uses that same `q` for signal generation.
 
+Further source inspection found these additional execution mismatches:
+
+- **Patient-axis order:** the configuration orders patient dimensions as `[r, m, f0, B0, c, epsilon]`; `trackc_sim.PARAMS` orders them as `[r, m, f0, c, eps, B0]`. Because the code uses Latin-hypercube coordinates, this changes which coordinate receives each stratified draw, even though marginal bounds remain the same.
+- **Observation-noise assignment:** the configuration assigns a balanced `{0.05, 0.10, 0.20}` sigma vector once per world over sorted patient IDs. `trackc_sim.draw_scenarios` instead permutes a resized sigma vector on every call. `prepare_synthetic_world` calls it separately for selection, calibration, and evaluation cohorts, so each cohort gets a separate assignment. With two patients per cohort, resizing assigns only `0.05` and `0.10`; `0.20` is absent.
+- **Bit generator and seed derivation:** the configuration names `PCG64DXSM` and SHA-256-derived stream seeds. The prototype uses `np.random.default_rng`, which returned `PCG64` in the recorded Python environment, and accepts preassigned integer seeds. `trackc_world_schedule` checks seed availability and uniqueness; it does not derive or reserve the configured streams.
+- **Signal-stream names:** the configuration lists separate molecular and MRI signal streams. `generate_integrated_signals` uses one joint seed for the correlated latent draws and report flip. Separate channel streams are not implemented. A joint signal stream should be named explicitly so future edits do not break the intended dependence structure.
+- **Policy and observation streams:** `run_shared_policy_world` passes one evaluation-policy seed to every arm. `simulate_two_endpoints` draws scan noise, then passes the same generator to `policy.reset`; it also derives missing-scan draws from that seed. The configuration instead names observation-noise and candidate, `d=0`, and secondary-policy streams. This is a reproducibility-spec mismatch; it does not by itself show biased scores, but the random-number coupling must be specified before evaluation.
+- **Treatment-stop rule:** the configuration specifies the observed two-consecutive-scan rule. `PolicyBenchmarkSettings` defaults to `stop_endpoint="either"`, and `_evaluate_policy` forwards that value. A caller can pass `observed_two_scan`, but no config loader or run guard enforces it, so the default benchmark call does not implement the configured rule.
+- **Penalty sensitivities and bootstrap:** the configuration lists course-penalty sensitivities of 0 and 10 days and a `world_bootstrap` stream. One `run_shared_policy_world` call uses one penalty value (default 5); the development schedule has no bootstrap role. The research driver and sensitivity orchestration remain unimplemented.
+
 The target population, categorical weights, randomization unit, and generator must agree before a confidence method can be validated for the intended estimand. If independent world-level inference is retained, a defensible option is to draw `(mu, nu)` and `q_signal` independently from their declared uniform distributions per world and draw `c` per patient. A balanced design can use complete independently randomized blocks, or another interval that accounts for the actual stratified design. Do not treat patients within one world, or points within one randomized QMC scramble, as independent worlds.
 
 ### 4. Literature does not remove these project-specific gates
@@ -63,9 +73,10 @@ Primary sources:
 
 ## Next work before any policy outcomes
 
-1. Amend the synthetic generator and configuration together. Lock the target population law, `(mu, nu)` weights, `q_signal` distribution, patient-level `c`, response-family relationship, and independent sampling unit.
-2. Obtain independent statistical review of a fixed-time simultaneous interval under that exact law. Keep 95% familywise coverage and the 14-day target unless a scientific rationale changes them before any outcomes.
-3. Preflight precision and runtime analytically first. If a valid method cannot meet both targets with a feasible, registered seed block, stop the confirmatory comparison. Do not lower the target after seeing outcomes.
-4. Only after those gates pass, implement the complete driver, test it on synthetic data in a scratch copy, register fresh seeds, freeze code/settings/environment hashes, and run the locked evaluation.
+1. Amend the synthetic generator and configuration together. Lock the target population law, `(mu, nu)` weights, `q_signal` distribution, patient-level `c`, patient-axis order, sigma assignment, response-family relationship, and independent sampling unit.
+2. Align the implementation contract: choose the bit generator and seed derivation; define joint signal streams, shared observation-noise coupling, per-arm policy streams, the observed two-scan stop rule, and the course-penalty sensitivity runs.
+3. Obtain independent statistical review of a fixed-time simultaneous interval under that exact law. Keep 95% familywise coverage and the 14-day target unless a scientific rationale changes them before any outcomes.
+4. Preflight precision and runtime analytically first. If a valid method cannot meet both targets with a feasible, registered seed block, stop the confirmatory comparison. Do not lower the target after seeing outcomes.
+5. Only after those gates pass, implement the complete driver, test it on synthetic data in a scratch copy, register fresh seeds, freeze code/settings/environment hashes, and run the locked evaluation.
 
 No policy outcome run, patient-data read, seed reservation, or result tuning is authorized by this memo.
