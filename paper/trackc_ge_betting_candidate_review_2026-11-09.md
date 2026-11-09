@@ -30,4 +30,3 @@ The paper also presents optional external randomization. It is not selected here
 - Martinez-Taboada, D. [Research page](https://dmartinezt.github.io/) (lists the paper as under review and links its code).
 - Authors' [GE-betting repository](https://github.com/DMartinezT/betting) (README says no open-source license has yet been selected).
 - Existing project calculation: [Track C population-mean feasibility audit](trackc_population_mean_feasibility_audit_2026-11-08.md).
-
