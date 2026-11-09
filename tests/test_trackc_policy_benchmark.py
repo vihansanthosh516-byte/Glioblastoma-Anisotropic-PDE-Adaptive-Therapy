@@ -100,6 +100,40 @@ def test_benchmark_blocks_legacy_repeated_reading_from_unseen_cycle():
         benchmark._validate_scenarios(scenario, "test")
 
 
+def test_policy_rng_consumption_does_not_change_shared_scan_noise():
+    class RecordPolicy:
+        uses_filter = False
+
+        def __init__(self, reset_draws):
+            self.reset_draws = reset_draws
+
+        def reset(self, scen, rng):
+            del scen
+            self.readings = []
+            rng.random(self.reset_draws)
+
+        def act(self, cycle, y):
+            self.readings.append(y.copy())
+            return np.zeros(1, dtype=bool)
+
+        def advance(self, cycle, treat):
+            pass
+
+    scenario = tc.draw_scenarios(1, seed=2026110901, sigmas=(0.1,))
+    settings = benchmark.PolicyBenchmarkSettings(
+        stop_endpoint="observed_two_scan", scan_every=3,
+    )
+    first = RecordPolicy(reset_draws=0)
+    second = RecordPolicy(reset_draws=1000)
+
+    benchmark._evaluate_policy(first, scenario, (2026110902,), settings)
+    benchmark._evaluate_policy(second, scenario, (2026110902,), settings)
+
+    assert len(first.readings) == len(second.readings) == tc.N_CYCLES
+    assert all(np.array_equal(left, right, equal_nan=True)
+               for left, right in zip(first.readings, second.readings))
+
+
 def _quiet_scenario():
     """One slow synthetic patient whose late schedule falls after 730 days."""
     return {
