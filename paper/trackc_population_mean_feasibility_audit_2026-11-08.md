@@ -88,6 +88,10 @@ With seven worlds per family and Bonferroni allocation `alpha = 0.025` per contr
 
 The HBCI literature assumes a bounded-mean sampling model; it does not validate the interval for this project's simulator, population law, or simultaneous two-family rule. The 2026 RQMC study uses independent randomized-QMC replicates and reports method performance for its integration settings; its RQMC gains do not transfer automatically to the current iid-world design or to this thresholded, capped simulator utility. No HBCI or RQMC interval was implemented or screened, and no policy outcomes were generated. Reconsider only after a defensible change in available independent worlds or a predeclared, scientifically justified tighter support/structural assumption is independently reviewed; do not add assumptions because they make the interval pass.
 
+#### GE-betting follow-up (2026-11-09)
+
+Martinez-Taboada and Ramdas's 2026 preprint adds a deterministic fixed-horizon bounded-mean interval with a finite-sample martingale-coverage theorem and iid Gaussian efficiency. It is a more directly matched candidate than a time-uniform confidence sequence, but it does not remove the all-zero-sample lower bound or validate itself under this project's sampling law. The candidate remains unimplemented and unadopted. Its outcome-blind review plan is in [the GE-betting candidate review](trackc_ge_betting_candidate_review_2026-11-09.md). The authors' linked implementation repository has no open-source license selected, so any project implementation must be independent from the paper's equations, not copied code.
+
 Primary sources:
 
 - L’Ecuyer, P., Nakayama, M. K., Owen, A. B., & Tuffin, B. (2023). *Confidence intervals for randomized quasi-Monte Carlo estimators*. [GERAD report](https://www.gerad.ca/en/papers/G-2023-67).
