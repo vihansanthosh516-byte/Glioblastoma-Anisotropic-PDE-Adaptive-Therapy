@@ -90,7 +90,7 @@ The HBCI literature assumes a bounded-mean sampling model; it does not validate 
 
 #### GE-betting follow-up (2026-11-09)
 
-Martinez-Taboada and Ramdas's 2026 preprint adds a deterministic fixed-horizon bounded-mean interval with a finite-sample martingale-coverage theorem and iid Gaussian efficiency. It is a more directly matched candidate than a time-uniform confidence sequence, but it does not remove the all-zero-sample lower bound or validate itself under this project's sampling law. The candidate remains unimplemented and unadopted. Its outcome-blind review plan is in [the GE-betting candidate review](trackc_ge_betting_candidate_review_2026-11-09.md). The authors' linked implementation repository has no open-source license selected, so any project implementation must be independent from the paper's equations, not copied code.
+Martinez-Taboada and Ramdas's 2026 preprint adds a deterministic fixed-horizon bounded-mean interval with a finite-sample martingale-coverage theorem and iid Gaussian efficiency. It is a more directly matched candidate than a time-uniform confidence sequence, but it does not remove the all-zero-sample lower bound or validate itself under this project's sampling law. An independent standalone prototype (`src/trackc_ge_betting.py`) passed 10 synthetic tests in a scratch copy; it remains unwired, unadopted, and without independent statistical review. The exact outcome-blind checks and remaining gates are in [the GE-betting candidate review](trackc_ge_betting_candidate_review_2026-11-09.md). The authors' linked implementation repository has no open-source license selected, so the project implementation was written independently from the paper's equations.
 
 Primary sources:
 

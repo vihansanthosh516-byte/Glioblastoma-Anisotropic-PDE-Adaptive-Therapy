@@ -2,7 +2,7 @@
 
 ## Decision
 
-GE-betting is a credible fixed-horizon confidence-interval candidate for later outcome-blind evaluation. It is **not adopted**, has not been implemented or independently reviewed, and does not make the current seven-world-per-family design capable of guaranteeing the 14-day precision target. No policy outcomes were generated for this review.
+GE-betting is a credible fixed-horizon confidence-interval candidate for later outcome-blind evaluation. A standalone implementation now exists at `src/trackc_ge_betting.py`; it is **not wired into the runner, not adopted, and not independently reviewed**. It does not make the current seven-world-per-family design capable of guaranteeing the 14-day precision target. No policy outcomes were generated for this review.
 
 ## What the method offers
 
@@ -16,13 +16,25 @@ The previously derived all-zero-sample lower bound still applies to deterministi
 
 The paper also presents optional external randomization. It is not selected here: it changes the interval procedure and its realized-width behavior, and would require its own predeclared interpretation and independent review. It must not be used as a way to bypass the sample-size bound.
 
+## Prototype checks
+
+The independent implementation passed **10 tests** in a Git-archive scratch copy with Python 3.14. The checks include:
+
+- Exact coverage enumeration for every seven-observation Bernoulli sequence over 41 probabilities from 0 to 1.
+- Exact coverage enumeration for two rare-event distributions at seven worlds, with extreme values at either support endpoint and event probability 0.409.
+- Connected accepted-mean sets on a 201-point grid for every four-observation binary sequence.
+- The project-scale all-zero sample check, which verifies that the deterministic interval includes at least `[-323.5, 323.5]` days.
+- Input checks, predictable variance calculations, and mapping to the `[-790, 790]` day support.
+
+These tests check implementation behavior on specified cases. They do not replace independent statistical review, validate the full project world law, establish the 14-day precision target, or compare interval widths under policy outcomes.
+
 ## If this candidate is pursued
 
 1. Keep the deterministic fixed-horizon version, `delta = 0.025` per contrast, and the existing population-mean estimand as the candidate specification.
-2. Implement independently from the paper's equations; the authors' linked GitHub repository states that it has no open-source license, so its code will not be copied into this project.
-3. Test endpoint inversion, interval geometry, boundary cases, and exact coverage on outcome-blind bounded distributions, including the rare-event distributions behind the lower bound.
-4. Compare width and coverage with HBCI, Hoeffding, and the rejected methods under the exact world-level sampling law and paired-stream coupling. Keep the 14-day precision gate and report failure unchanged.
-5. Do not generate policy evaluation outcomes unless the independent review and seed/runtime/precision gates pass.
+2. The independent prototype is in place; the authors' linked GitHub repository states that it has no open-source license, so its code was not copied.
+3. Basic endpoint inversion, geometry, boundary, and exact-coverage checks have passed. Next, obtain an independent statistical review and test coverage under the exact world-level sampling law and paired-stream coupling.
+4. Compare width with HBCI and Hoeffding under the frozen law. Keep the 14-day precision gate and report failure unchanged.
+5. Do not wire this candidate into the evaluation runner or generate policy evaluation outcomes unless the independent review and seed/runtime/precision gates pass.
 
 ## Sources
 
