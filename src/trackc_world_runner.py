@@ -33,10 +33,14 @@ def prepare_synthetic_world(world, *, family, patients_per_cohort, signal_parame
 
     The returned world seed is caller-declared provenance, not proof of generation.
     Seed preflight is not an atomic reservation. No files are read or written.
+    Integrated v2 requires the observed two-scan treatment-stop rule; reject any
+    other setting before generating world or patient inputs.
     """
     validate_development_schedule([world], entries=entries)
     if family not in ("single", "mixture"):
         raise ValueError("family must be single or mixture")
+    if getattr(settings, "stop_endpoint", None) != "observed_two_scan":
+        raise ValueError("integrated v2 requires stop_endpoint='observed_two_scan'")
     if isinstance(patients_per_cohort, bool) or not isinstance(patients_per_cohort, Integral) or patients_per_cohort < 2:
         raise ValueError("patients_per_cohort must be an integer of at least 2")
     n = int(patients_per_cohort)

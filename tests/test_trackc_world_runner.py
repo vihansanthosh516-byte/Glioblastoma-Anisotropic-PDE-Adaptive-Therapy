@@ -1,5 +1,7 @@
-import pytest
+from types import SimpleNamespace
+
 import numpy as np
+import pytest
 
 import trackc_seed_registry as registry
 import trackc_world_schedule as schedule
@@ -28,6 +30,10 @@ def fake_result(w):
 
 def entries():
     return [registry._entry("reserved", "dev", "reserved", [(1, 1000)], [], purpose="stage2_dev")]
+
+
+def v2_settings(stop_endpoint="observed_two_scan"):
+    return SimpleNamespace(stop_endpoint=stop_endpoint)
 
 
 def test_runs_all_preflighted_worlds_in_order():
@@ -66,7 +72,7 @@ def test_prepares_reproducible_disjoint_synthetic_inputs_without_scoring():
     options = dict(family="single", patients_per_cohort=2,
                    signal_parameters=SignalModelParameters(0.7, 0.2, 0.3, 0.1),
                    model_parameters=(SignalModelParameters(0.7, 0.2, 0.3, 0.1),),
-                   settings="synthetic-settings", entries=entries())
+                   settings=v2_settings(), entries=entries())
     first = prepare_synthetic_world(w, **options)
     second = prepare_synthetic_world(w, **options)
     assert first["world_generation_seed"] == w["world"]
@@ -93,7 +99,7 @@ def test_world_fingerprint_changes_when_world_parameters_change(monkeypatch):
     options = dict(family="single", patients_per_cohort=2,
                    signal_parameters=SignalModelParameters(0.7, 0.2, 0.3, 0.1),
                    model_parameters=(SignalModelParameters(0.7, 0.2, 0.3, 0.1),),
-                   settings="synthetic-settings", entries=entries())
+                   settings=v2_settings(), entries=entries())
     baseline = prepare_synthetic_world(world("a", 1), **options)
     monkeypatch.setattr(runner.calibration, "draw_worlds", changed)
     modified = prepare_synthetic_world(world("a", 1), **options)
@@ -127,7 +133,7 @@ def test_composed_runner_builds_and_checks_two_synthetic_worlds():
 
     params = SignalModelParameters(0.7, 0.2, 0.3, 0.1)
     executor = make_synthetic_executor(family="single", patients_per_cohort=2,
-        signal_parameters=params, model_parameters=(params,), settings="test", benchmark=benchmark, entries=entries())
+        signal_parameters=params, model_parameters=(params,), settings=v2_settings(), benchmark=benchmark, entries=entries())
     results = run_development_worlds([world("a", 1), world("b", 20)], executor, entries=entries())
     assert [row["world_provenance"]["world_generation_seed"] for row in results] == [1, 20]
     assert results[0]["world_provenance"]["world_parameters_sha256"] != results[1]["world_provenance"]["world_parameters_sha256"]
@@ -136,7 +142,7 @@ def test_composed_runner_builds_and_checks_two_synthetic_worlds():
 def test_scan_loss_is_visible_and_applied_to_every_cohort():
     params = SignalModelParameters(0.7, 0.2, 0.3, 0.1)
     options = dict(family="single", patients_per_cohort=2, signal_parameters=params,
-                   model_parameters=(params,), settings="test", entries=entries())
+                   model_parameters=(params,), settings=v2_settings(), entries=entries())
     prepared = prepare_synthetic_world(world("a", 1), scan_loss={"miss_p": 0.2, "miss_p_hi": 0.7}, **options)
     assert prepared["scan_loss"] == {"miss_p": 0.2, "miss_p_hi": 0.7}
     for role in ("selection", "calibration", "evaluation"):
@@ -146,3 +152,18 @@ def test_scan_loss_is_visible_and_applied_to_every_cohort():
         assert scenario["miss_visible"].all()
     with pytest.raises(ValueError, match="finite probability"):
         prepare_synthetic_world(world("a", 1), scan_loss={"miss_p": 1.1}, **options)
+
+
+def test_refuses_world_when_treatment_stop_differs_from_integrated_protocol(monkeypatch):
+    import trackc_world_runner as runner
+
+    monkeypatch.setattr(
+        runner.calibration,
+        "draw_worlds",
+        lambda *a, **k: pytest.fail("world generated before guard"),
+    )
+    params = SignalModelParameters(0.7, 0.2, 0.3, 0.1)
+    options = dict(family="single", patients_per_cohort=2, signal_parameters=params,
+                   model_parameters=(params,), settings=v2_settings("either"), entries=entries())
+    with pytest.raises(ValueError, match="requires stop_endpoint='observed_two_scan'"):
+        prepare_synthetic_world(world("a", 1), **options)
