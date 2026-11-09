@@ -4,7 +4,7 @@
 
 ## Decision
 
-Keep the population-mean estimand and the 14-day precision target unchanged. Keep policy evaluation blocked. The current design has no validated simultaneous interval, its generator does not match the integrated v2 sampling specification, and the available seed block cannot support the current distribution-free precision target.
+Keep the population-mean estimand and the 14-day precision target unchanged. Keep policy evaluation blocked. The current design has no validated simultaneous interval, its generator does not match the integrated v2 sampling specification, and current seed capacity cannot guarantee the 14-day target over the full bounded distribution class without stronger assumptions or tighter proven bounds.
 
 ## Findings
 
@@ -16,7 +16,7 @@ Keep the population-mean estimand and the 14-day precision target unchanged. Kee
 
 These are prior saved synthetic screens, not policy results: [max-T screen](trackc_max_t_coverage_audit_result_2026-11-08.md), [Student-t screen](trackc_t_bonferroni_coverage_audit_result_2026-11-08.md), [larger-world extension](trackc_t_bonferroni_worldcount_extension_result_2026-11-08.md), and [distribution-free precision audit](trackc_distribution_free_precision_audit_2026-11-08.md).
 
-### 2. A distribution-free precision lower bound rules out 14 days at current capacity
+### 2. A distribution-free lower bound rules out guaranteed 14-day precision at current capacity
 
 The configured utility is the minimum of two progression times capped at 730 days, minus five days for each course through the cutoff. With at most 12 courses, patient utility lies in `[-60, 730]` days, so a paired candidate-minus-control world difference lies in `[-790, 790]` days.
 
@@ -37,6 +37,8 @@ Under equal Bonferroni allocation, the all-zero-data lower bound is `790 Ã— [1âˆ
 | 200 | 14.44 days |
 
 At least **207 independent worlds per family** are needed merely to clear this bound under equal Bonferroni allocation. This is not sufficient to guarantee 14-day precision for the actual design. More generally, the familywise 95% requirement implies at least 95% marginal coverage per family; even using that less stringent marginal level, seven worlds require a half-width of at least 275.05 days on all-zero data. These bounds apply to deterministic, uniformly valid intervals built from independent bounded world differences. A narrower interval would need defensible additional assumptions or a tighter proven support; a method name alone cannot supply either.
+
+This is a worst-case guarantee result. It does not say every interval computed from every possible nonzero sample must exceed 14 days. It says the current design cannot guarantee that precision for every distribution in the stated bounded class without extra assumptions or a tighter proven range.
 
 The current development seed block has 89 free scenario seeds. The proposed schedule uses six scenario seeds per world, giving an upper capacity of 14 total worlds, or seven per family with an equal split. The 207-world threshold projects to about 164.22 serial hours for both families even at the existing two-patient-per-cohort timing reference; larger cohorts and method overhead add cost. The timing source is a small synthetic pilot, not a bound.
 
