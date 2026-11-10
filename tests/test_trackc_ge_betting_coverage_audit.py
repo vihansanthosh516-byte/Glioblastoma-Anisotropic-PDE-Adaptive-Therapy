@@ -73,6 +73,7 @@ def test_small_cell_runs_and_reports_all_methods():
     assert ge_row["inference_failures"] == 0
     assert ge_row["inversion_inconsistencies"] == 0
     assert 0.0 <= ge_row["joint_coverage"] <= 1.0
-    assert cell["methods"]["hoeffding"]["median_larger_half_width_days"] == pytest.approx(
-        audit.hoeffding_half_width_days(7)
-    )
+    # At n=7 the Hoeffding half-width exceeds the support, so the clipped
+    # interval can be no wider than the support itself.
+    assert audit.hoeffding_half_width_days(7) > 790.0
+    assert 0.0 < cell["methods"]["hoeffding"]["median_larger_half_width_days"] <= 790.0

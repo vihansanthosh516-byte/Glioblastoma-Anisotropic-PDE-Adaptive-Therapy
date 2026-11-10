@@ -1,5 +1,7 @@
 # Research Plan
 
+> **Status note (2026-11-09; plan text below is unchanged).** This plan is written in the future tense. Some analyses it describes as planned already have recorded outcomes: Track A's A5 candidate **failed** its frozen five-of-six donor rule (4 of 6); the 119-of-121 gene proxy ran and its paired differences split 3 and 3; the Duke transition analysis ran once as an exploratory analysis on a now-exposed cohort; the max-T and Student-t interval methods failed their coverage screens; and confirmatory Track C evaluation is stopped because the unchanged 14-day precision target cannot be reached with available worlds. See [the evidence table](gap_status_2026-11-09.md) and `START_HERE.md`.
+
 ## Project Title
 
 **Integrating Tumor Biology and Longitudinal MRI for Glioblastoma Progression Modeling and In-Silico Therapy Optimization**

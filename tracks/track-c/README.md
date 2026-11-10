@@ -25,7 +25,7 @@ Track C develops a two-compartment tumor-growth and treatment-suppression simula
 
 ## Confirmatory evaluation stopped (2026-11-09)
 
-The 14-day precision target is unchanged and cannot be guaranteed at current seed capacity: the [feasibility audit](../../paper/trackc_population_mean_feasibility_audit_2026-11-08.md) needs at least 207 worlds per family and the seed block allows 7. No interval method has passed its coverage screen; the GE-betting interval is an unreviewed prototype. Confirmatory evaluation stays stopped until the user authorizes more worlds with fresh reserved seeds and a runtime cap, or explicitly changes the target. See the [open-gap record](../../paper/gap_status_2026-11-09.md).
+The 14-day precision target is unchanged and cannot be guaranteed at current seed capacity: the [feasibility audit](../../paper/trackc_population_mean_feasibility_audit_2026-11-08.md) needs at least 207 worlds per family and the seed block allows 7. The GE-betting interval matched its published equations and passed a predeclared synthetic coverage screen (30/30 cells), but it is not adopted, has no independent review, and reached 18.3 days at 207 worlds per family in its most favourable cell; no method met 14 days in any cell ([result](../../paper/trackc_ge_betting_coverage_audit_result_2026-11-09.md)). `tests/test_trackc_config_parity_extended.py` pins further settings against the config and marks three known drifts as expected failures. Confirmatory evaluation stays stopped until the user authorizes more worlds with fresh reserved seeds and a runtime cap, or explicitly changes the target. See the [open-gap record](../../paper/gap_status_2026-11-09.md).
 
 ## Gate before a research-scale evaluation
 

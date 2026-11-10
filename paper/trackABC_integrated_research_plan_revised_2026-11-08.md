@@ -5,6 +5,8 @@
 **Project year:** 2026–2027
 **Plan version:** 2026-11-08
 
+> **Status note (2026-11-09; plan text below is unchanged).** Two later facts are not in this version: the Student-t interval with Bonferroni adjustment also failed its coverage screens (14/24 cells, then 35/44), and confirmatory Track C evaluation is stopped because the unchanged 14-day precision target cannot be reached with available worlds (GE-betting passed a synthetic coverage screen but reached 18.3 days at 207 worlds per family in its most favourable cell). See [the evidence table](gap_status_2026-11-09.md).
+
 ## Rationale
 
 ### Project summary

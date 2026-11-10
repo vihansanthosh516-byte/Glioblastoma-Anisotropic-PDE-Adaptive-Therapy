@@ -15,9 +15,11 @@ Labels come from each file's own status line or from the links in `START_HERE.md
 
 | Plan file (in `paper/` unless noted) | Status |
 |---|---|
-| `trackABC_integrated_research_plan_master_2026-11-07.md` | **Active** complete plan (unfrozen; not an evaluation authorization) |
-| `trackABC_integrated_research_plan_submission_2026-11-07.md` and `.docx` | **Active** short submission copy |
-| `trackABC_integrated_research_plan_revised_2026-11-08.md` | **Status undecided**: linked from no hub; the user must label it |
+| `gap_status_2026-11-09.md` | **Authoritative status record**: evidence table, action plan, per-track claim boundaries |
+| `trackABC_integrated_research_plan_master_2026-11-07.md` | **Active** complete plan (unfrozen; not an evaluation authorization). Future-tense text is stale on recorded outcomes; a dated status note at its top lists them |
+| `trackABC_integrated_research_plan_submission_2026-11-07.md` and `.docx` | **Active** short submission copy (form text only; carries no outcomes) |
+| `trackABC_integrated_research_plan_revised_2026-11-08.md` | **Proposed replacement** for the master plan: it states the recorded outcomes. Recommended as the active record; the user has not yet decided |
+| `trackc_ge_betting_coverage_audit_protocol_2026-11-09.md`, `trackc_ge_betting_coverage_audit_result_2026-11-09.md` | Completed synthetic methods screen; adopts no method |
 | `Track A5 Research Plan Science Fair MD Final.md` | Completed and frozen; A5 failed its 5-of-6 rule |
 | `trackc_world_benchmark_protocol_draft_2026-11-07.md` | Proposed draft; evaluation stopped (see Track C hub) |
 | `trackABC_integrated_research_plan_submission_2026-11-04.md`, `..._submission_short_2026-11-05.md`, `trackABC_integrated_virtual_patient_research_plan_draft_2026-11-04.md` | Superseded by the 2026-11-07 pair |

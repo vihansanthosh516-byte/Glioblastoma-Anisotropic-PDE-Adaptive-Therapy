@@ -23,4 +23,4 @@ Track A is a completed exploratory single-cell analysis. Its frozen A5 candidate
 
 ## Interpretation boundary
 
-The A5 labels are author-supplied MRI-marked sampling-point labels and the analyzed expression is mixed-cell. A5 failed its frozen donor-level success rule. It does not support malignant-cell-specific, resistance, causal, or independent external-confirmation claims. Deferred analyses and alternate-cohort leads remain deferred unless a dated amendment changes scope.
+The A5 labels are author-supplied MRI-marked sampling-point labels and the analyzed expression is mixed-cell. A5 failed its frozen donor-level success rule. It does not support malignant-cell-specific, resistance, causal, or independent external-confirmation claims. Deferred analyses and alternate-cohort leads remain deferred unless a dated amendment changes scope. The separate 119-of-121 gene score is an exploratory published-response proxy (paired differences split 3 and 3), not a drug-resistance test. A further metadata-only cohort search on 2026-11-09 found no dataset that passes every gate; see the [evidence table](../../paper/gap_status_2026-11-09.md).
