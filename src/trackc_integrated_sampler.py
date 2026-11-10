@@ -22,6 +22,22 @@ SIGMA_LEVELS = (0.05, 0.10, 0.20)
 COHORT_ROLES = ("selection", "calibration", "evaluation")
 PATIENT_DIMENSION_ORDER = ("r", "m", "f0", "B0", "c", "epsilon")
 SIGMA_ASSIGNMENT_CHILD = 0x5349474D  # ASCII "SIGM", fixed substream of the world seed.
+B0_CENTER_HALF_WIDTH = 0.10
+WORLD_AXIS_BOUNDS = {
+    "single": (
+        ("log_r_shift", -0.7, 0.9),
+        ("log_m_scale", float(np.log(0.05)), 0.0),
+        ("log_f0_shift", -0.7, 2.3),
+        ("B0_center", 0.12, 0.55),
+    ),
+    "mixture": (
+        ("log_r_shift", -0.7, 0.9),
+        ("log_m_scale_non", float(np.log(0.02)), float(np.log(0.30))),
+        ("log_f0_shift", -0.7, 2.3),
+        ("B0_center", 0.12, 0.55),
+        ("pi_response", 0.1, 0.6),
+    ),
+}
 
 
 def _seed(value: int, name: str) -> int:
@@ -40,21 +56,7 @@ def draw_world_parameters(family: str, seed: int) -> dict:
     if family not in ("single", "mixture"):
         raise ValueError("family must be 'single' or 'mixture'")
     rng = make_generator(seed)
-    if family == "single":
-        axes = (
-            ("log_r_shift", -0.7, 0.9),
-            ("log_m_scale", float(np.log(0.05)), 0.0),
-            ("log_f0_shift", -0.7, 2.3),
-            ("B0_center", 0.12, 0.55),
-        )
-    else:
-        axes = (
-            ("log_r_shift", -0.7, 0.9),
-            ("log_m_scale_non", float(np.log(0.02)), float(np.log(0.30))),
-            ("log_f0_shift", -0.7, 2.3),
-            ("B0_center", 0.12, 0.55),
-            ("pi_response", 0.1, 0.6),
-        )
+    axes = WORLD_AXIS_BOUNDS[family]
     point = qmc.LatinHypercube(d=len(axes), scramble=True, seed=rng).random(1)[0]
     world = {"family": family}
     for coordinate, (name, low, high) in zip(point, axes):
@@ -87,7 +89,8 @@ def draw_patient_cohort(world: Mapping, n: int, seed: int) -> dict[str, np.ndarr
     f0_high = min(tc.RANGES["f0"][1] * f0_scale, 0.9)
     if not (0.0 < f0_low < f0_high < 1.0):
         raise ValueError("world produced invalid f0 bounds")
-    b0_low, b0_high = float(world["B0_center"]) - 0.10, float(world["B0_center"]) + 0.10
+    b0_low = float(world["B0_center"]) - B0_CENTER_HALF_WIDTH
+    b0_high = float(world["B0_center"]) + B0_CENTER_HALF_WIDTH
     if not (0.0 < b0_low < b0_high < 1.0):
         raise ValueError("world produced invalid B0 bounds")
 

@@ -395,3 +395,9 @@ Last full Track C test run (scratch copy, 2026-11-04): 204 passed, 1 skipped (`o
 - Static review of the candidate code (2026-11-04): the Q-learning trainer requires discount 1 and its evaluator forwards the fitted course cap and scan interval. The belief-MPC already rejects fractional integer settings and holds treatment until the next usable scan when a scheduled reading is missing; a new `evaluate_robust_belief_mpc` helper now forwards its configured cap and scan interval to the simulator. The draft method plan records this fallback and requires shared missing-reading patterns across policies. No tests or simulations were run for these changes; the candidates remain unevaluated.
 - No candidate method has shown a win. Do not start a sealed run. Current reserved Stage 2 development block begins at scenario seed 20261880; noise keys after 1,892,400 are reserved in `src/trackc_seed_registry.py`.
 
+## Track C integrated-v2 status, 2026-11-09
+
+- Exact sampler/config checks now cover the declared world and patient ranges, response and signal levels, sigma assignment, and the B0 half-width. The focused scratch-copy sampler suite passed 7 tests. This is a drift check; the JSON remains a planning specification, not a runtime execution seal.
+- The low-level stop-rule bypass is closed. The replacement simultaneous interval remains unvalidated; the standalone GE-betting prototype is not adopted or connected to the runner.
+- No research-scale integrated policy outcomes exist. Evaluation stays blocked by inference/precision feasibility, an unmaterialized and unreserved seed schedule, incomplete penalty-sensitivity/bootstrap orchestration, and the missing complete run driver. Do not start a sealed run.
+

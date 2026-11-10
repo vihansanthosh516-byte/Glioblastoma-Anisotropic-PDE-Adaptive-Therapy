@@ -6,9 +6,11 @@ from scipy.stats import qmc
 
 import trackc_sim as tc
 from trackc_integrated_sampler import (
+    B0_CENTER_HALF_WIDTH,
     COHORT_ROLES,
     PATIENT_DIMENSION_ORDER,
     SIGMA_LEVELS,
+    WORLD_AXIS_BOUNDS,
     WORLD_MU_NU_LEVELS,
     WORLD_Q_SIGNAL_LEVELS,
     assign_balanced_sigma,
@@ -114,6 +116,8 @@ def test_integrated_config_matches_the_sampler_contract():
     root = Path(__file__).resolve().parents[1]
     config = json.loads((root / "configs" / "trackABC_integrated_v2.json").read_text(encoding="utf-8"))
     sampling = config["tumor_model"]["sampling_algorithm"]
+    world_axes = config["tumor_model"]["world_axes"]
+    patient_axes = config["tumor_model"]["patient_axes"]
     randomness = config["randomness_specification_draft"]
 
     assert "independently and uniformly" in sampling["mu_nu_assignment"]
@@ -122,9 +126,40 @@ def test_integrated_config_matches_the_sampler_contract():
     assert config["signal_model"]["primary_q_signal_sampling"] == (
         "uniform draw from [0.6, 0.7, 0.8, 0.9] once per world; constant across that world's virtual patients"
     )
+    assert config["signal_model"]["primary_q_signal_sampling_levels"] == list(WORLD_Q_SIGNAL_LEVELS)
+    assert sampling["world_dimension_order_single_response"] == [name for name, _, _ in WORLD_AXIS_BOUNDS["single"]]
+    assert sampling["world_dimension_order_mixture_response"] == [name for name, _, _ in WORLD_AXIS_BOUNDS["mixture"]]
+    assert world_axes["log_r_shift"] == list(WORLD_AXIS_BOUNDS["single"][0][1:])
+    assert world_axes["log_f0_shift"] == list(WORLD_AXIS_BOUNDS["single"][2][1:])
+    assert world_axes["B0_center"] == list(WORLD_AXIS_BOUNDS["single"][3][1:])
+    np.testing.assert_allclose(
+        world_axes["m_scale_single_response_factors"],
+        [float(np.exp(WORLD_AXIS_BOUNDS["single"][1][1])), float(np.exp(WORLD_AXIS_BOUNDS["single"][1][2]))],
+        rtol=0.0,
+        atol=1e-15,
+    )
+    np.testing.assert_allclose(
+        world_axes["m_scale_nonresponder_mixture_factors"],
+        [float(np.exp(WORLD_AXIS_BOUNDS["mixture"][1][1])), float(np.exp(WORLD_AXIS_BOUNDS["mixture"][1][2]))],
+        rtol=0.0,
+        atol=1e-15,
+    )
+    assert world_axes["pi_response_mixture"] == list(WORLD_AXIS_BOUNDS["mixture"][4][1:])
+    assert world_axes["mu_nu_day_minus1_levels"] == list(WORLD_MU_NU_LEVELS)
+    assert patient_axes["r_day_minus1_log_uniform"] == list(tc.RANGES["r"][:2])
+    assert patient_axes["m_log_uniform"] == list(tc.RANGES["m"][:2])
+    assert patient_axes["f0_log_uniform"] == list(tc.RANGES["f0"][:2])
+    assert patient_axes["f0_after_world_shift_cap"] == 0.9
+    assert patient_axes["B0_center_half_width"] == B0_CENTER_HALF_WIDTH
+    assert patient_axes["c_uniform"] == list(tc.RANGES["c"][:2])
+    assert patient_axes["epsilon_uniform"] == list(tc.RANGES["eps"][:2])
+    assert patient_axes["mixture_responder_m"] == list(tc.RANGES["m"][:2])
+    assert patient_axes["sigma_balanced_levels"] == list(SIGMA_LEVELS)
     assert "pi_response" in sampling["world_dimension_order_mixture_response"]
     assert "PCG64DXSM" in randomness["generator"]
     assert "calibration_joint_signal" in randomness["streams"]
     assert "evaluation_joint_signal" in randomness["streams"]
     assert "sigma_assignment_child" in randomness["streams"]
+    assert randomness["sigma_assignment_child"] == 0x5349474D
+    assert "0x5349474D" in sampling["observation_noise_assignment"]
     assert "molecular_signal" not in randomness["streams"]
