@@ -58,6 +58,10 @@ Status words: **fixed** (closed by a documentation change made with this record)
 | Many unrelated modified and untracked files | Already recorded | 130 status entries on 2026-11-09; 14 modified tracked files. None were touched, staged, or reverted for this record. |
 | Zenodo token pasted into chat | Blocked on the user | No token string was found in tracked files or in the searched untracked text files. Whether it is still active cannot be checked from here. |
 
+## User report received (2026-11-09)
+
+The user states: the school approved the project, the user obtained approval from the dataset administrator, and "the file said I can share it with anyone". This is recorded as **user-reported**. No approval or licence document is saved in the project, and none was written or reconstructed here. Two points stay unverified until the documents are on file: (a) which file contains the sharing statement and what exactly it covers (raw data, derived numbers, figures, or model weights); (b) how it fits the Zenodo record, which lists CC BY-NC-ND 4.0 or a Duke custom licence, where CC BY-NC-ND does not permit sharing adapted material. Until the file is saved and read, Duke-derived outputs stay out of Git and out of shared reports. Items 1 to 3 below change from "not provided" to "reported, document not on file".
+
 ## Items the user must provide
 
 1. Which Duke access option was accepted (CC BY-NC-ND 4.0 or the Duke custom licence), with the written terms or a screenshot of the grant.
