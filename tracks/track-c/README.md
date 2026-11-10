@@ -11,7 +11,7 @@ Track C develops a two-compartment tumor-growth and treatment-suppression simula
 - [Integrated-control prior-art update](../../paper/trackc_integrated_control_prior_art_update_2026-11-06.md)
 - [Finite-set signal-ambiguity prototype](../../paper/trackc_robust_signal_ambiguity_prototype_2026-11-06.md)
 - [Full prior-art review](../../paper/trackc_prior_art_full_2026-11-04.md)
-- [Integrated plan](../../paper/trackABC_integrated_research_plan_master_2026-11-07.md)
+- [Integrated plan (active, revised 2026-11-08)](../../paper/trackABC_integrated_research_plan_revised_2026-11-08.md)
 
 ## Main implementation and checks
 

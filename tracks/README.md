@@ -5,7 +5,7 @@ This folder is the navigation layer for the research project. It does not reloca
 ## Start here
 
 1. Read [`START_HERE.md`](../START_HERE.md) for the latest dated status, data boundaries, and project rules.
-2. Read the [integrated research plan master](../paper/trackABC_integrated_research_plan_master_2026-11-07.md) for the complete proposed method. The [submission copy](../paper/trackABC_integrated_research_plan_submission_2026-11-07.md) shortens only the Procedure section.
+2. Read the [active integrated research plan (revised 2026-11-08)](../paper/trackABC_integrated_research_plan_revised_2026-11-08.md); the user made it the active plan on 2026-11-09 because it states the recorded outcomes. The earlier [master plan](../paper/trackABC_integrated_research_plan_master_2026-11-07.md) is superseded. The [submission copy](../paper/trackABC_integrated_research_plan_submission_2026-11-07.md) is form text only.
 3. Use the track hubs for the current scope, primary records, code, tests, outputs, and next gates.
 4. Read [`shared/HANDOFF_AND_REPRODUCIBILITY.md`](shared/HANDOFF_AND_REPRODUCIBILITY.md) before trying to reproduce or run anything.
 
@@ -16,9 +16,9 @@ Labels come from each file's own status line or from the links in `START_HERE.md
 | Plan file (in `paper/` unless noted) | Status |
 |---|---|
 | `gap_status_2026-11-09.md` | **Authoritative status record**: evidence table, action plan, per-track claim boundaries |
-| `trackABC_integrated_research_plan_master_2026-11-07.md` | **Active** complete plan (unfrozen; not an evaluation authorization). Future-tense text is stale on recorded outcomes; a dated status note at its top lists them |
-| `trackABC_integrated_research_plan_submission_2026-11-07.md` and `.docx` | **Active** short submission copy (form text only; carries no outcomes) |
-| `trackABC_integrated_research_plan_revised_2026-11-08.md` | **Proposed replacement** for the master plan: it states the recorded outcomes. Recommended as the active record; the user has not yet decided |
+| `trackABC_integrated_research_plan_revised_2026-11-08.md` | **Active** plan (user decision, 2026-11-09). States the recorded outcomes; a dated note at its top adds two later facts. Unfrozen; not an evaluation authorization |
+| `trackABC_integrated_research_plan_master_2026-11-07.md` | **Superseded** on 2026-11-09 by the revised plan. Future-tense text is stale on recorded outcomes |
+| `trackABC_integrated_research_plan_submission_2026-11-07.md` and `.docx` | Form text only, derived from the superseded master; carries no outcomes. Check it against the active plan before any submission |
 | `trackc_ge_betting_coverage_audit_protocol_2026-11-09.md`, `trackc_ge_betting_coverage_audit_result_2026-11-09.md` | Completed synthetic methods screen; adopts no method |
 | `Track A5 Research Plan Science Fair MD Final.md` | Completed and frozen; A5 failed its 5-of-6 rule |
 | `trackc_world_benchmark_protocol_draft_2026-11-07.md` | Proposed draft; evaluation stopped (see Track C hub) |

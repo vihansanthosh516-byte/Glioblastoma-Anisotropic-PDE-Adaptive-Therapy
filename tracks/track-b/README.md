@@ -10,7 +10,7 @@ Track B contains longitudinal MRI forecasting and transition analyses. A private
 - [Duke source ledger](../../paper/track_b_duke_source_ledger_2026-11-02.md)
 - [FLAIR transition prior-art update](../../paper/track_b_flair_transition_prior_art_update_2026-11-07.md)
 - [Duke go/no-go packet](../../paper/track_b_duke_go_no_go_packet_2026-11-02.md)
-- [Integrated plan](../../paper/trackABC_integrated_research_plan_master_2026-11-07.md)
+- [Integrated plan (active, revised 2026-11-08)](../../paper/trackABC_integrated_research_plan_revised_2026-11-08.md)
 
 ## Main implementation and checks
 

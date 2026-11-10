@@ -108,7 +108,7 @@ Compute would be feasible for a cohort of Duke's size (B9). Data are the limit, 
 - U2. Save the school approval record.
 - U3. Decide, from that text, whether Duke-derived numbers, figures, or model weights may be shared. Reported so far: the user states the file permits adapted versions and sharing; neither statement is verified from a document.
 - U4. Revoke the pasted Zenodo token.
-- U5. Choose the active plan. Recommendation: make the revised 2026-11-08 plan the active record, because it states the recorded outcomes; keep the 2026-11-07 submission copy only as the form text.
+- U5. **Decided 2026-11-09:** the user made the revised 2026-11-08 plan the active plan. The 2026-11-07 master plan is superseded; the submission copy is form text only.
 - U6. Track C: either keep confirmatory evaluation stopped (recommended) or authorize a fixed world count with a runtime cap, knowing the run would very probably end "inconclusive" under the unchanged 14-day rule.
 - U7. Track C design choices that code cannot settle: 81 versus 135 controller models, and the forecast length for the 112-day scan sensitivity.
 

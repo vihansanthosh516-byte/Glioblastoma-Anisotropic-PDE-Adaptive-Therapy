@@ -11,7 +11,7 @@ Track A is a completed exploratory single-cell analysis. Its frozen A5 candidate
 - [A5 null-result record](../../paper/trackA_null_result.md)
 - [Novelty decision](../../paper/trackA_novelty_decision_20261101.md)
 - [Alternate-cohort screen](../../paper/trackA_alternate_dataset_plan_20261101.md)
-- [Integrated plan](../../paper/trackABC_integrated_research_plan_master_2026-11-07.md)
+- [Integrated plan (active, revised 2026-11-08)](../../paper/trackABC_integrated_research_plan_revised_2026-11-08.md)
 
 ## Main implementation and checks
 
