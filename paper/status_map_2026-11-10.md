@@ -44,3 +44,7 @@ Scratch copy of `src/`, `tests/`, `configs/`; source vs scratch `src/` and new t
 - V3 wired into every integrated filter arm; legacy defaults unchanged (`src/trackc_filter_priors.py`, `src/211_trackc_policy_benchmark.py`, `src/trackc_world_runner.py`; tests `tests/test_trackc_prior_support.py`).
 - Report-only recovery diagnostic run: `paper/trackc_prior_recovery_diagnostic_result_2026-11-10.md`. No policy outcomes. Track C evaluation still stopped.
 - Read-only reviews: `paper/track_reviews_readonly_2026-11-10.md`.
+
+## Decision, 2026-11-10 (user)
+
+Track C confirmatory evaluation stays stopped; 14-day target and success rule unchanged; no policy outcomes. 27,907 worlds per family = Hoeffding-bound count (not a universal minimum). 207 worlds per family = necessary for one lower-bound criterion, not sufficient for the target.

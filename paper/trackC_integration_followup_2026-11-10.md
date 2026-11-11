@@ -21,8 +21,10 @@ No policy utility was computed and no policies were compared. Confirmatory evalu
 ## What still blocks evaluation (not relaxed)
 
 1. Interval method: GE-betting is a candidate; independent statistical review is not done.
-2. Precision: 14-day half-width needs far more worlds than the reserved block (gap C4; config audit lists 27,907 worlds per family for a Hoeffding bound).
+2. Precision: the 14-day half-width is not reachable with the reserved block (gap C4). The config audit gives 27,907 worlds per family for the Hoeffding bound; that is a count for that bound, not a universal minimum. The earlier 207-world figure only clears one worst-case lower-bound criterion and is not sufficient for the target.
 3. Seed table and registry reservation for evaluation worlds; runtime cap; clean-install check.
 4. U7 design choices (81 vs 135 models; 112-day forecast length).
 
 These cannot be cleared by code in this repository. Items 1 and 2 need an outside reviewer and either the user's authorization of a large runtime or an explicit amendment of the target.
+
+**Decision 2026-11-10 (user):** evaluation stays stopped; target and success rule unchanged.
