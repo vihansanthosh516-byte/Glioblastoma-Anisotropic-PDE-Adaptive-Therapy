@@ -354,6 +354,14 @@ ENTRIES = [
            note="Stage 2 synthetic action-sensitivity run; scenario and signal seeds are consumed at run start. "
                 "This records treatment-plan choices only, not policy outcomes or patient benefit.",
            policy=[(930001001, 930001002)]),
+    _entry("221", "particle-filter prior recovery diagnostic (report-only)", "dev_used",
+           [(20263000, 20263199)], [(2630000, 2630100)],
+           [("output/trackc_prior_recovery_diagnostic_20261110/diagnostic.json", '"bootstrap_key": 2630100')],
+           note="Run 2026-11-10 under paper/trackc_amendment_pf_prior_support_2026-11-10.md rev 3 section 4. "
+                "World seeds 20263000-20263099, cohort seeds 20263100-20263199, noise keys 2630000-2630099, "
+                "bootstrap key 2630100, filter seeds 20263200-20263299 (policy stream). Synthetic parameter "
+                "recovery only; no controller, no utility, no policy outcomes.",
+           policy=[(20263200, 20263299)]),
 ]
 ENTRIES.append(_reserved_stage2_dev(ENTRIES))
 ENTRIES.append(_entry("restart", "Stage 3 sealed run (restart plan)", "reserved", [(20262300, 20262499)],

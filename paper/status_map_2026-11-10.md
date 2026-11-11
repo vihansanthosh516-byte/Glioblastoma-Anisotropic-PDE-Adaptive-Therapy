@@ -37,3 +37,10 @@ Built from disk at commit e58c9d1 on `main`. No research job was running (only M
 
 Scratch copy of `src/`, `tests/`, `configs/`; source vs scratch `src/` and new test identical (`diff -rq`).
 `PYTHONPATH=<scratch>/src py -3.14 -m pytest tests/test_trackc_prior_support.py tests/test_trackc_integrated_sampler.py tests/test_trackc_config_parity_extended.py -q -s -p no:cacheprovider` → 22 passed, 5 expected failures, 2.11 s.
+
+## Update, later 2026-11-10
+
+- Prior amendment revision 3 adopted for the future integrated benchmark (user standing delegation): `paper/trackc_amendment_pf_prior_support_2026-11-10.md`.
+- V3 wired into every integrated filter arm; legacy defaults unchanged (`src/trackc_filter_priors.py`, `src/211_trackc_policy_benchmark.py`, `src/trackc_world_runner.py`; tests `tests/test_trackc_prior_support.py`).
+- Report-only recovery diagnostic run: `paper/trackc_prior_recovery_diagnostic_result_2026-11-10.md`. No policy outcomes. Track C evaluation still stopped.
+- Read-only reviews: `paper/track_reviews_readonly_2026-11-10.md`.

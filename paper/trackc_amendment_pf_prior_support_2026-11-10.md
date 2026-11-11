@@ -44,7 +44,7 @@ V3 exactly: r (0.00049, 0.124, log), m (0.1, 20, log), f0 (0.001·e^-0.7, 0.9, l
 
 ## 4. Frozen outcome-blind parameter-recovery diagnostic (frozen 2026-11-10, before running)
 
-Purpose: describe how the filter's parameter recovery changes between the narrow-prior sensitivity (`PF_PRIOR_NARROW_V2`) and V3. It runs no controller, computes no utility, and compares no policies. Script: `src/219_trackc_prior_recovery_diagnostic.py`. Output: `output/trackc_prior_recovery_diagnostic_20261110/diagnostic.json`.
+Purpose: describe how the filter's parameter recovery changes between the narrow-prior sensitivity (`PF_PRIOR_NARROW_V2`) and V3. It runs no controller, computes no utility, and compares no policies. Script: `src/221_trackc_prior_recovery_diagnostic.py` (first written as `219_...`; renamed after the run to avoid a number collision with `219_trackc_minimax_action_stability.py`; content unchanged). Output: `output/trackc_prior_recovery_diagnostic_20261110/diagnostic.json`.
 
 - **Generator:** `trackc_integrated_sampler.draw_world_parameters` and `draw_patient_cohort`, both families.
 - **Size:** 50 worlds per family, 4 patients per world, 400 patients total. Fixed; not changed after results.
