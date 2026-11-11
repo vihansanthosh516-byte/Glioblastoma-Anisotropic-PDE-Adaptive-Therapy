@@ -844,6 +844,7 @@ def run_shared_policy_world(
     include_ambiguity_controller: bool = False,
     primary_contrast: str = "loo",
     filter_ranges=None,
+    include_single_signal_controls: bool = False,
 ) -> dict:
     """Run a three-cohort development comparison in one virtual world.
 
@@ -864,6 +865,8 @@ def run_shared_policy_world(
         raise ValueError("primary_contrast must be loo or minimax")
     if primary_contrast == "minimax" and not include_ambiguity_controller:
         raise ValueError("minimax primary contrast requires the finite-set controllers")
+    if include_single_signal_controls and not include_ambiguity_controller:
+        raise ValueError("single-signal controls require the finite-set controllers")
     n_selection = _validate_scenarios(selection_scenarios, "selection_scenarios")
     n_calibration = _validate_scenarios(calibration_scenarios, "calibration_scenarios")
     n_evaluation = _validate_scenarios(evaluation_scenarios, "evaluation_scenarios")
@@ -1036,6 +1039,15 @@ def run_shared_policy_world(
                     **deepcopy(common_mpc),
                 )
             )
+            if include_single_signal_controls:
+                # Single-channel controls: same models and prior, one signal channel only.
+                for channel in ("molecular", "mri"):
+                    policies_for_signals[f"finite_set_minimax_{channel}_only_mpc"] = (
+                        ambiguity_module.SignalAmbiguityBeliefMPC(
+                            signal_observations, model_parameters=models,
+                            channels=(channel,), **deepcopy(common_mpc),
+                        )
+                    )
         return policies_for_signals
 
     fixed_control_catalog = _fixed_schedule_control_catalog(settings)

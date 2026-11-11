@@ -128,8 +128,12 @@ class SignalAmbiguityBeliefMPC(_MPC.RobustBeliefMPC):
         *,
         model_parameters,
         mri_template=None,
+        channels=("molecular", "mri"),
         **kwargs,
     ):
+        self.signal_channels = tuple(sorted(frozenset(channels)))
+        if not self.signal_channels or set(self.signal_channels) - {"molecular", "mri"}:
+            raise ValueError("channels must be a nonempty subset of ('molecular', 'mri')")
         self.observations = _copy_observations(observations)
         models = tuple(model_parameters)
         if not models or any(not isinstance(model, SignalModelParameters) for model in models):
@@ -172,7 +176,7 @@ class SignalAmbiguityBeliefMPC(_MPC.RobustBeliefMPC):
                 particle_filter.theta["f0"],
                 self.observations,
                 parameters,
-                channels=("molecular", "mri"),
+                channels=self.signal_channels,
                 mri_template=self.mri_template,
             )
             if signal_log_likelihood.shape != particle_filter.logw.shape:
