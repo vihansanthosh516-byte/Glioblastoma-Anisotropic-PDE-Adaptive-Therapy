@@ -139,3 +139,61 @@ def test_runner_full_coverage_runs_every_arm():
     assert res["coverage_scoring"]["partial_coverage"] is False
     assert "mean_poisson_deviance" in res["count_arm"]
     assert any(d is not None for d in res["dice"]["pde_only"].values())
+
+
+# ------------------------------------------------------------------ padding and status (Codex review 2)
+def test_full_coverage_film_training_is_exactly_the_frozen_padded_path():
+    shape = (15, 13, 11)                                     # needs padding for TINY (2 levels)
+    rng = np.random.default_rng(3)
+    x = rng.random((3,) + shape).astype(np.float32)
+    ys = [rng.random(shape) > 0.7, rng.random(shape) > 0.6]
+    pairs = [(x, y) for y in ys]
+    frozen = ta.train_film_models(pairs, [(8, 8)] * 2, fold=0, recipe=TINY)
+    masked = ta.train_film_models(pairs, [(8, 8)] * 2, fold=0, recipe=TINY,
+                                  valid_masks=[np.ones(shape, bool)] * 2)
+    assert frozen["status"] == masked["status"]
+    for ma, mb in zip(frozen["models"], masked["models"]):
+        for (ka, a), (kb, b) in zip(ma.state_dict().items(), mb.state_dict().items()):
+            assert ka == kb and torch.equal(a, b), ka
+
+
+def test_partial_film_padding_voxels_stay_background_and_unobserved_are_ignored():
+    shape = (15, 13, 11)
+    rng = np.random.default_rng(4)
+    x = rng.random((3,) + shape).astype(np.float32)
+    v = np.ones(shape, bool)
+    v[12:] = False
+    y = rng.random(shape) > 0.7
+    a = ta.train_film_models([(x, y)], [(8, 8)], fold=0, recipe=TINY, valid_masks=[v])
+    y2 = y.copy()
+    y2[~v] = ~y2[~v]
+    b = ta.train_film_models([(x, y2)], [(8, 8)], fold=0, recipe=TINY, valid_masks=[v])
+    for ma, mb in zip(a["models"], b["models"]):
+        for (k, t1), (_, t2) in zip(ma.state_dict().items(), mb.state_dict().items()):
+            assert torch.equal(t1, t2), k
+
+
+class _NoCallProvider:
+    def fit_fold(self, view):
+        raise AssertionError("fit_fold called under partial coverage")
+
+    def forecast(self, case, nuisance):
+        raise AssertionError("forecast called under partial coverage")
+
+
+def test_partial_coverage_never_calls_pde_provider_and_is_incomplete():
+    from src import fk_lumiere_runner as lr
+    from tests.test_fk_lumiere_runner import _folds
+    cases = [replace(c, coverage=_cov()) for c in _cases(12)]
+    res = lr.run_lumiere_cv(cases, _folds(cases), pde_provider=_NoCallProvider(), recipe=TINY,
+                            minimum=10, n_bootstrap=50, require_coverage=True)
+    assert res["status"].startswith("incomplete") and "scored" != res["status"]
+    assert res["comparison_complete"] is False
+    assert res["count_arm"]["status"] == "not_scored_partial_coverage" and res["count_arm"]["reason"]
+    for fold in res["folds"].values():
+        assert fold["pde_only_cutoff"]["cutoff"] is None and fold["pde_only_cutoff"]["reason"]
+
+
+def test_full_coverage_status_is_scored():
+    res = _run([replace(c, coverage=_cov(shift_target=0)) for c in _cases(12)], require_coverage=True)
+    assert res["status"] == "scored (synthetic)"

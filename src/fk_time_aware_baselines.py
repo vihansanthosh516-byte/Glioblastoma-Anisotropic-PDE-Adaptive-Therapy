@@ -132,10 +132,16 @@ def train_film_models(pairs, intervals, *, fold: int, recipe=UNET_RECIPE, valid_
     shape = pairs[0][1].shape
     padded = _padded_shape(shape, len(recipe.widths))
     xs = [torch.from_numpy(np.stack([_pad(c, padded) for c in x]))[None] for x, _ in pairs]
+    if valid_masks is not None and len(valid_masks) != len(pairs):
+        raise ValueError("one valid mask per training pair is required")
+    if valid_masks is not None and all(np.asarray(v, bool).all() for v in valid_masks):
+        valid_masks = None          # full coverage: exact frozen path (padded voxels stay background in the loss)
     if valid_masks is not None:
-        if len(valid_masks) != len(pairs):
-            raise ValueError("one valid mask per training pair is required")
-        ws = [torch.from_numpy(_pad(np.asarray(v, bool).astype(np.float32), padded))[None, None] for v in valid_masks]
+        def _wpad(v):               # padding voxels keep weight 1 (frozen background); only unobserved get 0
+            out = np.ones(padded, np.float32)
+            out[tuple(slice(0, s) for s in v.shape)] = np.asarray(v, bool)
+            return out
+        ws = [torch.from_numpy(_wpad(v))[None, None] for v in valid_masks]
         ys = [torch.from_numpy(_pad((np.asarray(y, bool) & np.asarray(v, bool)).astype(np.float32), padded))[None, None]
               for (_, y), v in zip(pairs, valid_masks)]
     else:

@@ -24,7 +24,7 @@ Integrated into the future forecast scoring path `src/fk_lumiere_runner.py::run_
 
 - Targets are no longer zeroed. Each target carries a geometry-derived validity mask (the common support).
 - Growth-rate selection scores Dice only on valid voxels (forecast and target both masked).
-- FiLM training uses a masked Dice + BCE loss. Invalid voxels have weight 0 and add nothing. The mask is part of the reuse fingerprint. With an all-ones mask the loss equals the frozen loss.
+- FiLM training uses a masked Dice + BCE loss. Invalid voxels have weight 0 and add nothing. The mask is part of the reuse fingerprint. Under full coverage the frozen training path is used unchanged; a test on a padded grid shows identical trained weights. Under partial coverage, padding voxels keep weight 1 as frozen background; only unobserved voxels get weight 0. When partial coverage leaves arms unscored, the result status is "incomplete: partial coverage ..." and `comparison_complete` is false; the PDE provider's fit and forecast are never called (tested).
 - Final Dice is scored on support for every method (predictions and target both masked).
 - The PDE nuisance fit, PDE boundary calibration, PDE-only cutoff and count arm have no defined estimand for partly observed targets. When any eligible patient has partial coverage, these arms are not fitted or scored (fail closed, no fallback). See `paper/trackB_partial_coverage_pde_count_amendment_draft_2026-11-10.md` (draft, not adopted). Under full coverage they run unchanged.
 - Forecast domains and history inputs are unchanged.

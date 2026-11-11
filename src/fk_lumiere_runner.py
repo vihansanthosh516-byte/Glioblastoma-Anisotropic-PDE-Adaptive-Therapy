@@ -323,7 +323,8 @@ def run_lumiere_cv(cases: Sequence[LumiereCase], fold_by_patient: Mapping[str, i
                     "pde_unavailable_reason": nuisance.get("unavailable_reason")}
     stats = max_t_pass_test(dice, COMPARATORS, n_bootstrap=n_bootstrap or N_BOOTSTRAP)
     result.update({
-        "status": "scored (synthetic)" if all(c.synthetic for c in cases) else "scored",
+        "status": ("incomplete: partial coverage; candidate, PDE-only, ablation and count arms not scored"
+                   if partial else "scored (synthetic)" if all(c.synthetic for c in cases) else "scored"),
         "folds": folds, "dice": dice,
         "coverage_scoring": ({"applied": True, "visits": list(COVERAGE_VISITS), "per_patient": coverage_report,
                               "partial_coverage": partial,
@@ -333,7 +334,7 @@ def run_lumiere_cv(cases: Sequence[LumiereCase], fold_by_patient: Mapping[str, i
                              if observable else {"applied": False}),
         "patient_macro_dice": {k: (float(np.mean(list(v.values()))) if v and all(x is not None for x in v.values())
                                    else None) for k, v in dice.items()},
-        "comparison_complete": stats["status"] != "incomplete",
+        "comparison_complete": stats["status"] != "incomplete" and not partial,
         "pass_test": stats,
         "count_arm": ({"rows": count_rows, "status": "not_scored_partial_coverage", "reason": partial_reason}
                       if partial else
