@@ -29,6 +29,11 @@ def _sha(path):
 
 
 def patient_support(audit_rows, reg, atlas_mask_1mm):
+    covs = visit_coverages(audit_rows, reg)
+    return _summary(covs, atlas_mask_1mm)
+
+
+def visit_coverages(audit_rows, reg):
     covs = []
     for k, name in enumerate(VISITS):
         v = audit_rows[k]
@@ -38,6 +43,10 @@ def patient_support(audit_rows, reg, atlas_mask_1mm):
                                    tfm_native_to_atlas_ras=tfm_to_ras_4x4(leaves),
                                    atlas_affine=np.array(v["atlas"]["affine"]), atlas_shape=tuple(v["atlas"]["shape"]),
                                    rigid_params=params))
+    return covs
+
+
+def _summary(covs, atlas_mask_1mm):
     sup = common_support(covs, VISITS).mask
     dom = domain_on_scoring_grid(atlas_mask_1mm)
     return {"domain_voxels": int(dom.sum()), "support_voxels": int(sup.sum()),
