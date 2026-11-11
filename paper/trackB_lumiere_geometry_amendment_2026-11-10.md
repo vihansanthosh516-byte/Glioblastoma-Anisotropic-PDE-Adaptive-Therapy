@@ -24,6 +24,8 @@ For visit k in {1, 2, 3}, the output-to-input voxel map from scoring voxel to na
 
 where D = 2i scoring-to-atlas map (G2); `R_k` = the rigid output-to-input voxel map of `apply_rigid` for visit k (identity for visit 2); A = atlas affine; `T_k` = stored ct1.tfm in RAS (G1); `N_k` = native CT1 affine. Coverage = `geometric_coverage(native_shape_k, (91, 109, 91), map)`; common support = AND over the three visits.
 
+**Edge rule (clarified 2026-11-10, before any count).** `geometric_coverage` uses scipy `affine_transform` with `mode="constant"`, which treats a point as inside only within the hull of native voxel centres, [0, n-1] on each axis, not the full voxel extent [-0.5, n-0.5]. This is kept: it is conservative (the outer half-voxel band counts as unobserved; for 6 mm slices that is 3 mm). Synthetic tests confirm the chain matches brute-force physical-space mapping under this rule, except exact floating-point ties on the hull edge.
+
 **Forecast domain for this count:** the visit-2 atlas brain mask on the 2 mm grid (G2). The frozen support also adds history-label voxels outside the brain mask; these are tumor labels and are not read here, so that part is checked later, before target reads (a remaining gate; a patient whose history-label voxels fall outside common support is excluded then).
 
 **Eligible:** registration QC passed for visits 1 and 3, sanity checks passed, and common support covers every forecast-domain voxel. Frozen minimum: 25 patients; below 25 the run stops with no scoring. The eligible list and transforms are saved and hashed before any target-mask read.
