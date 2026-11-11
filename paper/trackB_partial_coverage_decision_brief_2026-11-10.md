@@ -76,7 +76,15 @@ Synthetic tests (`tests/test_fk_lumiere_transform_audit.py`, 7 tests, plus `test
 
 ### Geometry choices (2026-11-10; documentation, transform text, headers, synthetic checks; no count)
 
-**1. `.tfm` direction: UNRESOLVED.** Evidence:
+**1. `.tfm` direction: RESOLVED (2026-11-10) by the frozen brain-mask check.** The stored `ct1.tfm` maps **native points to atlas points**. For coverage use `atlas_to_native_ras = inv(T)`.
+
+- Protocol frozen and committed before any mask read: `paper/trackB_tfm_direction_check_protocol_2026-11-10.md` (commit 1e2882b). Code: `src/fk_lumiere_tfm_direction_check.py`. Record: `output/track_b_lumiere_transform_audit_20261110/tfm_direction_check.json`.
+- Read: 252 files (native `ct1_brain_mask`, atlas `brain_mask`, `ct1.tfm` for 84 scans). No CT1 intensities, no tumor labels, no patient count.
+- Result: candidate I (inverse of T as atlas-to-native) had median Dice 0.9989 (min 0.9808, max 1.0) against the atlas brain mask; candidate F had median 0.3936 (max 0.8751). I won 84 of 84 scans; median gap 0.605. All three frozen criteria (median >= 0.80, wins >= 80, gap >= 0.10) were met.
+- Limit: this validates the CT1 transform only, on brain masks made by the same tool; it does not test registration accuracy inside the brain.
+- The rotation-centre clue below was therefore misleading; the header-centre clue pointed the right way. The readme wording ("mapping the native CT1 space to the atlas space") matches the result read as a point map.
+
+Earlier evidence (kept for the record; it was not decisive):
 
 - LUMIERE readme (`data/external/lumiere/LUMIERE-readme.pdf`): `ct1.tfm` is the "transformation mapping the native CT1 space to the atlas space". In ITK this wording fits both readings: the image is moved native-to-atlas, which in ITK resampling means the stored point map goes atlas-to-native. It does not say which.
 - DeepBraTumIA is closed-source (NITRC; licence "Attribution Non-Commercial No Derivatives"). The NITRC page gives no transform definition. The publisher repo (`github.com/ysuter/gbm-data-longitudinal`) has HD-GLIO-AUTO scripts only, with no DeepBraTumIA transform code.
@@ -105,7 +113,7 @@ Tests: `tests/test_fk_lumiere_transform_audit.py`, 8 passed in the scratch copy.
 
 **No. The count stays blocked.** Missing:
 
-1. A resolved .tfm direction. The documentation and the transform text are not decisive (see Geometry choices). It needs the native-brain-mask check (separate mask-voxel approval) or the dataset authors' answer.
+1. ~~A resolved .tfm direction.~~ Done: stored T maps native to atlas (frozen brain-mask check, 84/84).
 2. The visit-3 rigid refinement transforms (the approved MRI-only read of visit-2/3 atlas CT1 and visit-2 brain mask).
 3. A frozen visit-1 rule (amendment). Under Option 1, also the visit-1 registrations and QC.
 4. Adoption of the proposed 2 mm rule (voxel i maps to 1 mm index 2i).

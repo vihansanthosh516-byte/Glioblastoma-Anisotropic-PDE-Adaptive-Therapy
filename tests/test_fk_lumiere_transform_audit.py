@@ -115,3 +115,24 @@ def test_existing_track_b_2mm_grid_maps_scoring_voxel_i_to_1mm_index_2i():
     m = np.linalg.inv(aff) @ aff2
     assert np.allclose(m, au.downsample_to_1mm(offset=0.0))
     assert not np.allclose(m, au.downsample_to_1mm(offset=0.5))
+
+
+def test_direction_check_picks_the_true_direction_on_synthetic_masks():
+    from src import fk_lumiere_tfm_direction_check as dc
+    atlas_aff = np.eye(4)
+    native_aff = np.eye(4)
+    atlas = np.zeros((30, 30, 30), bool)
+    atlas[8:20, 8:20, 8:20] = True
+    a2n = np.eye(4)
+    a2n[:3, 3] = (5.0, -3.0, 4.0)                       # true atlas-to-native point map
+    from scipy.ndimage import affine_transform
+    native = affine_transform(atlas.astype(np.uint8), np.eye(3), offset=-a2n[:3, 3], order=0).astype(bool)
+    r_true = dc.compare(native, native_aff, atlas, atlas_aff, a2n)                 # stored T = a2n
+    assert r_true["F_T_atlas_to_native"] == 1.0 and r_true["I_inverse_T"] < 0.6
+    r_inv = dc.compare(native, native_aff, atlas, atlas_aff, np.linalg.inv(a2n))  # stored T = n2a
+    assert r_inv["I_inverse_T"] == 1.0 and r_inv["F_T_atlas_to_native"] < 0.6
+    rows = [r_inv] * 84
+    assert dc.decide(rows, 84)["decision"] == "I"
+    assert dc.decide(rows[:83], 84)["decision"] == "unresolved"
+    mixed = [r_inv] * 70 + [r_true] * 14
+    assert dc.decide(mixed, 84)["decision"] == "unresolved"
