@@ -1,16 +1,24 @@
-# Clean-install check (2026-11-10)
+# Clean-install check (2026-11-10, revised after Codex review)
 
-Fresh virtual environment in the session scratch folder, Python 3.14.4 (`py -3.14 -m venv`), Windows 11.
+Windows 11, Python 3.14.4. Fresh virtual environments in the session scratch folder. The package was always built from a scratch copy of the tracked files, so no build files were written into the repository. An `egg-info` folder that an earlier dry run (run from the repository) wrote into `src/` was removed; its dependency list lacked `openpyxl`, which dates it to that dry run.
 
-## Steps and results
+## A. Package-install verification (installed code)
 
-1. `pip install . --dry-run --no-deps` **failed**: `pyproject.toml` named a nonexistent build backend (`setuptools.backends._legacy:_Backend`). Fixed to `setuptools.build_meta`; the dry run then reports "Would install gliblastoma-pde-adaptive-therapy-0.1.0".
-2. Installed the `pyproject.toml` dependencies, the `Requirements.txt` additions (SALib, dipy, h5py), `torch`, `openpyxl`, and `pytest` from PyPI with no version pins. Exit 0. Exact resolved versions: `configs/clean_install_freeze_2026-11-10.txt` (93 packages; for example numpy 2.5.4, scipy 1.18.1, scikit-learn 1.9.1, torch 2.15.0, pandas 2.3.3).
-3. `openpyxl` is required by the Track A loader (`pandas.read_excel` in `src/189_trackA_yu2020_lodo.py`) but was not declared. Added to `pyproject.toml`. `pytest` is still only a test tool and is not declared.
-4. Tests in a scratch copy of the tracked tree, run with the clean environment's interpreter: 15 test files covering the Track A synthetic helpers, Track B guard/estimand/coverage/LUMIERE runner and protocol, Track C prior, driver, runner, benchmark, ambiguity MPC, config parity, GE-betting, and seed registry. **199 passed, 1 skipped, 3 expected failures (C9-C11), 123 s.**
+1. First real `pip install <scratch copy>` (environment `cleanenv2`): exit 0, but only 9 files from three subpackages (`hil`, `neural_pde`, `rl`) were installed, and `run-pipeline --help` failed with `ModuleNotFoundError: No module named 'src'`. Cause: `[tool.setuptools.packages.find] where = ["src"]` packaged the subfolders of `src`, not the `src` package that the entry point `src.cli:main` and the code import.
+2. Fixes: `pyproject.toml` now uses `where = ["."]`, `include = ["src", "src.*"]`. `src/cli.py` now handles `--help`/`-h` (prints usage, exits 0, starts no analysis); before, `--help` was rejected as an unknown script key (exit 1, no job started). Earlier fixes stand: build backend `setuptools.build_meta`, and `openpyxl` declared.
+3. Second fresh environment (`cleanenv3`), command `python -m pip install <scratch copy>`: exit 0. `importlib.metadata` lists 363 installed `.py` files. `import src, src.cli` loads from `cleanenv3\Lib\site-packages\src`. `run-pipeline --help` exits 0 and prints usage. `--help` and `--list` start no analysis. No data job was launched.
+4. Installed-code test: `tests/test_track_b_coverage_scoring.py` copied alone to a folder with no `src`, run with `PYTHONPATH` empty and `--import-mode=importlib`; the run printed `src` loaded from site-packages. **10 passed.**
+
+Limit: an installed copy resolves `PROJECT_ROOT` to site-packages, so running numbered scripts through the installed CLI needs `GBM_PROJECT_ROOT` set to the checkout. The `--help` text says this. Many modules use bare imports (for example `import trackc_sim`) that work only with `src` on `sys.path`; they are not usable as an installed library without that path.
+
+## B. Dependency-install tests (source tree)
+
+Same `cleanenv3` interpreter plus `torch` and `pytest`, which the core package does not declare (torch is only in the `legacy-ml` extra, but the Track B LUMIERE runner tests need it). Resolved versions: `configs/clean_install_freeze_2026-11-10.txt` (80 packages from `pip freeze`; it includes the installed project itself).
+
+Command, run from a scratch copy of the tracked tree with `PYTHONPATH=<copy>;<copy>\src`: pytest on 15 files (Track A synthetic helpers; Track B coverage, estimand, run guard, LUMIERE runner and protocol; Track C driver, prior support, world runner, policy benchmark, ambiguity MPC, config parity, GE-betting, GE-betting shape, seed registry). The run printed `src` loaded from the scratch source copy, **not** the installed package. **203 passed, 1 skipped, 3 expected failures (C9-C11), 121 s.**
 
 ## Limits
 
-- Not the full test suite; legacy-ML extras (torch-geometric, gymnasium, stable-baselines3) were not installed or tested.
-- Versions are not pinned in `pyproject.toml`; the freeze file records what resolved on 2026-11-10 only.
-- No data-dependent analysis was run in the clean environment.
+- Not the full test suite. Legacy-ML extras (torch-geometric, gymnasium, stable-baselines3) not installed or tested.
+- Versions are not pinned in `pyproject.toml`; the freeze file records what resolved on 2026-11-10.
+- No data-dependent analysis ran in either environment.

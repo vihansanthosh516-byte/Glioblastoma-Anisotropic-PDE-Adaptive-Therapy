@@ -115,6 +115,13 @@ def main():
 
     arg = sys.argv[1]
 
+    if arg in ("--help", "-h"):
+        print(__doc__)
+        print("Usage: run-pipeline <script_number> | --list | --help")
+        print("       Scripts run from GBM_PROJECT_ROOT; set it to the project checkout when using an installed copy.")
+        print("       --run-all is disabled. --help and --list start no analysis.")
+        return
+
     if arg == "--list" or arg == "-l":
         list_scripts()
         return

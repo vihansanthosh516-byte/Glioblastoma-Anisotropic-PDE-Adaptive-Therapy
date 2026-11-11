@@ -36,4 +36,6 @@ legacy-ml = ["torch", "torch-geometric", "gymnasium", "stable-baselines3", "niba
 hil = ["pyserial"]
 
 [tool.setuptools.packages.find]
-where = ["src"]
+# Package the `src` package itself: the entry point and code import `src.<module>`.
+where = ["."]
+include = ["src", "src.*"]
