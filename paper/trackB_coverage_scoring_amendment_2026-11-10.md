@@ -18,4 +18,15 @@ Partial coverage; lesions outside coverage; one common support across methods; l
 
 ## Implementation note (2026-11-10, no rule change)
 
-Integrated into the future forecast scoring path `src/fk_lumiere_runner.py::run_lumiere_cv` (required comparators copy-last, time-aware growth, PDE-only, FiLM U-Net, candidate, ablation). Coverage is checked before any target read. Applying rule 4 consistently, the target is restricted to the common support before it is used anywhere, including fold-training steps (growth-rate selection, FiLM training, PDE-only cutoff, count model); otherwise labels outside coverage could still change held-out scores through training. End-to-end synthetic test: `tests/test_fk_lumiere_coverage_scoring.py`. The MU/Duke runner and the Duke result are not changed.
+Integrated into the future forecast scoring path `src/fk_lumiere_runner.py::run_lumiere_cv` (required comparators copy-last, time-aware growth, PDE-only, FiLM U-Net, candidate, ablation). Coverage is checked before any target read.
+
+**Correction (2026-11-10).** An earlier version of this note said targets were "restricted" to support. The code did that by setting unobserved target voxels to zero, and then used them as negatives in training and selection. That broke rule 4. It is fixed:
+
+- Targets are no longer zeroed. Each target carries a geometry-derived validity mask (the common support).
+- Growth-rate selection scores Dice only on valid voxels (forecast and target both masked).
+- FiLM training uses a masked Dice + BCE loss. Invalid voxels have weight 0 and add nothing. The mask is part of the reuse fingerprint. With an all-ones mask the loss equals the frozen loss.
+- Final Dice is scored on support for every method (predictions and target both masked).
+- The PDE nuisance fit, PDE boundary calibration, PDE-only cutoff and count arm have no defined estimand for partly observed targets. When any eligible patient has partial coverage, these arms are not fitted or scored (fail closed, no fallback). See `paper/trackB_partial_coverage_pde_count_amendment_draft_2026-11-10.md` (draft, not adopted). Under full coverage they run unchanged.
+- Forecast domains and history inputs are unchanged.
+
+Synthetic tests: `tests/test_fk_lumiere_coverage_scoring.py` and `tests/test_track_b_validity_masks.py`. Changing labels or predictions only outside support (supported labels fixed) does not change the masked loss, FiLM weights, selection scores, selected rate, fold records, count results or final Dice. The MU/Duke runner and the Duke result are not changed.

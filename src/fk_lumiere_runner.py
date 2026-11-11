@@ -100,6 +100,10 @@ def check_gates(cases: Sequence[LumiereCase], gates: Mapping[str, bool]) -> None
 COVERAGE_VISITS = ("visit1", "visit2", "target")
 
 
+class _PartialCoverage(Exception):
+    """Internal: PDE-dependent arms are not scored under partial coverage (amendment draft)."""
+
+
 def coverage_supports(cases: Sequence[LumiereCase], *, required: bool) -> dict:
     """Geometry-derived common support per case, built before any target read.
 
@@ -203,9 +207,17 @@ def run_lumiere_cv(cases: Sequence[LumiereCase], fold_by_patient: Mapping[str, i
     for c in elig:
         if targets[c.patient_id].shape != np.asarray(c.support).shape:
             raise ValueError(f"{c.patient_id}: target and support grids differ")
-    if observable:
-        # Outside geometric coverage the target is unobserved: no training step or score may use it.
-        targets = {pid: t & observable[pid].mask for pid, t in targets.items()}
+    # Coverage (amendment 2026-11-10): each target carries a geometry-derived validity mask. Unobserved voxels
+    # are ignored, never treated as negative. Targets are NOT zeroed; every target-dependent step masks.
+    valid = {c.patient_id: (observable[c.patient_id].mask if observable else None) for c in elig}
+    partial = bool(observable) and any((np.asarray(c.support, bool) & ~valid[c.patient_id]).any() for c in elig)
+    partial_reason = ("partial scan coverage: PDE nuisance/boundary calibration and the count arm have no defined "
+                      "estimand for partly observed targets; see "
+                      "paper/trackB_partial_coverage_pde_count_amendment_draft_2026-11-10.md (not adopted)")
+
+    def _obs(pid, mask):
+        m = np.asarray(mask, bool)
+        return m if valid[pid] is None else m & valid[pid]
     cache = {} if film_reuse_cache is None else film_reuse_cache
     dice = {name: {} for name in COMPARATORS + ("candidate", "matched_volume_no_pde_ablation")}
     count_rows = {}
@@ -217,37 +229,46 @@ def run_lumiere_cv(cases: Sequence[LumiereCase], fold_by_patient: Mapping[str, i
         if not test:
             continue
         timed = [ta.TimedGrowthCase(c.patient_id, c.visit2, c.support, c.spacing_mm, c.forecast_weeks,
-                                    targets[c.patient_id]) for c in train]
+                                    targets[c.patient_id], valid[c.patient_id]) for c in train]
         sel = ta.select_rate(timed)
-        pairs = [(unet_inputs(c.visit1, c.visit2, c.support), targets[c.patient_id] & np.asarray(c.support, bool))
-                 for c in train]
+        pairs = [(unet_inputs(c.visit1, c.visit2, c.support),
+                  _obs(c.patient_id, targets[c.patient_id] & np.asarray(c.support, bool))) for c in train]
         intervals = [(c.forecast_weeks, c.history_weeks) for c in train]
         ids = [c.patient_id for c in train]
-        fp = ta.film_training_fingerprint(ids, pairs, intervals, fold=f, recipe=recipe)
+        film_valid = None if not observable else [valid[c.patient_id] for c in train]
+        fp = ta.film_training_fingerprint(ids, pairs, intervals, fold=f, recipe=recipe, valid_masks=film_valid)
         reused = fp in cache
         if not reused:
-            cache[fp] = ta.train_film_models(pairs, intervals, fold=f, recipe=recipe)
+            cache[fp] = ta.train_film_models(pairs, intervals, fold=f, recipe=recipe,
+                                              **({} if film_valid is None else {"valid_masks": film_valid}))
         film = cache[fp]
-        training_view = [dict(case=c, target=targets[c.patient_id]) for c in train]
-        nuisance = pde_provider.fit_fold(training_view)
-        raw_rows = nuisance.get("pde_only_training_rows", {})
-        cut = select_pde_only_cutoff([(raw_rows[c.patient_id], np.asarray(c.support, bool), targets[c.patient_id])
-                                      for c in train if c.patient_id in raw_rows])
-        cut["training_ids_without_raw_fields"] = [c.patient_id for c in train if c.patient_id not in raw_rows]
-        # Frozen Poisson count arm: outer-training patients only, nominal-interval offset; count metrics only.
         vox_mm3 = float(np.prod(train[0].spacing_mm))
-        count_model = fit_count_model(
-            [new_label_pieces(c.visit2, targets[c.patient_id], spacing_mm=c.spacing_mm, domain=c.support)
-             for c in train],
-            [np.log(np.count_nonzero(np.asarray(c.visit2, bool) & np.asarray(c.support, bool)) * vox_mm3)
-             for c in train],
-            [DAYS_PER_WEEK * c.forecast_weeks for c in train])
+        if partial:
+            nuisance = {"model_ready": False, "unavailable_reason": partial_reason, "pde_only_training_rows": {}}
+            cut = {"cutoff": None, "reason": partial_reason, "training_ids_without_raw_fields": []}
+            count_model = {"status": "not_fitted_partial_coverage", "reason": partial_reason}
+        else:
+            training_view = [dict(case=c, target=targets[c.patient_id]) for c in train]
+            nuisance = pde_provider.fit_fold(training_view)
+            raw_rows = nuisance.get("pde_only_training_rows", {})
+            cut = select_pde_only_cutoff([(raw_rows[c.patient_id], np.asarray(c.support, bool), targets[c.patient_id])
+                                          for c in train if c.patient_id in raw_rows])
+            cut["training_ids_without_raw_fields"] = [c.patient_id for c in train if c.patient_id not in raw_rows]
+            # Frozen Poisson count arm: outer-training patients only, nominal-interval offset; count metrics only.
+            count_model = fit_count_model(
+                [new_label_pieces(c.visit2, targets[c.patient_id], spacing_mm=c.spacing_mm, domain=c.support)
+                 for c in train],
+                [np.log(np.count_nonzero(np.asarray(c.visit2, bool) & np.asarray(c.support, bool)) * vox_mm3)
+                 for c in train],
+                [DAYS_PER_WEEK * c.forecast_weeks for c in train])
         pde_info = {}
         for c in test:
             sup = np.asarray(c.support, bool)
             tgt = targets[c.patient_id]
             last = np.asarray(c.visit2, bool) & sup
             try:
+                if partial:
+                    raise _PartialCoverage(partial_reason)
                 full = pde_provider.forecast(c, nuisance)
                 cand = (np.asarray(full["mask_draws"]).mean(axis=0) >= 0.5) & sup
                 no_pde = (np.asarray(full["no_pde_ranker_mask_draws"]).mean(axis=0) >= 0.5) & sup
@@ -257,6 +278,9 @@ def run_lumiere_cv(cases: Sequence[LumiereCase], fold_by_patient: Mapping[str, i
                     pde_only = (full["pde_only_inclusion_probability_by_cutoff"][cut["cutoff"]] >= 0.5) & sup
                     empty_draws = int(full["pde_only_empty_draws_by_cutoff"][cut["cutoff"]])
                 failed, reason = False, None
+            except _PartialCoverage as exc:
+                cand, pde_only, no_pde = None, None, None          # not scored; amendment draft, no fallback
+                empty_draws, failed, reason = None, False, str(exc)
             except ForecastFailure as exc:
                 cand, pde_only, no_pde = last.copy(), last.copy(), last.copy()  # frozen persistence fallback
                 empty_draws, failed, reason = None, True, str(exc)
@@ -286,9 +310,12 @@ def run_lumiere_cv(cases: Sequence[LumiereCase], fold_by_patient: Mapping[str, i
             else:
                 for name, p in preds.items():
                     dice[name][c.patient_id] = None if p is None else float(dice_with_empty_rule(p, tgt))
-            mu = count_rate_per_day(count_model, float(np.log(last.sum() * vox_mm3))) * DAYS_PER_WEEK * c.forecast_weeks
-            y = new_label_pieces(c.visit2, tgt, spacing_mm=c.spacing_mm, domain=sup)
-            count_rows[c.patient_id] = {"predicted_count": mu, "observed_count": int(y), **count_metrics(mu, y)}
+            if partial:
+                count_rows[c.patient_id] = {"status": "not_scored_partial_coverage"}
+            else:
+                mu = count_rate_per_day(count_model, float(np.log(last.sum() * vox_mm3))) * DAYS_PER_WEEK * c.forecast_weeks
+                y = new_label_pieces(c.visit2, tgt, spacing_mm=c.spacing_mm, domain=sup)
+                count_rows[c.patient_id] = {"predicted_count": mu, "observed_count": int(y), **count_metrics(mu, y)}
         folds[f] = {"training_ids": ids, "test_ids": [c.patient_id for c in test], "rate": sel,
                     "film_fingerprint": fp, "film_reused": reused, "film_status": film.get("status"),
                     "pde_only_cutoff": cut, "pde": pde_info, "count_model_status": count_model["status"],
@@ -299,14 +326,19 @@ def run_lumiere_cv(cases: Sequence[LumiereCase], fold_by_patient: Mapping[str, i
         "status": "scored (synthetic)" if all(c.synthetic for c in cases) else "scored",
         "folds": folds, "dice": dice,
         "coverage_scoring": ({"applied": True, "visits": list(COVERAGE_VISITS), "per_patient": coverage_report,
-                              "scope": "targets restricted to common support before every training step, count metric and Dice"}
+                              "partial_coverage": partial,
+                              "scope": ("validity mask carried with each target; growth-rate selection, FiLM loss "
+                                        "and final Dice ignore unobserved voxels; PDE and count arms run only "
+                                        "under full coverage")}
                              if observable else {"applied": False}),
         "patient_macro_dice": {k: (float(np.mean(list(v.values()))) if v and all(x is not None for x in v.values())
                                    else None) for k, v in dice.items()},
         "comparison_complete": stats["status"] != "incomplete",
         "pass_test": stats,
-        "count_arm": {"rows": count_rows, "scope": "count metrics only; never a Dice mask",
-                      **{f"mean_{k}": float(np.mean([r[k] for r in count_rows.values()]))
-                         for k in ("poisson_deviance", "abs_error", "brier_any_new")}},
+        "count_arm": ({"rows": count_rows, "status": "not_scored_partial_coverage", "reason": partial_reason}
+                      if partial else
+                      {"rows": count_rows, "scope": "count metrics only; never a Dice mask",
+                       **{f"mean_{k}": float(np.mean([r[k] for r in count_rows.values()]))
+                          for k in ("poisson_deviance", "abs_error", "brier_any_new")}}),
     })
     return result

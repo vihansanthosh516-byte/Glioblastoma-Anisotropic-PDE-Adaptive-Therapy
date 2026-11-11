@@ -90,7 +90,7 @@ FILM_CONFIG = {"film_hidden": FILM_HIDDEN, "interval_scale_weeks": INTERVAL_SCAL
 
 
 def film_training_fingerprint(patient_ids, pairs, intervals, *, fold: int, recipe=UNET_RECIPE,
-                              environment: Mapping | None = None) -> str:
+                              environment: Mapping | None = None, valid_masks=None) -> str:
     """Frozen U-Net fingerprint extended with the FiLM recipe and each patient's (forecast, history) weeks."""
     from src.fk_learned_baselines import unet_training_fingerprint
     import hashlib
@@ -99,11 +99,32 @@ def film_training_fingerprint(patient_ids, pairs, intervals, *, fold: int, recip
     h.update(repr(sorted(FILM_CONFIG.items())).encode())
     for pid, (f, hw) in zip(patient_ids, intervals):
         h.update(repr((str(pid), float(f), float(hw))).encode())
+    if valid_masks is not None:
+        h.update(b"valid-masks")
+        for v in valid_masks:
+            h.update(np.packbits(np.asarray(v, bool)).tobytes())
     return h.hexdigest()
 
 
-def train_film_models(pairs, intervals, *, fold: int, recipe=UNET_RECIPE) -> dict:
-    """Frozen U-Net training loop with FiLM; ``intervals`` are (forecast weeks, history weeks) per pair."""
+def masked_loss(logits, target, weight, smoothing):
+    """Dice + BCE over observed voxels only (weight 1); weight-0 voxels contribute nothing.
+
+    With weight all ones on the original grid this equals the frozen loss on that grid.
+    """
+    w = weight
+    prob = torch.sigmoid(logits)
+    inter = (prob * target * w).sum()
+    dice = 1 - (2 * inter + smoothing) / ((prob * w).sum() + (target * w).sum() + smoothing)
+    bce = torch.nn.functional.binary_cross_entropy_with_logits(logits, target, weight=w, reduction="sum")
+    return dice + bce / torch.clamp(w.sum(), min=1.0)
+
+
+def train_film_models(pairs, intervals, *, fold: int, recipe=UNET_RECIPE, valid_masks=None) -> dict:
+    """Frozen U-Net training loop with FiLM; ``intervals`` are (forecast weeks, history weeks) per pair.
+
+    ``valid_masks`` (optional, one per pair): geometry-derived observed voxels. When given, the loss ignores
+    unobserved voxels (coverage amendment 2026-11-10). When None, the frozen loss is used unchanged.
+    """
     from dataclasses import asdict
     from src.fk_learned_baselines import _loss, _pad, _padded_shape
     if not pairs:
@@ -111,7 +132,15 @@ def train_film_models(pairs, intervals, *, fold: int, recipe=UNET_RECIPE) -> dic
     shape = pairs[0][1].shape
     padded = _padded_shape(shape, len(recipe.widths))
     xs = [torch.from_numpy(np.stack([_pad(c, padded) for c in x]))[None] for x, _ in pairs]
-    ys = [torch.from_numpy(_pad(y.astype(np.float32), padded))[None, None] for _, y in pairs]
+    if valid_masks is not None:
+        if len(valid_masks) != len(pairs):
+            raise ValueError("one valid mask per training pair is required")
+        ws = [torch.from_numpy(_pad(np.asarray(v, bool).astype(np.float32), padded))[None, None] for v in valid_masks]
+        ys = [torch.from_numpy(_pad((np.asarray(y, bool) & np.asarray(v, bool)).astype(np.float32), padded))[None, None]
+              for (_, y), v in zip(pairs, valid_masks)]
+    else:
+        ws = None
+        ys = [torch.from_numpy(_pad(y.astype(np.float32), padded))[None, None] for _, y in pairs]
     zs = [interval_features(f, h)[None] for f, h in intervals]
     prior_det = torch.are_deterministic_algorithms_enabled()
     torch.use_deterministic_algorithms(True)
@@ -129,13 +158,18 @@ def train_film_models(pairs, intervals, *, fold: int, recipe=UNET_RECIPE) -> dic
             for _ in range(recipe.epochs):
                 for i in gen.permutation(len(xs)):
                     x, y = xs[i], ys[i]
+                    w = None if ws is None else ws[i]
                     for axis in (2, 3, 4):
                         if gen.random() < 0.5:
                             x, y = torch.flip(x, (axis,)), torch.flip(y, (axis,))
+                            w = None if w is None else torch.flip(w, (axis,))
                     k = int(gen.integers(4))
                     x, y = torch.rot90(x, k, (2, 3)), torch.rot90(y, k, (2, 3))
+                    w = None if w is None else torch.rot90(w, k, (2, 3))
                     opt.zero_grad()
-                    loss = _loss(model(x, zs[i]), y, recipe.dice_smoothing)
+                    logits = model(x, zs[i])
+                    loss = (_loss(logits, y, recipe.dice_smoothing) if w is None
+                            else masked_loss(logits, y, w, recipe.dice_smoothing))
                     if not torch.isfinite(loss):
                         return {"status": "unavailable", "reason": "non-finite loss", "models": [], "seeds": seeds}
                     loss.backward()
@@ -174,6 +208,7 @@ class TimedGrowthCase:
     spacing_mm: tuple[float, float, float]
     gap_weeks: int
     target_mask: np.ndarray | None = None
+    valid_mask: np.ndarray | None = None      # geometry-derived observed voxels; None = all observed
 
 
 def _check_grid(grid, max_gap_weeks):
@@ -207,7 +242,11 @@ def select_rate(training_cases: Sequence[TimedGrowthCase], *, rate_grid=RATE_GRI
                 raise ValueError(f"training case {c.patient_id} has no target mask")
             f = fixed_growth_forecast(c.last_mask, c.support, spacing_mm=c.spacing_mm,
                                       radius_mm=timed_radius_mm(k, c.gap_weeks))
-            scores.append(dice_with_empty_rule(f, np.asarray(c.target_mask, bool)))
+            t = np.asarray(c.target_mask, bool)
+            if c.valid_mask is not None:
+                v = np.asarray(c.valid_mask, bool)
+                f, t = f & v, t & v
+            scores.append(dice_with_empty_rule(f, t))
         mean_dice.append(float(np.mean(scores)))
     best = max(mean_dice)
     chosen = next(k for k, d in zip(grid, mean_dice) if d >= best - TIE_TOLERANCE)
