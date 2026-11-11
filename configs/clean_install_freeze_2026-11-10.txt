@@ -15,7 +15,7 @@ filelock==4.2.10
 fonttools==4.68.0
 formulaic==1.2.2
 fsspec==2026.9.0
-gliblastoma-pde-adaptive-therapy @ file:///C:/Users/vihan/AppData/Local/Temp/claude/4f2805960e8e511f/3bfc98ea-ed10-4ac2-b477-9dfaef96ca14/scratchpad/pkgsrc
+gliblastoma-pde-adaptive-therapy==0.1.0  # installed from a scratch copy of the tracked tree (local path removed)
 google-crc32c==1.9.0
 h5py==3.16.0
 ImageIO==2.38.1
