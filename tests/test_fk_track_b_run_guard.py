@@ -79,8 +79,7 @@ def test_no_seal_refused(setup, tmp_path):
 
 
 def test_real_cases_without_seal_refused_before_any_target_read(tmp_path):
-    reads = []
-    real = [replace(c, synthetic=False, load_target=lambda c=c: reads.append(c.patient_id)) for c in _spread_cases()]
+    real, reads = _real(_spread_cases())
     with pytest.raises(g.SealMismatch):
         _call(real, _folds(real), tmp_path / "missing.json", allow_synthetic=False, gates={x: True for x in lr.LUMIERE_GATES})
     assert reads == []
@@ -88,8 +87,7 @@ def test_real_cases_without_seal_refused_before_any_target_read(tmp_path):
 
 def test_real_cases_with_mismatching_seal_refused_before_target_read(setup):
     _, _, _, path = setup
-    reads = []
-    real = [replace(c, synthetic=False, load_target=lambda c=c: reads.append(c.patient_id)) for c in _spread_cases()]
+    real, reads = _real(_spread_cases())
     with pytest.raises(g.SealMismatch):
         _call(real, _folds(real), path, recipe=replace(TINY, epochs=2), allow_synthetic=False,
               gates={x: True for x in lr.LUMIERE_GATES})
@@ -197,7 +195,13 @@ ALL_GATES = {x: True for x in lr.LUMIERE_GATES}
 
 def _real(cases):
     reads = []
-    return [replace(c, synthetic=False, load_target=lambda c=c: reads.append(c.patient_id)) for c in cases], reads
+    return [replace(c, synthetic=False, load_target=lambda c=c: reads.append(c.patient_id),
+                    qc_record=_qc(c.qc_passed)) for c in cases], reads
+
+
+def _qc(passed):
+    return {"passed": bool(passed), "reasons": [] if passed else ["synthetic failure"],
+            "max_rotation_deg": 0.0, "shift_mm": 0.0}
 
 
 def test_real_case_without_token_raises_in_runner_and_protocol():
@@ -326,3 +330,52 @@ def test_eligibility_manifest_ignores_order_and_voxels():
     a = g.eligibility_manifest_sha256(cs)
     assert a == g.eligibility_manifest_sha256(list(reversed(cs)))
     assert a == g.eligibility_manifest_sha256([replace(c, visit1=c.visit1 * 0) for c in cs])
+
+
+# ---------------------------------------------------------------- 2026-11-10 guard fixes
+def test_seal_records_gates_and_real_run_requires_same_gates(tmp_path):
+    cases = _spread_cases()
+    real, reads = _real(cases)
+    folds = _folds(real)
+    seal = g.build_seal(cases=real, fold_by_patient=folds, provider_factory=_factory, recipe=TINY,
+                        n_bootstrap=N_BOOT, gates=ALL_GATES)
+    assert seal["gates"] == {k: True for k in sorted(ALL_GATES)}
+    path = g.write_seal(seal, tmp_path / "seal.json")
+    # entry gates differ from sealed gates (an extra gate) -> refused before any target read
+    with pytest.raises(g.SealMismatch, match="differ from the sealed gates"):
+        _call(real, folds, path, allow_synthetic=False, gates=dict(ALL_GATES, extra_gate=True))
+    assert reads == []
+
+
+def test_seal_without_passed_gates_refused_for_real_cases(setup):
+    _, folds, _, path = setup          # seal built with no gates
+    real, reads = _real(_spread_cases())
+    with pytest.raises(g.SealMismatch, match="sealed gates|seal does not record"):
+        _call(real, folds, path, allow_synthetic=False, gates=ALL_GATES)
+    assert reads == []
+
+
+def test_real_case_without_qc_record_refused(setup):
+    _, folds, _, path = setup
+    real, reads = _real(_spread_cases())
+    real[0] = replace(real[0], qc_record=None)
+    with pytest.raises(PermissionError, match="no registration QC record"):
+        _call(real, folds, path, allow_synthetic=False, gates=ALL_GATES)
+    assert reads == []
+
+
+def test_qc_flag_disagreeing_with_record_refused(setup):
+    _, folds, _, path = setup
+    real, reads = _real(_spread_cases())
+    real[0] = replace(real[0], qc_record=_qc(not real[0].qc_passed))
+    with pytest.raises(PermissionError, match="disagrees with its QC record"):
+        _call(real, folds, path, allow_synthetic=False, gates=ALL_GATES)
+    assert reads == []
+
+
+def test_qc_record_is_bound_into_manifest():
+    real, _ = _real(_spread_cases())
+    a = g.eligibility_manifest_sha256(real)
+    changed = [replace(real[0], qc_record=dict(real[0].qc_record, reasons=["edited"]))] + real[1:]
+    assert a != g.eligibility_manifest_sha256(changed)
+    assert g.eligibility_manifest_sha256(_spread_cases()) == g.eligibility_manifest_sha256(list(_spread_cases()))

@@ -4,6 +4,8 @@ import pytest
 from src.track_b_transition_estimand import (construct_history_states, history_band_counts, geometric_coverage, output_to_input_affine, target_field_coverage, summarize_window,
                                               summarize_patients, bootstrap_patients)
 
+SP = (2.0, 2.0, 2.0)
+
 
 def test_weighted_bands_and_label_distribution():
     # Two bands: weights 2/3 and 1/3; differences 1/2 and -1.
@@ -74,7 +76,7 @@ def test_history_states_use_physical_distance_and_cavity():
     middle[5:24, 1, 1] = 2
     middle[9, 2, 1] = 4
     previous[5, 1, 1] = 2
-    state, bands = construct_history_states(previous, middle)
+    state, bands = construct_history_states(previous, middle, voxel_spacing_mm=SP)
     assert state[5, 1, 1] == 2
     assert state[6, 1, 1] == 2  # within 2 mm of prior FLAIR
     assert state[7, 1, 1] == 1
@@ -90,18 +92,21 @@ def test_empty_previous_flair_and_empty_core():
     middle = previous.copy()
     middle[0, 0, 0] = 1
     middle[3, 3, 3] = 2
-    state, _ = construct_history_states(previous, middle)
+    with pytest.raises(ValueError, match='empty previous FLAIR'):
+        construct_history_states(previous, middle, voxel_spacing_mm=SP)
+    previous[4, 4, 4] = 2
+    state, _ = construct_history_states(previous, middle, voxel_spacing_mm=SP)
     assert state[3, 3, 3] == 1
     middle[0, 0, 0] = 0
     with pytest.raises(ValueError, match='empty core'):
-        construct_history_states(previous, middle)
+        construct_history_states(previous, middle, voxel_spacing_mm=SP)
 
 
 def test_invalid_history_label_and_shape_rejected():
     with pytest.raises(ValueError):
-        construct_history_states(np.zeros((2, 2, 2)), np.full((2, 2, 2), 5))
+        construct_history_states(np.zeros((2, 2, 2)), np.full((2, 2, 2), 5), voxel_spacing_mm=SP)
     with pytest.raises(ValueError):
-        construct_history_states(np.zeros((2, 2)), np.zeros((2, 2)))
+        construct_history_states(np.zeros((2, 2)), np.zeros((2, 2)), voxel_spacing_mm=SP)
 
 
 def test_synthetic_history_to_window_score():
@@ -113,7 +118,7 @@ def test_synthetic_history_to_window_score():
     # Move the new site away from the 2-mm prior dilation.
     middle[3, 3, 4] = 0
     middle[3, 5, 3] = 2
-    state, bands = construct_history_states(previous, middle)
+    state, bands = construct_history_states(previous, middle, voxel_spacing_mm=SP)
     target = np.zeros_like(previous)
     target[3, 5, 3] = 3
     result = summarize_window(state, bands, target, min_voxels=1)
@@ -255,3 +260,24 @@ def test_geometric_coverage_matches_nibabel_physical_resampling():
         resampled = resample_from_to(
             registered, (dst_shape, dst_affine), order=0).get_fdata() > 0.5
         np.testing.assert_array_equal(actual, resampled)
+
+
+
+def test_non_2mm_spacing_refused():
+    previous = np.zeros((5, 5, 5), dtype=int); previous[1, 1, 1] = 2
+    middle = previous.copy(); middle[0, 0, 0] = 1
+    for bad in ((1.0, 1.0, 1.0), (2.0, 2.0, 3.0), (2.0, 2.0)):
+        with pytest.raises(ValueError, match='2-mm grid'):
+            construct_history_states(previous, middle, voxel_spacing_mm=bad)
+    with pytest.raises(TypeError):
+        construct_history_states(previous, middle)
+
+
+def test_history_constructor_is_future_blind():
+    """The history constructor accepts only previous and middle labels plus spacing."""
+    import inspect
+    params = list(inspect.signature(construct_history_states).parameters)
+    assert params == ['previous_labels', 'middle_labels', 'voxel_spacing_mm']
+    from src import track_b_transition_estimand as est
+    src = inspect.getsource(est.construct_history_states)
+    assert 'target' not in src and 'load_target' not in src

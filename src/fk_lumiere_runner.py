@@ -63,6 +63,7 @@ class LumiereCase:
     load_target: Callable[[], np.ndarray]
     spacing_mm: tuple[float, float, float] = (2.0, 2.0, 2.0)
     synthetic: bool = False
+    qc_record: Mapping | None = None   # registration_qc() output; required for real cases
 
 
 def nominal_days(case: LumiereCase) -> dict:
@@ -89,6 +90,19 @@ def check_gates(cases: Sequence[LumiereCase], gates: Mapping[str, bool]) -> None
     missing = [g for g in LUMIERE_GATES if gates.get(g) is not True]
     if missing:
         raise PermissionError(f"scoring refused: gates not recorded as passed: {missing}")
+    check_qc_records(cases)
+
+
+def check_qc_records(cases: Sequence[LumiereCase]) -> None:
+    """Real cases: qc_passed must equal the saved registration_qc() record's ``passed`` field."""
+    for c in cases:
+        if c.synthetic:
+            continue
+        rec = c.qc_record
+        if not isinstance(rec, Mapping) or not isinstance(rec.get("passed"), bool) or "reasons" not in rec:
+            raise PermissionError(f"refused: case {c.patient_id} has no registration QC record")
+        if bool(c.qc_passed) != rec["passed"]:
+            raise PermissionError(f"refused: case {c.patient_id} qc_passed disagrees with its QC record")
 
 
 def eligibility(cases: Sequence[LumiereCase], *, minimum: int = MIN_ELIGIBLE_PATIENTS) -> dict:

@@ -77,7 +77,7 @@ def test_too_few_central_gap_patients_is_incomplete_not_completed():
 def test_real_data_cannot_lower_minimums():
     import pytest
     from src import fk_lumiere_runner as lr
-    real = [replace(c, synthetic=False) for c in _cases()]
+    real = [replace(c, synthetic=False, qc_record={"passed": bool(c.qc_passed), "reasons": []}) for c in _cases()]
     gates = {g: True for g in lr.LUMIERE_GATES}
     with pytest.raises(PermissionError, match="25-patient minimum"):
         lr.run_lumiere_cv(real, _folds(real), pde_provider=FakeProvider(), gates=gates, minimum=10)

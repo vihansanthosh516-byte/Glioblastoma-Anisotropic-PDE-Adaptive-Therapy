@@ -88,10 +88,20 @@ def _env_versions() -> dict:
     return out
 
 
+def _qc_record_suffix(case) -> str:
+    """Bind the saved QC record into the manifest; empty for cases without one (synthetic)."""
+    rec = getattr(case, "qc_record", None)
+    if rec is None:
+        return ""
+    blob = json.dumps(_jsonable(dict(rec)), sort_keys=True).encode()
+    return f"|qcrec={hashlib.sha256(blob).hexdigest()}"
+
+
 def eligibility_manifest_sha256(cases: Sequence[lr.LumiereCase]) -> str:
     """Hash of patient id and the non-voxel QC/interval fields per case. No image or target data is read."""
     lines = [f"{c.patient_id}|qc={bool(c.qc_passed)}|fw={c.forecast_weeks}|hw={c.history_weeks}|"
-             f"sp={tuple(float(x) for x in c.spacing_mm)}" for c in sorted(cases, key=lambda c: c.patient_id)]
+             f"sp={tuple(float(x) for x in c.spacing_mm)}" + _qc_record_suffix(c)
+             for c in sorted(cases, key=lambda c: c.patient_id)]
     return hashlib.sha256("\n".join(lines).encode()).hexdigest()
 
 
@@ -134,13 +144,16 @@ def _current_state(*, provider_factory, recipe, n_bootstrap, fold_by_patient, pa
 
 def build_seal(*, cases: Sequence[lr.LumiereCase], fold_by_patient: Mapping[str, int],
                provider_factory: Callable = lp.default_provider_factory, recipe=UNET_RECIPE,
-               n_bootstrap: int | None = None, project_root=PROJECT_ROOT) -> dict:
+               n_bootstrap: int | None = None, project_root=PROJECT_ROOT,
+               gates: Mapping[str, bool] | None = None) -> dict:
+    """``gates`` records the LUMIERE gate decisions in the seal; real runs must pass the same dict."""
     state = _current_state(provider_factory=provider_factory, recipe=recipe, n_bootstrap=n_bootstrap,
                            fold_by_patient=fold_by_patient, patient_ids=[c.patient_id for c in cases],
                            project_root=project_root, eligibility_sha256=eligibility_manifest_sha256(cases))
     return {"schema_version": SCHEMA_VERSION, "created_utc": datetime.now(timezone.utc).isoformat(),
             "record_type": "pre-run seal (code, protocol, settings, folds, eligibility manifest, git, versions); "
                            "patient input files NOT hashed",
+            "gates": {str(k): bool(v) for k, v in sorted((gates or {}).items())},
             **state}
 
 
@@ -206,6 +219,21 @@ def verify_seal(seal: Mapping, current: Mapping) -> list[str]:
     return problems
 
 
+def _gate_problems(seal: Mapping, gates: Mapping[str, bool] | None) -> list[str]:
+    """Real runs: the gate decisions passed at entry must equal those recorded in the seal, all True."""
+    sealed_gates = seal.get("gates")
+    passed = {str(k): bool(v) for k, v in sorted((gates or {}).items())}
+    if not isinstance(sealed_gates, dict):
+        return ["seal records no gate decisions"]
+    problems = []
+    if sealed_gates != passed:
+        problems.append(f"gates {passed} differ from the sealed gates {sealed_gates}")
+    unsealed = [x for x in lr.LUMIERE_GATES if sealed_gates.get(x) is not True]
+    if unsealed:
+        problems.append(f"seal does not record these gates as passed: {unsealed}")
+    return problems
+
+
 def run_sealed_protocol(cases: Sequence[lr.LumiereCase], fold_by_patient: Mapping[str, int], *, seal_path,
                         expected_seal_sha256: str, gates: Mapping[str, bool] | None = None,
                         provider_factory: Callable | None = None, recipe=None, n_bootstrap: int | None = None,
@@ -227,6 +255,7 @@ def run_sealed_protocol(cases: Sequence[lr.LumiereCase], fold_by_patient: Mappin
         missing = [x for x in lr.LUMIERE_GATES if (gates or {}).get(x) is not True]
         if missing:
             raise PermissionError(f"scoring refused: gates not recorded as passed: {missing}")
+        lr.check_qc_records(cases)
     seal = load_seal(seal_path)
     actual = file_sha256(seal_path)
     if actual != expected_seal_sha256:
@@ -244,6 +273,8 @@ def run_sealed_protocol(cases: Sequence[lr.LumiereCase], fold_by_patient: Mappin
     except FileNotFoundError as exc:
         raise SealMismatch(str(exc)) from exc
     problems = verify_seal(seal, current)
+    if not all(c.synthetic for c in cases):
+        problems += _gate_problems(seal, gates)
     if problems:
         raise SealMismatch("seal check failed before any target read: " + "; ".join(problems))
     return lp.run_lumiere_protocol(cases, fold_by_patient, provider_factory=factory, gates=gates,

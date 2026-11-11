@@ -16,7 +16,7 @@ Track B contains longitudinal MRI forecasting and transition analyses. A private
 
 - `src/track_b_transition_estimand.py`, `src/track_b_run_provenance.py`, `src/fk_duke_archive_inventory.py` — transition and provenance prototypes.
 - `src/fk_longitudinal_prep.py`, `src/fk_track_b_run_guard.py` — registration preparation and guarded-run components.
-- `tests/test_track_b_transition_estimand.py`, `tests/test_track_b_run_provenance.py`, `tests/test_track_b_manifest_triplets.py`, `tests/test_track_b_geometry_contract.py`, `tests/test_track_b_future_blind.py`, `tests/test_fk_track_b_run_guard.py` — focused checks.
+- `tests/test_track_b_transition_estimand.py`, `tests/test_track_b_run_provenance.py`, `tests/test_track_b_manifest_triplets.py`, `tests/test_track_b_geometry_contract.py`, `tests/test_track_b_future_blind.py` (covers `src/165_signed_transition_cv.py` only), `tests/test_fk_track_b_run_guard.py` — focused checks. The transition estimand's own future-blind check is in `tests/test_track_b_transition_estimand.py`. Since 2026-11-10 the guard seals gate decisions, binds each real case's saved registration QC record, and the estimand refuses non-2-mm spacing and an empty previous FLAIR mask.
 - `output/track_b_feasibility_pilot_20261102/` and `output/track_b_two_history_screen_20261102/` — synthetic development records only.
 - Private Duke files remain in access-controlled local storage and are not listed, copied, hashed, or committed here.
 

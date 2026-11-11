@@ -11,11 +11,20 @@ import numpy as np
 from scipy.ndimage import affine_transform, distance_transform_edt
 
 
-def construct_history_states(previous_labels, middle_labels):
+GRID_SPACING_MM = (2.0, 2.0, 2.0)
+
+
+def construct_history_states(previous_labels, middle_labels, *, voxel_spacing_mm):
     """Build draft risk states and distance bands on a registered 2-mm grid.
 
     Only history labels are accepted. No support, registration, or QC is inferred.
+    ``voxel_spacing_mm`` must be the grid's actual spacing and must equal 2 mm on every
+    axis; distances below are in millimetres on that grid. An empty previous-visit
+    FLAIR mask is refused, because it would label every risk voxel as new.
     """
+    spacing = tuple(float(s) for s in voxel_spacing_mm)
+    if len(spacing) != 3 or not np.allclose(spacing, GRID_SPACING_MM, rtol=0, atol=1e-6):
+        raise ValueError(f'voxel spacing {spacing} is not the required 2-mm grid')
     previous, middle = map(np.asarray, (previous_labels, middle_labels))
     if previous.ndim != 3 or previous.shape != middle.shape or not previous.size:
         raise ValueError('history labels must have the same nonempty 3D shape')
@@ -29,8 +38,9 @@ def construct_history_states(previous_labels, middle_labels):
     excluded_distance = distance_transform_edt(~excluded, sampling=2.0)
     risk = (middle == 2) & (excluded_distance > 2.0)
     previous_flair = previous == 2
-    near_previous = (distance_transform_edt(~previous_flair, sampling=2.0) <= 2.0
-                     if previous_flair.any() else np.zeros(previous.shape, dtype=bool))
+    if not previous_flair.any():
+        raise ValueError('empty previous FLAIR mask')
+    near_previous = distance_transform_edt(~previous_flair, sampling=2.0) <= 2.0
     state = np.zeros(middle.shape, dtype=np.uint8)
     state[risk & ~near_previous] = 1
     state[risk & near_previous] = 2
