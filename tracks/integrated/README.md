@@ -15,7 +15,8 @@ In synthetic glioblastoma-like worlds, will a finite-set dependence-aware minima
 
 - [Active plan (revised 2026-11-08)](../../paper/trackABC_integrated_research_plan_revised_2026-11-08.md)
 - [Earlier master plan (superseded 2026-11-09)](../../paper/trackABC_integrated_research_plan_master_2026-11-07.md)
-- [Submission copy](../../paper/trackABC_integrated_research_plan_submission_2026-11-07.md)
+- [Submission copy (current, 2026-11-09)](../../paper/trackABC_integrated_research_plan_submission_2026-11-09.md); the 2026-11-07 copy is superseded
+- [Science-corrected plan (proposed, not adopted)](../../paper/trackABC_integrated_research_plan_submission_science_revision_2026-11-09.md)
 - [Machine-readable protocol settings](../../configs/trackABC_integrated_v2.json)
 - [Initial input checksum and rights manifest](../../configs/trackABC_input_manifest_v2.csv)
 - [Handoff and reproducibility notes](../shared/HANDOFF_AND_REPRODUCIBILITY.md)
