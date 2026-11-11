@@ -53,6 +53,47 @@ No tumor-label file (`seg_mask`, native seg masks, HD-GLIO segmentations) is nee
 - Code to parse `.tfm`, verify its type and convention, and compose the full chain; synthetic tests.
 - Then the steps in "Decision sequence for Option A" below.
 
+## Metadata audit of the chain (2026-11-10, after the audit above)
+
+Code: `src/fk_lumiere_transform_audit.py`. Records: `output/track_b_lumiere_transform_audit_20261110/transform_audit.json` (per visit: full qform, sform and chosen affine; .tfm blocks) and `direction_check.json`. Read: 252 files for 28 patients x 3 visits, namely native `CT1.nii.gz` header (348 bytes), atlas `ct1_skull_strip.nii.gz` header (348 bytes), and `native/transformation/ct1.tfm` text. No voxel arrays, intensities or labels. The code asserts that no other file was opened.
+
+| Item | Result | Status |
+|---|---|---|
+| Files present | 84/84 native CT1, 84/84 atlas CT1, 84/84 ct1.tfm | Complete |
+| Atlas grid | 182 x 218 x 182, one affine for all 84 | Verified |
+| Native grids | 10 shapes, 8 spacings, incl. thick stacks (224 x 256 x 24 and 448 x 512 x 24 at 6 mm slices) | Recorded. Thin stacks make real partial coverage likely. |
+| Native affine | Full 4x4 saved; sform used where set, else qform; 0 qform/sform disagreements | Verified |
+| .tfm format and type | ITK `CompositeTransform` with one `MatrixOffsetTransformBase_double_3_3` leaf in all 84; singular values 1.000 +/- 1e-15, so rigid | Verified; no deformable part |
+| Coordinate convention | ITK physical space is LPS; converted with diag(-1,-1,1) | Standard ITK rule; code-tested on synthetic data only |
+| Direction | **Ambiguous.** ITK files usually store the resampling map (fixed to moving), but which image was fixed in DeepBraTumIA is not documented in files read here. Metadata evidence: mapping the atlas centre through inverse(T) lands nearer the native grid centre in 74/84 visits (median 40.7 mm vs 80.4 mm; outliers up to 695 vs 75 mm). This favours "stored T maps native to atlas". It is evidence, not proof. | **Not frozen** |
+| Fits the 4x4 `geometric_coverage` method | Yes, for every link: native affine, rigid .tfm, visit-3 rigid refinement (`rigid_voxel_map` equals `apply_rigid`, tested) and 2 mm downsampling | Representable, once direction is fixed |
+| Visit-3 rigid refinement | Not run (needs the approved MRI-only read) | Missing |
+| 2 mm block centre offset | `downsample_to_1mm` uses 2i + 0.5 | Protocol choice; not frozen |
+
+Composition per visit (scoring voxel to native voxel): `inv(native_affine) @ atlas_to_native_ras @ atlas_affine [@ rigid for visit 3] @ downsample`. Visit 2 has no rigid factor. Visit 1 depends on the rule below.
+
+Synthetic tests (`tests/test_fk_lumiere_transform_audit.py`, 7 tests, plus `tests/test_fk_longitudinal_prep.py`; 20 passed in the scratch copy): header affines match nibabel for qform and sform; the ITK centre convention; deformable types are refused, not approximated; LPS-to-RAS conversion; rigid map equals `apply_rigid`; known-geometry coverage, where the right direction and the wrong direction give different masks; one exact 4x4 for the full chain.
+
+### Visit-1 alignment choice (recommendation only; no amendment adopted)
+
+- **Option 1: MRI-only rigid registration of visit 1 to visit 2**, with the same frozen method and QC as visit 3.
+  - For: the same rule for every non-origin visit. Visit 1 feeds history inputs (FiLM channel, PDE start state). Misalignment there would bias forecasts and coverage. QC also catches bad atlas alignments.
+  - Against: it needs 28 more atlas CT1 reads. Some patients may fail QC, which raises the risk of falling below the 25-patient minimum. It changes the history inputs of the frozen protocol, so a dated amendment is needed.
+- **Option 2: accept the publisher's atlas alignment for visit 1**, as a stated assumption.
+  - For: no new reads, and no change to history inputs.
+  - Against: it is unverified, and it treats visit 1 differently from visit 3. A visit-3-style check was judged necessary there, and nothing shows visit 1 is safer.
+- **Recommendation: Option 1.** It is the consistent and checkable choice. Its cost (cohort loss) is measured by the QC, not hidden.
+
+### Is a valid geometry-only count possible now?
+
+**No. The count stays blocked.** Missing:
+
+1. A frozen .tfm direction. This needs DeepBraTumIA documentation or source showing the registration's fixed image, or a frozen rule chosen before any count (for example, the metadata evidence above) and stated as an assumption.
+2. The visit-3 rigid refinement transforms (the approved MRI-only read of visit-2/3 atlas CT1 and visit-2 brain mask).
+3. A frozen visit-1 rule (amendment). Under Option 1, also the visit-1 registrations and QC.
+4. The frozen 2 mm block centre convention.
+5. A runner that composes the chain per visit and feeds `coverage_from_geometry`, with tests. Not built.
+
 ## Option A: exclude partial-coverage patients from all arms
 
 - **Cohort:** one cohort. Only patients whose common support covers the whole forecast domain. Smaller than now.
