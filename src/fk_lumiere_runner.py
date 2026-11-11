@@ -15,6 +15,9 @@ Fail-closed rules:
   counted, and the run stops (no target read, no scoring) if fewer than MIN_ELIGIBLE_PATIENTS remain.
 - Targets are lazy (`load_target`); they are read only for eligible patients after the stop check.
 - Every arm uses the same eligible patients, the same fold per patient, the same support and the same target.
+- Coverage (amendment 2026-11-10): real cases, or synthetic runs with require_coverage=True, need geometry-built
+  ScanCoverage for visit1, visit2 and target before any target read; targets are restricted to the common support
+  for every training step and score, and per-patient support size and fraction are reported.
 """
 from __future__ import annotations
 
@@ -64,6 +67,7 @@ class LumiereCase:
     spacing_mm: tuple[float, float, float] = (2.0, 2.0, 2.0)
     synthetic: bool = False
     qc_record: Mapping | None = None   # registration_qc() output; required for real cases
+    coverage: tuple = ()               # ScanCoverage per visit (COVERAGE_VISITS); required for real cases
 
 
 def nominal_days(case: LumiereCase) -> dict:
@@ -91,6 +95,30 @@ def check_gates(cases: Sequence[LumiereCase], gates: Mapping[str, bool]) -> None
     if missing:
         raise PermissionError(f"scoring refused: gates not recorded as passed: {missing}")
     check_qc_records(cases)
+
+
+COVERAGE_VISITS = ("visit1", "visit2", "target")
+
+
+def coverage_supports(cases: Sequence[LumiereCase], *, required: bool) -> dict:
+    """Geometry-derived common support per case, built before any target read.
+
+    Amendment paper/trackB_coverage_scoring_amendment_2026-11-10.md. Real cases always require coverage.
+    Returns {} when coverage is neither required nor supplied (historical synthetic behavior).
+    """
+    from src.track_b_coverage_scoring import common_support
+    need = required or any(not c.synthetic for c in cases) or any(c.coverage for c in cases)
+    if not need:
+        return {}
+    out = {}
+    for c in cases:
+        if not c.coverage:
+            raise PermissionError(f"refused: case {c.patient_id} has no scan coverage; scoring stopped")
+        support = common_support(c.coverage, COVERAGE_VISITS)
+        if support.mask.shape != np.asarray(c.support).shape:
+            raise ValueError(f"{c.patient_id}: coverage and support grids differ")
+        out[c.patient_id] = support
+    return out
 
 
 def check_qc_records(cases: Sequence[LumiereCase]) -> None:
@@ -140,7 +168,8 @@ def run_lumiere_cv(cases: Sequence[LumiereCase], fold_by_patient: Mapping[str, i
                    pde_provider,
                    gates: Mapping[str, bool] | None = None, recipe=UNET_RECIPE,
                    film_reuse_cache: dict | None = None, minimum: int | None = None,
-                   n_bootstrap: int | None = None, analysis: str = "primary", _sealed_token=None) -> dict:
+                   n_bootstrap: int | None = None, analysis: str = "primary", _sealed_token=None,
+                   require_coverage: bool = False) -> dict:
     """Outer patient CV with the four proposed required comparators, the PDE candidate, a separately named
     matched-volume no-PDE ablation and the frozen Poisson count arm (count metrics only, never a mask).
 
@@ -169,13 +198,18 @@ def run_lumiere_cv(cases: Sequence[LumiereCase], fold_by_patient: Mapping[str, i
     missing = [c.patient_id for c in elig if c.patient_id not in fold_by_patient]
     if missing:
         raise ValueError(f"patients without a fold: {missing}")
+    observable = coverage_supports(elig, required=require_coverage)   # fail closed before any target read
     targets = {c.patient_id: np.asarray(c.load_target(), bool) for c in elig}
     for c in elig:
         if targets[c.patient_id].shape != np.asarray(c.support).shape:
             raise ValueError(f"{c.patient_id}: target and support grids differ")
+    if observable:
+        # Outside geometric coverage the target is unobserved: no training step or score may use it.
+        targets = {pid: t & observable[pid].mask for pid, t in targets.items()}
     cache = {} if film_reuse_cache is None else film_reuse_cache
     dice = {name: {} for name in COMPARATORS + ("candidate", "matched_volume_no_pde_ablation")}
     count_rows = {}
+    coverage_report = {}
     folds = {}
     for f in sorted({fold_by_patient[c.patient_id] for c in elig}):
         train = [c for c in elig if fold_by_patient[c.patient_id] != f]
@@ -241,8 +275,17 @@ def run_lumiere_cv(cases: Sequence[LumiereCase], fold_by_patient: Mapping[str, i
                 "candidate": cand,
                 "matched_volume_no_pde_ablation": no_pde,
             }
-            for name, p in preds.items():
-                dice[name][c.patient_id] = None if p is None else float(dice_with_empty_rule(p, tgt))
+            if observable:
+                from src.track_b_coverage_scoring import forecast_dice_on_support
+                scored = {k: v for k, v in preds.items() if v is not None}
+                cov = forecast_dice_on_support(scored, tgt, observable[c.patient_id])
+                for name in preds:
+                    dice[name][c.patient_id] = cov["dice"].get(name)
+                coverage_report[c.patient_id] = {k: cov[k] for k in ("support_voxels", "support_fraction",
+                                                                     "support_visits")}
+            else:
+                for name, p in preds.items():
+                    dice[name][c.patient_id] = None if p is None else float(dice_with_empty_rule(p, tgt))
             mu = count_rate_per_day(count_model, float(np.log(last.sum() * vox_mm3))) * DAYS_PER_WEEK * c.forecast_weeks
             y = new_label_pieces(c.visit2, tgt, spacing_mm=c.spacing_mm, domain=sup)
             count_rows[c.patient_id] = {"predicted_count": mu, "observed_count": int(y), **count_metrics(mu, y)}
@@ -255,6 +298,9 @@ def run_lumiere_cv(cases: Sequence[LumiereCase], fold_by_patient: Mapping[str, i
     result.update({
         "status": "scored (synthetic)" if all(c.synthetic for c in cases) else "scored",
         "folds": folds, "dice": dice,
+        "coverage_scoring": ({"applied": True, "visits": list(COVERAGE_VISITS), "per_patient": coverage_report,
+                              "scope": "targets restricted to common support before every training step, count metric and Dice"}
+                             if observable else {"applied": False}),
         "patient_macro_dice": {k: (float(np.mean(list(v.values()))) if v and all(x is not None for x in v.values())
                                    else None) for k, v in dice.items()},
         "comparison_complete": stats["status"] != "incomplete",

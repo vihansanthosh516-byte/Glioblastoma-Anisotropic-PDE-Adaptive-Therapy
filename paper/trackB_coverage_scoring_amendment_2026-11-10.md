@@ -15,3 +15,7 @@
 ## Tests required
 
 Partial coverage; lesions outside coverage; one common support across methods; labels or predictions changed outside support cannot change any score; missing or invalid coverage fails closed.
+
+## Implementation note (2026-11-10, no rule change)
+
+Integrated into the future forecast scoring path `src/fk_lumiere_runner.py::run_lumiere_cv` (required comparators copy-last, time-aware growth, PDE-only, FiLM U-Net, candidate, ablation). Coverage is checked before any target read. Applying rule 4 consistently, the target is restricted to the common support before it is used anywhere, including fold-training steps (growth-rate selection, FiLM training, PDE-only cutoff, count model); otherwise labels outside coverage could still change held-out scores through training. End-to-end synthetic test: `tests/test_fk_lumiere_coverage_scoring.py`. The MU/Duke runner and the Duke result are not changed.
