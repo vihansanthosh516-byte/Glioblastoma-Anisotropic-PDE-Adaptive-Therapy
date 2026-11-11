@@ -96,3 +96,22 @@ def test_chain_with_rigid_and_downsampling_is_one_exact_4x4():
                                  rigid=rigid, scoring_to_atlas=au.downsample_to_1mm())
     assert m.shape == (4, 4) and np.allclose(m[3], [0, 0, 0, 1])
     assert np.allclose(m @ [1, 1, 1, 1], [2.5, 2.5, 5.5, 1])  # 2*1+0.5, then +3 mm rigid shift on z
+
+
+def test_existing_track_b_2mm_grid_maps_scoring_voxel_i_to_1mm_index_2i():
+    """The only coded Track B 2 mm operation (fk_mu_development_data._target_grid + nibabel resample_from_to,
+    nearest neighbour) keeps the origin and doubles spacing: 2 mm voxel i samples 1 mm index 2i, not 2i + 0.5."""
+    from nibabel.processing import resample_from_to
+    from src.fk_mu_development_data import _target_grid
+    aff = np.array([[-1.0, 0, 0, 90], [0, 1, 0, -126], [0, 0, 1, -72], [0, 0, 0, 1]])   # LUMIERE atlas affine
+    shape = (182, 218, 182)
+    grid_shape, aff2 = _target_grid({"shape": shape, "affine": aff})
+    assert grid_shape == (91, 109, 91)
+    vol = np.zeros(shape, np.uint8)
+    vol[40, 50, 60] = 1                                    # even indices -> lands exactly on 2 mm voxel (20,25,30)
+    vol[41, 51, 61] = 1                                    # odd neighbour is never sampled by nearest neighbour
+    out = np.asarray(resample_from_to(nib.Nifti1Image(vol, aff), (grid_shape, aff2), order=0).dataobj)
+    assert out[20, 25, 30] == 1 and out.sum() == 1
+    m = np.linalg.inv(aff) @ aff2
+    assert np.allclose(m, au.downsample_to_1mm(offset=0.0))
+    assert not np.allclose(m, au.downsample_to_1mm(offset=0.5))

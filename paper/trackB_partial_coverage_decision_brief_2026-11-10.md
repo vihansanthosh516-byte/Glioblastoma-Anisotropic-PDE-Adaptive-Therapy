@@ -68,11 +68,28 @@ Code: `src/fk_lumiere_transform_audit.py`. Records: `output/track_b_lumiere_tran
 | Direction | **Ambiguous.** ITK files usually store the resampling map (fixed to moving), but which image was fixed in DeepBraTumIA is not documented in files read here. Metadata evidence: mapping the atlas centre through inverse(T) lands nearer the native grid centre in 74/84 visits (median 40.7 mm vs 80.4 mm; outliers up to 695 vs 75 mm). This favours "stored T maps native to atlas". It is evidence, not proof. | **Not frozen** |
 | Fits the 4x4 `geometric_coverage` method | Yes, for every link: native affine, rigid .tfm, visit-3 rigid refinement (`rigid_voxel_map` equals `apply_rigid`, tested) and 2 mm downsampling | Representable, once direction is fixed |
 | Visit-3 rigid refinement | Not run (needs the approved MRI-only read) | Missing |
-| 2 mm block centre offset | `downsample_to_1mm` uses 2i + 0.5 | Protocol choice; not frozen |
+| 2 mm grid centre mapping | See "Geometry choices" below: the existing Track B 2 mm operation maps voxel i to 1 mm index 2i (not 2i + 0.5) | Proposed rule; not frozen |
 
 Composition per visit (scoring voxel to native voxel): `inv(native_affine) @ atlas_to_native_ras @ atlas_affine [@ rigid for visit 3] @ downsample`. Visit 2 has no rigid factor. Visit 1 depends on the rule below.
 
 Synthetic tests (`tests/test_fk_lumiere_transform_audit.py`, 7 tests, plus `tests/test_fk_longitudinal_prep.py`; 20 passed in the scratch copy): header affines match nibabel for qform and sform; the ITK centre convention; deformable types are refused, not approximated; LPS-to-RAS conversion; rigid map equals `apply_rigid`; known-geometry coverage, where the right direction and the wrong direction give different masks; one exact 4x4 for the full chain.
+
+### Geometry choices (2026-11-10; documentation, transform text, headers, synthetic checks; no count)
+
+**1. `.tfm` direction: UNRESOLVED.** Evidence:
+
+- LUMIERE readme (`data/external/lumiere/LUMIERE-readme.pdf`): `ct1.tfm` is the "transformation mapping the native CT1 space to the atlas space". In ITK this wording fits both readings: the image is moved native-to-atlas, which in ITK resampling means the stored point map goes atlas-to-native. It does not say which.
+- DeepBraTumIA is closed-source (NITRC; licence "Attribution Non-Commercial No Derivatives"). The NITRC page gives no transform definition. The publisher repo (`github.com/ysuter/gbm-data-longitudinal`) has HD-GLIO-AUTO scripts only, with no DeepBraTumIA transform code.
+- Transform text: all 84 files share one rotation centre, (0.5, 17.5, 18.5) mm LPS. This equals the atlas grid centre exactly (atlas affine converted to LPS). ITK centred initialisers take the centre from the fixed image, so this fits "fixed = atlas", which would make the stored T map atlas to native. **It is not decisive**: ITK `GetInverse()` keeps the same centre, so a stored inverse looks the same.
+- Header geometry (`direction_check.json`): the inverse of T maps the atlas centre nearer the native grid centre in 74 of 84 visits. This points the other way. It is weak evidence, because the native grid centre is not the brain centre (field of view offsets are common).
+- The two clues disagree, and neither is decisive. **Direction is not chosen.** It was not chosen by cohort size, and no count was made.
+- Decisive check (needs separate approval): map the publisher's native CT1 brain mask (`native/skull_strip/ct1_brain_mask.nii.gz`, not a tumor label) through both directions and compare it with the atlas brain mask. This reads mask voxels, which is outside the current scope. Another way is to ask the dataset authors.
+
+**2. 2 mm scoring-grid centre mapping: PROPOSED, not frozen.** No LUMIERE 2 mm resampler is coded; the protocol states only the shape 91 x 109 x 91. The only coded Track B 2 mm operation is `src/fk_mu_development_data.py::_target_grid` + nibabel `resample_from_to(order=0)`. It keeps the 1 mm origin and doubles the spacing, so 2 mm voxel i is centred at 1 mm index **2i** (shape ceil(n/2) = 91 x 109 x 91). A block-average resampler would centre at 2i + 0.5 instead. A synthetic test (`test_existing_track_b_2mm_grid_maps_scoring_voxel_i_to_1mm_index_2i`) confirms 2i on the LUMIERE atlas affine and grid, and shows that 2i + 0.5 does not match. Proposed frozen rule: **scoring voxel i maps to 1 mm atlas index 2i, matching the existing Track B operation**, with labels and masks resampled by nearest neighbour. `downsample_to_1mm` must then be called with `offset=0.0`; its current default (0.5) does not match and must not be used. This rule does not depend on any patient data.
+
+**3. Visit 1:** draft amendment `paper/trackB_visit1_alignment_amendment_draft_2026-11-10.md` (not adopted). It recommends MRI-only rigid registration to visit 2 with the frozen QC (details below).
+
+Tests: `tests/test_fk_lumiere_transform_audit.py`, 8 passed in the scratch copy.
 
 ### Visit-1 alignment choice (recommendation only; no amendment adopted)
 
@@ -88,10 +105,10 @@ Synthetic tests (`tests/test_fk_lumiere_transform_audit.py`, 7 tests, plus `test
 
 **No. The count stays blocked.** Missing:
 
-1. A frozen .tfm direction. This needs DeepBraTumIA documentation or source showing the registration's fixed image, or a frozen rule chosen before any count (for example, the metadata evidence above) and stated as an assumption.
+1. A resolved .tfm direction. The documentation and the transform text are not decisive (see Geometry choices). It needs the native-brain-mask check (separate mask-voxel approval) or the dataset authors' answer.
 2. The visit-3 rigid refinement transforms (the approved MRI-only read of visit-2/3 atlas CT1 and visit-2 brain mask).
 3. A frozen visit-1 rule (amendment). Under Option 1, also the visit-1 registrations and QC.
-4. The frozen 2 mm block centre convention.
+4. Adoption of the proposed 2 mm rule (voxel i maps to 1 mm index 2i).
 5. A runner that composes the chain per visit and feeds `coverage_from_geometry`, with tests. Not built.
 
 ## Option A: exclude partial-coverage patients from all arms
