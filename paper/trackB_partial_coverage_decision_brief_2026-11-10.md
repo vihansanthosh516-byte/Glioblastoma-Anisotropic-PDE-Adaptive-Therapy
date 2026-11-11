@@ -2,7 +2,15 @@
 
 **Status: brief only. No option adopted. No code changed.** Source: `paper/trackB_partial_coverage_pde_count_amendment_draft_2026-11-10.md`. Current code fails closed: with any partial-coverage patient, the candidate, PDE-only, ablation and count arms are not scored and the result is `incomplete` (tests: `tests/test_track_b_validity_masks.py`).
 
-**Unknown that drives feasibility:** how many LUMIERE patients have partial coverage. This has not been counted. It can be counted from scan geometry (headers and resampling transforms) alone, with no tumor labels and no voxel intensities read.
+**Unknown that drives feasibility:** how many LUMIERE patients have partial coverage. This has not been counted.
+
+**Correction (2026-11-10).** An earlier version said the count needs only headers and transforms, with no image intensities read. That was wrong. The coverage mask and the count use geometry only. But the exact target-to-origin transform they need does not exist yet:
+
+- It is produced by `src/fk_longitudinal_prep.py::register_rigid_mri`, which uses visit-2 and visit-3 CT1 MRI intensities (no label input).
+- No LUMIERE transform is recorded. `output/track_b_lumiere_inventory_20261031/header_check.json` stores no affine matrices (keys: source, read, files_per_visit, n_eligible, n_excluded, grid_counts, problems, patients). `src/fk_nifti_header_audit.py` reads affines to check agreement but does not save them.
+- `output/cfb_registration_qc_20261028/registration_qc.json` is a different cohort (CFB-GBM) and stores no transform matrices.
+
+So the transform must first come from the approved MRI-only registration step. Tumor-label files stay closed throughout.
 
 ## Option A: exclude partial-coverage patients from all arms
 
@@ -45,13 +53,22 @@
 
 **Option A.** It keeps every frozen estimand, keeps one cohort, and keeps all comparisons paired. It is the smallest change. Its cost (smaller, possibly biased population) is stated, not hidden. Option C can be kept as later, separately frozen method work.
 
-Do first: count partial-coverage patients from geometry only. If the full-coverage cohort is below the frozen minimum, A stops the run, and the choice must be reopened. Do not switch options after seeing any target.
+Option A is conditional on meeting the frozen minimum (`MIN_ELIGIBLE_PATIENTS = 25`, `src/fk_lumiere_runner.py:34`).
+
+## Decision sequence for Option A
+
+1. Establish each patient's exact transform with the approved MRI-only registration step (`register_rigid_mri`, CT1 intensities only). Record full matrices and QC. No tumor label is opened.
+2. Build coverage masks from those transforms and the grids (geometry only). Count patients whose common support covers the whole forecast domain. No tumor label is opened.
+3. Apply the frozen 25-patient minimum. If fewer than 25 remain, the run stops with no scoring, and the option choice is reopened.
+4. If 25 or more remain, freeze the cohort (patient list and transforms, hashed) before any target-mask read.
+
+Do not switch options after seeing any target.
 
 ## Decision needed from you
 
 Reply with one of:
 
-1. "Adopt Option A: exclude patients whose geometry-derived common support does not cover the whole forecast domain, from all arms, decided before any target is read. The frozen minimum stop rule applies unchanged. Approve a geometry-only count of eligible patients first." (recommended)
+1. "Adopt Option A, conditional on the frozen 25-patient minimum: exclude patients whose geometry-derived common support does not cover the whole forecast domain, from all arms. Approve steps 1-4 above: MRI-only registration to record transforms, then a geometry-only coverage count with tumor labels closed, then the minimum check, then a cohort freeze before any target-mask read." (recommended)
 2. "Adopt Option B with primary cohort = [all patients / full-coverage subset]."
 
 Option C would need a separate method plan; it is not a short decision.
