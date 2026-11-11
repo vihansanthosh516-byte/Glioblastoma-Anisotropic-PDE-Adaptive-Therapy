@@ -59,7 +59,12 @@ def main():
             if r["passed"]:
                 d = _visit_dirs(names, pid)[(audit[pid][1]["week"], audit[pid][1]["order"])]
                 img = nib.Nifti1Image.from_bytes(gzip.decompress(zf.read(d + ATLAS_MASK)))
-                row.update(patient_support(audit[pid], r, np.asarray(img.dataobj) > 0))
+                try:
+                    row.update(patient_support(audit[pid], r, np.asarray(img.dataobj) > 0))
+                except ValueError as exc:      # empty/invalid support or domain: recorded failure, not coverage
+                    row.update({"support_failure": str(exc), "full_domain_coverage": False})
+                if row.get("domain_voxels") == 0:
+                    row.update({"support_failure": "empty forecast domain", "full_domain_coverage": False})
             row["eligible"] = bool(r["passed"] and row.get("full_domain_coverage"))
             rows[pid] = row
     eligible = sorted(p for p, r in rows.items() if r["eligible"])
@@ -69,7 +74,9 @@ def main():
            "inputs_sha256": {str(reg_path.relative_to(PROJECT_ROOT)): _sha(reg_path),
                              str(audit_path.relative_to(PROJECT_ROOT)): _sha(audit_path)},
            "n_patients": len(rows), "n_registration_failed": sum(not r["registration_passed"] for r in rows.values()),
-           "n_partial_coverage": sum(r["registration_passed"] and not r["eligible"] for r in rows.values()),
+           "n_support_failure": sum("support_failure" in r for r in rows.values()),
+           "n_partial_coverage": sum(r["registration_passed"] and not r["eligible"] and "support_failure" not in r
+                                     for r in rows.values()),
            "n_eligible": n, "minimum": MIN_ELIGIBLE_PATIENTS,
            "decision": ("proceed: eligible list frozen before any target read" if n >= MIN_ELIGIBLE_PATIENTS
                         else f"stop: {n} eligible < {MIN_ELIGIBLE_PATIENTS}; no scoring"),
