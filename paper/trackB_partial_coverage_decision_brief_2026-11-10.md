@@ -6,11 +6,52 @@
 
 **Correction (2026-11-10).** An earlier version said the count needs only headers and transforms, with no image intensities read. That was wrong. The coverage mask and the count use geometry only. But the exact target-to-origin transform they need does not exist yet:
 
-- It is produced by `src/fk_longitudinal_prep.py::register_rigid_mri`, which uses visit-2 and visit-3 CT1 MRI intensities (no label input).
+- Its visit-3 rigid link is produced by `src/fk_longitudinal_prep.py::register_rigid_mri`, which uses visit-2 and visit-3 CT1 MRI intensities (no label input). This link alone is not enough; see the transform-chain audit below for the other links.
 - No LUMIERE transform is recorded. `output/track_b_lumiere_inventory_20261031/header_check.json` stores no affine matrices (keys: source, read, files_per_visit, n_eligible, n_excluded, grid_counts, problems, patients). `src/fk_nifti_header_audit.py` reads affines to check agreement but does not save them.
 - `output/cfb_registration_qc_20261028/registration_qc.json` is a different cohort (CFB-GBM) and stores no transform matrices.
 
 So the transform must first come from the approved MRI-only registration step. Tumor-label files stay closed throughout.
+
+## Transform-chain audit (2026-11-10; docs, code, headers and zip file names only)
+
+**Result: the chain is incomplete. The coverage count stays BLOCKED.** A single visit-3-to-visit-2 rigid transform is not enough.
+
+### What `coverage_from_geometry` needs
+
+`coverage_from_geometry(visit, moving_shape, output_shape, output_to_input)` (`src/track_b_coverage_scoring.py:59`) needs, for each visit, one map from a voxel of the scoring grid (2 mm atlas grid, 91 x 109 x 91) to a voxel of the grid where that visit was really acquired. Coverage is "where the scanner saw". For LUMIERE this is the **native** scan grid, not the publisher's atlas grid: the atlas images are already resampled onto a full 182 x 218 x 182 grid, so coverage computed on the atlas grid alone would be trivially full and would hide real field-of-view loss.
+
+Full chain per visit: 2 mm scoring voxel -> 1 mm atlas voxel -> (visit 3 only: rigid refinement to visit 2) -> atlas physical space -> inverse of the publisher's native-to-atlas transform -> native physical space -> native voxel (native NIfTI affine).
+
+### Per visit
+
+| Link | Visit 1 (history) | Visit 2 (origin) | Visit 3 (target) | Exists? |
+|---|---|---|---|---|
+| Native source grid (shape) | `CT1.nii.gz` (native) | same | same | Files present in zip (632 CT1 files). Native headers **not read**; `header_check.json` covers atlas files only. |
+| Native affine (full 4x4) | needed | needed | needed | **Missing.** `src/fk_lumiere_headers.py` saves shape, spacing, qform/sform codes only, and reads atlas files only. |
+| Publisher native-to-atlas transform | `DeepBraTumIA-segmentation/native/transformation/ct1.tfm` | same | same | Files present (599 per sequence). **Not parsed.** Type (rigid, affine or deformable), direction and coordinate convention (ITK LPS vs. NIfTI RAS) **unverified**. |
+| Atlas grid (1 mm) and 2 mm scoring grid | 182 x 218 x 182 at 1 mm; 2 mm = 91 x 109 x 91 | same | same | Shape and spacing verified from headers (84 headers, one grid). Atlas affine **not saved**. Atlas-1 mm to 2 mm mapping: fixed by protocol, not yet written as code. |
+| Visit-to-visit MRI registration | **None planned.** Protocol assumes visit 1 is aligned to visit 2 through the atlas only. | Fixed reference | `register_rigid_mri`, visit-3 atlas CT1 onto visit-2 atlas CT1 (`paper/track_b_no_contact_dataset_plan_2026-10-31.md` section 5b) | Visit 3: method frozen, **not run**, no transforms recorded. Visit 1: **no transform and no QC** (assumed identity in atlas space, unverified). |
+| Exact `output_to_input` for coverage | composition of the rows above | composition | composition including rigid | **Not built.** No code composes the chain. |
+
+The only saved registration output, `output/cfb_registration_qc_20261028/registration_qc.json`, is a different cohort (CFB-GBM) and stores no matrices.
+
+### Does the proposed MRI-only read approval cover it?
+
+No. The proposed preflight scope (`paper/track_b_readiness_audit_2026-11-01.md`) reads 84 files: visit-2 and visit-3 atlas CT1, plus visit-2 atlas brain mask, for 28 patients. It explicitly excludes visit-1 files and native-space files. So it yields only the visit-3 rigid refinement. It does **not** cover:
+
+1. Native CT1 headers with full affines for visits 1, 2 and 3 (header-only; no voxels needed, but outside the listed scope).
+2. The publisher `.tfm` files for visits 1, 2 and 3 (text files, not image voxels; outside the listed scope).
+3. Any check that visit 1 is aligned with visit 2. Either an approved visit-1-to-visit-2 MRI-only registration with QC, or a documented decision that the atlas alignment is accepted for visit 1 (with its weakness stated). Neither exists.
+4. Code that composes the chain and synthetic tests of it (known transforms, ITK/NIfTI convention, direction).
+
+No tumor-label file (`seg_mask`, native seg masks, HD-GLIO segmentations) is needed for any link.
+
+### What must exist before any count
+
+- Approval of an extended read scope: native CT1 headers (full affines) and `ct1.tfm` for visits 1-3, plus the visit-2/3 atlas CT1 and visit-2 brain mask already proposed. Tumor-label files stay closed.
+- A decision on visit 1: MRI-only rigid registration to visit 2 with the same frozen QC, or atlas-only alignment accepted as a stated assumption. Either needs a dated amendment.
+- Code to parse `.tfm`, verify its type and convention, and compose the full chain; synthetic tests.
+- Then the steps in "Decision sequence for Option A" below.
 
 ## Option A: exclude partial-coverage patients from all arms
 
@@ -57,7 +98,7 @@ Option A is conditional on meeting the frozen minimum (`MIN_ELIGIBLE_PATIENTS = 
 
 ## Decision sequence for Option A
 
-1. Establish each patient's exact transform with the approved MRI-only registration step (`register_rigid_mri`, CT1 intensities only). Record full matrices and QC. No tumor label is opened.
+1. Establish the full transform chain for visits 1, 2 and 3 (see the transform-chain audit): native affines, publisher `.tfm`, the visit-3 rigid refinement (`register_rigid_mri`, CT1 intensities only), and the approved visit-1 handling. Record full matrices and QC. No tumor label is opened. This needs a wider read approval than the current 84-file proposal.
 2. Build coverage masks from those transforms and the grids (geometry only). Count patients whose common support covers the whole forecast domain. No tumor label is opened.
 3. Apply the frozen 25-patient minimum. If fewer than 25 remain, the run stops with no scoring, and the option choice is reopened.
 4. If 25 or more remain, freeze the cohort (patient list and transforms, hashed) before any target-mask read.
@@ -68,7 +109,7 @@ Do not switch options after seeing any target.
 
 Reply with one of:
 
-1. "Adopt Option A, conditional on the frozen 25-patient minimum: exclude patients whose geometry-derived common support does not cover the whole forecast domain, from all arms. Approve steps 1-4 above: MRI-only registration to record transforms, then a geometry-only coverage count with tumor labels closed, then the minimum check, then a cohort freeze before any target-mask read." (recommended)
+1. "Adopt Option A, conditional on the frozen 25-patient minimum: exclude patients whose geometry-derived common support does not cover the whole forecast domain, from all arms. Approve steps 1-4 above: a wider read scope (native CT1 headers and `ct1.tfm` for visits 1-3, plus the proposed atlas CT1 and brain-mask files) and a dated visit-1 handling amendment, MRI-only registration and chain code to record transforms, then a geometry-only coverage count with tumor labels closed, then the minimum check, then a cohort freeze before any target-mask read." (recommended)
 2. "Adopt Option B with primary cohort = [all patients / full-coverage subset]."
 
 Option C would need a separate method plan; it is not a short decision.
