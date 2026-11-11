@@ -421,8 +421,13 @@ class CourseCappedPolicy:
         self._used += actual.astype(np.int16)
 
 
-def baseline_policy_catalog(settings: PolicyBenchmarkSettings) -> dict:
-    """Return fixed scan-rule and state-estimation comparators with their provenance."""
+def baseline_policy_catalog(settings: PolicyBenchmarkSettings, filter_ranges=None) -> dict:
+    """Return fixed scan-rule and state-estimation comparators with their provenance.
+
+    filter_ranges: optional particle-filter prior passed to every filter-based arm
+    (integrated benchmark: PF_PRIOR_INTEGRATED_V3). None keeps each arm's historical prior.
+    """
+    fr = {} if filter_ranges is None else {"ranges": filter_ranges}
     scan_configurations = {
         "raw_zhang_1.0_0.5": "RawThreshold(a_on=1.0, a_off=0.5)",
         "raw_0.6_0.6": "RawThreshold(a_on=0.6, a_off=0.6)",
@@ -453,7 +458,7 @@ def baseline_policy_catalog(settings: PolicyBenchmarkSettings) -> dict:
     catalog.update({
         "filtered_threshold_pilot2": {
             "factory": lambda: tc.FilteredThreshold(
-                0.6, 0.3, 0.6, 0.05, n_particles=settings.mpc_particles
+                0.6, 0.3, 0.6, 0.05, n_particles=settings.mpc_particles, **fr
             ),
             "max_courses": tc.BUDGET,
             "family": "state_estimation",
@@ -469,7 +474,7 @@ def baseline_policy_catalog(settings: PolicyBenchmarkSettings) -> dict:
         },
         "pf_wide_containment": {
             "factory": lambda: tc.RiskContainment(
-                0.10, 2, 0.0, True, n_particles=settings.mpc_particles
+                0.10, 2, 0.0, True, n_particles=settings.mpc_particles, **fr
             ),
             "max_courses": tc.BUDGET,
             "family": "state_estimation",
@@ -482,7 +487,7 @@ def baseline_policy_catalog(settings: PolicyBenchmarkSettings) -> dict:
         },
         "pf_tail_trigger_candidate": {
             "factory": lambda: tc.RiskContainment(
-                0.05, 4, 0.0, True, n_particles=settings.mpc_particles, front=4
+                0.05, 4, 0.0, True, n_particles=settings.mpc_particles, front=4, **fr
             ),
             "max_courses": tc.BUDGET,
             "family": "state_estimation",
@@ -495,7 +500,7 @@ def baseline_policy_catalog(settings: PolicyBenchmarkSettings) -> dict:
         },
         "pf_holiday_containment": {
             "factory": lambda: tc.HolidayContainment(
-                0.10, 2, front=0, max_run=2, n_particles=settings.mpc_particles
+                0.10, 2, front=0, max_run=2, n_particles=settings.mpc_particles, **fr
             ),
             "max_courses": tc.BUDGET,
             "family": "state_estimation",
@@ -524,7 +529,7 @@ def baseline_policy_catalog(settings: PolicyBenchmarkSettings) -> dict:
             "factory": lambda a_on=a_on, a_off=a_off, a_resistance=a_resistance, p_trigger=p_trigger: (
                 tc.FilteredThreshold(
                     a_on, a_off, a_resistance, p_trigger,
-                    n_particles=settings.mpc_particles,
+                    n_particles=settings.mpc_particles, **fr,
                 )
             ),
             "max_courses": tc.BUDGET,
@@ -838,8 +843,13 @@ def run_shared_policy_world(
     settings: PolicyBenchmarkSettings = PolicyBenchmarkSettings(),
     include_ambiguity_controller: bool = False,
     primary_contrast: str = "loo",
+    filter_ranges=None,
 ) -> dict:
     """Run a three-cohort development comparison in one virtual world.
+
+    filter_ranges: particle-filter prior for every filter-based arm. None keeps the
+    historical behavior (INTEGRATED_BELIEF_RANGES for MPC arms, legacy priors for
+    baseline filter arms). The integrated driver passes PF_PRIOR_INTEGRATED_V3.
 
     Selection patients choose schedules and baseline families. Calibration patients
     estimate feedback-policy course use. Their target doses choose randomized mixtures
@@ -955,7 +965,10 @@ def run_shared_policy_world(
     chosen_fixed = select_fixed_schedule(
         selection_scenarios, seed=selection_seed_key, settings=settings
     )
-    baseline_catalog = baseline_policy_catalog(settings)
+    baseline_catalog = (
+        baseline_policy_catalog(settings) if filter_ranges is None
+        else baseline_policy_catalog(settings, filter_ranges)
+    )
     baseline_selection = select_baseline_policy_families(
         selection_scenarios, seed=selection_seed_key, settings=settings,
         catalog=baseline_catalog,
@@ -990,7 +1003,7 @@ def run_shared_policy_world(
         "assumed_future_scan_miss_probability": (
             settings.mpc_assumed_future_scan_miss_probability
         ),
-        "ranges": mpc.INTEGRATED_BELIEF_RANGES,
+        "ranges": mpc.INTEGRATED_BELIEF_RANGES if filter_ranges is None else filter_ranges,
     }
     def make_signal_policies(signal_observations):
         policies_for_signals = {

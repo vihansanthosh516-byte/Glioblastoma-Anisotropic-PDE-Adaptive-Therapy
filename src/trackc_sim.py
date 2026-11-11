@@ -411,8 +411,8 @@ class HolidayContainment(RiskContainment):
     (script 176; aimed at reversible drug-induced tolerance, where time off drug lets
     tolerant cells revert). The run counter uses the courses actually given."""
 
-    def __init__(self, p_star, horizon=2, front=0, max_run=2, n_particles=500):
-        super().__init__(p_star, horizon, 0.0, True, n_particles, front=front)
+    def __init__(self, p_star, horizon=2, front=0, max_run=2, n_particles=500, ranges=None):
+        super().__init__(p_star, horizon, 0.0, True, n_particles, ranges=ranges, front=front)
         self.max_run = max_run
 
     def reset(self, scen, rng):

@@ -76,8 +76,15 @@ def test_every_scan_sensitivity_runs_with_configured_forecast(benchmark):
 
 
 def test_particle_filter_prior_matches_belief_ranges(mpc):
+    """Config primary prior is V3 (amendment rev 3); NARROW_V2 equals the old integrated prior."""
+    from trackc_filter_priors import PF_PRIOR_INTEGRATED_V3, PF_PRIOR_NARROW_V2
+    assert PF_PRIOR_NARROW_V2 == mpc.INTEGRATED_BELIEF_RANGES
+    narrow = CONFIG["particle_filter_prior"]["sensitivity_priors"]["PF_PRIOR_NARROW_V2"]
+    assert tuple(narrow["r_day_minus1_log_uniform"]) == PF_PRIOR_NARROW_V2["r"][:2]
+    assert tuple(narrow["B0_uniform"]) == PF_PRIOR_NARROW_V2["B0"][:2]
     prior = CONFIG["particle_filter_prior"]
-    ranges = mpc.INTEGRATED_BELIEF_RANGES
+    assert prior["version"] == "PF_PRIOR_INTEGRATED_V3"
+    ranges = PF_PRIOR_INTEGRATED_V3
     assert tuple(prior["r_day_minus1_log_uniform"]) == ranges["r"][:2]
     assert tuple(prior["m_log_uniform"]) == ranges["m"][:2]
     assert ranges["f0"][0] == pytest.approx(_f0_low(prior["f0_log_uniform"][0]), rel=1e-15)

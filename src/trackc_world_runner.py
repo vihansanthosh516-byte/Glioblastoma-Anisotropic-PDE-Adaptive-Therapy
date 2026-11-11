@@ -7,6 +7,7 @@ from numbers import Integral
 
 import numpy as np
 import trackc_integrated_sampler as integrated_sampler
+from trackc_filter_priors import PF_PRIOR_INTEGRATED_V3
 from trackc_integrated_signal_model import SignalModelParameters, generate_integrated_signals
 from trackc_world_schedule import validate_development_schedule
 
@@ -105,6 +106,7 @@ def prepare_synthetic_world(world, *, family, patients_per_cohort, signal_parame
         "schedule_mixture_seed": [world["schedule_mixture"]], "settings": settings,
         "include_ambiguity_controller": True,
         "primary_contrast": "minimax",
+        "filter_ranges": PF_PRIOR_INTEGRATED_V3,
     }
     world_bytes = json.dumps(
         {"family": family, "parameters": latent_world}, sort_keys=True,
