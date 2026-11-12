@@ -47,3 +47,17 @@ TCIA controlled-access collections are requested through dbGaP (phs004225 for mo
 ## Not verified
 
 Per-patient study counts for Ivy GAP; contents of the Ivy GAP clinical database; whether Burdenko follow-up scans include FLAIR for every visit; Ntafoulis data-availability sentence in full; dbGaP processing time.
+
+## Addendum (2026-11-12, later): user cannot make requests; open-only search
+
+The user states they cannot ask anyone for data, so sponsor-dependent targets (Burdenko images, Ivy GAP images) and author emails are parked. The user also proposed relaxing tests; this was declined (project rule: never tune toward a positive result). Search continued for sources that need no request. Metadata pages only; nothing downloaded.
+
+| Candidate | Verified facts (TCIA record, read 2026-11-12) | Open without request? | Limits |
+|---|---|---|---|
+| **ACRIN-DSC-MR-Brain (ACRIN 6677 / RTOG 0625)** https://www.cancerimagingarchive.net/collection/acrin-dsc-mr-brain/ | 123 subjects, 566 studies; randomized phase II trial of bevacizumab with irinotecan or temozolomide in recurrent GBM; baseline plus at least one post-treatment MRI; two central neuroradiologists serially measured 2D and 3D enhancement and FLAIR volume; outcome variables include progression and survival dates | **Clinical zip (2.2 MB): CC BY 4.0, direct download.** Images: NIH controlled access (not usable) | Whether the central-reader measurements per time point are inside the open zip is NOT verified (page does not say which form holds them). Recurrent disease on bevacizumab (pseudo-response). No expression data. Already analysed by the trial authors (Boxerman 2013), so novelty needs a new question. Not in this project's used or rejected lists. |
+| ACRIN-FMISO-Brain (ACRIN 6684) https://www.cancerimagingarchive.net/collection/acrin-fmiso-brain/ | 45 subjects; newly diagnosed GBM, TMZ plus RT; MGMT status; progression and survival dates; enhancing-lesion VOIs | Clinical: CC BY 3.0. Images: controlled | Mid- and post-therapy scans were dropped after the 4th case, so it is mostly baseline: not longitudinal |
+| Burdenko clinical CSV | MGMT, IDH, treatment-response status (response, progression, pseudoprogression) for up to 180 patients | CSV: CC BY 4.0. Images: controlled | No image-derived measurements in the CSV as far as the record states |
+| Sussman et al. 2026 (Cell Reports Medicine) | Longitudinal single-nucleus atlas, 16 patients | No (dbGaP phs002371) | Pediatric high-grade glioma, not adult GBM; no MRI |
+| GSE300985 (GBM organoids) | RNA-seq of organoids and matched tissue | Yes (GEO) | Radiotherapy response, not TMZ; counts per line not checked |
+
+**Lead worth a gate check:** the ACRIN 6677 open clinical tables. If they hold per-visit tumor measurements, they would give a fresh, open, patient-level longitudinal cohort (tabular, no registration, no voxel reads) with treatment arm and outcomes. It would support a pre-registered question about measured radiographic change under therapy. It would not support biology integration (no expression) or cellular drug resistance. A dated protocol is required before the zip is opened.
