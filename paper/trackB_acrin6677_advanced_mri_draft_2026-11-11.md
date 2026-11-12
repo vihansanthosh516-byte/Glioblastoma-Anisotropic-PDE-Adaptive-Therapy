@@ -1,6 +1,8 @@
 # Exploratory advanced-MRI forecasting protocol draft (2026-11-11)
 
-**Draft only. No advanced-MRI rows inspected and no evaluation run.** The area result already informed this follow-up, so reuse of this cohort is exploratory. [Area result](trackB_acrin6677_result_2026-11-11.md)
+**Historical draft; superseded by the frozen protocol.** The metadata-only linkage audit found 15 eligible patients against a minimum of 25, so this analysis stopped before measurement magnitudes were evaluated. No model was fit. See the [frozen protocol](trackB_acrin6677_advanced_mri_protocol_2026-11-11.md) and [no-go result](trackB_acrin6677_advanced_mri_linkage_result_2026-11-11.md). The area result already informed this follow-up, so any later use of this cohort remains exploratory. [Area result](trackB_acrin6677_result_2026-11-11.md)
+
+The draft text below is retained as history. Its proposed DCE and spectroscopy extensions were withdrawn by the frozen protocol and must not be treated as active options.
 
 Question. Does DSC perfusion add information to the last enhancing area when forecasting the next measured area? Use SC as the primary form for this draft. Consider DCE permeability from DE and spectroscopy from MS as separately labeled descriptive extensions, subject to metadata coverage and documented units.
 

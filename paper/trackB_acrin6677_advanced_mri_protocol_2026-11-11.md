@@ -1,6 +1,6 @@
 # ACRIN 6677 advanced-MRI increment protocol
 
-**Status: frozen for a metadata-only feasibility audit.** Freeze date: 2026-11-11 (America/Chicago). The area forecast has already been evaluated on this cohort, so any advanced-MRI analysis will be exploratory and will not be an independent confirmation. No advanced-MRI measurement magnitudes are authorized by this protocol until the metadata audit meets the frozen feasibility rule below.
+**Status: frozen protocol; feasibility gate failed.** Freeze date: 2026-11-11 (America/Chicago). The 2026-11-11 metadata audit found 15 eligible patients against the frozen minimum of 25. Stop before reading measurement magnitudes or fitting the model. See [linkage result](trackB_acrin6677_advanced_mri_linkage_result_2026-11-11.md). The area forecast has already been evaluated on this cohort, so any advanced-MRI analysis would be exploratory and not an independent confirmation.
 
 ## Question
 

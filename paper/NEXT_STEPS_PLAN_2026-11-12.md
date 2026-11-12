@@ -1,6 +1,8 @@
 # Complete next-steps plan (written 2026-11-12 for handoff to Claude or Codex)
 
-Read this file after `START_HERE.md`. It says exactly what to do next, in order. On resume, first run `git log --oneline -8` and `git status --short`, and check that the files named here exist.
+Read this file after `START_HERE.md`. It records the current state and next safe work. On resume, first run `git log --oneline -8` and `git status --short`, and check that the files named here exist.
+
+> **Track B status correction (2026-11-12):** ACRIN 6677 area forecasting was completed and failed its frozen rule. Its separate sRCBV linkage audit found 15 eligible patients against a frozen minimum of 25 and stopped before reading measurement magnitudes. Sections 2–8 below preserve the old ACRIN procedure for audit history only; do not execute them. See `paper/trackB_acrin6677_result_2026-11-11.md` and `paper/trackB_acrin6677_advanced_mri_linkage_result_2026-11-11.md`.
 
 ## 0. Where things stand (verified on disk 2026-11-12)
 
@@ -9,7 +11,7 @@ Read this file after `START_HERE.md`. It says exactly what to do next, in order.
 | Track A A5 | Failed frozen rule (4 of 6 donors, rule 5 of 6). Stays failed. | `output/trackA_yu2020/result.json` |
 | Track B Duke | Exploratory, cohort spent. | `paper/gap_status_2026-11-09.md` B1 |
 | Track B LUMIERE | No-go (7 of 28 passed QC). | `paper/trackB_lumiere_registration_nogo_2026-11-11.md` |
-| **Track B ACRIN 6677 (new, fresh cohort)** | Protocol frozen (commit 85378cb). Stage 0 done (commit 09f9a4e): gates S1, S2, S4 pass; **S3 open** (volume unit not documented). **No measurement value has been read.** | `paper/trackB_acrin6677_protocol_2026-11-12.md`, `paper/trackB_acrin6677_stage0_2026-11-12.md` |
+| **Track B ACRIN 6677** | Area forecast completed and failed. sRCBV exact-link feasibility audit stopped at 15/25 before measurement magnitudes. No further ACRIN model is active. | `paper/trackB_acrin6677_result_2026-11-11.md`, `paper/trackB_acrin6677_advanced_mri_linkage_result_2026-11-11.md` |
 | Track C | Confirmatory evaluation **stopped**; 14-day target unchanged (user decision 2026-11-10). Do not reopen or suggest changing it. | `START_HERE.md` |
 | Integration | No patient-level link among biology, MRI, and measured drug response exists in open data. | `paper/data_request_plan_2026-11-12.md` |
 | HGCC bridge | Withdrawn: no measured TMZ response found. | same file |
@@ -20,8 +22,8 @@ Data on disk: `data/acrin6677/ACRIN-DSC-MR-Brain-Full-Clinical.zip` (SHA-256 `58
 ## 1. Hard rules (do not break)
 
 1. Never tune, relax, or re-choose a test after seeing results. The user asked once to "bend the test"; this was declined and stays declined (project rule: never fabricate or tune toward a positive result).
-2. Do not read any ACRIN measurement value, outcome, or arm until Steps 2 and 3 below are committed.
-3. Do not change sections 3 to 6 of the ACRIN protocol. Any change is a dated amendment and must be labelled.
+2. The original pre-analysis ACRIN restriction is historical. The sRCBV feasibility rule now blocks further ACRIN measurement reads and model fitting on this cohort. Do not relax its 25-patient minimum.
+3. The old ACRIN instructions in sections 2–8 are historical. No ACRIN 6677 measurement or model analysis is active.
 4. Track C stays stopped. No policy outcomes.
 5. Report whatever the result is: success, failure, or inconclusive. Put the weakest point next to the result.
 6. Run Python that reads downloaded files with `python -I`. Scripts live in `src/`, never inside `data/acrin6677/`.
@@ -94,39 +96,34 @@ These use the same open file and need a short dated note before each one:
 2. Later windows (visits 2,3 to 4).
 3. By treatment arm (arm variable: find in form A0 dictionary; not yet identified).
 4. Early volume change versus survival (death days in form DS, `DSe5d`). Note: Boxerman 2013 already published early progression versus survival on this trial, so this is confirmatory of known work, not new.
-5. Advanced-MRI central-reader forms (DE: DCE Ktrans; SC: DSC perfusion; MS: spectroscopy) as predictors of later volume. This is the most likely place for something new, and it is where a pre-registered second protocol would be worth writing.
+5. **Completed feasibility check:** the SC sRCBV exact-link audit found 15 eligible patients against the frozen 25-patient minimum. It stopped before measurement magnitudes; no advanced-MRI model was run. See `paper/trackB_acrin6677_advanced_mri_linkage_result_2026-11-11.md`. The old suggestion to substitute DE or MS is withdrawn.
 
-## 9. The integration question (honest state and remaining options)
+## 9. Integration status and next route
 
-Open data cannot give a patient-level link among Track A biology, Track B MRI, and measured drug response. What can honestly be built:
+No patient-level link among Track A expression, Track B MRI, and measured drug response exists in the current evidence. The ACRIN 6677 area forecast failed its frozen rule; its sRCBV analysis stopped at 15 of 25 before reading values. It does not validate the Track C response curve. Track C policy evaluation remains stopped under the user's unchanged 14-day target.
 
-- **Track B to Track C link (real, modest):** ACRIN 6677 tests the Track C curve form (growth minus a decaying treatment term) on real treated patients. If Step 4 succeeds, say: "the simulator's response form is consistent with measured trajectories in one trial cohort". Do not say the simulator or its policies are validated.
-- **Track A to drug response (small, exploratory):** Ntafoulis 2023, GEO GSE232173 (24 cultures, RNA-seq, GPL20301). First find whether per-culture TMZ values are in the paper's supplementary tables (open). If yes, write a dated protocol for a descriptive association (n about 20, exploratory, in-vitro only). If no, it stays parked (needs an author email).
-- **Track A to Track B (pilot, parked):** Ivy GAP, 10 tumors with region RNA; images need a dbGaP sponsor.
-- **Call the whole thing what it is:** three tracks, one Track B to C consistency check on real data, and a simulated bridge for the rest.
+- **Track A to drug response:** Ntafoulis 2023 has RNA-seq for at most 24 cultures with measured in-vitro TMZ response. This could support a small descriptive association only; it cannot establish patient drug resistance or repair A5's failed rule.
+- **Track A to Track B:** Ivy GAP has region RNA for at most 10 tumors and images require controlled access. It cannot meet the 25-patient gate.
+- **Integrated claim:** any future A/B-to-C connection remains a simulation unless a matched patient cohort supplies the required measurements. Do not describe simulated treatment benefit as clinical benefit.
 
-Parked until the user has a sponsor or sends emails: Burdenko images, Ivy GAP images, Moniz Garcia (6 patients; the only source with all three data types), Ntafoulis extra data.
+## 10. Fresh-cohort screening after ACRIN no-go
 
-## 10. Further open-data searches not yet done (do after Step 5)
+Keep all cohort checks metadata-only until an eligible source, access terms, and exact repeated-measure linkage are established. Current candidate screen:
 
-Each is metadata-only first, gates as in `paper/trackB_fresh_cohort_screen_2026-11-11.md` (G5 now reads "open, or request allowed and feasible"):
+1. **ACRIN 6686 / RTOG 0825: strongest request-gated lead.** The trial protocol scheduled serial MRIs and central review. A published central-reader analysis used 284 patients with two timepoints only; it does not establish how many have three or more linked quantitative visits. The advanced-MRI subset enrolled 44 patients, with smaller per-timepoint evaluable counts. Requesting data requires the ECOG-ACRIN Data Access Committee; access, output terms, complete visit counts, and overlap with prior project cohorts remain unresolved. This is a candidate, not an eligible cohort. Sources: `https://www.acr.org/Clinical-Resources/Publications-and-Research/Clinical-Research/acrin-legacy-trials`, `https://pmc.ncbi.nlm.nih.gov/articles/PMC6120359/`, `https://pmc.ncbi.nlm.nih.gov/articles/PMC7906067/`.
+2. **BraTS Longitudinal:** a published benchmark reports 164 glioma patients with three to five scans each, but this project has prior BraTS exposure. Exact patient overlap, disease-specific eligible count, and dataset-use terms must be checked before any fresh-confirmation claim. Treat any reused or exposed subjects as exploratory. Source: `https://www.synapse.org/#!Synapse:syn28740011/wiki/70861`.
+3. **Burdenko-GBM-Progression:** 180 patients and serial imaging are reported, but images require controlled access, follow-up GTV labels cover only an unknown subset, and this project already used its clinical CSV. It is not fresh confirmation. Source: `https://www.cancerimagingarchive.net/collection/burdenko-gbm-progression/`.
+4. QIN-GBM Treatment Response is a repeatability study with double-baseline scans; Brain-Tumor-Progression has 20 patients and two exams; QIN-BRAIN-DSC-MRI has 49 subjects and 52 studies. These do not meet the current three-visit, 25-patient forecast gates.
 
-1. Other TCIA collections whose **clinical tables are CC BY** even when images are controlled: check every glioma collection's Data Access table for central-reader or volumetric measurement tables (ACRIN-FMISO has enhancing VOIs but mostly baseline; check RTOG/NRG trial collections, "QIN-BRAIN-DSC-MRI", "QIN GBM Treatment Response" (54 patients, two baseline scans plus follow-up), "Brain-Tumor-Progression" (20 patients)).
-2. Project Data Sphere and Vivli glioma trial tables (registration needed; check whether a student account is allowed).
-3. CGGA (open download): expression with TMZ treatment flag and survival, including recurrent samples. Already named in `paper/status_map_2026-11-10.md` item 5 for an MGMT association. Treatment history is a proxy, not measured response.
-4. GLASS consortium (Synapse, registration): primary and recurrent expression with treatment. No MRI.
-5. GDSC and CCLE glioma lines with TMZ IC50 (open). Serum lines; weak match to tissue.
-6. Supplementary tables of Nam 2023 and Skaga 2022 for per-culture TMZ values with public expression.
-7. UPENN-GBM (CC BY 4.0, 630 subjects): rejected earlier for Track B; re-read the rejection reason in `paper/track_b_external_cohort_screen_2026-10-28.md` before any second look.
+The next research task is to finish a source-checked, request-ready feasibility screen for ACRIN 6686 and BraTS Longitudinal. Do not download, contact anyone, read patient rows, or adopt a protocol until metadata availability, access terms, and overlap gates are clear. Do not lower the cohort threshold or change outcomes to obtain a positive result.
 
-## 11. Things only the user can do
+## 11. External actions and records
 
-1. Answer the S3 amendment question (Section 2).
-2. Save the Duke licence text and the school approval in `paper/` (gap U1, U2).
-3. Revoke the Zenodo token pasted earlier (gap U4).
-4. Decide the two Track C code choices (81 or 135 models; 112-day scan forecast length) (gap U7). These do not reopen evaluation.
-5. If a teacher or local professor can sponsor a dbGaP request, tell the assistant; the draft is in `paper/data_request_drafts_2026-11-12.md`.
+- ACRIN legacy data requests must go through the ECOG-ACRIN Data Access Committee. No request has been sent. A qualified sponsor may be required; the public access page does not establish that a trainee can apply independently.
+- The Duke result remains exploratory and its accepted license/share terms are not saved. Do not share Duke-derived summaries or weights until terms are verified.
+- The Zenodo access token was pasted into chat earlier. Revoke it and create a replacement privately; never store it in the repository or chat.
+- Track C's 14-day target and stop decision remain unchanged. Open code-setting decisions do not authorize policy outcome runs.
 
-## 12. What no plan can promise
+## 12. Claim boundary
 
-A positive or unique result cannot be guaranteed. The ACRIN test is a fair, fresh, pre-registered test, and that is the most direct way to an honest positive result if one exists. If it fails, the failure is reported and the next pre-registered idea (Section 8 item 5 is the best candidate) is tried on its own terms.
+No plan can guarantee a positive result or uniqueness. New analysis must use a predeclared question, cohort, endpoint, comparator, split, uncertainty method, and failure rule. Report failed or inconclusive results as observed. A better result cannot be created by relaxing eligibility, changing outcomes after inspection, or presenting simulation as patient evidence.

@@ -2,6 +2,8 @@
 
 **Status: frozen before any ACRIN 6677 file was downloaded or opened.** Written from the public TCIA record only (https://www.cancerimagingarchive.net/collection/acrin-dsc-mr-brain/, read 2026-11-12). The commit that adds this file is the freeze record. Any later change is a dated amendment and makes the affected analysis exploratory.
 
+> **Historical-status note (2026-11-12):** This initial protocol specified 3D tumor volume. Its volume-unit gate was not resolved; the analysis was amended to 2D area, then completed with a failed result. See `paper/trackB_acrin6677_amendment1_2026-11-11.md` and `paper/trackB_acrin6677_result_2026-11-11.md`. The later sRCBV feasibility audit also stopped at 15 of the required 25 patients; see `paper/trackB_acrin6677_advanced_mri_linkage_result_2026-11-11.md`.
+
 This is a new Track B analysis on a cohort this project has never used. It does not change the Duke result (exploratory, spent), the LUMIERE no-go, Track A's failed A5 rule, or the Track C stop and its 14-day target.
 
 ## 1. Data

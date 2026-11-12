@@ -2,6 +2,8 @@
 
 **Result: no candidate passes every gate. Recommendation: close patient-level Track B forecasting for now; keep the LUMIERE registration work as a feasibility result** (`paper/trackB_lumiere_registration_nogo_2026-11-11.md`). No code or frozen rule was changed. Nothing was downloaded, no one was contacted, and no image or mask voxel was read.
 
+> **Later update (2026-11-12):** ACRIN 6677 clinical tables were subsequently identified as a fresh, open tabular cohort and evaluated under their own frozen protocol. The area forecast failed its rule. The separate sRCBV exact-link audit found 15 eligible patients against a minimum of 25 and stopped before measurement magnitudes. ACRIN therefore does not provide an active Track B forecast path; this update does not change the bounded scope or findings of the screen above. See `paper/trackB_acrin6677_result_2026-11-11.md` and `paper/trackB_acrin6677_advanced_mri_linkage_result_2026-11-11.md`.
+
 ## Gates (frozen before the search; unknown is not a pass)
 
 G1 repeated scans supporting a forecast interval (at least three labelled visits per patient: two history, one target); G2 patient-level scan and segmentation links; G3 usable tumor labels with documented definitions; G4 enough eligible patients (frozen project minimum 25); G5 access and reuse terms that permit the analysis without a pending request; G6 no overlap with datasets or patients already used here.

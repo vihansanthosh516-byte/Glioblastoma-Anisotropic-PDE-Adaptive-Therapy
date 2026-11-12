@@ -2,6 +2,8 @@
 
 Protocol: `paper/trackB_acrin6677_protocol_2026-11-12.md` (frozen in commit 85378cb before download). This record reports structure, headers, and presence counts only. **No measurement value, progression date, survival time, or treatment arm was printed, summarized, or correlated.**
 
+> **Historical-status note (2026-11-12):** Stage 0 preceded the area amendment and the completed ACRIN area forecast. Area measurements were later analyzed under the dated amendment; the forecast failed its frozen rule. The separate DSC sRCBV audit found 15 eligible patients against a minimum of 25 and stopped before evaluating measurement magnitudes. See `paper/trackB_acrin6677_result_2026-11-11.md` and `paper/trackB_acrin6677_advanced_mri_linkage_result_2026-11-11.md`.
+
 ## File
 
 - `data/acrin6677/ACRIN-DSC-MR-Brain-Full-Clinical.zip`, 2,303,087 bytes, SHA-256 `584a17f37017e5a00962a1677cc4640a6073f79ec1ae905f639e0867d9866157`, downloaded 2026-11-12 from the TCIA record (CC BY 4.0 as stated there). Not committed (`data/acrin6677/` is ignored).
