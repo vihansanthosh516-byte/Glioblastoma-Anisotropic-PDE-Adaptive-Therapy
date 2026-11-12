@@ -408,3 +408,7 @@ Last full Track C test run (scratch copy, 2026-11-04): 204 passed, 1 skipped (`o
 - The low-level stop-rule bypass is closed. The replacement simultaneous interval remains unvalidated; the standalone GE-betting prototype is not adopted or connected to the runner.
 - No research-scale integrated policy outcomes exist. Evaluation stays blocked by inference/precision feasibility, an unmaterialized and unreserved seed schedule, incomplete penalty-sensitivity/bootstrap orchestration, and the missing complete run driver. Do not start a sealed run.
 
+
+## Track B LUMIERE no-go, 2026-11-11 (read first for Track B)
+
+LUMIERE registration QC: 7 of 28 patients passed (visit 1: 9/28, visit 3: 19/28), below the frozen 25-patient minimum. All failures were QC failures (no file or code errors). No tumor label, coverage count, cohort freeze, target mask, or score. Thresholds and the minimum are unchanged. Record: `paper/trackB_lumiere_registration_nogo_2026-11-11.md`; outputs `output/track_b_lumiere_registration_20261110/`. Valid next options (none chosen): close LUMIERE for forecast scoring; a new dated, synthetic-validated registration protocol (any rerun is post hoc); or another cohort under its own frozen protocol. Geometry work that stays valid: tfm direction (native to atlas, brain-mask validated, 84 scans in 28 patients), 2i grid rule, coverage chain (`paper/trackB_lumiere_geometry_amendment_2026-11-10.md`).
