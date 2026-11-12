@@ -127,3 +127,4 @@ kaggle_run/**/*.npz
 output/predictgbm/**/*.npz
 kaggle_run/**/*.pyc
 data/acrin6677/
+data/hgcc/
