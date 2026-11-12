@@ -10,7 +10,7 @@ Open, no-request sources were screened and none gives a patient-level link among
 
 | Source | Finding | Evidence |
 |---|---|---|
-| HGCC (Johansson 2020, Cell Reports) | Expression is public (GSE152160, 145 samples, HTA 2.0 arrays). No measured temozolomide (TMZ) response found: TMZ appears only in the introduction and reference list of the main text; MGMT is absent. Table S2 (drug list) not opened, so absence is likely, not proven. | https://www.cell.com/cell-reports/fulltext/S2211-1247(20)30878-0 ; GEO GSE152160 |
+| HGCC (Johansson 2020, Cell Reports; preliminary screen) | Expression is public (GSE152160, 145 samples, HTA 2.0 arrays). That 2020 paper was not a confirmed TMZ-response source; this was incorrectly generalized to the full HGCC resource. Ju et al. (2025) later reported 83 HGCC microarray profiles paired with TMZ viability AUC. See the correction below and the dedicated bridge record. | https://www.cell.com/cell-reports/fulltext/S2211-1247(20)30878-0 ; GEO GSE152160; Ju et al. (2025), https://doi.org/10.1177/11779322241301507 |
 | Ntafoulis 2023 (Br J Cancer) | Measured TMZ response on 66 cultures (agent-reported, paper not opened by the main session); RNA-seq for 24 cultures (GEO GSE232173, GPL20301, verified). Paired count is at most 24; too small for a defensible held-out model. | GEO GSE232173 |
 | Ivy GAP (TCIA) | 39 patients, 390 MRI studies (pre-surgery, post-surgery, follow-up). Region-labelled RNA-seq: 122 samples from 10 tumors only. Images under NIH Controlled Data Access Policy. No follow-up tumor labels listed. BraTS 2021 is built partly on this collection. | https://www.cancerimagingarchive.net/collection/ivygap/ |
 
@@ -50,7 +50,7 @@ Per-patient study counts for Ivy GAP; contents of the Ivy GAP clinical database;
 
 ## Addendum (2026-11-12, later): user cannot make requests; open-only search
 
-The user states they cannot ask anyone for data, so sponsor-dependent targets (Burdenko images, Ivy GAP images) and author emails are parked. The user also proposed relaxing tests; this was declined (project rule: never tune toward a positive result). Search continued for sources that need no request. Metadata pages only; nothing downloaded.
+The user states they cannot ask anyone for data, so sponsor-dependent targets (Burdenko images, Ivy GAP images) and author emails are parked. The user also proposed relaxing tests; this was declined (project rule: never tune toward a positive result). Search continued for sources that need no request. At the time this addendum was written, only metadata pages had been read and nothing had been downloaded; the ACRIN clinical zip was downloaded later and is recorded in the ACRIN result files.
 
 | Candidate | Verified facts (TCIA record, read 2026-11-12) | Open without request? | Limits |
 |---|---|---|---|
@@ -61,3 +61,9 @@ The user states they cannot ask anyone for data, so sponsor-dependent targets (B
 | GSE300985 (GBM organoids) | RNA-seq of organoids and matched tissue | Yes (GEO) | Radiotherapy response, not TMZ; counts per line not checked |
 
 **Lead worth a gate check:** the ACRIN 6677 open clinical tables. If they hold per-visit tumor measurements, they would give a fresh, open, patient-level longitudinal cohort (tabular, no registration, no voxel reads) with treatment arm and outcomes. It would support a pre-registered question about measured radiographic change under therapy. It would not support biology integration (no expression) or cellular drug resistance. A dated protocol is required before the zip is opened.
+
+## Correction and HGCC bridge (2026-11-12)
+
+The earlier screen's conclusion that HGCC lacked measured TMZ response was too broad. The 2025 Ju et al. paper reports TMZ viability AUC paired with 83 HGCC microarray profiles and uses HGCC for response-model training/evaluation and transfer-learning experiments. The official HGCC resource page currently lists 48 cell lines. Neither figure establishes the number of independent biological origins in the response table; exact profile, cell-line, and parent-origin mapping is still required. Ju et al. also caution that AUC values are not directly comparable across datasets because dose ranges and curve-fitting differ, so any analysis must use within-HGCC ranks only.
+
+The possible analysis is a fixed-score association check using Track A's already frozen 119-of-121 response-direction score. It is not a new response-prediction model, not an untouched external validation of the published HGCC dataset, and not a patient-level drug-resistance result. Exact origin independence from the Ntafoulis source cultures, HGCC data-use terms, and exact gene mapping remain gates. No TMZ outcome analysis has been performed. See `paper/trackA_hgcc_tmz_response_bridge_2026-11-12.md` for the proposed protocol and the recorded browser-preview scope deviation.

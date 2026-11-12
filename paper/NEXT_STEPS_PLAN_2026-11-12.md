@@ -4,6 +4,8 @@ Read this file after `START_HERE.md`. It records the current state and next safe
 
 > **Track B status correction (2026-11-12):** ACRIN 6677 area forecasting was completed and failed its frozen rule. Its separate sRCBV linkage audit found 15 eligible patients against a frozen minimum of 25 and stopped before reading measurement magnitudes. Sections 2–8 below preserve the old ACRIN procedure for audit history only; do not execute them. See `paper/trackB_acrin6677_result_2026-11-11.md` and `paper/trackB_acrin6677_advanced_mri_linkage_result_2026-11-11.md`.
 
+> **Track A HGCC correction (2026-11-12):** the earlier statement that no HGCC TMZ response was found was too broad. Ju et al. (2025) report 83 HGCC microarray profiles with measured TMZ viability AUC and response-model experiments on HGCC. The HGCC resource page currently lists 48 cell lines, so the 83 profiles are not an established independent-origin count. The proposed fixed-score analysis is secondary and exploratory; exact origin mapping, source-cohort overlap, data-use terms, and feature mapping must pass first. No TMZ outcome was analyzed. The browser-preview scope deviation and proposed protocol are recorded in `paper/trackA_hgcc_tmz_response_bridge_2026-11-12.md`.
+
 ## 0. Where things stand (verified on disk 2026-11-12)
 
 | Part | State | Record |
@@ -14,7 +16,7 @@ Read this file after `START_HERE.md`. It records the current state and next safe
 | **Track B ACRIN 6677** | Area forecast completed and failed. sRCBV exact-link feasibility audit stopped at 15/25 before measurement magnitudes. No further ACRIN model is active. | `paper/trackB_acrin6677_result_2026-11-11.md`, `paper/trackB_acrin6677_advanced_mri_linkage_result_2026-11-11.md` |
 | Track C | Confirmatory evaluation **stopped**; 14-day target unchanged (user decision 2026-11-10). Do not reopen or suggest changing it. | `START_HERE.md` |
 | Integration | No patient-level link among biology, MRI, and measured drug response exists in open data. | `paper/data_request_plan_2026-11-12.md` |
-| HGCC bridge | Withdrawn: no measured TMZ response found. | same file |
+| **HGCC bridge** | Proposed, not adopted. Published HGCC TMZ AUC exists; origin count, overlap with score-source cultures, data-use terms, and exact gene mapping are unresolved. No TMZ outcome analysis. | `paper/trackA_hgcc_tmz_response_bridge_2026-11-12.md` |
 | Data requests | User allowed them, then stated they cannot ask anyone. Drafts exist, unsent, parked. | `paper/data_request_drafts_2026-11-12.md` |
 
 Data on disk: `data/acrin6677/ACRIN-DSC-MR-Brain-Full-Clinical.zip` (SHA-256 `584a17f37017e5a00962a1677cc4640a6073f79ec1ae905f639e0867d9866157`), extracted to `data/acrin6677/x/`. Folder is git-ignored. Licence CC BY 4.0 (TCIA record).
@@ -115,7 +117,7 @@ Keep all cohort checks metadata-only until an eligible source, access terms, and
 3. **Burdenko-GBM-Progression:** 180 patients and serial imaging are reported, but images require controlled access, follow-up GTV labels cover only an unknown subset, and this project already used its clinical CSV. It is not fresh confirmation. Source: `https://www.cancerimagingarchive.net/collection/burdenko-gbm-progression/`.
 4. QIN-GBM Treatment Response is a repeatability study with double-baseline scans; Brain-Tumor-Progression has 20 patients and two exams; QIN-BRAIN-DSC-MRI has 49 subjects and 52 studies. These do not meet the current three-visit, 25-patient forecast gates.
 
-The next research task is to finish a source-checked, request-ready feasibility screen for ACRIN 6686 and BraTS Longitudinal. Do not download, contact anyone, read patient rows, or adopt a protocol until metadata availability, access terms, and overlap gates are clear. Do not lower the cohort threshold or change outcomes to obtain a positive result.
+The immediate Track A task is a metadata-only HGCC gate audit under the bridge document: establish unique biological origins, exact expression/outcome identifiers, overlap with the Ntafoulis source cultures, exact 119-gene mapping, and applicable data-use terms. Do not open the TMZ outcome field until these gates and the analysis protocol are frozen. The prior ACRIN 6686 and BraTS Longitudinal screen remains a separate future source-check task. Do not lower cohort thresholds or change outcomes to seek a positive result.
 
 ## 11. External actions and records
 
