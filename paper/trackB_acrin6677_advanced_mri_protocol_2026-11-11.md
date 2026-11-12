@@ -21,6 +21,8 @@ The audit may read only these fields from the clinical tables:
 - S0: patient key `cn`, nominal visit `s0e1`, day `s0e2d`, image-quality code `s0e5`, lesion-presence code `s0e13`, and nonempty/missing status of area field `s0e23`.
 - SC: patient key `cn`, nominal visit `sce1`, day `sce2d`, reader key `sce3deid`, image-quality code `sce4`, and nonempty/missing status only for `sce20`, `sce28`, and `sce36`.
 
+For presence checks, a field is missing only when blank or when its trimmed text equals `NA`, `N/A`, `NaN`, `null`, or `none`, case-insensitively. Any other nonempty field counts as present without parsing its content.
+
 The audit will not parse, display, summarize, or model area or rCBV magnitudes. It will not open images, survival fields, progression fields, or treatment-arm fields. The result will contain aggregate counts, reader-count categories, file/schema checks, and a hash of the eligible patient-key set; it will not save patient-level rows or feature values.
 
 ## Frozen linkage and eligibility rules
