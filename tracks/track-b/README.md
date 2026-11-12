@@ -4,6 +4,8 @@
 
 Track B contains longitudinal MRI forecasting and transition analyses. A private Duke patient-mask analysis was completed on 2026-11-04; its cohort and outcomes are exposed exploratory evidence, not an untouched test set. The integrated phase will use only aggregate summaries that the exact access agreement permits. It will not reopen patient images, masks, ADC maps, or patient-level records.
 
+LUMIERE forecast scoring ended in a final no-go on 2026-11-11 under the frozen protocol: 7 of 28 patients passed registration QC, below the minimum of 25. No coverage count, tumor label, target mask, or score was used ([record](../../paper/trackB_lumiere_registration_nogo_2026-11-11.md)). The coverage-aware runner code below is kept but has no active cohort.
+
 ## Primary records
 
 - [Duke readiness and source record](../../paper/track_b_duke_readiness_2026-11-03.md)
