@@ -112,7 +112,8 @@ def main(argv=None) -> int:
     with ProcessPoolExecutor(max_workers=args.workers) as pool:
         rows = list(pool.map(case_features, cases["brats_id"], chunksize=4))
     feats = pd.DataFrame(rows)
-    assert list(feats.columns[1:]) == feature_names()
+    assert set(feats.columns[1:]) == set(feature_names())
+    feats = feats[["brats_id", *feature_names()]]
     out = cases.merge(feats, on="brats_id", validate="one_to_one")
     OUT.mkdir(parents=True, exist_ok=True)
     path = OUT / "features.csv"
