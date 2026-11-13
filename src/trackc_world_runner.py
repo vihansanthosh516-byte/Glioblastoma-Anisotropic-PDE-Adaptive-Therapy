@@ -29,7 +29,8 @@ class WorldRunError(RuntimeError):
 
 
 def prepare_synthetic_world(world, *, family, patients_per_cohort, signal_parameters,
-                            model_parameters, settings, scan_loss=None, entries=None):
+                            model_parameters, settings, scan_loss=None, entries=None,
+                            seed_purpose="stage2_dev"):
     """Build one development world's benchmark inputs without scoring policies.
 
     The returned world seed is caller-declared provenance, not proof of generation.
@@ -37,7 +38,7 @@ def prepare_synthetic_world(world, *, family, patients_per_cohort, signal_parame
     Integrated v2 requires the observed two-scan treatment-stop rule; reject any
     other setting before generating world or patient inputs.
     """
-    validate_development_schedule([world], entries=entries)
+    validate_development_schedule([world], entries=entries, purpose=seed_purpose)
     if family not in ("single", "mixture"):
         raise ValueError("family must be single or mixture")
     if getattr(settings, "stop_endpoint", None) != "observed_two_scan":

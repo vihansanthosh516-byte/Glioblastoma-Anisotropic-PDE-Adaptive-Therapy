@@ -69,10 +69,13 @@ def test_scan_interval_matches_benchmark_default(benchmark):
         assert 1 <= days // tc.CYCLE_DAYS <= 4
 
 
-@pytest.mark.xfail(strict=True, reason="known gap: the 112-day scan sensitivity (scan_every=4) is rejected with the configured 6 forecast cycles; its forecast length is undeclared")
 def test_every_scan_sensitivity_runs_with_configured_forecast(benchmark):
+    """Closed 2026-11-12 by decision D2: forecast length is declared per scan interval."""
+    by_interval = CONFIG["controller_comparison"]["forecast_cycles_by_scan_interval_days"]
     for days in CONFIG["simulation_clock_and_treatment"]["scan_interval_sensitivities_days"]:
-        benchmark.PolicyBenchmarkSettings(scan_every=days // tc.CYCLE_DAYS)
+        cycles = by_interval[str(days)]
+        benchmark.PolicyBenchmarkSettings(scan_every=days // tc.CYCLE_DAYS, forecast_cycles=cycles)
+        assert cycles * tc.CYCLE_DAYS >= 2 * days  # two scans fit, as the stop rule needs
 
 
 def test_particle_filter_prior_matches_belief_ranges(mpc):
@@ -149,10 +152,12 @@ def test_rejected_max_t_method_stays_marked_rejected():
     assert CONFIG["outcomes_and_inference"]["inference_status"].startswith("blocked_until")
 
 
-@pytest.mark.xfail(strict=True, reason="known drift: controller model grid uses 3 q levels (81 models); config declares 5 (135)")
 def test_controller_q_grid_matches_config_grid():
-    grid = _load("212_trackc_signal_fisher_grid.py")
-    assert list(grid.Q_GRID) == CONFIG["signal_model"]["synthetic_q_signal_grid"]
+    """Closed 2026-11-12 by decision D1: the research run uses trackc_research_grid (135 models).
+    Script 212 keeps its historical 81-model grid as the record of earlier diagnostics."""
+    import trackc_research_grid as research_grid
+    assert list(research_grid.research_q_grid()) == CONFIG["signal_model"]["synthetic_q_signal_grid"]
+    assert len(research_grid.research_model_grid()) == CONFIG["controller_comparison"]["candidate_model_set_maximum"]
 
 
 @pytest.mark.xfail(strict=True, reason="known drift: RobustBeliefMPC default stop endpoint is the legacy latent rule; the benchmark overrides it")

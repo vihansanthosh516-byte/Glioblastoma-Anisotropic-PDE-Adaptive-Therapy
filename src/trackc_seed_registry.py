@@ -368,6 +368,23 @@ ENTRIES.append(_entry("restart", "Stage 3 sealed run (restart plan)", "reserved"
                       [(2300000, 2399999)], purpose="stage3_sealed",
                       note="Reserved 2026-11-03. Spend only after the Stage 3 gate and the user's OK."))
 
+# Track C integrated v2 research run (paper/trackc_amendment_unblock_2026-11-12.md, decision D3 and C-9).
+# Separate, contiguous blocks far from every earlier seed. The development pilot estimates variance
+# components only; its results are never evaluation data. The evaluation block is spent only when the
+# config gate list is empty and the run is authorized.
+V2_DEV_PILOT_SCENARIO_BLOCK = (30000000, 30099999)
+V2_DEV_PILOT_POLICY_BLOCK = (31000000, 31099999)
+V2_EVALUATION_SCENARIO_BLOCK = (40000000, 40999999)
+V2_EVALUATION_POLICY_BLOCK = (41000000, 41999999)
+ENTRIES.append(_entry("trackc_v2", "Integrated v2 development pilot (variance components)", "reserved",
+                      [V2_DEV_PILOT_SCENARIO_BLOCK], [], purpose="trackc_v2_dev_pilot",
+                      policy=[V2_DEV_PILOT_POLICY_BLOCK],
+                      note="Reserved 2026-11-12. Development worlds only; never evaluation data."))
+ENTRIES.append(_entry("trackc_v2", "Integrated v2 evaluation run", "reserved",
+                      [V2_EVALUATION_SCENARIO_BLOCK], [], purpose="trackc_v2_evaluation",
+                      policy=[V2_EVALUATION_POLICY_BLOCK],
+                      note="Reserved 2026-11-12. Spend only after every config gate is closed and the run is authorized."))
+
 # Numeric seed overlaps that exist on purpose or are recorded as a flaw. The test compares the
 # computed same-stream and cross-stream overlaps with this list, so a new accidental collision fails.
 KNOWN_OVERLAPS = [
@@ -442,9 +459,9 @@ def check_free(scenario=None, noise=None, purpose=None, entries=ENTRIES, policy=
     """Return a list of problems with using these ranges. Empty list = free to use.
 
     scenario / noise / policy: inclusive (low, high) or None. Policy covers controller RNG seeds.
-    purpose: 'stage2_dev' or 'stage3_sealed' to spend a reserved scenario/noise block. The request
-    must then lie inside that reserved block. No policy-RNG block is reserved; check policy seeds
-    without a purpose. Without a purpose, any overlap in the requested stream is a problem.
+    purpose: the purpose of a reserved block ('stage2_dev', 'stage3_sealed', 'trackc_v2_dev_pilot',
+    'trackc_v2_evaluation'). The request must then lie inside that reserved block in the same stream.
+    Only the trackc_v2 blocks reserve policy-RNG seeds. Without a purpose, any overlap in the requested stream is a problem.
     """
     problems = []
     requests = [("scenario", "scenario_seeds", scenario), ("noise", "noise_keys", noise),

@@ -36,7 +36,7 @@ def test_new_accidental_overlap_is_caught():
 def test_reserved_blocks_touch_no_used_seed():
     reserved = [e for e in reg.ENTRIES if e["status"] == "reserved"]
     used = [e for e in reg.ENTRIES if e["status"] != "reserved"]
-    assert {e["purpose"] for e in reserved} == {"stage2_dev", "stage3_sealed"}
+    assert {e["purpose"] for e in reserved} == {"stage2_dev", "stage3_sealed", "trackc_v2_dev_pilot", "trackc_v2_evaluation"}
     for r in reserved:
         for u in used:
             for field in ("scenario_seeds", "noise_keys", "policy_seeds"):
@@ -174,3 +174,15 @@ def test_signal_action_sensitivity_seed_allocation_is_registered():
             "pre_run_synthetic_action_sensitivity_manifest"] in entry["evidence"]
     assert ["output/trackc_signal_action_sensitivity_20261106_v2/diagnostic.json",
             "synthetic_signal_action_sensitivity_result"] in entry["evidence"]
+
+
+def test_trackc_v2_blocks_are_disjoint_and_spendable_only_by_purpose():
+    assert reg.check_free(scenario=(30000000, 30000010), purpose="trackc_v2_dev_pilot") == []
+    assert reg.check_free(policy=(41000000, 41000010), purpose="trackc_v2_evaluation") == []
+    assert reg.check_free(scenario=(40000000, 40000000))  # no purpose: refused
+    assert reg.check_free(scenario=(40000000, 40000000), purpose="trackc_v2_dev_pilot")  # wrong block
+    blocks = [reg.V2_DEV_PILOT_SCENARIO_BLOCK, reg.V2_DEV_PILOT_POLICY_BLOCK,
+              reg.V2_EVALUATION_SCENARIO_BLOCK, reg.V2_EVALUATION_POLICY_BLOCK]
+    for i, a in enumerate(blocks):
+        for b in blocks[i + 1:]:
+            assert reg._overlap(a, b) is None

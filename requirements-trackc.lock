@@ -1,0 +1,8 @@
+# Track C v2 research run: pinned environment (C-14).
+# Recorded 2026-11-12 from the Windows PC that ran the synthetic tests (Python 3.14.4).
+# The Track C code uses only numpy and scipy at run time (CPU only; no GPU code).
+# On the DGX Spark (ARM64 Linux): python3.14 -m venv venv && venv/bin/pip install -r requirements-trackc.lock
+# Clean-install verification on the Spark is still open (see paper/trackc_spark_runbook_2026-11-12.md).
+numpy==2.4.4
+scipy==1.18.0
+pytest==9.0.3
