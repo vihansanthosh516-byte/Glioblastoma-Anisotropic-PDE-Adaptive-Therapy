@@ -2,7 +2,7 @@
 
 ## Track navigation and integrated handoff
 
-- **Integration BAMD (2026-11-12): Gate 1 failed.** MRI features (59, BraTS 2021 masks) did not predict bulk-RNA Neftel cell states in 91 TCGA patients (CV rho -0.07 to 0.07; none passed). Survival not opened; UPENN-GBM (403, MRI + survival) stays fresh. Record: `paper/integration_bamd_gate1_result_2026-11-12.md`. Next per user order: Track A, then Track B.
+- **Integration BAMD (2026-11-12): Gate 1 failed.** MRI features (59, BraTS 2021 masks) did not predict bulk-RNA Neftel cell states in 91 TCGA patients (CV rho -0.07 to 0.07; none passed). Survival not opened; UPENN-GBM (403, MRI + survival) stays fresh. Record: `paper/integration_bamd_gate1_result_2026-11-12.md`. Gate 1b on Hu 2023 biopsy-site MRI vs biopsy RNA (25 patients) also failed: `paper/integration_bamd_gate1b_result_2026-11-12.md`. Next per user order: Track A, then Track B.
 
 - **Track C (2026-11-12): ready for the DGX Spark.** All PC-side gates closed except cohort size, world count, runtime cap, clean install. Follow `paper/trackc_spark_runbook_2026-11-12.md`; amendment `paper/trackc_amendment_unblock_2026-11-12.md`.
 
