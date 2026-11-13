@@ -1160,6 +1160,14 @@ def run_shared_policy_world(
             "finite_set_d0_minimax_mpc",
             "finite_set_minimax_mpc minus finite_set_d0_minimax_mpc",
         )
+        if include_single_signal_controls:
+            # Integration contrasts (amendment 2026-11-12): both signals vs one or none,
+            # same controller, models, prior and patients.
+            for key, control in (("combined_vs_molecular_only", "finite_set_minimax_molecular_only_mpc"),
+                                 ("combined_vs_mri_only", "finite_set_minimax_mri_only_mpc"),
+                                 ("combined_vs_no_signal", "no_signal_mpc")):
+                paired_contrasts[key] = make_paired_contrast(
+                    "finite_set_minimax_mpc", control, f"finite_set_minimax_mpc minus {control}")
     primary = paired_contrasts[primary_contrast]
     if primary["robust_utility_difference"].shape != (n_evaluation,):
         raise ArithmeticError("primary paired contrast does not match the evaluation cohort")

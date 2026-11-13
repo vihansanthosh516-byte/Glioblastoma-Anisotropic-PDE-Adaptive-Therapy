@@ -287,7 +287,8 @@ def _stub_benchmark(**kwargs):
     if os.environ.get("TRACKC_STUB_FAIL") == kwargs["world_id"]:
         raise RuntimeError("stub failure requested")
     return {"world_id": kwargs["world_id"], "stub": True,
-            "paired_contrasts": {"minimax": {"robust_utility_difference": diff}}}
+            "paired_contrasts": {k: {"robust_utility_difference": diff + i} for i, k in enumerate(
+                ("minimax", "combined_vs_molecular_only", "combined_vs_mri_only", "combined_vs_no_signal"))}}
 
 
 def plan_jobs(phase, cell, patients, n_worlds, benchmark, families=FAMILIES, stub_settings=None):

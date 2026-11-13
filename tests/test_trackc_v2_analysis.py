@@ -45,3 +45,24 @@ def test_order_is_preserved_not_sorted(monkeypatch):
     d = {"single": [5.0, -3.0, 9.0], "mixture": [2.0, 1.0, 0.5]}
     an.analyse(d, primary=True)
     assert seen[0] == [5.0, -3.0, 9.0]
+
+
+def _st(s):
+    return {"status": s}
+
+
+def test_integration_positive_only_if_all_three_positive():
+    c = an.INTEGRATION_CONTRASTS
+    assert an.integration_status({k: _st("positive") for k in c}) == "positive"
+    mixed = {k: _st("positive") for k in c}
+    mixed[c[1]] = _st("not_positive")
+    assert an.integration_status(mixed) == "not_positive"
+    mixed[c[2]] = _st("inconclusive_precision_not_met")
+    assert an.integration_status(mixed) == "inconclusive"
+
+
+def test_benchmark_names_integration_contrasts():
+    from pathlib import Path
+    src = (Path(an.__file__).parent / "211_trackc_policy_benchmark.py").read_text(encoding="utf-8")
+    for k in an.INTEGRATION_CONTRASTS:
+        assert f'"{k}"' in src

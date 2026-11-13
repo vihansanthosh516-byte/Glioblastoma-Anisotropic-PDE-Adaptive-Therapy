@@ -31,6 +31,20 @@ import trackc_research_driver as rd  # noqa: E402
 from trackc_ge_betting import ge_betting_interval  # noqa: E402
 
 PRIMARY_CONTRAST = "minimax"
+# Integration question (amendment paper/integration_amendment_signal_value_2026-11-12.md):
+# combined signals must beat EACH of molecular-only, MRI-only and no-signal (intersection-union
+# test, so no multiplicity correction across the three). Primary cell only.
+INTEGRATION_CONTRASTS = ("combined_vs_molecular_only", "combined_vs_mri_only", "combined_vs_no_signal")
+
+
+def integration_status(per_contrast: dict) -> str:
+    """'positive' only if every integration contrast is positive; else the weakest status."""
+    statuses = [per_contrast[c]["status"] for c in INTEGRATION_CONTRASTS]
+    if all(s == "positive" for s in statuses):
+        return "positive"
+    if any(s.startswith("inconclusive") for s in statuses):
+        return "inconclusive"
+    return "not_positive"
 SUPPORT = (-790.0, 790.0)
 DELTA = 0.025
 TARGET = 14.0
@@ -96,8 +110,14 @@ def main(argv=None) -> int:
     if report["status"] != "complete":
         result = {"status": "inconclusive", "problems": ["run incomplete"], "verification": report}
     else:
-        result = analyse(family_differences(run_dir, jobs), primary=args.cell == "primary")
+        primary = args.cell == "primary"
+        result = analyse(family_differences(run_dir, jobs), primary=primary)
         result["verification_status"] = report["status"]
+        integ = {c: analyse(family_differences(run_dir, jobs, contrast=c), primary=primary)
+                 for c in INTEGRATION_CONTRASTS}
+        result["integration"] = {"contrasts": integ,
+                                 "status": integration_status(integ) if primary else "descriptive",
+                                 "rule": "positive iff all three contrasts positive (primary cell only)"}
     result.update({"cell": args.cell, "patients_per_cohort": args.patients, "n_worlds_per_family": args.n_worlds,
                    "script_sha256": hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
                    "label": "simulation only; not a clinical result"})
