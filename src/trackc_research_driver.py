@@ -38,6 +38,11 @@ from concurrent.futures import FIRST_COMPLETED, ProcessPoolExecutor, wait
 from dataclasses import dataclass
 from pathlib import Path
 
+# One BLAS/OpenMP thread per worker process: the driver parallelizes over worlds, so
+# multi-threaded math libraries would oversubscribe the cores (set before numpy loads).
+for _var in ("OMP_NUM_THREADS", "OPENBLAS_NUM_THREADS", "MKL_NUM_THREADS"):
+    os.environ.setdefault(_var, "1")
+
 import numpy as np
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
@@ -308,7 +313,7 @@ def verify(run_dir: Path, jobs) -> dict:
             continue
         rec = read_checkpoint(path)
         if rec is None or rec["seeds"] != job["world"] or rec["cell"] != job["cell"] \
-                or rec["patients_per_cohort"] != job["patients"]:
+                or rec["patients_per_cohort"] != job["patients"] or rec["code"] != job["code"]:
             bad.append(wid)
             continue
         hashes[wid] = _sha(path.read_bytes())
@@ -319,7 +324,14 @@ def verify(run_dir: Path, jobs) -> dict:
 def execute(jobs, run_dir: Path, *, workers: int, max_hours: float | None, log=print) -> dict:
     """Run jobs not yet checkpointed. Stops submitting new worlds after max_hours."""
     run_dir.mkdir(parents=True, exist_ok=True)
-    todo = [j for j in jobs if read_checkpoint(checkpoint_path(run_dir, j["world"]["world_id"])) is None]
+    todo = []
+    for j in jobs:
+        rec = read_checkpoint(checkpoint_path(run_dir, j["world"]["world_id"]))
+        if rec is None:
+            todo.append(j)
+        elif rec["code"] != j["code"]:
+            raise RuntimeError(f"{j['world']['world_id']} was run with different code or config; "
+                               "refusing to mix results (use a new --out folder)")
     log(f"{len(jobs) - len(todo)} of {len(jobs)} worlds already done; {len(todo)} to run")
     deadline = None if max_hours is None else time.time() + max_hours * 3600.0
     failures, done = [], 0
@@ -357,6 +369,27 @@ def execute(jobs, run_dir: Path, *, workers: int, max_hours: float | None, log=p
                         failures.append({"world_id": wid, "error": repr(exc)})
                         log(f"FAILED {wid}: {exc!r}")
     return {"ran_this_session": done, "failures": failures}
+
+
+def write_seed_table(phase: str, n_worlds: int, path: Path) -> str:
+    """Materialize the derived seed table (C-9). Worlds are nested, so a table for a large
+    n contains every smaller run. Returns the SHA-256 of the written file."""
+    rows = [{"family": fam, **w} for fam, w in build_schedule(phase, n_worlds)]
+    seeds = [v for r in rows for k, v in r.items() if k not in ("family", "world_id")]
+    if len(seeds) != len(set(seeds)):
+        raise ValueError("seed reused inside the table")
+    purpose = PHASES[phase][0]
+    from trackc_world_schedule import validate_development_schedule
+    for fam in FAMILIES:
+        validate_development_schedule([{k: v for k, v in r.items() if k != "family"} for r in rows if r["family"] == fam],
+                                      purpose=purpose)
+    body = json.dumps({"phase": phase, "purpose": purpose, "n_worlds_per_family": n_worlds,
+                       "derivation": "slot g = i*2 + family_index; scenario seed = block_start + 6g + role; "
+                                     "policy seed = block_start + 5g + role",
+                       "rows": rows}, indent=1).encode("utf-8")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_bytes(body)
+    return _sha(body)
 
 
 def main(argv=None) -> int:

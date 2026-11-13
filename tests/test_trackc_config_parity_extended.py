@@ -149,7 +149,8 @@ def test_paired_difference_support_follows_from_utility_settings(benchmark):
 def test_rejected_max_t_method_stays_marked_rejected():
     proposal = CONFIG["outcomes_and_inference"]["interval_method_proposal"]
     assert proposal["status"].startswith("rejected_by_predeclared_synthetic_coverage_screen")
-    assert CONFIG["outcomes_and_inference"]["inference_status"].startswith("blocked_until")
+    assert CONFIG["outcomes_and_inference"]["inference_status"].startswith("ge_betting_adopted")
+    assert CONFIG["outcomes_and_inference"]["interval_method_adopted"]["delta_per_family"] == 0.025
 
 
 def test_controller_q_grid_matches_config_grid():

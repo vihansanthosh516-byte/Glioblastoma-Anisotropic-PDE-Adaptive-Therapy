@@ -114,3 +114,21 @@ def test_cli_refuses_evaluation_max_t_and_unconfirmed_pilot(tmp_path):
 def test_driver_does_not_import_rejected_max_t_helper():
     text = Path(rd.__file__).read_text(encoding="utf-8")
     assert "import trackc_world_summary" not in text and "from trackc_world_summary" not in text
+
+
+def test_resume_refuses_checkpoints_from_changed_code(tmp_path):
+    js = jobs(1)
+    rd.execute(js, tmp_path, workers=1, max_hours=None, log=lambda *_: None)
+    changed = [dict(j, code={**j["code"], "config": "different"}) for j in js]
+    with pytest.raises(RuntimeError, match="different code"):
+        rd.execute(changed, tmp_path, workers=1, max_hours=None, log=lambda *_: None)
+    assert rd.verify(tmp_path, changed)["status"] == "incomplete"
+
+
+def test_seed_table_is_written_and_validated(tmp_path):
+    sha = rd.write_seed_table("evaluation", 50, tmp_path / "t.json")
+    assert len(sha) == 64 and (tmp_path / "t.json").stat().st_size > 0
+
+
+def test_worker_math_libraries_are_single_threaded():
+    assert os.environ.get("OMP_NUM_THREADS") == "1"

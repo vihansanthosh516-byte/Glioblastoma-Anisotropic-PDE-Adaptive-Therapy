@@ -50,11 +50,23 @@ The driver derives each world's 11 seeds from its index (`build_schedule`); worl
 
 ## Test status (scratch copy, Python 3.14.4)
 
-Full `tests/test_trackc_*.py`: 555 passed, 2 skipped, 1 xfailed, 7 failed in the first scratch run. Six of the seven failed only because the scratch copy lacked `paper/`; they pass with it. One (`test_trackc_policy_context.py::test_benchmark_evaluation_requests_observation_only_context`) also fails on the unchanged HEAD code, so these changes did not cause it. It is recorded as a known failing test to fix before evaluation.
+First pass: 555 passed, 2 skipped, 1 xfailed, 7 failed. Six failed only because the scratch copy lacked `paper/`. One (`test_trackc_policy_context.py`) also failed on unchanged HEAD code; fixed in the second pass below. Final full-suite count: see `paper/trackc_spark_runbook_2026-11-12.md`, step 1.
 
-## Gates still open after this amendment
+## Pre-Spark fixes (same day, second pass)
 
-From the config list: cohort size (pilot), world count (pilot + screen), interval adoption written into the config inference block, runtime cap, clean-install verification on the Spark, and the policy-context test above. The driver and seed table exist; their gate items close when the pilot design is frozen. No v2 evaluation world has been run.
+- `test_trackc_policy_context.py`: the test's fake simulator still returned the retired `"either"` stop rule and no `observed_stop_day`, which the benchmark correctly refuses. The test was fixed; the code was not changed.
+- Frozen analysis written before any evaluation world: `src/trackc_v2_analysis.py` (tests `tests/test_trackc_v2_analysis.py`). It applies the config `positive_rule` to the primary cell only, feeds worlds in schedule order, and returns "inconclusive" on an incomplete run, an empty interval, or an out-of-support value.
+- GE-betting adopted in the config (`outcomes_and_inference.interval_method_adopted`, `inference_status`).
+- Driver: refuses to resume or verify over checkpoints made with different code or config (each checkpoint stores file hashes); one math-library thread per worker so 18 workers do not oversubscribe the Spark's cores.
+- Seed tables written: `output/trackc_v2_seed_tables/dev_pilot_50.json` and `evaluation_2000.json` (nested; covers any n up to 2,000 per family).
+
+## Gates closed and still open
+
+Closed 2026-11-12 (config `closed_gates_2026_11_12`): Duke aggregate, q grid, interval method, seed table, research driver.
+
+Still open, all needing the Spark: cohort size and world count (pilot design), runtime cap, clean-install verification. No v2 evaluation world has been run.
+
+**Freeze rule.** After the pilot design, the only allowed config change is writing `choice_m`, `choice_n_per_family` and the runtime cap, and removing those gates. After that, no code or config change: the driver refuses to mix checkpoints from different code.
 
 ## Cost
 

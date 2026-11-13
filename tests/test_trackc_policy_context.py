@@ -119,7 +119,8 @@ def test_benchmark_evaluation_requests_observation_only_context(monkeypatch):
             "capped_rano": np.zeros(n, dtype=bool),
             "courses": np.ones(n),
             "courses_through_cutoff": np.ones(n),
-            "stop_endpoint": "either",
+            "stop_endpoint": "observed_two_scan",  # integrated v2 refuses any other rule
+            "observed_stop_day": np.full(n, np.nan),  # no observed stop in this fake
         }
 
     monkeypatch.setattr(benchmark.tc, "simulate_two_endpoints", fake_simulate_two_endpoints)
