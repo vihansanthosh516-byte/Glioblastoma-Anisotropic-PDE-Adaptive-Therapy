@@ -2,6 +2,10 @@
 
 ## Track navigation and integrated handoff
 
+- **Integration BAMD (2026-11-12): Gate 1 failed.** MRI features (59, BraTS 2021 masks) did not predict bulk-RNA Neftel cell states in 91 TCGA patients (CV rho -0.07 to 0.07; none passed). Survival not opened; UPENN-GBM (403, MRI + survival) stays fresh. Record: `paper/integration_bamd_gate1_result_2026-11-12.md`. Next per user order: Track A, then Track B.
+
+- **Track C (2026-11-12): ready for the DGX Spark.** All PC-side gates closed except cohort size, world count, runtime cap, clean install. Follow `paper/trackc_spark_runbook_2026-11-12.md`; amendment `paper/trackc_amendment_unblock_2026-11-12.md`.
+
 - **Track A HGCC TMZ bridge result (2026-11-12): no association shown.** Fixed 102-of-119 Ntafoulis score vs measured TMZ viability AUC in 83 HGCC lines: Spearman rho -0.102, one-sided permutation p 0.820, bootstrap 95% CI -0.327 to 0.128; score at the 31st percentile of matched random panels. Protocol, amendment, and code were frozen before the TMZ values were read. Conclusion: do not use the 119-gene panel as a drug-response signal in Track A or Track C. [Result](paper/trackA_hgcc_tmz_102_result_2026-11-12.md), [gate check](paper/trackA_hgcc_gate_check_2026-11-12.md).
 
 - **Track B ACRIN update (2026-11-11 America/Chicago).** Enhancing-area forecast failed its frozen rule. A separate sRCBV feasibility audit found 15 eligible patients against a frozen minimum of 25, so it stopped before evaluating measurement magnitudes. See the [area result](paper/trackB_acrin6677_result_2026-11-11.md), [sRCBV protocol](paper/trackB_acrin6677_advanced_mri_protocol_2026-11-11.md), and [linkage no-go](paper/trackB_acrin6677_advanced_mri_linkage_result_2026-11-11.md). No ACRIN follow-up model was fit.
