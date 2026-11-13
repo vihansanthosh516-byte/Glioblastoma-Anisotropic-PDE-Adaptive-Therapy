@@ -2,6 +2,8 @@
 
 Written before any UPENN survival analysis. Second, independent pre-registered test. It does not replace the CPTAC + IvyGAP confirmation (`paper/integration_protocol_methoddev_2026-11-12.md`); both are reported, whatever they show.
 
+**Status (same day, user rule): the research question stays "does pre-operative MRI carry tumor biology?". This survival test does not answer that question. It is a supporting analysis only, never a replacement for the CPTAC + IvyGAP confirmation.**
+
 ## What has been seen
 
 - UPENN MRI features (images and masks only; no outcome).
