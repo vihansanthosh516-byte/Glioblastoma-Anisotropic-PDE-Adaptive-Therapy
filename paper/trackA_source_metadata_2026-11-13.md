@@ -18,4 +18,4 @@ The [GEO SOFT metadata](https://ftp.ncbi.nlm.nih.gov/geo/series/GSE59nnn/GSE5961
 
 The pinned [repository README](https://github.com/WangLabHKUST/TMZscript/blob/48a1a13fd946a1ea50013dc6b835ca45d509b1a0/README.md) identifies the featureCounts table as tumor–culture expression pairs used in the published figure and the labeled workbook as training input. The repository names TCGA as its published test dataset, which does not supply direct cultured TMZ response. Checked workbook sheet names only. Ask for the coded pretreatment RNA to measured continuous viability AUC crosswalk, assay definitions and processed data terms. The repository alone does not establish an independent assay validation cohort. [Study](https://pmc.ncbi.nlm.nih.gov/articles/PMC10010007/).
 
-Wu's [specimen audit](trackA_wu_crosswalk_2026-11-13.md) remains applicable. No new candidate expression or response values accessed. No external message sent.
+Wu's [specimen audit](trackA_wu_crosswalk_2026-11-13.md) remains applicable. No new candidate expression or response values accessed. The user reports sending the Harwood metadata request. The reply and independent pathology map are pending.
