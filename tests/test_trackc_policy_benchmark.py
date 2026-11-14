@@ -815,3 +815,48 @@ def test_harness_rejects_reused_signal_generation_seed_before_fitting():
             evaluation_seed=[2026110624],
             schedule_mixture_seed=[2026110627],
         )
+
+
+def test_earf_arm_and_contrasts_run_when_model_set_given(monkeypatch):
+    import integration_earf as earf
+    selection = tc.draw_scenarios(2, seed=2026111401, sigmas=(0.05,))
+    calibration, calibration_observations = _calibration_cohort(
+        2, scenario_seed=2026111411, signal_seed=2026111418
+    )
+    evaluation = tc.draw_scenarios(2, seed=2026111402, sigmas=(0.05,))
+    observations, _truth = generate_integrated_signals(
+        2, q=0.6, a=-0.1, b=0.1, d=0.1, seed=2026111403, f0=evaluation["f0"],
+    )
+    models = (
+        SignalModelParameters(q=0.6, a=0.2, b=0.4, d=0.1),
+        SignalModelParameters(q=0.8, a=-0.1, b=0.7, d=-0.2),
+    )
+    settings = benchmark.PolicyBenchmarkSettings(
+        course_budget=12, stop_endpoint="observed_two_scan", tau_days=84.0,
+        n_f0_nodes=8, mpc_particles=2, prediction_particles=1, forecast_cycles=3, q_episodes=1,
+    )
+    full_catalog = benchmark.baseline_policy_catalog(settings)
+    small = {n: s for n, s in full_catalog.items()
+             if not n.startswith(("filtered_threshold_grid_", "raw_threshold_grid_"))}
+    monkeypatch.setattr(benchmark, "baseline_policy_catalog", lambda _settings: small)
+    earf_set = earf.credible_box_model_set([0.6])
+    result = benchmark.run_shared_policy_world(
+        world_id="earf-mechanics-test",
+        selection_scenarios=selection, calibration_scenarios=calibration, evaluation_scenarios=evaluation,
+        selection_patient_ids=("s-0", "s-1"), calibration_patient_ids=("c-0", "c-1"),
+        evaluation_patient_ids=("e-0", "e-1"),
+        calibration_observations=calibration_observations, evaluation_observations=observations,
+        model_parameters=models,
+        signal_generation_parameters=SignalModelParameters(q=0.6, a=-0.1, b=0.1, d=0.1),
+        signal_generation_seed=2026111403, calibration_signal_generation_seed=2026111418,
+        signal_generation_mri_template_sha256=None,
+        selection_scenario_seed=2026111410, calibration_scenario_seed=2026111411,
+        evaluation_scenario_seed=2026111412,
+        selection_seed=[2026111404], q_training_seed=[2026111405], calibration_seed=[2026111419],
+        evaluation_seed=[2026111406], schedule_mixture_seed=[2026111420],
+        settings=settings, include_ambiguity_controller=True, primary_contrast="minimax",
+        earf_model_parameters=earf_set,
+    )
+    for key in ("earf_vs_full_minimax", "earf_vs_no_signal"):
+        diff = np.asarray(result["paired_contrasts"][key]["robust_utility_difference"])
+        assert diff.shape == (2,) and np.isfinite(diff).all()

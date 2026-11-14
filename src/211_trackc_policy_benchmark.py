@@ -845,6 +845,7 @@ def run_shared_policy_world(
     primary_contrast: str = "loo",
     filter_ranges=None,
     include_single_signal_controls: bool = False,
+    earf_model_parameters=None,
 ) -> dict:
     """Run a three-cohort development comparison in one virtual world.
 
@@ -1048,6 +1049,13 @@ def run_shared_policy_world(
                             channels=(channel,), **deepcopy(common_mpc),
                         )
                     )
+            if earf_model_parameters is not None:
+                # EARF arm (paper/integration_earf_protocol_2026-11-14.md): same controller,
+                # evidence-anchored credible-box model set, both channels.
+                policies_for_signals["earf_minimax_mpc"] = ambiguity_module.SignalAmbiguityBeliefMPC(
+                    signal_observations, model_parameters=tuple(earf_model_parameters),
+                    **deepcopy(common_mpc),
+                )
         return policies_for_signals
 
     fixed_control_catalog = _fixed_schedule_control_catalog(settings)
@@ -1168,6 +1176,11 @@ def run_shared_policy_world(
                                  ("combined_vs_no_signal", "no_signal_mpc")):
                 paired_contrasts[key] = make_paired_contrast(
                     "finite_set_minimax_mpc", control, f"finite_set_minimax_mpc minus {control}")
+    if include_ambiguity_controller and earf_model_parameters is not None:
+        for key, control in (("earf_vs_full_minimax", "finite_set_minimax_mpc"),
+                             ("earf_vs_no_signal", "no_signal_mpc")):
+            paired_contrasts[key] = make_paired_contrast(
+                "earf_minimax_mpc", control, f"earf_minimax_mpc minus {control}")
     primary = paired_contrasts[primary_contrast]
     if primary["robust_utility_difference"].shape != (n_evaluation,):
         raise ArithmeticError("primary paired contrast does not match the evaluation cohort")
