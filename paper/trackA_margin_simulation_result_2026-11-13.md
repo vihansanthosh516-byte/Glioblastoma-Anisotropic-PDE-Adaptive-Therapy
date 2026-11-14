@@ -1,0 +1,5 @@
+# Track A margin simulation result
+
+The candidate failed the prospectively frozen [simulation rule](trackA_margin_simulation_protocol_2026-11-13.md). In the shared-plus-state-specific scenario, the minimum-state selector and mean-state ablation selected the same pair and tied at 0.7715. The pooled rank arm scored 0.6914 and the centroid scored 1.0000. In the state-specific-only scenario, both state-consistency selectors scored 0.6719 with different pairs. The pooled rank arm scored 0.5996 and the centroid scored 1.0000. Null scores ranged from 0.4883 to 0.5078. All numbers are rounded from [saved simulation JSON](../output/trackA_margin_simulation/result.json).
+
+The simulation deliberately includes Gaussian noise and additive shifts. It has no biological or cross-study calibration. It offers no evidence that the weakest-state selector adds predictive value over mean-state selection. In the state-specific-only scenario, it selected a pair partly on finite-sample changes in states without a true effect. This highlights the proposal's vulnerability to signing noise in training. No new seed or simulated effect size was tried. No patient test scores were computed.
