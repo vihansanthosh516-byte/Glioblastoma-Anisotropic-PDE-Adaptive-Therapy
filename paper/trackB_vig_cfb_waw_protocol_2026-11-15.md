@@ -54,6 +54,11 @@ Reason: CFB gives one binary GTV label. GTV is the radiotherapy target, not necr
 - Last change `c`: from the earlier post-operative scan if its core > 0, else 0.
 - No patient is removed after step 6 for any reason.
 
+Details fixed while writing the script (2026-11-15, step 2, before any outcome existed; input side only):
+- CFB pairs are between adjacent visits only (t0-to-t1, t1-to-t2). A visit without both sequences breaks the chain.
+- WAW exams with no `days_postop` value (12 of 160 in the metadata table) are dropped before pairing.
+- Builders were tested with random fake volumes and a fake mask archive only.
+
 ## 6. Comparators (all fitted in step 2 on the 976 pairs, then frozen)
 
 Persistence, two-point exponential, population rate, empirical-Bayes random slope, Gompertz, gradient boosting, Gompertz with absolute loss, gradient boosting with absolute loss. Definitions as in `output/track_b_code_audit_20261114/loco4_all_baselines.py`. Gradient boosting uses the inputs present in all cohorts (input size, interval, earlier rate, has-earlier-scan).
