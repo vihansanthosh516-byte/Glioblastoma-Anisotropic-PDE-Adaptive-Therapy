@@ -7,8 +7,9 @@ T0 = time.time(); BUDGET_H = 10.3
 W = "/kaggle/working"; PRE = "/tmp/nnunet_pre"; RES = f"{W}/nnUNet_results"
 run = lambda c, **k: subprocess.run(c, shell=isinstance(c, str), **k)
 run("nvidia-smi")
-if run(f"{sys.executable} -m pip install -q nnunetv2==2.5.1").returncode != 0:
-    run(f"{sys.executable} -m pip install -q nnunetv2", check=True)
+# nnunetv2 2.5.1 does not run with the torch of the Kaggle image (2.11): its LR scheduler call fails. Use the current release; the
+# installed version is written to train_status.json and must be the same in every later session and at inference.
+run(f"{sys.executable} -m pip install -q nnunetv2" + (f"=={os.environ['NNUNET_VERSION']}" if os.environ.get("NNUNET_VERSION") else ""), check=True)
 import nnunetv2, torch
 ver = {"nnunetv2": getattr(nnunetv2, "__version__", None) or subprocess.run(f"{sys.executable} -m pip show nnunetv2", shell=True, capture_output=True, text=True).stdout.split("Version:")[1].split()[0],
        "torch": torch.__version__, "gpu": torch.cuda.get_device_name(0) if torch.cuda.is_available() else None}
@@ -43,10 +44,10 @@ random.seed(20261115); np.random.seed(20261115); torch.manual_seed(20261115)
 
 class nnUNetTrainer_VIG250(nnUNetTrainer):
     """Default trainer. Only changes: 250 epochs, checkpoint every 5 epochs, no end-of-training validation pass (fold all has no held-out cases)."""
-    def __init__(self, plans, configuration, fold, dataset_json, unpack_dataset=True, device=torch.device("cuda")):
-        super().__init__(plans, configuration, fold, dataset_json, unpack_dataset, device)
+    def initialize(self):
         self.num_epochs = 250
         self.save_every = 5
+        super().initialize()
 
     def perform_actual_validation(self, *a, **k):
         return None
