@@ -1,0 +1,2 @@
+two-sided level 0.05: critical z 1.960 | patients for 80% power 256 | power at n=100: 0.42, n=120: 0.48, n=158: 0.60, n=186: 0.67
+two-sided level 0.025: critical z 2.241 | patients for 80% power 310 | power at n=100: 0.31, n=120: 0.37, n=158: 0.49, n=186: 0.56
