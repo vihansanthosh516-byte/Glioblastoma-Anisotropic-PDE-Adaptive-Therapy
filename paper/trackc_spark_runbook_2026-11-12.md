@@ -31,6 +31,14 @@ venv/bin/python -I src/trackc_research_driver.py --phase dev_pilot --cell primar
 
 This also gives `elapsed_seconds` per world at m = 2. These worlds are development data only.
 
+### 2b. EARF timing (integration, added 2026-11-14)
+
+```bash
+venv/bin/python -I src/trackc_research_driver.py --phase dev_pilot --cell primary     --patients 2 --n-worlds 3 --workers 6 --confirm-development --earf evidence
+```
+
+Same as step 2, plus the EARF arm (one more 135-model minimax controller) on evidence-anchored worlds. Writes to `dev_pilot/primary_earf_evidence/m02`. Read only `elapsed_seconds`. Expect roughly 15-25% more time per world than step 2 (estimate, not measured).
+
 ## 3. Development pilot (decision D3)
 
 ```bash
@@ -63,6 +71,18 @@ venv/bin/python -I src/trackc_research_driver.py --phase evaluation --cell prima
 
 Repeat until complete. Then run each sensitivity cell with the same command and `--cell scan28`, `scan56`, `scan112`, `miss10`, `penalty0`, `penalty10`.
 
+### 5b. EARF integration run (protocol `paper/integration_earf_protocol_2026-11-14.md`)
+
+Same `choice_m` and `choice_n_per_family` as the primary cell. Locked test:
+
+```bash
+venv/bin/python -I src/trackc_research_driver.py --phase evaluation --cell primary     --patients <choice_m> --n-worlds <choice_n_per_family> --workers 18 --max-hours 5 --earf evidence
+```
+
+Secondary (descriptive, run only if time allows): the same command with `--earf primary_anchor`.
+
+Note: the EARF run reuses the evaluation world seeds, so its virtual patients are the same as in the primary run; only the signal truth differs. This is declared, not hidden.
+
 ## 6. Bring results back
 
 Copy `output/trackc_v2_research/` back to the PC. Run `--verify-only` with the same arguments for every cell; each must say `complete`. Then run the frozen analysis once per cell:
@@ -72,6 +92,15 @@ venv/bin/python -I src/trackc_v2_analysis.py --cell primary --patients <choice_m
 ```
 
 Only the primary cell can be "positive". Report every cell, whatever the result.
+
+EARF analysis (once each):
+
+```bash
+venv/bin/python -I src/trackc_v2_analysis.py --cell primary --patients <choice_m> --n-worlds <choice_n_per_family> --earf evidence
+venv/bin/python -I src/trackc_v2_analysis.py --cell primary --patients <choice_m> --n-worlds <choice_n_per_family> --earf primary_anchor
+```
+
+Only `--earf evidence` can be "positive" (both `earf_vs_full_minimax` and `earf_vs_no_signal` positive under the frozen rule).
 
 ## Size check
 

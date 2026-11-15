@@ -66,3 +66,10 @@ def test_benchmark_names_integration_contrasts():
     src = (Path(an.__file__).parent / "211_trackc_policy_benchmark.py").read_text(encoding="utf-8")
     for k in an.INTEGRATION_CONTRASTS:
         assert f'"{k}"' in src
+
+
+def test_earf_positive_only_if_both_contrasts_positive():
+    c = an.EARF_CONTRASTS
+    assert an.all_positive_status({k: _st("positive") for k in c}, c) == "positive"
+    assert an.all_positive_status({c[0]: _st("positive"), c[1]: _st("not_positive")}, c) == "not_positive"
+    assert an.all_positive_status({c[0]: _st("positive"), c[1]: _st("inconclusive")}, c) == "inconclusive"

@@ -45,6 +45,19 @@ def integration_status(per_contrast: dict) -> str:
     if any(s.startswith("inconclusive") for s in statuses):
         return "inconclusive"
     return "not_positive"
+# EARF (paper/integration_earf_protocol_2026-11-14.md): positive iff both contrasts positive.
+EARF_CONTRASTS = ("earf_vs_full_minimax", "earf_vs_no_signal")
+
+
+def all_positive_status(per_contrast: dict, names) -> str:
+    statuses = [per_contrast[c]["status"] for c in names]
+    if all(s == "positive" for s in statuses):
+        return "positive"
+    if any(s.startswith("inconclusive") for s in statuses):
+        return "inconclusive"
+    return "not_positive"
+
+
 SUPPORT = (-790.0, 790.0)
 DELTA = 0.025
 TARGET = 14.0
@@ -103,11 +116,19 @@ def main(argv=None) -> int:
     ap.add_argument("--patients", type=int, required=True)
     ap.add_argument("--n-worlds", type=int, required=True)
     ap.add_argument("--out", default=str(rd.DEFAULT_OUT))
+    ap.add_argument("--earf", choices=("evidence", "primary_anchor"), default=None)
     args = ap.parse_args(argv)
-    jobs = rd.plan_jobs("evaluation", args.cell, args.patients, args.n_worlds, "real")
-    run_dir = rd.run_dir_for(Path(args.out), "evaluation", args.cell, args.patients)
+    jobs = rd.plan_jobs("evaluation", args.cell, args.patients, args.n_worlds, "real", earf=args.earf)
+    run_dir = rd.run_dir_for(Path(args.out), "evaluation", rd.earf_cell_dir(args.cell, args.earf), args.patients)
     report = rd.verify(run_dir, jobs)
-    if report["status"] != "complete":
+    if report["status"] == "complete" and args.earf:
+        locked = args.earf == "evidence" and args.cell == "primary"
+        per = {c: analyse(family_differences(run_dir, jobs, contrast=c), primary=locked) for c in EARF_CONTRASTS}
+        result = {"earf_mode": args.earf, "contrasts": per,
+                  "status": all_positive_status(per, EARF_CONTRASTS) if locked else "descriptive",
+                  "rule": "EARF positive iff both contrasts positive (evidence mode, primary cell only)",
+                  "verification_status": report["status"]}
+    elif report["status"] != "complete":
         result = {"status": "inconclusive", "problems": ["run incomplete"], "verification": report}
     else:
         primary = args.cell == "primary"

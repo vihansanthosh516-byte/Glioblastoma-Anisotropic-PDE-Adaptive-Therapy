@@ -259,12 +259,16 @@ def run_one_world(job: dict) -> dict:
     anchor = config["signal_model"]["primary_anchor"]
     signal = SignalModelParameters(q=0.5, a=float(anchor[0]), b=float(anchor[1]), d=float(anchor[2]))
     earf_set = None
-    if job.get("earf"):
+    earf_mode = job.get("earf") or None
+    if earf_mode not in (None, "evidence", "primary_anchor"):
+        raise ValueError("earf must be None, 'evidence' or 'primary_anchor'")
+    if earf_mode:
         # EARF (paper/integration_earf_protocol_2026-11-14.md): evidence-anchored world truth
         # from a stream derived from the world seed; controller gets the credible-box set.
         import integration_earf as earf
         stream = np.random.Generator(np.random.PCG64DXSM(np.random.SeedSequence([int(job["world"]["world"]), 0xEA4F])))
-        signal = earf.sample_evidence_world(stream, research_q_grid(config))
+        if earf_mode == "evidence":  # locked test; 'primary_anchor' keeps the (0.5,0.5,0.5) truth (secondary)
+            signal = earf.sample_evidence_world(stream, research_q_grid(config))
         earf_set = earf.credible_box_model_set(research_q_grid(config))
     scan_loss = {"miss_p": spec.missingness} if spec.missingness > 0 else None
     t0 = time.time()
@@ -283,7 +287,7 @@ def run_one_world(job: dict) -> dict:
         "seeds": job["world"], "world_parameters_sha256": prepared["world_parameters_sha256"],
         "contrasts": summarize_result(result), "elapsed_seconds": round(time.time() - t0, 3),
         "host": platform.node(), "code": job["code"], "result": full,
-        "earf": bool(job.get("earf")),
+        "earf": earf_mode,
         "signal_truth_ab_d": [float(signal.a), float(signal.b), float(signal.d)],
         "earf_model_count": None if earf_set is None else len(earf_set),
     }
@@ -302,13 +306,17 @@ def _stub_benchmark(**kwargs):
                 ("minimax", "combined_vs_molecular_only", "combined_vs_mri_only", "combined_vs_no_signal"))}}
 
 
-def plan_jobs(phase, cell, patients, n_worlds, benchmark, families=FAMILIES, stub_settings=None, earf=False):
+def earf_cell_dir(cell: str, earf) -> str:
+    return cell if not earf else f"{cell}_earf_{earf}"
+
+
+def plan_jobs(phase, cell, patients, n_worlds, benchmark, families=FAMILIES, stub_settings=None, earf=None):
     purpose = PHASES[phase][0]
     spec = cell_spec(cell)
     code = code_fingerprint()
     return [{"phase": phase, "family": fam, "world": w, "patients": patients, "seed_purpose": purpose,
              "cell": spec.__dict__, "benchmark": benchmark, "stub_settings": stub_settings, "code": code,
-             "earf": bool(earf)}
+             "earf": earf or None}
             for fam, w in build_schedule(phase, n_worlds, families)]
 
 
@@ -419,8 +427,8 @@ def main(argv=None) -> int:
     ap.add_argument("--confirm-development", action="store_true",
                     help="required for dev_pilot: results are development data, never evaluation data")
     ap.add_argument("--interval-method", default=INTERVAL_METHOD)
-    ap.add_argument("--earf", action="store_true",
-                    help="EARF integration test: evidence-anchored worlds + earf arm (separate run dir)")
+    ap.add_argument("--earf", choices=("evidence", "primary_anchor"), default=None,
+                    help="EARF integration run: 'evidence' = locked test, 'primary_anchor' = secondary (separate run dirs)")
     args = ap.parse_args(argv)
 
     if args.interval_method in REFUSED_INTERVAL_METHODS or args.interval_method != INTERVAL_METHOD:
@@ -434,7 +442,7 @@ def main(argv=None) -> int:
         raise SystemExit(f"families must be from {FAMILIES}")
 
     jobs = plan_jobs(args.phase, args.cell, args.patients, args.n_worlds, "real", families, earf=args.earf)
-    run_dir = run_dir_for(Path(args.out), args.phase, args.cell + ("_earf" if args.earf else ""), args.patients)
+    run_dir = run_dir_for(Path(args.out), args.phase, earf_cell_dir(args.cell, args.earf), args.patients)
     session = None
     if not args.verify_only:
         session = execute(jobs, run_dir, workers=args.workers, max_hours=args.max_hours)

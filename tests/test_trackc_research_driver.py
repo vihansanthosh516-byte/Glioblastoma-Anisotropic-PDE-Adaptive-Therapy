@@ -135,12 +135,16 @@ def test_worker_math_libraries_are_single_threaded():
 
 
 def test_earf_jobs_draw_evidence_worlds_and_pass_model_set(tmp_path):
-    js = rd.plan_jobs("dev_pilot", "primary", 2, 2, "stub", rd.FAMILIES, stub_settings=STUB_SETTINGS, earf=True)
+    js = rd.plan_jobs("dev_pilot", "primary", 2, 2, "stub", rd.FAMILIES, stub_settings=STUB_SETTINGS, earf="evidence")
     recs = [rd.run_one_world(j) for j in js]
-    assert all(r["earf"] and r["earf_model_count"] == 135 for r in recs)
+    assert all(r["earf"] == "evidence" and r["earf_model_count"] == 135 for r in recs)
     truths = [tuple(r["signal_truth_ab_d"]) for r in recs]
     assert len(set(truths)) == len(truths)
     assert all(abs(a) < 0.6 and abs(b) < 0.6 for a, b, _ in truths)
     assert truths == [tuple(rd.run_one_world(j)["signal_truth_ab_d"]) for j in js]
     plain = rd.run_one_world(jobs(1)[0])
-    assert plain["earf"] is False and plain["signal_truth_ab_d"] == [0.5, 0.5, 0.5]
+    assert plain["earf"] is None and plain["signal_truth_ab_d"] == [0.5, 0.5, 0.5]
+    sec = rd.run_one_world(rd.plan_jobs("dev_pilot", "primary", 2, 1, "stub", rd.FAMILIES,
+                                        stub_settings=STUB_SETTINGS, earf="primary_anchor")[0])
+    assert sec["earf_model_count"] == 135 and sec["signal_truth_ab_d"] == [0.5, 0.5, 0.5]
+    assert rd.earf_cell_dir("primary", "evidence") == "primary_earf_evidence"
