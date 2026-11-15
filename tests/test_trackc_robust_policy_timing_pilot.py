@@ -79,8 +79,11 @@ def test_completed_manifest_has_timings_and_no_outcome_fields():
     forbidden = {"policy_scores", "utilities", "endpoint_times", "course_counts", "policy_ranks"}
     assert not forbidden.intersection(record)
 
-    def file_hash(path: Path) -> str:
-        return hashlib.sha256(path.read_bytes()).hexdigest()
+    def file_hashes(path: Path) -> set:
+        # Recorded on a Windows (CRLF) checkout; a clean Linux clone has LF. Same content either way.
+        crlf, lf_byte = bytes([13, 10]), bytes([10])
+        lf = path.read_bytes().replace(crlf, lf_byte)
+        return {hashlib.sha256(lf).hexdigest(), hashlib.sha256(lf.replace(lf_byte, crlf)).hexdigest()}
 
-    assert record["runner_script_sha256"] == file_hash(SCRIPT_PATH)
-    assert record["amendment_sha256"] == file_hash(amendment_path)
+    assert record["runner_script_sha256"] in file_hashes(SCRIPT_PATH)
+    assert record["amendment_sha256"] in file_hashes(amendment_path)

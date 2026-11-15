@@ -148,3 +148,27 @@ def test_earf_jobs_draw_evidence_worlds_and_pass_model_set(tmp_path):
                                         stub_settings=STUB_SETTINGS, earf="primary_anchor")[0])
     assert sec["earf_model_count"] == 135 and sec["signal_truth_ab_d"] == [0.5, 0.5, 0.5]
     assert rd.earf_cell_dir("primary", "evidence") == "primary_earf_evidence"
+
+
+def test_code_fingerprint_covers_earf_and_ignores_line_endings(tmp_path, monkeypatch):
+    fp = rd.code_fingerprint()
+    assert "integration_earf.py" in fp and "216_trackc_robust_signal_ambiguity.py" in fp
+    prints = []
+    crlf, lf = bytes([13, 10]), bytes([10])
+    for name, style in (("lf", lf), ("crlf", crlf)):
+        d = tmp_path / name
+        d.mkdir()
+        for f in fp:
+            if f != "config":
+                (d / f).write_bytes((rd.SRC / f).read_bytes().replace(crlf, lf).replace(lf, style))
+        monkeypatch.setattr(rd, "SRC", d)
+        prints.append(rd.code_fingerprint())
+    assert prints[0] == prints[1] == fp
+
+
+def test_lfs_pointer_config_is_refused(tmp_path, monkeypatch):
+    ptr = tmp_path / "c.json"
+    ptr.write_bytes(b"version https://git-lfs.github.com/spec/v1" + bytes([10]) + b"oid sha256:abc" + bytes([10]))
+    monkeypatch.setattr(rd, "CONFIG_PATH", ptr)
+    with pytest.raises(RuntimeError, match="LFS pointer"):
+        rd.code_fingerprint()

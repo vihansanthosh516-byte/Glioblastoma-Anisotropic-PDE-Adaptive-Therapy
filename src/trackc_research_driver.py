@@ -206,9 +206,21 @@ def _sha(data: bytes) -> str:
 def code_fingerprint() -> dict:
     files = ["trackc_research_driver.py", "211_trackc_policy_benchmark.py", "208_trackc_robust_belief_mpc.py",
              "trackc_world_runner.py", "trackc_integrated_sampler.py", "trackc_integrated_signal_model.py",
-             "trackc_research_grid.py", "trackc_sim.py", "trackc_filter_priors.py"]
-    return {f: _sha((SRC / f).read_bytes()) for f in files if (SRC / f).exists()} | {
-        "config": _sha(CONFIG_PATH.read_bytes())}
+             "trackc_research_grid.py", "trackc_sim.py", "trackc_filter_priors.py",
+             "216_trackc_robust_signal_ambiguity.py", "214_trackc_loo_model_average.py",
+             "207_trackc_qlearning_baseline.py", "trackc_integrated_driver.py", "integration_earf.py"]
+    # Line endings normalized so a Windows (CRLF) checkout and a Linux (LF) clone give the same hashes.
+    CRLF, LF = bytes([13, 10]), bytes([10])
+
+    def norm(p: Path) -> bytes:
+        return p.read_bytes().replace(CRLF, LF)
+    missing = [f for f in files if not (SRC / f).exists()]
+    if missing:
+        raise FileNotFoundError(f"fingerprinted source files missing: {missing}")
+    config = norm(CONFIG_PATH)
+    if config.startswith(b"version https://git-lfs"):
+        raise RuntimeError("config is a Git LFS pointer; run 'git lfs install && git lfs pull' first")
+    return {f: _sha(norm(SRC / f)) for f in files} | {"config": _sha(config)}
 
 
 def checkpoint_path(run_dir: Path, world_id: str) -> Path:

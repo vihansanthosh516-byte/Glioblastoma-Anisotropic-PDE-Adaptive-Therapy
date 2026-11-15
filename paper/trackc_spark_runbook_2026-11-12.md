@@ -7,7 +7,10 @@ Do not look at any policy result between steps unless a step says so. Do not cha
 ## 0. Connect and set up (about 30 minutes)
 
 ```bash
+git lfs install            # REQUIRED: configs/*.json and output/*.json are stored in Git LFS
 git clone <this repository> trackc && cd trackc
+git lfs pull
+head -c 40 configs/trackABC_integrated_v2.json   # must start with "{", not "version https://git-lfs"
 python3.14 -m venv venv
 venv/bin/pip install -r requirements-trackc.lock
 ```
@@ -21,6 +24,8 @@ PYTHONPATH=src venv/bin/python -m pytest -q -p no:cacheprovider tests/test_track
 ```
 
 Expected (PC result in the commit message of the pre-Spark fix commit): all pass except two skips and one known strict xfail (the `RobustBeliefMPC` default stop rule; the driver passes the stop rule explicitly). Any other failure: stop and fix before step 2. Write the count into `paper/trackc_spark_log_<date>.md`.
+
+PC rehearsal (2026-11-14): clean `git archive` copy (LF line endings) + fresh venv from `requirements-trackc.lock` (numpy 2.4.4, scipy 1.18.0, pytest 9.0.3, Python 3.14.4): 586 passed, 1 xfailed, 1 failed; the failure was a CRLF-recorded hash check, fixed (both line endings accepted); after the fix the affected files pass (22/22). The driver code fingerprint now normalizes line endings so PC `--verify-only` accepts Spark (LF) checkpoints.
 
 ## 2. Timing at two cohort sizes (closes the time model for D3)
 
