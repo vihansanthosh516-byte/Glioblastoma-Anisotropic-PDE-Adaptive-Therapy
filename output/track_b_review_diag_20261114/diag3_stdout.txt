@@ -1,0 +1,24 @@
+MU clin cols tail ['Number of Days from Diagnosis to Start Immunotherapy', 'Number of Days from Diagnosis to Complete Immunotherapy', 'Number of Cycles of Immunotherapy', 'Brachy therapy', 'Number of Days from Diagnosis to the day of Insertion of Brachytherapy', 'Other Types of Therapy (LITT, more chemo, proton therapy)', 'Number of Days from Diagnosis to Start Other Additional Therapy', 'Number of Days from Diagnosis to Complete Other Additional Therapy', 'Number of Days from Diagnosis to 1st MRI (Timepoint_1)', 'Number of Days from Diagnosis to 2nd MRI (Timepoint_2)', 'Number of Days from Diagnosis to 3rd MRI (Timepoint_3)', 'Number of Days from Diagnosis to 4th MRI (Timepoint_4)', 'Number of Days from Diagnosis to 5th MRI (Timepoint_5)', 'Number of Days from Diagnosis to 6th MRI (Timepoint_6)']
+MU Multiple surgeries {'0': 152, '1': 51}
+MU Additional Therapy {'Temozolomide': 106, 'nan': 94, 'PCV': 3}
+MU 2nd_Additional Therapy {'nan': 187, 'Lomustine': 5, 'PCV': 2, 'Keytruda': 2, 'Temozolomide w/ Avastin': 2, 'Temozolomide': 2, 'Avastin': 1}
+MU Other Types of Therapy (LITT, more chemo, proton therapy) {'nan': 142, 'Optune TTF': 53, 'Dabrafenib and Trametinib': 2, 'LITT at WashU': 1, 'CyberKnife': 1, 'Clinical trial with disulfiram': 1, 'Optune TTF EF 32 TRIDENT trial': 1}
+MU Treatment started after 2nd progression {'nan': 186, 'Avastin': 6, 'Surgery': 3, 'Avastin and Temodar': 2, 'Avastin and Irinotecan': 1, 'Carbopatin': 1, 'Temodar + radiation + Optune': 1}
+MU Immuno therapy {'nan': 150, 'Avastin': 49, 'Avastin w/ Temodar': 2, 'Avastin and Retifanlimab': 1, 'Ivosenib': 1}
+MU Brachy therapy {'nan': 185, 'Gliadel wafer': 9, 'Gamma tiles': 7, 'Gamma tile': 2}
+MU Name of Initial Chemo Therapy {'Temozolomide': 128, 'nan': 74, 'Lomustine': 1}
+event-date cols used: ['Time to First Progression (Days)', 'Number of days from Diagnosis to date of First Progression', 'Number of days from Diagnosis to date of Further Progression', 'Treatment started after 2nd progression', 'Days from Diagnosis to new treatment', 'Number of Days from Diagnosis to Starting Additional Therapy', 'Number of Days from Diagnosis to Starting 2nd_Additional Therapy', 'Number of Days from Diagnosis to Start Immunotherapy', 'Number of Days from Diagnosis to the day of Insertion of Brachytherapy', 'Number of Days from Diagnosis to Start Other Additional Therapy']
+MU pairs 334 collapse(>95% drop) 22 zero-out 11
+event BETWEEN scans (future info) : n 163 | collapse rate in 0.031 out 0.099 | collapse pairs covered 5 of 22 | mean pers err in 1.193 out 1.423
+event in 60 d BEFORE input scan : n 144 | collapse rate in 0.042 out 0.084 | collapse pairs covered 6 of 22 | mean pers err in 1.067 out 1.495
+MU collapse by phase {False: {'adjuvant': 81, 'chemoradiation': 13, 'other': 91, 'post_progression': 127}, True: {'adjuvant': 8, 'chemoradiation': 0, 'other': 7, 'post_progression': 7}}
+MU collapse: median y_in collapse 8.14 others 8.71 | median dt collapse 103.0 others 76.0
+MU jumps up >3 log: 12 median y_in 4.8
+MU median |dy| by input size tertile {'small': 1.516, 'mid': 0.641, 'large': 0.545} mean {'small': 1.796, 'mid': 1.154, 'large': 0.985}
+MU signed mean change by tertile (regression to mean check) {'small': 0.587, 'mid': -0.108, 'large': -0.411}
+UCSF alt sign (negative = after scan 1): surgery between n 2 zero-out covered 0 of 6 mean err in 1.191
+UCSF n_surg>=2: 95 | 2nd SX date present 94 | of those positive 59 negative 35
+UCSF table rows with any |days| > 15000 (looks like raw date serial): 22 of 298 | in eligible: 14
+UCSF code phase vs dataset on-treatment flag at scan 1: {'c': {'adjuvant': 16, 'chemoradiation': 0, 'other': 61}, 'n': {'adjuvant': 15, 'chemoradiation': 1, 'other': 91}, 'rt': {'adjuvant': 1, 'chemoradiation': 0, 'other': 1}}
+UCSF zero-out pairs: y_in [6.54, 3.95, 6.15, 3.5, 5.39, 4.26] dt [97.87638888888614, 62.950000000004366, 109.93055555555475, 90.78194444443943, 90.98124999999709, 59.80486111110804] on tx ['c', 'n', 'c', 'n', 'n', 'c']
+UCSF progression called between scans: n 28 mean signed change 0.655 others -0.02

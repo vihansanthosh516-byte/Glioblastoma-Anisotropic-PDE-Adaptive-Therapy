@@ -1,0 +1,78 @@
+== v8 part-2 on UCSF untouched intercept 8.835 | MU mean y_in 8.315 test mean y_in 7.922
+                     coef_std  mu_mean   mu_sd  test_mean  z_shift  contrib
+x_hat                  -0.172    8.298   1.767      7.922   -0.213    0.037
+y_in                    1.185    8.315   1.861      7.922   -0.211   -0.250
+dt                     -0.084   82.713  46.686     73.795   -0.191    0.016
+has_prior              -0.161    0.596   0.491      0.000   -1.212    0.195
+dt_post_progression     0.064   33.542  51.154      0.000   -0.656   -0.042
+dt_chemoradiation       0.067    3.105  16.367      0.523   -0.158   -0.011
+dt_adjuvant             0.000   21.760  41.669     10.153   -0.279   -0.000
+log_edema              -0.824   10.420   1.187     10.467    0.039   -0.032
+nec_frac                0.103    0.070   0.117      0.055   -0.125   -0.013
+enh_frac                0.000    0.930   0.117      0.945    0.125    0.000
+log_whole               1.082   10.669   1.017     10.630   -0.038   -0.041
+compact                -0.243    0.161   0.130      0.140   -0.167    0.041
+ mean pred 8.734 mean y_in 7.922 mean y_out 7.969 sum contrib -0.1
+ raw slope on y_in+x_hat 0.539
+== v8 part-2 on UCSD intercept 8.835 | MU mean y_in 8.315 test mean y_in 9.102
+                     coef_std  mu_mean   mu_sd  test_mean  z_shift  contrib
+x_hat                  -0.172    8.298   1.767      9.149    0.482   -0.083
+y_in                    1.185    8.315   1.861      9.102    0.423    0.501
+dt                     -0.084   82.713  46.686    107.065    0.522   -0.044
+has_prior              -0.161    0.596   0.491      0.304   -0.593    0.095
+dt_post_progression     0.064   33.542  51.154     25.370   -0.160   -0.010
+dt_chemoradiation       0.067    3.105  16.367      0.000   -0.190   -0.013
+dt_adjuvant             0.000   21.760  41.669     15.783   -0.143   -0.000
+log_edema              -0.824   10.420   1.187     10.244   -0.148    0.122
+nec_frac                0.103    0.070   0.117      0.123    0.452    0.046
+enh_frac                0.000    0.930   0.117      0.877   -0.452   -0.000
+log_whole               1.082   10.669   1.017     10.649   -0.020   -0.022
+compact                -0.243    0.161   0.130      0.188    0.204   -0.050
+ mean pred 9.379 mean y_in 9.102 mean y_out 8.848 sum contrib 0.542
+ raw slope on y_in+x_hat 0.539
+MU patient diff v8-pop: mean -0.0795 sd 0.86 n 135 | v8-pers mean -0.0806 sd 0.873
+track_b_v8_ucsd_external_20261114 n 33 v8-pop mean -0.222 sd 1.237 | v8-pers mean -0.1232 sd 1.133
+track_b_v8_ucsf_alptdg_20261114 n 137 v8-pop mean 0.221 sd 0.733 | v8-pers mean 0.2393 sd 0.86
+                   Days from 1st surgery/DX to 1st scan                                                                       Date of first surgery (or diagnosis by MRI if there was never surgery) - date of scan 1 in days
+0                        Days from 1st scan to 2nd scan                                                                                                                               Date of scan 2 - date of scan 1 in days
+1                                         EOR at 1st SX                                                                                                                                  Extent of resection at first surgery
+2                                              WHO 2021                                                                                                              Diagnostic classification according to WHO 2021 criteria
+3                                                 Grade                                                                                                                                  Grade according to WHO 2021 criteria
+4                                                  MGMT                                                                                                                     MGMT methylation, either positive or unmethylated
+5                                MGMT methylation index                                        If MGMT methylation was postive, this methylation index is often listed in the pathology report. If blank, no index was listed
+6                                                   IDH                                                                                                            IDH mutation status. Mut = IDH mutated, WT = IDH wild type
+7                                                 1p19q                                                                                        1p19q codeletion status. Codel = 1p19q codeleted, intact = not 1p19q codeleted
+8                                                  ATRX                                                                         ATRX status. Loss = indication of mutation, intact = ATRX retained, no indication of mutation
+9                           Days from death to 1st scan                                                                                   Date of scan 1 - Date of death in days. If blank, there was no date of death listed
+10               Days from 1st scan to next progression                                                            Date of first progression after scan 1 - date of scan 1 in days. If blank, there was no progression listed
+11  Days from 1st scan to 1st RT start (neg = RT first)                                                                                      Date of scan 1 - start date of first RT in days. If blank, there was no RT given
+12                                       1st Chemo type                                                                                                                                  Type of first chemotherapy treatment
+13                Days from 1st chemo start to 1st scan                                                                        Date of scan 1 - start date of first chemotherapy in days. If blank, no chemotherapy was given
+14          On tx at 1st scan (c = chemo, rt, n = none)   If the patient was actively on treatment at the time of the first scan, the treatment type is listed : c = chemo, rt = RT, n = none (not on treatment at that time)
+15          On tx at 2nd scan (c = chemo, rt, n = none)  If the patient was actively on treatment at the time of the second scan, the treatment type is listed : c = chemo, rt = RT, n = none (not on treatment at that time)
+16                                  Number of surgeries                                                                                                                           Number of surgeries prior to the first scan
+17                         Days from 1st scan to 2nd SX                                                                        Date of scan 1 - date of second surgery, in days. If blank, there was no second surgery listed
+18                         Days from 1st scan to 3rd SX                                                                         Date of scan 1 - date of third surgery, in days. If blank, there was no second surgery listed
+UCSF eligible 186 day_in describe {'count': 186.0, 'mean': 2110.0, 'std': 6099.0, 'min': -2026.0, '25%': 274.0, '50%': 496.0, '75%': 1487.0, 'max': 41745.0}
+UCSF dt {'count': 186.0, 'mean': 69.0, 'std': 42.0, 'min': 18.0, '25%': 49.0, '50%': 59.0, '75%': 71.0, 'max': 315.0}
+UCSF surgery between scans: n 5 | zero-out n 6 of which surgery between 0 | >95% drop n 6 of which surgery between 0
+UCSF pers err: surgery-between mean 0.524 others 0.818 share of err 0.017
+On tx at 1st scan (c = chemo, rt, n = none) {'n': 107, 'c': 77, 'rt': 2}
+On tx at 2nd scan (c = chemo, rt, n = none) {'n': 103, 'c': 79, 'rt': 4}
+1st Chemo type {'TMZ': 133, 'nan': 6, 'TMZ and optune': 6, 'PCV': 2, 'TMZ and Optune': 2, 'TMZ plus Optune': 2, 'TMZ + Nivo/Placebo': 2, 'TMZ and Optune (6 cycles), immuotherapy with dendritic cell vaccine in Germany (3/29)': 1}
+Number of surgeries {'1': 91, '2': 71, '3': 19, '4': 4, '6': 1}
+UCSF 2nd SX sign sample {'count': 94.0, 'mean': 865.0, 'std': 4586.0, 'min': -1719.0, '25%': -143.0, '50%': 119.0, '75%': 684.0, 'max': 43358.0}
+UCSF chemo-start col {'count': 181.0, 'mean': 2441.0, 'std': 8026.0, 'min': -1868.0, '25%': 197.0, '50%': 428.0, '75%': 979.0, 'max': 43366.0}
+UCSF RT col {'count': 177.0, 'mean': -187.0, 'std': 25808.0, 'min': -43585.0, '25%': -1022.0, '50%': -426.0, '75%': -198.0, 'max': 328372.0}
+UCSF next progression col {'count': 130.0, 'mean': 188.0, 'std': 458.0, 'min': -3612.0, '25%': 36.0, '50%': 89.0, '75%': 225.0, 'max': 1719.0}
+UCSF y_in<log(500): n 32 mean err 1.663 rest 0.633
+UCSD Progression Free survival non-null 87 {'count': 87.0, 'mean': 258.0, 'std': 290.0, 'min': -8.0, '25%': 52.0, '50%': 188.0, '75%': 348.0, 'max': 1620.0}
+UCSD Overall survival non-null 86 {'count': 86.0, 'mean': 488.0, 'std': 320.0, 'min': 64.0, '25%': 234.0, '50%': 448.0, '75%': 671.0, 'max': 1660.0}
+UCSD Days from Acquisition to Date of initial surgery, treatment  non-null 198 {'count': 198.0, 'mean': -297.0, 'std': 409.0, 'min': -2657.0, '25%': -365.0, '50%': -159.0, '75%': -38.0, 'max': 0.0}
+UCSD Days from Acquisition to Date of last surgery prior to scan  non-null 55 {'count': 55.0, 'mean': -255.0, 'std': 487.0, 'min': -2393.0, '25%': -212.0, '50%': -90.0, '75%': -34.0, 'max': 35.0}
+UCSD Days from Acquisition to Date of last Avastin treatment prio non-null 22 {'count': 22.0, 'mean': -10.0, 'std': 92.0, 'min': -136.0, '25%': -61.0, '50%': -21.0, '75%': 0.0, 'max': 316.0}
+UCSD Days from Acquistion to Date of last radiation prior to scan non-null 121 {'count': 121.0, 'mean': -280.0, 'std': 389.0, 'min': -2301.0, '25%': -338.0, '50%': -147.0, '75%': -34.0, 'max': 8.0}
+UCSD Number of surgeries non-null 243 {'count': 243.0, 'mean': 1.0, 'std': 1.0, 'min': 0.0, '25%': 1.0, '50%': 1.0, '75%': 1.0, 'max': 3.0}
+UCSD Number of radiation courses non-null 141 {'count': 141.0, 'mean': 1.0, 'std': 0.0, 'min': 1.0, '25%': 1.0, '50%': 1.0, '75%': 1.0, 'max': 2.0}
+UCSD Avastin col values {'No': 214, 'Yes': 27, 'nan': 1, 'N': 1}
+MU clin cols ['Patient_ID', 'Sex at Birth', 'Race', 'Age at diagnosis', 'Primary Diagnosis', 'Grade of Primary Brain Tumor', 'Stereotactic Biopsy before Surgical Resection', 'Progression', 'Time to First Progression (Days)', 'Type of 1st Progression', 'Second Progression/Recurrence', 'Type of 2nd Progression', 'Multiple surgeries', 'Hospice', 'Overall Survival (Death)', 'Number of days from Diagnosis to death (Days)', 'IDH1 mutation', 'IDH2 mutation', '1p/19q', 'ATRX mutation', 'MGMT methylation', 'BRAF V600E mutation', 'TERT promoter mutation', 'Chromosome 7 gain and Chromosome 10 loss', 'H3-3A mutation', 'EGFR amplification', 'PTEN mutation', 'CDKN2A/B deletion', 'TP53 alteration', 'Other mutations/alterations', 'Previous Brain Tumor', 'Type of previous brain tumor', 'Year of previous surgery', 'Grade of Previous brain tumor', 'Number of days from Diagnosis to First surgery or procedure', 'Initial Chemo Therapy', 'Name of Initial Chemo Therapy', 'Number of days from Diagnosis to Initial Chemo Therapy Start date', 'Number of days from Diagnosis to Initial Chemo Therapy end date', 'Radiation Therapy', 'Number of days from Diagnosis to Radiation Therapy Start date', 'Number of days from Diagnosis to Radiation Therapy end date', 'Dose', 'Number of Fractions', 'Number of days from Diagnosis to date of First Progression', 'Number of days from Diagnosis to date of Further Progression', 'Treatment started after 2nd progression', 'Days from Diagnosis to new treatment', 'Additional Therapy', 'Cycle length of Additional Therapy (q days)', 'Number of Days from Diagnosis to Starting Additional Therapy', 'Number of Days from Diagnosis to Complete Additional Therapy', 'Number of Cycles of Additional Therapy', '2nd_Additional Therapy', 'Cycle length of 2nd_Additional Therapy (q days)', 'Number of Days from Diagnosis to Starting 2nd_Additional Therapy', 'Number of Days from Dagnosis to Complete 2nd_Additional Therapy', 'Number of Cycles of 2nd_Additional Therapy', 'Immuno therapy', 'Cycle length of Immunotherapy (q days)', 'Number of Days from Diagnosis to Start Immunotherapy', 'Number of Days from Diagnosis to Complete Immunotherapy', 'Number of Cycles of Immunotherapy', 'Brachy therapy', 'Number of Days from Diagnosis to the day of Insertion of Brachytherapy', 'Other Types of Therapy (LITT, more chemo, proton therapy)', 'Number of Days from Diagnosis to Start Other Additional Therapy', 'Number of Days from Diagnosis to Complete Other Additional Therapy', 'Number of Days from Diagnosis to 1st MRI (Timepoint_1)', 'Number of Days from Diagnosis to 2nd MRI (Timepoint_2)', 'Number of Days from Diagnosis to 3rd MRI (Timepoint_3)', 'Number of Days from Diagnosis to 4th MRI (Timepoint_4)', 'Number of Days from Diagnosis to 5th MRI (Timepoint_5)', 'Number of Days from Diagnosis to 6th MRI (Timepoint_6)']

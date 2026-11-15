@@ -1,0 +1,4 @@
+track_b_v8_ucsd_external_20261114 n 46 | signed mean change by input tertile {'small': -0.141, 'mid': -0.106, 'large': -0.524} | median |change| {'small': 1.444, 'mid': 0.394, 'large': 0.439} | corr(y_in, change) -0.183 | mean y_in 9.102 sd y_in 1.538
+   excluding zero-outcome pairs: corr -0.485 n 44
+track_b_v8_ucsf_alptdg_20261114 n 137 | signed mean change by input tertile {'small': -0.18, 'mid': 0.171, 'large': 0.152} | median |change| {'small': 0.844, 'mid': 0.452, 'large': 0.359} | corr(y_in, change) 0.125 | mean y_in 7.922 sd y_in 1.774
+   excluding zero-outcome pairs: corr -0.127 n 132
