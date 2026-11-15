@@ -25,3 +25,11 @@ Source: output/track_b_v8_ucsd_external_20261114/result.json
 ## Hybrid search (6 subagent candidates, protocol paper/trackB_hybrid_search_protocol_2026-11-14.md)
 Dev patient MAE (99.64% CI rule; none passed): moe 1.453, compartment 1.463, pkpd 1.473, stack 1.474, deconv 1.480, switch 1.590 (worse than pop_rate). v8 dev 1.449 stays lowest.
 Finalist moe on UCSD (second exposure): 1.256 vs pop_rate 1.441; diff -0.184, 95% CI (-0.643, 0.079). Not passed. v8 on UCSD stays lowest (1.219). Source: output/track_b_hybrid_moe_ucsd_20261114/result.json
+
+## Frozen v8 on UCSF-ALPTDG (protocol paper/trackB_v8_ucsf_alptdg_protocol_2026-11-14.md, one run)
+Eligible pairs 186 of 298 (dt 14-365 days, non-empty time1 core). PRIMARY untouched patients: 137.
+Primary patient MAE: persistence 0.832, pop_rate 0.851, Gompertz 0.955, v8 1.072, GBR 1.205.
+v8 minus pop_rate: +0.221, 95% CI (0.102, 0.340). v8 is significantly WORSE. Primary success: no.
+Secondary (49 used-before patients): v8 0.880 vs pop_rate 0.743; diff +0.137, CI (-0.070, 0.351).
+Reading: with expert masks (baseline error 0.83 vs 1.53 on MU), v8's MU-learned corrections hurt. The MU gains look tied to MU's automatic-mask noise, not general tumor biology.
+Source: output/track_b_v8_ucsf_alptdg_20261114/result.json
