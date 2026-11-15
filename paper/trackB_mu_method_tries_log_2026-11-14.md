@@ -9,5 +9,6 @@ Same question, data (334 pairs, 135 patients), folds, target and score for every
 | 3 | v3 median latent regression | 1.529 | +0.001 (-0.071, 0.079) | 98.33% | no | 0.587 | output/track_b_mu_v3_20261114/result.json |
 | 4 | v4 median-loss boosted | 1.582 | +0.054 (-0.115, 0.221) | 98.75% | no | 0.567 | output/track_b_mu_v4_20261114/result.json |
 | 5 | v5 input-mask composition + latent | 1.497 | -0.031 (-0.148, 0.100) | 99% | no | 0.641 | output/track_b_mu_v5_20261114/result.json |
+| 6 | v6 composition + edge shape | 1.505 | -0.023 (-0.155, 0.117) | 99.17% | no | 0.658 | output/track_b_mu_v6_20261114/result.json |
 
 Weak points: every try after 1 is post hoc; the cohort was used before; segmentations are the dataset's own and not checked here; best baseline AUC for comparison: Gompertz 0.580.
