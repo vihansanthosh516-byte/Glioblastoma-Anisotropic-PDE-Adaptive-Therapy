@@ -14,3 +14,10 @@ Same question, data (334 pairs, 135 patients), folds, target and score for every
 | 8 | v8 two-part collapse model | 1.449 | -0.079 (-0.287, 0.121) | 99.375% | no | 0.650 | output/track_b_mu_v8_20261114/result.json |
 
 Weak points: every try after 1 is post hoc; the cohort was used before; segmentations are the dataset's own and not checked here; best baseline AUC for comparison: Gompertz 0.580.
+
+## External test of frozen v8 (UCSD-PTGBM, one run)
+Protocol: paper/trackB_v8_ucsd_external_protocol_2026-11-14.md. Fit on all MU, applied once. 46 pairs, 33 patients.
+Patient MAE: v8 1.219; persistence 1.342; Gompertz 1.438; pop_rate 1.441; EB slope 1.488; two-point 1.582; GBR 1.687.
+v8 minus pop_rate (pre-set comparator): -0.222, 95% CI (-0.700, 0.066). Pass: no (CI crosses 0). v8 was lowest of all 7 methods.
+Weak points: small n (33 patients); UCSD exposed before for a different target; phase windows assumed; only 1 of 4 collapse pairs flagged.
+Source: output/track_b_v8_ucsd_external_20261114/result.json
