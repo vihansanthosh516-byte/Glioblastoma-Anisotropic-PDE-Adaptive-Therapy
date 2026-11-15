@@ -1,0 +1,31 @@
+Fix 1 UCSD: pairs 46 -> 55 | patients 33 -> 42 | {'intervals_recovered_from_other_anchors': 12, 'anchor_disagreement_days_median': 0.0, 'anchor_disagreement_days_max': 4018.0, 'n_checked': 62}
+Fix 2 LUMIERE: pairs 400 patients 79 (locked run: 400 pairs, 79 patients)
+MU rebuilt from raw files: pairs 335 patients 135 (pair table: 334, 135)
+pairs with an earlier scan: {'LUMIERE': '325/400', 'MU': '202/335', 'UCSD': '14/55', 'UCSF': '0/186'}
+
+== held out MU: patients 135 | fitted on the other three: {'lam_rebound': 0.34, 'pk_rate': 0.003232908344950799, 'gomp_l1': [0.0016598605025355934, 9.201024044116746]}
+   patient MAE {'persistence': 1.529, 'pop_rate': 1.523, 'gompertz': 1.532, 'gomp_l1': 1.49, 'rebound': 1.508, 'pk_gomp': 1.513, 'vig': 1.493, 'blend': 1.487}
+
+== held out UCSD: patients 42 | fitted on the other three: {'lam_rebound': 0.34, 'pk_rate': 0.0026188033248543898, 'gomp_l1': [0.0016720473313611354, 9.457613294208997]}
+   patient MAE {'persistence': 1.214, 'pop_rate': 1.252, 'gompertz': 1.331, 'gomp_l1': 1.243, 'rebound': 1.187, 'pk_gomp': 1.201, 'vig': 1.195, 'blend': 1.211}
+
+== held out UCSF: patients 186 | fitted on the other three: {'lam_rebound': 0.34, 'pk_rate': 0.0026188033248543898, 'gomp_l1': [0.0027875600878966497, 9.416168949630004]}
+   patient MAE {'persistence': 0.81, 'pop_rate': 0.806, 'gompertz': 0.962, 'gomp_l1': 0.937, 'rebound': 0.81, 'pk_gomp': 0.81, 'vig': 0.787, 'blend': 0.847}
+
+== held out LUMIERE: patients 79 | fitted on the other three: {'lam_rebound': 0.34, 'pk_rate': 0.002121350227877485, 'gomp_l1': [0.0005399682333976372, 10.621727332069392]}
+   patient MAE {'persistence': 1.26, 'pop_rate': 1.287, 'gompertz': 1.217, 'gomp_l1': 1.239, 'rebound': 1.223, 'pk_gomp': 1.211, 'vig': 1.237, 'blend': 1.226}
+
+LOCO-4: method minus persistence, mean and 95% CI (negative = better)
+rebound   | MU -0.021 (-0.041, -0.003) | UCSD -0.026 (-0.069, +0.004) | UCSF +0.000 (+0.000, +0.000) | LUMIERE -0.036 (-0.067, -0.006) | POOLED -0.016 (-0.025, -0.007)
+pk_gomp   | MU -0.016 (-0.034, +0.003) | UCSD -0.012 (-0.038, +0.005) | UCSF +0.000 (+0.000, +0.000) | LUMIERE -0.049 (-0.076, -0.023) | POOLED -0.015 (-0.023, -0.007)
+vig       | MU -0.036 (-0.061, -0.012) | UCSD -0.019 (-0.063, +0.023) | UCSF -0.024 (-0.039, -0.008) | LUMIERE -0.023 (-0.058, +0.011) | POOLED -0.027 (-0.039, -0.014)
+blend     | MU -0.042 (-0.074, -0.011) | UCSD -0.003 (-0.052, +0.048) | UCSF +0.036 (-0.002, +0.076) | LUMIERE -0.034 (-0.056, -0.012) | POOLED -0.004 (-0.024, +0.016)
+gomp_l1   | MU -0.039 (-0.099, +0.021) | UCSD +0.029 (-0.047, +0.120) | UCSF +0.126 (+0.053, +0.204) | LUMIERE -0.020 (-0.034, -0.008) | POOLED +0.040 (+0.003, +0.079)
+gompertz  | MU +0.003 (-0.077, +0.082) | UCSD +0.118 (-0.045, +0.280) | UCSF +0.152 (+0.087, +0.220) | LUMIERE -0.043 (-0.092, +0.006) | POOLED +0.068 (+0.028, +0.110)
+pop_rate  | MU -0.006 (-0.013, +0.001) | UCSD +0.039 (-0.004, +0.083) | UCSF -0.004 (-0.010, +0.003) | LUMIERE +0.027 (+0.002, +0.052) | POOLED +0.005 (-0.002, +0.012)
+
+LOCO-4: method minus the best baseline of that cohort (best of persistence, pop_rate, gompertz, gomp_l1)
+rebound   | MU vs gomp_l1 +0.018 (-0.043, +0.078) | UCSD vs persistence -0.026 (-0.069, +0.004) | UCSF vs pop_rate +0.004 (-0.003, +0.010) | LUMIERE vs gompertz +0.007 (-0.051, +0.066)
+pk_gomp   | MU vs gomp_l1 +0.023 (-0.036, +0.083) | UCSD vs persistence -0.012 (-0.038, +0.005) | UCSF vs pop_rate +0.004 (-0.003, +0.010) | LUMIERE vs gompertz -0.006 (-0.062, +0.053)
+vig       | MU vs gomp_l1 +0.003 (-0.064, +0.070) | UCSD vs persistence -0.019 (-0.063, +0.023) | UCSF vs pop_rate -0.020 (-0.034, -0.006) | LUMIERE vs gompertz +0.020 (-0.038, +0.080)
+blend     | MU vs gomp_l1 -0.003 (-0.037, +0.030) | UCSD vs persistence -0.003 (-0.052, +0.048) | UCSF vs pop_rate +0.040 (+0.005, +0.077) | LUMIERE vs gompertz +0.009 (-0.044, +0.065)

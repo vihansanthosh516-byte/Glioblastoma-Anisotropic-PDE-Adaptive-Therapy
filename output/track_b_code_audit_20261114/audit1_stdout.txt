@@ -1,0 +1,56 @@
+C:\Users\vihan\20206 science fair\output\track_b_code_audit_20261114\audit1.py:45: FutureWarning: Downcasting behavior in `replace` is deprecated and will be removed in a future version. To retain the old behavior, explicitly call `result.infer_objects(copy=False)`. To opt-in to the future behavior, set `pd.set_option('future.no_silent_downcasting', True)`
+  print("   unexpected labels:", c.other_labels.fillna("").replace("", np.nan).dropna().value_counts().to_dict())
+A. masks: 596 patients 203 | missing mask 2 | zoom {'(1.0, 1.0, 1.0)': 594} | shape {'(240, 240, 155)': 594}
+   file sets: {'brain_t1c.nii.gz|brain_t1n.nii.gz|brain_t2f.nii.gz|brain_t2w.nii.gz|tumorMask.nii.gz': 594, 'brain_t1c.nii.gz|brain_t1n.nii.gz|brain_t2f.nii.gz|brain_t2w.nii.gz': 2}
+   unexpected labels: {}
+   label present in share of masks: {'n1': 0.529, 'n2': 0.992, 'n3': 0.916, 'n4': 0.872}
+   median voxels when present: {'n1': 1103.0, 'n2': 43921.0, 'n3': 6822.5, 'n4': 5006.0}
+   masks with core == 0: 48 | of those with label 4 > 0: 40 | with label 2 > 0: 46 | fully empty: 0
+   label 3 > 0 but label 1 == 0: 231 | label 1 > 0 but label 3 == 0: 0 | label 4 > 0 and label 3 == 0: 40
+
+B. scan days: masks with no day in the clinical table: 3 | days in the table with no mask folder: 4
+   patients whose days do not increase with timepoint number: 1 [('PatientID_0081', [1, 2], [24.0, -965.0])]
+
+C. pair table vs raw files: pairs 387 | core_in mismatch 0 | core_out mismatch 0 | day_in mismatch 0 | day_out mismatch 0 | dt mismatch 0
+   pairs whose tp_out is not the next scan in time: 0 | possible consecutive pairs from raw files: 391 | pairs in table: 387
+   in_primary false: 53 | reasons: dt<14 21 dt>365 6 empty input 29
+
+D. worst pairs (|log change| > 3): 32 | share of total abs change 0.365
+    patient_id  tp_in  tp_out  dt_days    n1_a    n3_a     n2_a     n4_a    n1_b    n3_b     n2_b     n4_b    ch  d_whole
+PatientID_0275      1       3    132.0     0.0 11862.0  13351.0   1826.0     0.0     0.0   4003.0   5833.0 -9.38    -1.84
+PatientID_0236      1       3    126.0  1294.0  5183.0   7269.0      3.0     0.0     0.0   1581.0    522.0 -8.78    -2.16
+PatientID_0264      1       2    115.0     0.0  5945.0  13291.0   6562.0     0.0     0.0  45501.0   2936.0 -8.69     0.86
+PatientID_0271      1       3    150.0     0.0  3831.0   9965.0   3217.0     0.0     0.0   1047.0    668.0 -8.25    -2.58
+PatientID_0089      3       4     77.0     0.0  3067.0  69207.0 121390.0     0.0     0.0  86651.0 135816.0 -8.03     0.18
+PatientID_0196      1       2    103.0     0.0   534.0   1148.0    762.0     0.0     0.0   5635.0    839.0 -6.28     1.21
+PatientID_0029      1       3    183.0     0.0  2772.0  13020.0    599.0     0.0     5.0  46583.0   1116.0 -6.14     1.08
+PatientID_0197      1       2     56.0     0.0   307.0      0.0    563.0     0.0     0.0      0.0    601.0 -5.73    -5.73
+PatientID_0066      3       5    170.0     0.0   166.0  12394.0      0.0     0.0     0.0  44929.0      0.0 -5.12     1.27
+PatientID_0021      3       4     92.0  7099.0 11101.0  34516.0      7.0     0.0   126.0  44255.0    311.0 -4.97    -0.17
+PatientID_0025      2       3     78.0 12993.0 44571.0  57978.0      4.0     0.0   476.0   8718.0  25887.0 -4.79    -2.53
+PatientID_0207      2       3     64.0     0.0 32348.0  11772.0   9401.0     0.0   369.0  20819.0   4152.0 -4.47    -0.73
+PatientID_0074      5       6    103.0     0.0    82.0  26980.0  17162.0     0.0     0.0  28823.0  15386.0 -4.42     0.06
+PatientID_0036      3       4     98.0 15561.0 48795.0 221557.0   2777.0     0.0  1223.0 113803.0  11552.0 -3.96    -0.91
+PatientID_0074      4       5    240.0    84.0  4127.0  37918.0   9535.0     0.0    82.0  26980.0  17162.0 -3.93    -0.44
+PatientID_0186      5       6    154.0     0.0   511.0  54771.0   5619.0     0.0    10.0  61619.0   6826.0 -3.84     0.11
+PatientID_0140      2       3    101.0     0.0   610.0  16274.0   8342.0     0.0    18.0  15150.0   7388.0 -3.47    -0.11
+PatientID_0072      1       2    103.0  3742.0 10272.0  25430.0     19.0     0.0   463.0  26582.0   7427.0 -3.41    -0.38
+PatientID_0034      2       3     42.0     0.0   930.0   8539.0  10177.0     0.0    43.0   8466.0  15581.0 -3.05    -0.11
+PatientID_0204      2       3     56.0  1355.0 26883.0  51323.0   3430.0     0.0  1373.0  38224.0  11144.0 -3.02    -0.70
+PatientID_0036      4       5     91.0     0.0  1223.0 113803.0  11552.0 12119.0 12625.0 101558.0  10603.0  3.01     0.09
+PatientID_0136      1       2     54.0     0.0  1118.0  24827.0  12136.0   826.0 22851.0  40876.0    984.0  3.05     0.91
+PatientID_0014      1       2     42.0     0.0   116.0  85840.0    848.0     0.0  3519.0   7095.0   1327.0  3.40    -2.09
+PatientID_0105      3       4     98.0     0.0   194.0  11418.0    144.0   532.0  5772.0  13850.0     83.0  3.48     0.55
+PatientID_0032      4       5     76.0     0.0  1101.0  99462.0   7079.0 10923.0 26742.0  35851.0    907.0  3.53    -0.31
+PatientID_0152      2       3     98.0     0.0   219.0   3433.0   5788.0     0.0  7558.0  28192.0  11970.0  3.54     2.28
+PatientID_0074      3       4    146.0     0.0    91.0  21909.0  14135.0    84.0  4127.0  37918.0   9535.0  3.82     0.65
+PatientID_0021      4       5     63.0     0.0   126.0  44255.0    311.0    41.0  5821.0  35978.0     66.0  3.83    -0.06
+PatientID_0214      1       2     96.0     0.0    21.0  42258.0  36120.0     0.0  1347.0  20100.0  21712.0  4.12    -0.68
+PatientID_0121      1       2     91.0     2.0    15.0   9766.0   5389.0     0.0  1674.0  13012.0   2122.0  4.53     0.41
+PatientID_0186      1       2     36.0     0.0    44.0  18990.0  19423.0     0.0  8310.0  44519.0   8494.0  5.22     1.02
+PatientID_0249      1       3    182.0     0.0     1.0  61462.0  25968.0     0.0  9306.0  23692.0   5516.0  8.45    -0.62
+   falls: 20 | whole tumor also fell > 1 log: 5 | cavity grew > 1000 vox: 9 | cavity appeared (0 -> >0): 0 | edema grew by more than the lost core: 8
+   rises: 12 | whole tumor also rose > 1 log: 2 | cavity shrank > 1000 vox: 7 | edema fell by more than half the gained core: 5
+
+E. pairs where the whole tumor (1+2+3) changed < 0.3 log: 137 | their mean |core change| 1.002 | others 1.526
+   corr(core change, whole change) 0.348 | corr(core change, edema log change) 0.13

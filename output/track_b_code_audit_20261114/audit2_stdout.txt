@@ -1,0 +1,22 @@
+== UCSD
+sessions 243 patients 178 | patients with > 1 session 49 | consecutive pairs possible 65 | patients whose day does not increase with session number or is missing: 12 ['UCSD-PTGBM-0034', 'UCSD-PTGBM-0066', 'UCSD-PTGBM-0073', 'UCSD-PTGBM-0101', 'UCSD-PTGBM-0103', 'UCSD-PTGBM-0116']
+eligible pairs 46 patients 33 | dt quantiles {0.0: 17.0, 0.5: 87.5, 1.0: 312.0}
+   sx_between: n=13, share of abs error=0.219, mean |change|=0.99 vs 1.39 | median change -0.22289963014470793
+   av_between: n=4, share of abs error=0.018, mean |change|=0.27 vs 1.37 | median change -0.2516191404724992
+   rt_between: n=16, share of abs error=0.463, mean |change|=1.69 vs 1.05 | median change -0.311578793283239
+   zero-outcome pairs: 2 | with surgery between: 0 | with Avastin between: 0
+== UCSF
+patients 298 | dt missing 0 | dt < 14 0 | dt > 365 4 | table core volume at scan 1 == 0: 111
+eligible 186 | mask voxel count / table volume at scan 1: median 1.0 | 5%-95% [1.0, 1.0] (1.0 = table is in mm3 and matches the mask)
+== LUMIERE (spent)
+rating rows 616 | duplicated patient-time rows 6 | scans with mask and no rating row: 39
+eligible pairs 400 | outcome-scan rating counts {'PD': 224, 'SD': 84, 'none': 26, 'CR': 24, 'Post-Op': 22, 'PR': 20}
+   input-scan rating counts {'PD': 160, 'Post-Op': 98, 'SD': 74, 'none': 28, 'CR': 23, 'PR': 16, 'Post-Op/PD': 1}
+   pairs that END in a post-operative scan (a surgery between the scans): n=22, share of abs error=0.049, mean |change|=1.09 vs 1.22 | median change 0.25
+   pairs that START at a post-operative scan: n=99, share of abs error=0.326, mean |change|=1.60 vs 1.09 | median change -0.49
+   median change by outcome rating {'CR': -0.49, 'PD': 0.2, 'PR': -0.67, 'Post-Op': 0.25, 'SD': -0.5, 'none': 0.57}
+   zero-outcome pairs 9 | of those ending in a post-operative scan 0 | ending in CR 1
+   persistence patient MAE: all 1.261 | excluding pairs that end in a post-operative scan 1.297
+== scoring code check (toy data with a known answer)
+   boot_ci [-0.235, -0.039] | normal-theory CI [np.float64(-0.234), np.float64(-0.039)]
+   patient-mean of errors [1,3 | 5] = 3.5 (expected 3.5)

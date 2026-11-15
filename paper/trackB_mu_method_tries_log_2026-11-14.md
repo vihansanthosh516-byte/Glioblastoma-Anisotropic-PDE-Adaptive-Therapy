@@ -43,3 +43,9 @@ Secondary: without the history term VIG is +0.007 vs persistence (-0.009, +0.024
 Weak points: LUMIERE exposed; 79 patients; about 20 variants were looked at on development data before the lock; LUMIERE has no treatment dates in the tables used.
 Source: output/track_b_vig_lumiere_20261114/result.json
 Development exploration (post hoc): output/track_b_loco_explore_20261114/. Problem review: paper/trackB_problem_review_2026-11-14.md.
+
+## Code and data audit + four-cohort leave-one-cohort-out (exploratory, post hoc)
+Record: paper/trackB_code_audit_2026-11-14.md. No large code bug found. Two small data fixes (UCSD 46 -> 55 pairs; one LUMIERE pre-operative scan).
+Pooled over 442 patients, each cohort held out in turn: VIG 1.121, persistence 1.148, pop_rate 1.154, Gompertz (abs. loss) 1.189, Gompertz 1.217. VIG minus persistence -0.027, 95% CI (-0.039, -0.014); every comparator CI upper limit is below 0.
+NOT a confirmed win: the pooled rule was chosen after the locked LUMIERE run failed; all four cohorts are spent; the VIG design was chosen with three of the four cohorts in view; gain is about 2.4%.
+Source: output/track_b_code_audit_20261114/loco4_all_baselines_stdout.txt
