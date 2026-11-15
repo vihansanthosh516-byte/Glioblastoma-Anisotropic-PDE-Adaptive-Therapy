@@ -1,0 +1,38 @@
+days since first surgery at input scan: {'MU': {'count': 333.0, '25%': 97.0, '50%': 153.0, '75%': 256.0}, 'UCSD': {'count': 46.0, '25%': 55.0, '50%': 156.0, '75%': 336.0}, 'UCSF': {'count': 181.0, '25%': 272.0, '50%': 482.0, '75%': 1389.0}}
+
+1. by days since surgery: n | P(zero) | median change | mean |change| | median y_in
+MU {Interval(-1, 60, closed='right'): {'n': 32, 'p0': 0.06, 'med': 0.49, 'mad': 1.76, 'yin': 8.82}, Interval(60, 180, closed='right'): {'n': 162, 'p0': 0.03, 'med': 0.12, 'mad': 1.3, 'yin': 8.91}, Interval(180, 365, closed='right'): {'n': 114, 'p0': 0.03, 'med': 0.07, 'mad': 1.21, 'yin': 8.32}, Interval(365, 730, closed='right'): {'n': 22, 'p0': 0.05, 'med': 0.38, 'mad': 1.37, 'yin': 8.5}, Interval(730, 20000, closed='right'): {'n': 3, 'p0': 0.0, 'med': 0.82, 'mad': 0.99, 'yin': 7.26}}
+UCSD {Interval(-1, 60, closed='right'): {'n': 12, 'p0': 0.17, 'med': -0.46, 'mad': 2.03, 'yin': 9.14}, Interval(60, 180, closed='right'): {'n': 14, 'p0': 0.0, 'med': 0.29, 'mad': 1.14, 'yin': 9.03}, Interval(180, 365, closed='right'): {'n': 11, 'p0': 0.0, 'med': -0.38, 'mad': 1.02, 'yin': 9.65}, Interval(365, 730, closed='right'): {'n': 4, 'p0': 0.0, 'med': 0.59, 'mad': 1.33, 'yin': 8.84}, Interval(730, 20000, closed='right'): {'n': 5, 'p0': 0.0, 'med': 0.19, 'mad': 0.34, 'yin': 10.7}}
+UCSF {Interval(-1, 60, closed='right'): {'n': 1, 'p0': 1.0, 'med': -6.15, 'mad': 6.15, 'yin': 6.15}, Interval(60, 180, closed='right'): {'n': 26, 'p0': 0.0, 'med': 0.0, 'mad': 0.51, 'yin': 8.71}, Interval(180, 365, closed='right'): {'n': 40, 'p0': 0.0, 'med': 0.28, 'mad': 0.76, 'yin': 8.98}, Interval(365, 730, closed='right'): {'n': 47, 'p0': 0.06, 'med': 0.09, 'mad': 0.87, 'yin': 8.68}, Interval(730, 20000, closed='right'): {'n': 67, 'p0': 0.03, 'med': 0.12, 'mad': 0.82, 'yin': 7.21}}
+
+   small lesions only (y_in < 7): median change by days since surgery
+MU {Interval(-1, 60, closed='right'): {'n': 5, 'p0': 0.2, 'med': 0.87}, Interval(60, 180, closed='right'): {'n': 26, 'p0': 0.08, 'med': 1.31}, Interval(180, 365, closed='right'): {'n': 29, 'p0': 0.07, 'med': 0.38}, Interval(365, 730, closed='right'): {'n': 7, 'p0': 0.14, 'med': 1.03}, Interval(730, 20000, closed='right'): {'n': 1, 'p0': 0.0, 'med': 0.82}}
+UCSD {Interval(-1, 60, closed='right'): {'n': 1, 'p0': 1.0, 'med': -6.98}, Interval(60, 180, closed='right'): {'n': 2, 'p0': 0.0, 'med': 3.24}, Interval(180, 365, closed='right'): {'n': 2, 'p0': 0.0, 'med': -1.15}, Interval(365, 730, closed='right'): {'n': 1, 'p0': 0.0, 'med': 3.2}}
+UCSF {Interval(-1, 60, closed='right'): {'n': 1, 'p0': 1.0, 'med': -6.15}, Interval(60, 180, closed='right'): {'n': 3, 'p0': 0.0, 'med': 0.55}, Interval(180, 365, closed='right'): {'n': 8, 'p0': 0.0, 'med': 1.76}, Interval(365, 730, closed='right'): {'n': 11, 'p0': 0.27, 'med': -0.71}, Interval(730, 20000, closed='right'): {'n': 29, 'p0': 0.07, 'med': 0.05}}
+
+2. MU zero outcomes (all pairs): 12 | has a later scan: 9 | later scan core > 0: 2 | later core voxels: [82, 0, 4953, 0, 0, 0, 0, 0, 0]
+   MU pairs that START at zero: 29 | regrow (>0): 10 | median regrown voxels: 3562.5
+
+3. LOCO patient MAE minus persistence (negative = better). Train on the other two cohorts.
+                            MU   UCSD   UCSF
+const                   -0.014  0.020 -0.014
+ldt                     -0.016 -0.023 -0.023
+z                       -0.013  0.009  0.066
+z+ldt                   -0.026 -0.038  0.057
+small+ldt               -0.022 -0.031  0.029
+small+ldt+lsx           -0.015 -0.029  0.068
+z+ldt+lsx               -0.017 -0.036  0.083
+z+ldt+er                -0.019 -0.041  0.105
+small+ldt+lsx+small:lsx -0.039 -0.053  0.067
+
+   same models, 5-fold patient CV inside each cohort (own-cohort ceiling)
+                            MU   UCSD   UCSF
+const                   -0.017  0.019 -0.014
+ldt                     -0.012  0.116 -0.028
+z                       -0.052  0.061 -0.010
+z+ldt                   -0.037  0.107 -0.017
+small+ldt               -0.015  0.102 -0.010
+small+ldt+lsx           -0.025  0.034 -0.010
+z+ldt+lsx               -0.019  0.099 -0.018
+z+ldt+er                -0.084  0.083 -0.011
+small+ldt+lsx+small:lsx -0.040  0.529  0.014

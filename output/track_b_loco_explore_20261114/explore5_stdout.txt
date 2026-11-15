@@ -1,0 +1,9 @@
+coefficients, rep 0, per fold: {'h1': [0.15], 'h2': [0.05, 0.38], 'h3': [0.27, 0.1], 'h4': [0.14, 0.19]}
+   rep 0, patients with history (n=101): h1 minus base -0.0224 CI (-0.059, 0.013)
+   rep 0, patients with history (n=101): h2 minus base -0.0391 CI (-0.095, 0.011)
+   rep 0, patients with history (n=101): h3 minus base -0.0116 CI (-0.065, 0.041)
+   rep 0, patients with history (n=101): h4 minus base -0.0059 CI (-0.05, 0.038)
+        n_pat  h1-base  h2-base  h3-base  h4-base  base-pers
+cohort                                                      
+MU       89.0  -0.0015  -0.0308   0.0074   0.0093    -0.0041
+UCSD     12.0  -0.1140  -0.1022  -0.1185  -0.1016    -0.0502
