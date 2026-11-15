@@ -30,7 +30,7 @@ class WorldRunError(RuntimeError):
 
 def prepare_synthetic_world(world, *, family, patients_per_cohort, signal_parameters,
                             model_parameters, settings, scan_loss=None, entries=None,
-                            seed_purpose="stage2_dev"):
+                            seed_purpose="stage2_dev", earf_model_parameters=None):
     """Build one development world's benchmark inputs without scoring policies.
 
     The returned world seed is caller-declared provenance, not proof of generation.
@@ -110,6 +110,8 @@ def prepare_synthetic_world(world, *, family, patients_per_cohort, signal_parame
         "filter_ranges": PF_PRIOR_INTEGRATED_V3,
         "include_single_signal_controls": True,
     }
+    if earf_model_parameters is not None:
+        kwargs["earf_model_parameters"] = tuple(earf_model_parameters)
     world_bytes = json.dumps(
         {"family": family, "parameters": latent_world}, sort_keys=True,
         separators=(",", ":"), allow_nan=False,

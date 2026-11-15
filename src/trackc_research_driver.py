@@ -53,7 +53,7 @@ if str(SRC) not in sys.path:
 import trackc_integrated_driver as integrated  # noqa: E402
 import trackc_seed_registry as registry  # noqa: E402
 from trackc_integrated_signal_model import F0_REFERENCE_BOUNDS, SignalModelParameters  # noqa: E402
-from trackc_research_grid import research_model_grid  # noqa: E402
+from trackc_research_grid import research_model_grid, research_q_grid  # noqa: E402
 from trackc_world_schedule import POLICY_ROLES, SCENARIO_ROLES  # noqa: E402
 
 CONFIG_PATH = PROJECT_ROOT / "configs" / "trackABC_integrated_v2.json"
@@ -258,12 +258,20 @@ def run_one_world(job: dict) -> dict:
     settings = make_settings(spec, config) if job["benchmark"] == "real" else job["stub_settings"]
     anchor = config["signal_model"]["primary_anchor"]
     signal = SignalModelParameters(q=0.5, a=float(anchor[0]), b=float(anchor[1]), d=float(anchor[2]))
+    earf_set = None
+    if job.get("earf"):
+        # EARF (paper/integration_earf_protocol_2026-11-14.md): evidence-anchored world truth
+        # from a stream derived from the world seed; controller gets the credible-box set.
+        import integration_earf as earf
+        stream = np.random.Generator(np.random.PCG64DXSM(np.random.SeedSequence([int(job["world"]["world"]), 0xEA4F])))
+        signal = earf.sample_evidence_world(stream, research_q_grid(config))
+        earf_set = earf.credible_box_model_set(research_q_grid(config))
     scan_loss = {"miss_p": spec.missingness} if spec.missingness > 0 else None
     t0 = time.time()
     prepared = runner.prepare_synthetic_world(
         job["world"], family=job["family"], patients_per_cohort=job["patients"],
         signal_parameters=signal, model_parameters=research_model_grid(config), settings=settings,
-        scan_loss=scan_loss, seed_purpose=job["seed_purpose"],
+        scan_loss=scan_loss, seed_purpose=job["seed_purpose"], earf_model_parameters=earf_set,
     )
     integrated.check_arm_plan(prepared["benchmark_kwargs"])
     benchmark = _load_benchmark_module().run_shared_policy_world if job["benchmark"] == "real" else _stub_benchmark
@@ -275,6 +283,9 @@ def run_one_world(job: dict) -> dict:
         "seeds": job["world"], "world_parameters_sha256": prepared["world_parameters_sha256"],
         "contrasts": summarize_result(result), "elapsed_seconds": round(time.time() - t0, 3),
         "host": platform.node(), "code": job["code"], "result": full,
+        "earf": bool(job.get("earf")),
+        "signal_truth_ab_d": [float(signal.a), float(signal.b), float(signal.d)],
+        "earf_model_count": None if earf_set is None else len(earf_set),
     }
 
 
@@ -291,12 +302,13 @@ def _stub_benchmark(**kwargs):
                 ("minimax", "combined_vs_molecular_only", "combined_vs_mri_only", "combined_vs_no_signal"))}}
 
 
-def plan_jobs(phase, cell, patients, n_worlds, benchmark, families=FAMILIES, stub_settings=None):
+def plan_jobs(phase, cell, patients, n_worlds, benchmark, families=FAMILIES, stub_settings=None, earf=False):
     purpose = PHASES[phase][0]
     spec = cell_spec(cell)
     code = code_fingerprint()
     return [{"phase": phase, "family": fam, "world": w, "patients": patients, "seed_purpose": purpose,
-             "cell": spec.__dict__, "benchmark": benchmark, "stub_settings": stub_settings, "code": code}
+             "cell": spec.__dict__, "benchmark": benchmark, "stub_settings": stub_settings, "code": code,
+             "earf": bool(earf)}
             for fam, w in build_schedule(phase, n_worlds, families)]
 
 
@@ -407,6 +419,8 @@ def main(argv=None) -> int:
     ap.add_argument("--confirm-development", action="store_true",
                     help="required for dev_pilot: results are development data, never evaluation data")
     ap.add_argument("--interval-method", default=INTERVAL_METHOD)
+    ap.add_argument("--earf", action="store_true",
+                    help="EARF integration test: evidence-anchored worlds + earf arm (separate run dir)")
     args = ap.parse_args(argv)
 
     if args.interval_method in REFUSED_INTERVAL_METHODS or args.interval_method != INTERVAL_METHOD:
@@ -419,8 +433,8 @@ def main(argv=None) -> int:
     if not set(families) <= set(FAMILIES):
         raise SystemExit(f"families must be from {FAMILIES}")
 
-    jobs = plan_jobs(args.phase, args.cell, args.patients, args.n_worlds, "real", families)
-    run_dir = run_dir_for(Path(args.out), args.phase, args.cell, args.patients)
+    jobs = plan_jobs(args.phase, args.cell, args.patients, args.n_worlds, "real", families, earf=args.earf)
+    run_dir = run_dir_for(Path(args.out), args.phase, args.cell + ("_earf" if args.earf else ""), args.patients)
     session = None
     if not args.verify_only:
         session = execute(jobs, run_dir, workers=args.workers, max_hours=args.max_hours)

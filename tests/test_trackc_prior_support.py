@@ -149,7 +149,7 @@ def test_mpc_arms_take_ranges_only_from_common_mpc(benchmark):
     assert "else baseline_policy_catalog(settings, filter_ranges)" in source
     block = source[source.index("def make_signal_policies"):source.index("return policies_for_signals")]
     constructors = block.count("MPC(")
-    assert constructors == 6
+    assert constructors == 7  # +earf_minimax_mpc (paper/integration_earf_protocol_2026-11-14.md)
     assert block.count("**deepcopy(common_mpc)") == constructors
 
 
