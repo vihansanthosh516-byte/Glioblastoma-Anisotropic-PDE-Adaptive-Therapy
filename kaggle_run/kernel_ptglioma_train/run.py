@@ -43,8 +43,8 @@ random.seed(20261115); np.random.seed(20261115); torch.manual_seed(20261115)
 
 class nnUNetTrainer_VIG250(nnUNetTrainer):
     """Default trainer. Only changes: 250 epochs, checkpoint every 5 epochs, no end-of-training validation pass (fold all has no held-out cases)."""
-    def __init__(self, *a, **k):
-        super().__init__(*a, **k)
+    def __init__(self, plans, configuration, fold, dataset_json, unpack_dataset=True, device=torch.device("cuda")):
+        super().__init__(plans, configuration, fold, dataset_json, unpack_dataset, device)
         self.num_epochs = 250
         self.save_every = 5
 
