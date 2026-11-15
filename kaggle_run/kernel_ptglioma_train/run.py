@@ -19,9 +19,15 @@ if not hit:                                                   # directory upload
     for z in glob.glob("/kaggle/input/**/*.zip", recursive=True):
         zipfile.ZipFile(z).extractall("/tmp/raw_unzip")
     hit = glob.glob("/tmp/raw_unzip/**/Dataset501_PTGlioma/dataset.json", recursive=True)
-RAW = os.path.dirname(os.path.dirname(hit[0]))
-n_img, n_lab = len(glob.glob(f"{RAW}/Dataset501_PTGlioma/imagesTr/*.nii.gz")), len(glob.glob(f"{RAW}/Dataset501_PTGlioma/labelsTr/*.nii.gz"))
-print("raw", RAW, "images", n_img, "labels", n_lab, flush=True); assert n_img == 2 * n_lab and n_lab > 1000
+SRC = os.path.dirname(hit[0])
+# Kaggle may unpack .nii.gz to .nii. nnU-Net needs one file ending, so build a raw folder of links with a matching dataset.json.
+end = ".nii.gz" if glob.glob(f"{SRC}/labelsTr/*.nii.gz") else ".nii"
+RAW = "/tmp/nnunet_raw"; D = f"{RAW}/Dataset501_PTGlioma"; os.makedirs(D, exist_ok=True)
+for sub in ("imagesTr", "labelsTr"):
+    if not os.path.exists(f"{D}/{sub}"): os.symlink(f"{SRC}/{sub}", f"{D}/{sub}")
+dj = json.load(open(hit[0])); dj["file_ending"] = end; json.dump(dj, open(f"{D}/dataset.json", "w"))
+n_img, n_lab = len(glob.glob(f"{D}/imagesTr/*{end}")), len(glob.glob(f"{D}/labelsTr/*{end}"))
+print("raw", SRC, "ending", end, "images", n_img, "labels", n_lab, flush=True); assert n_img == 2 * n_lab and n_lab == dj["numTraining"]
 
 old = glob.glob("/kaggle/input/**/nnUNet_results", recursive=True)   # checkpoint of an earlier session, if this version has one as input
 if old and not os.path.exists(RES):
