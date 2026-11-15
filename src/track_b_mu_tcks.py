@@ -18,7 +18,7 @@ ROOT = Path(__file__).resolve().parent.parent
 PAIRS = ROOT / "data" / "manifests" / "forecast_pairs_mu.csv"
 SPLIT = ROOT / "data" / "manifests" / "split_mu.csv"
 CLIN = ROOT / "data" / "tcia" / "MU-Glioma-Post_ClinicalData-July2025.xlsx"
-OUT = ROOT / "output" / "track_b_mu_tcks_20261114"
+OUT = ROOT / "output" / "track_b_mu_tcks_v2_20261114"
 PHASES = ["post_progression", "chemoradiation", "adjuvant", "other"]
 SEED = 20261114
 
@@ -106,7 +106,7 @@ def features(d):
 def run():
     d, _ = load()
     preds = {k: np.full(len(d), np.nan) for k in
-             ["persistence", "two_point_exp", "pop_rate", "eb_random_slope", "gompertz", "gbr", "tcks"]}
+             ["persistence", "two_point_exp", "pop_rate", "eb_random_slope", "gompertz", "gbr", "tcks", "tcks_v2"]}
     wts = np.full(len(d), np.nan)
     for f in sorted(d.fold.unique()):
         tr, te_m = d[d.fold != f], d.fold == f
@@ -125,15 +125,27 @@ def run():
         t2p, s2p = eb_params(tr, c_tr)
         yh, w = shrink_pred(te, c_te, t2p, s2p)
         preds["tcks"][te_m], wts[te_m] = yh, w
+        # v2: noise-aware latent size (amendment 2026-11-14)
+        has = te.r_hist.notna().values
+        dtp = te.dt_prior.fillna(1.0).values
+        y_prev = te.y_in.values - te.r_hist.fillna(0.0).values * dtp
+        x_prior = y_prev + c_te * dtp
+        P = s2p + t2p * dtp ** 2
+        K = P / (P + s2p)
+        x_hat = np.where(has, x_prior + K * (te.y_in.values - x_prior), te.y_in.values)
+        preds["tcks_v2"][te_m] = x_hat + c_te * te.dt_days.values
     err = {k: np.abs(v - d.y_out.values) for k, v in preds.items()}
     pat = pd.DataFrame({k: v for k, v in err.items()}).assign(pid=d.patient_id.values).groupby("pid").mean()
     mae = pat.mean().to_dict()
-    base = [k for k in mae if k != "tcks"]
+    base = [k for k in mae if not k.startswith("tcks")]
     best = min(base, key=mae.get)
     diff = (pat.tcks - pat[best]).values
     rng = np.random.default_rng(SEED)
     boots = np.array([diff[rng.integers(0, len(diff), len(diff))].mean() for _ in range(5000)])
     ci = [float(np.percentile(boots, 2.5)), float(np.percentile(boots, 97.5))]
+    d2 = (pat.tcks_v2 - pat[best]).values
+    b2 = np.array([d2[rng.integers(0, len(d2), len(d2))].mean() for _ in range(5000)])
+    v2 = {"mean": float(d2.mean()), "ci95": [float(np.percentile(b2, 2.5)), float(np.percentile(b2, 97.5))]}
     prior = d.r_hist.notna().values
     pat_p = pd.DataFrame({k: v[prior] for k, v in err.items()}).assign(pid=d.patient_id.values[prior]).groupby("pid").mean()
     grow = (d.core_vox_out > 1.25 * d.core_vox_in).astype(int).values
@@ -151,7 +163,8 @@ def run():
         "phase_counts": d.phase.value_counts().to_dict(),
         "patient_mae_log_volume": mae, "best_baseline": best,
         "tcks_minus_best": {"mean": float(diff.mean()), "ci95": ci},
-        "success": bool(ci[1] < 0), "tcks_vs_each_baseline": vs_all,
+        "success_v1": bool(ci[1] < 0), "tcks_v2_minus_best": v2,
+        "success_v2": bool(v2["ci95"][1] < 0), "tcks_vs_each_baseline": vs_all,
         "secondary_mae_pairs_with_prior": pat_p.mean().to_dict(),
         "secondary_auc_growth25": auc,
         "tcks_mean_weight_with_prior": float(np.nanmean(wts[prior])),
