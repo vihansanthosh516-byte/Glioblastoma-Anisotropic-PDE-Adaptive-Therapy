@@ -1,4 +1,4 @@
-"""Track B v6: MRI brightness + composition latent model. Exploratory, try 7.
+"""Track B v7: MRI brightness + composition latent model. Exploratory, try 7.
 
 Amendment: paper/trackB_mu_v7_amendment_2026-11-14.md (locked before scoring).
 Reads only INPUT-timepoint masks. Reuses v5 features and model; baselines from the v2 run.
