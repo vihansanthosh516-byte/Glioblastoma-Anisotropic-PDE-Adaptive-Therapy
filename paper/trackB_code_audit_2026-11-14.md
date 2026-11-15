@@ -60,9 +60,14 @@ VIG minus persistence by held-out cohort: MU -0.036 (-0.061, -0.012); UCSD -0.01
 - Gradient boosting here uses only the inputs present in all four cohorts.
 - The pooled interval treats patients from four cohorts as one sample.
 
-## 5. Prior-art check (partial)
+## 5. Prior-art check (updated 2026-11-15)
 
-Two web searches, result snippets only. "Informative observation times" is a known idea in biostatistics (for example PSA testing frequency in prostate cancer follow-up, arXiv 1508.07511). No paper was found that uses the scan interval as a predictor of glioma volume at the next MRI. This is NOT a full prior-art search. Novelty is unverified.
+Full record: `paper/trackB_vig_prior_art_2026-11-14.md` (about 16 queries on one paper index; four papers read in full-text passages, the others as abstract only).
+
+- **Correction of the earlier text here.** The earlier text said no paper used the scan interval as a predictor in glioma follow-up. That is wrong. Lindner & Fiehler 2026 (PMC13421742) report, on 60 UCSF-ALPTDG patients, that a longer scan interval goes with lower odds of enhancing-tumor increase (odds ratio 0.91 per day, 95% CI 0.84 to 0.99). The sign is the same as ours and the data are a subset of one of our cohorts.
+- "Informative observation times" is a known idea in biostatistics (for example arXiv 1508.07511; Buzkova 2010, pmid 21969983).
+- Not found: a next-scan glioma volume forecast that uses the interval as an informative-visit weight inside a growth law, with a two-slope reversal term, tested against all six baselines.
+- VIG is a new combination of known parts, not a new principle. Novelty is narrow and is "not found", not "proven absent".
 
 ## 6. What a confirmed win needs
 

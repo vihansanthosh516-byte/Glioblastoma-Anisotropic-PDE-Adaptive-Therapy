@@ -49,3 +49,9 @@ Record: paper/trackB_code_audit_2026-11-14.md. No large code bug found. Two smal
 Pooled over 442 patients, each cohort held out in turn: VIG 1.121, persistence 1.148, pop_rate 1.154, Gompertz (abs. loss) 1.189, Gompertz 1.217. VIG minus persistence -0.027, 95% CI (-0.039, -0.014); every comparator CI upper limit is below 0.
 NOT a confirmed win: the pooled rule was chosen after the locked LUMIERE run failed; all four cohorts are spent; the VIG design was chosen with three of the four cohorts in view; gain is about 2.4%.
 Source: output/track_b_code_audit_20261114/loco4_all_baselines_stdout.txt
+
+## Prior-art check for VIG (2026-11-15, literature only, no new run)
+Record: paper/trackB_vig_prior_art_2026-11-14.md.
+The scan-interval effect (shorter gap, more enhancing growth) is already published on a UCSF-ALPTDG subset: Lindner & Fiehler 2026, PMC13421742, odds ratio 0.91 per day (0.84 to 0.99). Informative visit times are a known idea.
+Not found: a next-scan volume forecast that uses the interval as an informative-visit weight in a growth law with a two-slope reversal term, tested against all six baselines.
+Weak points: one paper index, about 16 queries, most papers abstract only. "Not found" is not "proven absent".
