@@ -21,3 +21,7 @@ Patient MAE: v8 1.219; persistence 1.342; Gompertz 1.438; pop_rate 1.441; EB slo
 v8 minus pop_rate (pre-set comparator): -0.222, 95% CI (-0.700, 0.066). Pass: no (CI crosses 0). v8 was lowest of all 7 methods.
 Weak points: small n (33 patients); UCSD exposed before for a different target; phase windows assumed; only 1 of 4 collapse pairs flagged.
 Source: output/track_b_v8_ucsd_external_20261114/result.json
+
+## Hybrid search (6 subagent candidates, protocol paper/trackB_hybrid_search_protocol_2026-11-14.md)
+Dev patient MAE (99.64% CI rule; none passed): moe 1.453, compartment 1.463, pkpd 1.473, stack 1.474, deconv 1.480, switch 1.590 (worse than pop_rate). v8 dev 1.449 stays lowest.
+Finalist moe on UCSD (second exposure): 1.256 vs pop_rate 1.441; diff -0.184, 95% CI (-0.643, 0.079). Not passed. v8 on UCSD stays lowest (1.219). Source: output/track_b_hybrid_moe_ucsd_20261114/result.json
