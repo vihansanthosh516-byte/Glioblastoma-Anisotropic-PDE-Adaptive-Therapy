@@ -33,3 +33,13 @@ v8 minus pop_rate: +0.221, 95% CI (0.102, 0.340). v8 is significantly WORSE. Pri
 Secondary (49 used-before patients): v8 0.880 vs pop_rate 0.743; diff +0.137, CI (-0.070, 0.351).
 Reading: with expert masks (baseline error 0.83 vs 1.53 on MU), v8's MU-learned corrections hurt. The MU gains look tied to MU's automatic-mask noise, not general tumor biology.
 Source: output/track_b_v8_ucsf_alptdg_20261114/result.json
+
+## VIG hybrid on LUMIERE (protocol paper/trackB_vig_lumiere_protocol_2026-11-14.md, locked in commit 5a68658, one run)
+Method: scan-interval growth weight + rebound-after-fall history term. Fit on all 566 development pairs (MU + UCSD + UCSF). LUMIERE: 400 pairs, 79 patients, DeepBraTumIA masks. LUMIERE was exposed before for other targets; it is not untouched.
+Patient MAE: Gompertz 1.220, VIG 1.239, Gompertz (absolute loss) 1.239, persistence 1.261, GBR (absolute loss) 1.264, pop_rate 1.289, GBR 1.317, EB slope 1.497, two-point 2.041.
+VIG minus persistence -0.022, 95% CI (-0.056, +0.012). VIG minus Gompertz +0.019 (-0.039, +0.080). VIG minus pop_rate -0.050 (-0.088, -0.011).
+Primary success (all eight CI upper limits below 0): NO. Passed 3 of 8 (two-point, pop_rate, EB slope).
+Secondary: without the history term VIG is +0.007 vs persistence (-0.009, +0.024), so the scan-interval signal seen in MU, UCSD and UCSF did not show on LUMIERE. The history term gave about -0.029.
+Weak points: LUMIERE exposed; 79 patients; about 20 variants were looked at on development data before the lock; LUMIERE has no treatment dates in the tables used.
+Source: output/track_b_vig_lumiere_20261114/result.json
+Development exploration (post hoc): output/track_b_loco_explore_20261114/. Problem review: paper/trackB_problem_review_2026-11-14.md.
