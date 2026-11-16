@@ -9,7 +9,8 @@ run = lambda c, **k: subprocess.run(c, shell=isinstance(c, str), **k)
 run("nvidia-smi")
 # nnunetv2 2.5.1 does not run with the torch of the Kaggle image (2.11): its LR scheduler call fails. Use the current release; the
 # installed version is written to train_status.json and must be the same in every later session and at inference.
-run(f"{sys.executable} -m pip install -q nnunetv2" + (f"=={os.environ['NNUNET_VERSION']}" if os.environ.get("NNUNET_VERSION") else ""), check=True)
+NNUNET_PIN = os.environ.get("NNUNET_VERSION", "2.8.1")           # version of session 1 (train_status.json of kernel version 3)
+run(f"{sys.executable} -m pip install -q nnunetv2=={NNUNET_PIN}", check=True)
 import nnunetv2, torch
 ver = {"nnunetv2": getattr(nnunetv2, "__version__", None) or subprocess.run(f"{sys.executable} -m pip show nnunetv2", shell=True, capture_output=True, text=True).stdout.split("Version:")[1].split()[0],
        "torch": torch.__version__, "gpu": torch.cuda.get_device_name(0) if torch.cuda.is_available() else None}
@@ -32,7 +33,7 @@ print("raw", SRC, "ending", end, "images", n_img, "labels", n_lab, flush=True); 
 
 old = glob.glob("/kaggle/input/**/nnUNet_results", recursive=True)   # checkpoint of an earlier session, if this version has one as input
 if old and not os.path.exists(RES):
-    shutil.copytree(old[0], RES); print("restored results from", old[0], flush=True)
+    shutil.copytree(old[0], RES); run(f"chmod -R u+w {RES}"); print("restored results from", old[0], flush=True)
 os.makedirs(PRE, exist_ok=True); os.makedirs(RES, exist_ok=True)
 env = dict(os.environ, nnUNet_raw=RAW, nnUNet_preprocessed=PRE, nnUNet_results=RES, nnUNet_n_proc_DA="4", nnUNet_compile="f")
 
