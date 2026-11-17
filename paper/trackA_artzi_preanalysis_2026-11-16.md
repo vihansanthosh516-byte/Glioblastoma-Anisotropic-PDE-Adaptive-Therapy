@@ -1,6 +1,6 @@
 # Track A Artzi region benchmark: pre-analysis plan
 
-Status: amended and frozen before opening `large_sparse_matrices2.h5` or calculating any expression score. Amendment 1 adds direct gene-pair families found in the 2025 method review and the recent GBM MBMC classifier; it supersedes the comparator count, minimum-pair rule, and comparator specifications below. No Artzi expression matrix, gene count, or test score was inspected while making this amendment.
+Status: amended and frozen before opening `large_sparse_matrices2.h5` or calculating any expression score. Amendment 1 adds direct gene-pair families found in the 2025 method review and the recent GBM MBMC classifier, freezes the candidate feature cap, and supersedes the comparator count, minimum-pair rule, and comparator specifications below. No Artzi expression matrix, gene count, or test score was inspected while making this amendment.
 
 Analysis date: 2026-11-16.
 Review: [full scoped prior-art inventory](trackA_prior_art_full_2026-11-16.md).
@@ -25,7 +25,7 @@ Minimum eligible set: ten complete patient pairs. The frozen comparator upper bo
 
 ## Candidate method: maximin patient-paired rank-pair vote (MP-RPV)
 
-For each training patient `i`, specimen `r`, and gene pair `(g,h)`, calculate `v[i,r,g,h] = sign(x[i,r,g] - x[i,r,h])`. The sign is `-1`, `0`, or `+1`; ties are neutral. Define the within-patient region contrast as `d[i,g,h] = v[i,P-IT,g,h] - v[i,P-CT,g,h]`.
+Within each outer training fold, rank genes by absolute mean within-patient P-IT minus P-CT log-expression difference; retain the top 30 genes, with symbol order breaking ties. Evaluate every gene pair in this training-only pool. For each training patient `i`, specimen `r`, and gene pair `(g,h)`, calculate `v[i,r,g,h] = sign(x[i,r,g] - x[i,r,h])`. The sign is `-1`, `0`, or `+1`; ties are neutral. Define the within-patient region contrast as `d[i,g,h] = v[i,P-IT,g,h] - v[i,P-CT,g,h]`.
 
 For each pair, choose orientation `s` from `{-1,+1}` to maximize the worst-patient signed contrast `m[g,h] = max_s min_i (s*d[i,g,h])`. Break equal `m` by larger mean oriented contrast, then lexicographic gene-symbol order. Keep the first five pairs with `m > 0`; use equal vote weights and do not allow a gene pair to be duplicated. If fewer than five pairs have positive `m`, use only those pairs. If none have positive `m`, give both specimens the same score and therefore predict a tie. No fallback selector is allowed.
 
