@@ -1,6 +1,6 @@
 # Track A Artzi region benchmark: pre-analysis plan
 
-Status: amended and frozen before opening `large_sparse_matrices2.h5` or calculating any expression score. Amendment 1 adds direct gene-pair families found in the 2025 method review and the recent GBM MBMC classifier, freezes the candidate feature cap, and supersedes the comparator count, minimum-pair rule, and comparator specifications below. Amendment 2 specifies the executable binary monotone-pair adapter and average-rank tie handling. No Artzi expression matrix, gene count, or test score was inspected while making these amendments.
+Status: amended and frozen before opening `large_sparse_matrices2.h5` or calculating any expression score. Amendment 1 adds direct gene-pair families found in the 2025 method review and the recent GBM MBMC classifier, freezes the candidate feature cap, and supersedes the comparator count, minimum-pair rule, and comparator specifications below. Amendment 2 specifies the executable binary monotone-pair adapter and average-rank tie handling. Amendment 3 places the stability-selected conditional-logistic adapter inside the same top-30 paired-DE pool as its C08 base. No Artzi expression matrix, gene count, or test score was inspected while making these amendments.
 
 Analysis date: 2026-11-16.
 Review: [full scoped prior-art inventory](trackA_prior_art_full_2026-11-16.md).
@@ -53,7 +53,7 @@ Compare MP-RPV against every portable predictor below. The frozen upper bound is
 | C06 | GBM rank-pair/Robencla | Pre-score structurally ineligible: source method relies on cross-dataset cluster replication, while this benchmark has one study and one pathology endpoint. It remains in the scoped prior-art inventory. |
 | C07 | Penalized pair-order GLMM | Pre-score structurally ineligible: source method estimates between-study random effects; the Artzi benchmark supplies one study. Do not label a single-study fit as the published model. |
 | C08 | Paired conditional logistic regression | In each fold, keep the top 30 training-only paired-DE genes. Fit ridge-penalized conditional logistic likelihood on within-patient P-IT minus P-CT vectors, penalty 1; score regions by the fitted linear predictor. |
-| C09 | Stability-selected conditional logistic regression | In each fold, run 100 training-patient bootstrap resamples with seed 0. Refit an L1 conditional-logistic adapter at penalty 1; retain genes selected in at least 75% of resamples, then fit C08 on those genes. If no gene remains, assign tied scores. |
+| C09 | Stability-selected conditional logistic regression | In each fold, keep the top 30 training-only paired-DE genes, then run 100 training-patient bootstrap resamples with seed 0. Refit an L1 conditional-logistic adapter at penalty 1; retain genes selected in at least 75% of resamples, then fit C08 on those genes. If no gene remains, assign tied scores. |
 | C10 | Paired centroid | Fit the average P-IT minus P-CT log-expression vector on training patients; score each region by its dot product with this vector. |
 | C11 | Ridge logistic regression | Fit on both regional samples from training patients; use all genes, `C=1`, balanced classes, and training-only standardization. |
 | C12 | Linear SVM | Fit on both regional samples from training patients; use all genes, `C=1`, balanced classes, and training-only standardization. |
