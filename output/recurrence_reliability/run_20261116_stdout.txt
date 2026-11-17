@@ -1,0 +1,10 @@
+Traceback (most recent call last):
+  File "C:\Users\vihan\20206 science fair\src\recurrence_reliability\run.py", line 263, in <module>
+    main()
+    ~~~~^^
+  File "C:\Users\vihan\20206 science fair\src\recurrence_reliability\run.py", line 118, in main
+    specs[sid] = Specimen(lib_of[sid], ann[key_of[lib_of[sid]]])
+                 ~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\vihan\20206 science fair\src\recurrence_reliability\run.py", line 42, in __init__
+    raise RuntimeError(f"{library_id}: unannotated nuclei pass filters; refusing to fill labels")
+RuntimeError: GSM5319524_SF4810: unannotated nuclei pass filters; refusing to fill labels

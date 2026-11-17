@@ -38,8 +38,13 @@ class Specimen:
         umi, genes, mito = nucleus_metrics(lib)
         keep = (genes >= MIN_GENES) & (mito <= MAX_MITO_FRAC)
         lab = np.array([annotation.get(b, "NA") for b in lib.barcodes])
-        if np.any(lab[keep] == "NA"):
-            raise RuntimeError(f"{library_id}: unannotated nuclei pass filters; refusing to fill labels")
+        # Amendment 1 (2026-11-16, before any scoring): nuclei without an author label are dropped,
+        # never assigned a label; their count is reported. A library with > 5% unlabelled nuclei stops.
+        unl = keep & (lab == "NA")
+        self.n_unlabelled_dropped = int(unl.sum())
+        if unl.sum() > 0.05 * max(1, keep.sum()):
+            raise RuntimeError(f"{library_id}: more than 5% of filtered nuclei lack an author label")
+        keep = keep & (lab != "NA")
         self.library_id = library_id
         self.counts = lib.counts[:, np.flatnonzero(keep)]
         self.cell_ids = np.array([f"{library_id}:{b}" for b in lib.barcodes[keep]])
@@ -118,6 +123,8 @@ def main() -> None:
             specs[sid] = Specimen(lib_of[sid], ann[key_of[lib_of[sid]]])
     b2_specs = {sid: Specimen(lid, ann[key_of[lid]]) for sid, lid in cfg["independent_capture_libraries"].items()}
     rows, result = analyze(specs, b2_specs, cohort, rio.neftel_mes(), rio.verhaak_mes()["Mesenchymal"], cfg)
+    result["unlabelled_nuclei_dropped"] = {s.library_id: s.n_unlabelled_dropped
+                                           for s in [*specs.values(), *b2_specs.values()] if s.n_unlabelled_dropped}
     tsv = ["\t".join(rows[0].keys())] + ["\t".join(str(v) for v in r.values()) for r in rows]
     (run_dir / "patient_changes.tsv").write_text("\n".join(tsv) + "\n", encoding="utf-8")
     result = {
