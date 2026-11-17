@@ -19,3 +19,9 @@ Last update: 2026-11-16, Claude. Executing `paper/CLAUDE_RESEARCH_PAPER_HANDOFF_
 2. Recommended next: Phase G CARE audit (GSE274546/GSE274548): paired IDs, CNV annotation linkage (GBM-CARE-WT repository), overlap with Wang, terms, prior exposure. Metadata only; reserve before any scoring; apply the frozen pipeline once. This is the only route to a narrower interval.
 3. Alternative: prespecified multi-scorer extension (AUCell, JASMINE, ANS, z-score) on the same 21 patients, labelled exploratory.
 4. Figures for the manuscript from `patient_changes.tsv` (patients with SE bars), not cells.
+
+## Post-run review (Codex, 2026-11-16)
+
+Saved counts, exact interval arithmetic, config hash, and all recorded source hashes were verified without rerunning the study. See `paper/recurrence_reliability_postrun_review_2026-11-16.md`. CARE is the preferred independent-cohort lead, not the only possible source of additional patients. A 59-patient cohort cannot confirm a rate below 5% using the locked two-sided interval even with zero events (upper limit about 6.06%). The 59/72 sample-size calculations assume zero events and do not promise reliability at the observed rate.
+
+Before any CARE outcome analysis, a separate prospective protocol must resolve patient overlap, annotation/barcode linkage, cohort/QC, shared-reference inference assumptions, and whether the Wang fitted reference is transported or the scoring algorithm is refitted on CARE. The original Wang run, protocol, and result remain unchanged.
