@@ -1,0 +1,334 @@
+^SERIES = GSE174554
+
+!Series_title = A single cell atlas of human glioma under therapy
+
+!Series_geo_accession = GSE174554
+
+!Series_status = Public on Jul 05 2022
+
+!Series_submission_date = May 17 2021
+
+!Series_last_update_date = Feb 02 2023
+
+!Series_pubmed_id = 36539501
+
+!Series_summary = Most clinical trials for glioblastoma (GBM) enroll patients at recurrence. However, most pre-clinical animal models are of primary disease. Most studies have used tissues from primary tumors. Knowledge of GBM cellular composition at recurrence is limited. We profiled 80 human IDH-wild-type GBM specimens via single-nucleus RNA sequencing, 40 primary tumors and 40 patient-matched recurrent tumors. Select cohorts were also profiled via single-cell assay for transposase-accessible chromatin, single-cell digital-spatial, and single-cell spatial-transcriptomic assays. All patients were treated only with standard-of-care therapy: temozolomide, radiation and surgical resection. The cohort had a 1.2 male/female ratio, ages 35–76. We found a significant increase at recurrence in cells with the Verhaak mesenchymal phenotype and fewer proneural cells. Although there was an increase in the percentage of cycling cells overall, the fraction of cycling proneural cells decreased while the fraction of cycling mesenchymal cells increased. These changes were concomitant with a significant increase in the percentage of tumor-infiltrating monocytic-lineage cells derived from the periphery. Taken together, these findings support a proneural-to-mesenchymal shift at recurrence due to an increase in the birth rate of mesenchymal cells, supported by an expansion of myeloid-derived cells from peripheral blood. Although the percentages of glioblastoma-infiltrating T-cells are generally low (~1% on average in our data), we found a statistically significant increase in T-cell abundance at recurrence. We identified a cohort of T-cell outliers that demonstrate 2-to-8-fold increases in T-cells over average levels. We validated that T-cells in these tumors have extravasated beyond the perivascular space and into the cellular tumor via immunohistochemistry and spatial profiling. We present our ongoing analysis of the paracrine signals, upstream transcription-factor expression, and cis-regulatory grammars utilized in immune-outlier GBMs. We describe how these programs change under therapy. These studies shed light on the effect of standard therapy in shaping GBM composition at recurrence.
+
+!Series_overall_design = We performed bulk RNA sequencing (RNA-seq), single-nuclei RNA sequencing (snRNA-seq), single-cell assay for transposase-accessible chromatin using sequencing(scATAC-seq), and spatial transcriptomics and proteomics of specimens from untreated human gliomas. We integrated the public single cell GBM data and our data, which showed that proneural and mesenchymal cells resided on a single axis. We investigated the cell composition and showed that mesenchymal cells increased in recurrence compared with the primary GBM. We identified therapeutic targets gene via intergration of spatial data and cell-cell interction analysis from snRNA-seq daata. Lastly, we performed an in vitro screen of drug combinations that target genes identified from our single-cell analysisof GBM.
+
+!Series_overall_design =
+
+!Series_overall_design = We profiled spatial proteomics (SP) for six formalin-fixed paraffin embedded (FFPE) slides from three recurrent outlier-cases and their matched primary cases by using the Nanostring GeoMx platform. We next performed spatial transcriptomics (ST) on 10 slides from five patient-matched primary-recurrent pairs.
+
+!Series_overall_design = -------------------------------------------------------------------------------
+
+!Series_overall_design = Authors state that the raw data is "not available due to privacy concerns".
+
+!Series_type = Expression profiling by high throughput sequencing
+
+!Series_type = Other
+
+!Series_contributor = Aaron,,Diaz
+
+!Series_contributor = Lin,,Wang
+
+!Series_contributor = Husam,,Babikir
+
+!Series_contributor = Jangham,,Jung
+
+!Series_contributor = Karin,,Shamardani
+
+!Series_contributor = Saket,,Jain
+
+!Series_contributor = Xi,,Feng
+
+!Series_contributor = Nalin,,Gupta
+
+!Series_contributor = Susanna,,Rosi
+
+!Series_contributor = Susan,,Chang
+
+!Series_contributor = David,,Raleigh
+
+!Series_contributor = David,,Solomon
+
+!Series_contributor = Joanna,J,Phillips
+
+!Series_sample_id = GSM5319503
+
+!Series_sample_id = GSM5319504
+
+!Series_sample_id = GSM5319505
+
+!Series_sample_id = GSM5319506
+
+!Series_sample_id = GSM5319507
+
+!Series_sample_id = GSM5319508
+
+!Series_sample_id = GSM5319509
+
+!Series_sample_id = GSM5319510
+
+!Series_sample_id = GSM5319511
+
+!Series_sample_id = GSM5319512
+
+!Series_sample_id = GSM5319513
+
+!Series_sample_id = GSM5319514
+
+!Series_sample_id = GSM5319515
+
+!Series_sample_id = GSM5319516
+
+!Series_sample_id = GSM5319517
+
+!Series_sample_id = GSM5319518
+
+!Series_sample_id = GSM5319519
+
+!Series_sample_id = GSM5319520
+
+!Series_sample_id = GSM5319521
+
+!Series_sample_id = GSM5319522
+
+!Series_sample_id = GSM5319523
+
+!Series_sample_id = GSM5319524
+
+!Series_sample_id = GSM5319525
+
+!Series_sample_id = GSM5319526
+
+!Series_sample_id = GSM5319527
+
+!Series_sample_id = GSM5319528
+
+!Series_sample_id = GSM5319529
+
+!Series_sample_id = GSM5319530
+
+!Series_sample_id = GSM5319531
+
+!Series_sample_id = GSM5319532
+
+!Series_sample_id = GSM5319533
+
+!Series_sample_id = GSM5319534
+
+!Series_sample_id = GSM5319535
+
+!Series_sample_id = GSM5319536
+
+!Series_sample_id = GSM5319537
+
+!Series_sample_id = GSM5319538
+
+!Series_sample_id = GSM5319539
+
+!Series_sample_id = GSM5319540
+
+!Series_sample_id = GSM5319541
+
+!Series_sample_id = GSM5319542
+
+!Series_sample_id = GSM5319543
+
+!Series_sample_id = GSM5319544
+
+!Series_sample_id = GSM5319545
+
+!Series_sample_id = GSM5319546
+
+!Series_sample_id = GSM5319547
+
+!Series_sample_id = GSM5319548
+
+!Series_sample_id = GSM5319549
+
+!Series_sample_id = GSM5319550
+
+!Series_sample_id = GSM5319551
+
+!Series_sample_id = GSM5319552
+
+!Series_sample_id = GSM5319553
+
+!Series_sample_id = GSM5319554
+
+!Series_sample_id = GSM5319555
+
+!Series_sample_id = GSM5319556
+
+!Series_sample_id = GSM5319557
+
+!Series_sample_id = GSM5319558
+
+!Series_sample_id = GSM5319559
+
+!Series_sample_id = GSM5319560
+
+!Series_sample_id = GSM5319561
+
+!Series_sample_id = GSM5319562
+
+!Series_sample_id = GSM5319563
+
+!Series_sample_id = GSM5319564
+
+!Series_sample_id = GSM5319565
+
+!Series_sample_id = GSM5319566
+
+!Series_sample_id = GSM5319567
+
+!Series_sample_id = GSM5319568
+
+!Series_sample_id = GSM5319569
+
+!Series_sample_id = GSM5319570
+
+!Series_sample_id = GSM5319571
+
+!Series_sample_id = GSM5319572
+
+!Series_sample_id = GSM5319573
+
+!Series_sample_id = GSM5319574
+
+!Series_sample_id = GSM5319575
+
+!Series_sample_id = GSM5319576
+
+!Series_sample_id = GSM5319577
+
+!Series_sample_id = GSM5319578
+
+!Series_sample_id = GSM5319579
+
+!Series_sample_id = GSM5319580
+
+!Series_sample_id = GSM5319581
+
+!Series_sample_id = GSM5319582
+
+!Series_sample_id = GSM5319583
+
+!Series_sample_id = GSM5319584
+
+!Series_sample_id = GSM5319585
+
+!Series_sample_id = GSM5319586
+
+!Series_sample_id = GSM6199398
+
+!Series_sample_id = GSM6199399
+
+!Series_sample_id = GSM6199400
+
+!Series_sample_id = GSM6199401
+
+!Series_sample_id = GSM6199402
+
+!Series_sample_id = GSM6199403
+
+!Series_sample_id = GSM6199404
+
+!Series_sample_id = GSM6199405
+
+!Series_sample_id = GSM6199406
+
+!Series_sample_id = GSM6199407
+
+!Series_sample_id = GSM6199408
+
+!Series_sample_id = GSM6199409
+
+!Series_sample_id = GSM6199410
+
+!Series_sample_id = GSM6337065
+
+!Series_sample_id = GSM6337066
+
+!Series_sample_id = GSM6337067
+
+!Series_sample_id = GSM6337068
+
+!Series_sample_id = GSM6337069
+
+!Series_sample_id = GSM6337070
+
+!Series_sample_id = GSM6337071
+
+!Series_sample_id = GSM6337072
+
+!Series_sample_id = GSM6337073
+
+!Series_sample_id = GSM6337074
+
+!Series_sample_id = GSM6337075
+
+!Series_sample_id = GSM6337076
+
+!Series_sample_id = GSM6337077
+
+!Series_sample_id = GSM6337078
+
+!Series_sample_id = GSM6337079
+
+!Series_sample_id = GSM6337080
+
+!Series_contact_name = Aaron,,Diaz
+
+!Series_contact_email = aaron.diaz@ucsf.edu
+
+!Series_contact_laboratory = Diaz Lab
+
+!Series_contact_department = Neurological Surgery
+
+!Series_contact_institute = University of California, San Francisco
+
+!Series_contact_address = 1450 3rd St
+
+!Series_contact_city = San Francisco
+
+!Series_contact_state = CA
+
+!Series_contact_zip/postal_code = 94158
+
+!Series_contact_country = USA
+
+!Series_supplementary_file = ftp://ftp.ncbi.nlm.nih.gov/geo/series/GSE174nnn/GSE174554/suppl/GSE174554_RAW.tar
+
+!Series_supplementary_file = ftp://ftp.ncbi.nlm.nih.gov/geo/series/GSE174nnn/GSE174554/suppl/GSE174554_Spatial_proteomics_matrix.txt.gz
+
+!Series_supplementary_file = ftp://ftp.ncbi.nlm.nih.gov/geo/series/GSE174nnn/GSE174554/suppl/GSE174554_Spatial_transcriptomic_matrix.txt.gz
+
+!Series_supplementary_file = ftp://ftp.ncbi.nlm.nih.gov/geo/series/GSE174nnn/GSE174554/suppl/GSE174554_Tumor_normal_metadata.txt.gz
+
+!Series_platform_id = GPL21697
+
+!Series_platform_id = GPL24247
+
+!Series_platform_id = GPL24676
+
+!Series_platform_organism = Homo sapiens
+
+!Series_platform_organism = Mus musculus
+
+!Series_platform_taxid = 9606
+
+!Series_platform_taxid = 10090
+
+!Series_sample_organism = Homo sapiens
+
+!Series_sample_organism = Mus musculus
+
+!Series_sample_taxid = 9606
+
+!Series_sample_taxid = 10090
+
+!Series_relation = BioProject: https://www.ncbi.nlm.nih.gov/bioproject/PRJNA730532
+
