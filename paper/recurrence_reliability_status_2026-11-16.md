@@ -11,7 +11,7 @@ Last update: 2026-11-16, Claude. Executing `paper/CLAUDE_RESEARCH_PAPER_HANDOFF_
 | E code | Written; 19 synthetic tests pass in a scratch copy (rerun after each code change) | `src/recurrence_reliability/`, `tests/test_recurrence_reliability.py` |
 | F run | Done. First attempt stopped before scoring (spec conflict) → amendment 1 → `run_20261116_locked_a1` completed in 122 s. Discordance 3/21 (95% CI 3.0–36.3%), inconclusive. | `paper/recurrence_reliability_result.md`, `output/recurrence_reliability/run_20261116_locked_a1/` |
 | Manuscript | Draft written | `paper/recurrence_reliability_manuscript_draft.md` |
-| G external | Not started (CARE metadata lead only) | — |
+| G external | Metadata audit started; CARE remains conditional, no expression/scoring opened | `paper/recurrence_reliability_care_metadata_audit_2026-11-16.md` |
 
 ## Exact next actions
 
