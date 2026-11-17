@@ -1,6 +1,6 @@
 # Track A Artzi Zenodo metadata audit
 
-Dylan Harwood directed the user to [Zenodo 22791462](https://zenodo.org/records/22791462). The record lists Final_meta.csv and a separate expression matrix. The audit read the entire metadata CSV, verified MD5 53057e9514bda0a070edc3f3202bb35b against the [record API](https://zenodo.org/api/records/22791462), and did not open expression.
+Dylan Harwood directed the user to [Zenodo 22791462](https://zenodo.org/records/22791462). The record lists Final_meta.csv and a separate expression matrix. The audit read the entire metadata CSV, verified MD5 53057e9514bda0a070edc3f3202bb35b against the [record API](https://zenodo.org/api/records/22791462), and did not open expression. The API reports open access under CC BY 4.0 and lists file sizes of 451,456,146 bytes for Final_meta.csv and 2,994,664,853 bytes for large_sparse_matrices2.h5; its version field is blank. This record check was repeated on 2026-11-16. No expression matrix was downloaded or opened during this check.
 
 Counting distinct nonblank Patient codes by Setting gives 28 P-CT and 12 P-IT patients. The intersection is 10 patient codes. Restricting both to Malignant = Malignant retains all 10. These counts come from Final_meta.csv in the linked release. No recurrent core or surgical margin records were included in this overlap.
 
@@ -10,7 +10,7 @@ The metadata field Subtype is NA in P-IT, including its malignant cells. P-CT Su
 
 ## Source and pass-rule follow-up
 
-The [Artzi abstract](https://pubmed.ncbi.nlm.nih.gov/42820945/) reports histology-guided sampling for the recurrence study but does not describe how each primary P-IT/P-CT label was assigned or establish the resection link for the metadata pairs. The [Crossref record](https://api.crossref.org/works/10.1158/2159-8290.CD-25-2302) identifies the publisher methods PDF. Access returned HTTP 403. The Zenodo record has no linked annotation codebook in its related identifiers or notes. Author confirmation or a readable full Methods PDF remains necessary for primary label provenance.
+The Zenodo record has no linked annotation codebook in its related identifiers or notes. The user-supplied full Methods PDF resolves label provenance: H&E guided region selection and a neuropathologist confirmed the labels. The exact same-resection link remains inferred from the study design because the public metadata has no surgery identifier. Do not claim a specimen-level pairing until that link is confirmed.
 
 The [frozen rule](trackA_matched_margin_protocol_2026-11-13.md) and [evaluation code](../src/trackA_margin_evaluation.py) use exact paired sign tests and Holm correction. At the metadata ceiling of 10 donors, the best raw p-value is 1/1024, attained only with 10 discordant wins. An individual comparison with fewer than 5 discordant donors cannot reject at alpha 0.05 even before adjustment. The [readiness record](trackA_benchmark_readiness_2026-11-13.md) explains why arm count, baseline ties, and attrition must be checked before opening expression. No pass-rule change and no patient scoring.
 
