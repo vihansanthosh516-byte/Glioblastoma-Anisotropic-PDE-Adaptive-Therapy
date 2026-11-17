@@ -1,4 +1,6 @@
-﻿# CARE metadata eligibility audit (Phase G)
+# CARE metadata eligibility audit (Phase G)
+
+> **Correction and follow-up (2026-11-16, Claude):** not all 59 patients have primary + first-recurrence specimens: 52 do; 4 pair a primary with a second recurrence and 3 pair two recurrences (GEO source labels, Table S1, and Spitzer et al. text agree). 42 pass the transported Wang treatment rule. Cell-level gates remain open. See `recurrence_reliability_care_eligibility_gate_2026-11-16.md`.
 
 Date: 2026-11-16. Metadata only. No expression matrix, gene list, outcome, cell-state result, or score opened. GEO brieftext records and two small GitHub metadata files were inspected. Curated record: `output/recurrence_reliability_care_metadata/care_metadata_summary.json`.
 

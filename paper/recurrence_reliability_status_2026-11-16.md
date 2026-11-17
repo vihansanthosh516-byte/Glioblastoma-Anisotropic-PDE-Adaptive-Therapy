@@ -11,7 +11,7 @@ Last update: 2026-11-16, Claude. Executing `paper/CLAUDE_RESEARCH_PAPER_HANDOFF_
 | E code | Written; 19 synthetic tests pass in a scratch copy (rerun after each code change) | `src/recurrence_reliability/`, `tests/test_recurrence_reliability.py` |
 | F run | Done. First attempt stopped before scoring (spec conflict) → amendment 1 → `run_20261116_locked_a1` completed in 122 s. Discordance 3/21 (95% CI 3.0–36.3%), inconclusive. | `paper/recurrence_reliability_result.md`, `output/recurrence_reliability/run_20261116_locked_a1/` |
 | Manuscript | Draft written | `paper/recurrence_reliability_manuscript_draft.md` |
-| G external | Metadata audit started; CARE remains conditional, no expression/scoring opened | `paper/recurrence_reliability_care_metadata_audit_2026-11-16.md` |
+| G external | Sample-level gate done: 42 of 59 CARE patients pass (52 have primary + 1st recurrence; 10 fail the RT+TMZ-only rule). Cell-level gates (barcode/label join, ≥50 malignant nuclei) unresolved; 0 confirmed. Protocol proposed, not locked. No CARE expression, labels, scores or survival opened. | `paper/recurrence_reliability_care_eligibility_gate_2026-11-16.md`, `paper/recurrence_reliability_care_protocol_PROPOSED.md`, `output/recurrence_reliability_care_metadata/care_eligibility_manifest.json` |
 
 ## Exact next actions
 
@@ -25,3 +25,7 @@ Last update: 2026-11-16, Claude. Executing `paper/CLAUDE_RESEARCH_PAPER_HANDOFF_
 Saved counts, exact interval arithmetic, config hash, and all recorded source hashes were verified without rerunning the study. See `paper/recurrence_reliability_postrun_review_2026-11-16.md`. CARE is the preferred independent-cohort lead, not the only possible source of additional patients. A 59-patient cohort cannot confirm a rate below 5% using the locked two-sided interval even with zero events (upper limit about 6.06%). The 59/72 sample-size calculations assume zero events and do not promise reliability at the observed rate.
 
 Before any CARE outcome analysis, a separate prospective protocol must resolve patient overlap, annotation/barcode linkage, cohort/QC, shared-reference inference assumptions, and whether the Wang fitted reference is transported or the scoring algorithm is refitted on CARE. The original Wang run, protocol, and result remain unchanged.
+
+## CARE eligibility gate (Claude, 2026-11-16, later the same day)
+
+Sample-level: 121/121 Table S1 ↔ GEO identity matches; 52 patients have primary + first recurrence (the earlier audit's "primary and first-recurrence labels" for all 59 was wrong: 4 are primary + 2nd recurrence, 3 are 1st + 2nd recurrence); 42 pass the transported Wang treatment rule. Refit is the proposed primary reference (estimand: same algorithm in a new cohort); transport is a declared secondary. **Next action needs a user decision:** authorise a blinded, column-restricted extraction of `celltype_meta_data_2025_01_08.RDS` (print column names only; keep CellID, Sample, ID, CellType; discard other columns unprinted) to close gates C6/C7. Do not open `malignant_meta_data_2025_01_08.RDS` (cell states). Tests: 23 pass in a scratch copy (`tests/test_recurrence_reliability*.py`).
