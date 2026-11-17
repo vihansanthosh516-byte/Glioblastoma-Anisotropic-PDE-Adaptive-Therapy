@@ -1,0 +1,200 @@
+Gene Symbol,Signature,Ivy GAP Region,Primary biological Role,Source Validation
+PTPRZ1,Leading Edge,LE,Glioblastoma stem cell marker / Migration,Ivy GAP / scRNA-seq
+BCAN,Leading Edge,LE,Extracellular matrix / Infiltration,Ivy GAP / scRNA-seq
+FABP7,Leading Edge,LE,Fatty acid binding / Migration,Ivy GAP / scRNA-seq
+GLI3,Leading Edge,LE,Hedgehog signaling / Progenitor identity,Ivy GAP / scRNA-seq
+SOX2,Leading Edge,LE,Stemness / Self-renewal,Ivy GAP / scRNA-seq
+OLIG2,Leading Edge,LE,Progenitor identity / Migration,Ivy GAP / scRNA-seq
+MAP2,Leading Edge,LE,Microtubule stability / Neural identity,Ivy GAP / scRNA-seq
+SOX4,Leading Edge,LE,EMT regulator / Migration,Ivy GAP / scRNA-seq
+NES,Leading Edge,LE,Intermediate filament / Migration,Ivy GAP / scRNA-seq
+VIM,Leading Edge,LE,Mesenchymal filament / EMT,Ivy GAP / scRNA-seq
+NCAM1,Leading Edge,LE,Cell adhesion / Migration,Ivy GAP / scRNA-seq
+STMN1,Leading Edge,LE,Microtubule dynamics / Migration,Ivy GAP / scRNA-seq
+L1CAM,Leading Edge,LE,Cell adhesion / Migration,Ivy GAP / scRNA-seq
+DLL3,Leading Edge,LE,Notch signaling / Progenitor identity,Ivy GAP / scRNA-seq
+PROM1,Leading Edge,LE,CD133 / Stem cell marker,Ivy GAP / scRNA-seq
+MSI1,Leading Edge,LE,RNA-binding / Stemness,Ivy GAP / scRNA-seq
+ELAVL4,Leading Edge,LE,Neural identity / Migration,Ivy GAP / scRNA-seq
+CD24,Leading Edge,LE,Cell surface adhesion / Migration,Ivy GAP / scRNA-seq
+PMP2,Leading Edge,LE,Myelin-associated / Migration,Ivy GAP / scRNA-seq
+SPARCL1,Leading Edge,LE,ECM modulator / Migration,Ivy GAP / scRNA-seq
+GPM6B,Leading Edge,LE,Membrane glycoprotein / Migration,Ivy GAP / scRNA-seq
+CHI3L1,Leading Edge,LE,Mesenchymal transition / YKL-40,Ivy GAP / scRNA-seq
+CD44,Leading Edge,LE,HA receptor / Invasion,Ivy GAP / scRNA-seq
+TIMP1,Leading Edge,LE,MMP inhibitor / Invasion,Ivy GAP / scRNA-seq
+POSTN,Leading Edge,LE,Periostin / ECM remodeling,Ivy GAP / scRNA-seq
+COL1A1,Leading Edge,LE,Collagen type I / ECM,Ivy GAP / scRNA-seq
+COL1A2,Leading Edge,LE,Collagen type I / ECM,Ivy GAP / scRNA-seq
+COL3A1,Leading Edge,LE,Collagen type III / ECM,Ivy GAP / scRNA-seq
+FN1,Leading Edge,LE,Fibronectin / Migration,Ivy GAP / scRNA-seq
+IGFBP2,Leading Edge,LE,IGF pathway / Migration,Ivy GAP / scRNA-seq
+IGFBP3,Leading Edge,LE,IGF pathway / Migration,Ivy GAP / scRNA-seq
+SPARC,Leading Edge,LE,ECM remodeling / Migration,Ivy GAP / scRNA-seq
+TNC,Leading Edge,LE,Tenascin-C / ECM remodeling,Ivy GAP / scRNA-seq
+VCAN,Leading Edge,LE,Versican / Infiltration,Ivy GAP / scRNA-seq
+LGALS1,Leading Edge,LE,Galectin-1 / Migration,Ivy GAP / scRNA-seq
+LGALS3,Leading Edge,LE,Galectin-3 / Migration,Ivy GAP / scRNA-seq
+S100A4,Leading Edge,LE,Calcium binding / Migration,Ivy GAP / scRNA-seq
+S100A10,Leading Edge,LE,Calcium binding / Migration,Ivy GAP / scRNA-seq
+S100A11,Leading Edge,LE,Calcium binding / Migration,Ivy GAP / scRNA-seq
+ANXA1,Leading Edge,LE,Annexin A1 / Migration,Ivy GAP / scRNA-seq
+ANXA2,Leading Edge,LE,Annexin A2 / Migration,Ivy GAP / scRNA-seq
+CAV1,Leading Edge,LE,Caveolin-1 / Migration,Ivy GAP / scRNA-seq
+CAV2,Leading Edge,LE,Caveolin-2 / Migration,Ivy GAP / scRNA-seq
+EMP1,Leading Edge,LE,Epithelial membrane protein / Migration,Ivy GAP / scRNA-seq
+EMP2,Leading Edge,LE,Epithelial membrane protein / Migration,Ivy GAP / scRNA-seq
+EMP3,Leading Edge,LE,Epithelial membrane protein / Migration,Ivy GAP / scRNA-seq
+SERPINE1,Leading Edge,LE,PAI-1 / Invasion,Ivy GAP / scRNA-seq
+SERPINE2,Leading Edge,LE,PAI-2 / Invasion,Ivy GAP / scRNA-seq
+PLAU,Leading Edge,LE,uPA / Invasion,Ivy GAP / scRNA-seq
+PLAUR,Leading Edge,LE,uPAR / Invasion,Ivy GAP / scRNA-seq
+MMP2,Leading Edge,LE,Matrix metalloproteinase-2 / Invasion,Ivy GAP / scRNA-seq
+MMP9,Leading Edge,LE,Matrix metalloproteinase-9 / Invasion,Ivy GAP / scRNA-seq
+ADAM17,Leading Edge,LE,Metalloproteinase / Infiltration,Ivy GAP / scRNA-seq
+ADAMTS1,Leading Edge,LE,Metalloproteinase / Infiltration,Ivy GAP / scRNA-seq
+ITGA5,Leading Edge,LE,Integrin alpha-5 / Adhesion,Ivy GAP / scRNA-seq
+ITGB1,Leading Edge,LE,Integrin beta-1 / Adhesion,Ivy GAP / scRNA-seq
+ITGB5,Leading Edge,LE,Integrin beta-5 / Adhesion,Ivy GAP / scRNA-seq
+LOX,Leading Edge,LE,Lysyl oxidase / ECM stiffness,Ivy GAP / scRNA-seq
+LOXL2,Leading Edge,LE,Lysyl oxidase-like 2 / ECM stiffness,Ivy GAP / scRNA-seq
+HAS2,Leading Edge,LE,Hyaluronan synthase / Migration,Ivy GAP / scRNA-seq
+LAMA4,Leading Edge,LE,Laminin alpha-4 / Migration,Ivy GAP / scRNA-seq
+LAMC1,Leading Edge,LE,Laminin gamma-1 / Migration,Ivy GAP / scRNA-seq
+FBN1,Leading Edge,LE,Fibrillin-1 / ECM,Ivy GAP / scRNA-seq
+THBS1,Leading Edge,LE,Thrombospondin-1 / Migration,Ivy GAP / scRNA-seq
+CTGF,Leading Edge,LE,CCN2 / ECM remodeling,Ivy GAP / scRNA-seq
+CYR61,Leading Edge,LE,CCN1 / ECM remodeling,Ivy GAP / scRNA-seq
+TGFB1,Leading Edge,LE,TGF-beta 1 / EMT inducer,Ivy GAP / scRNA-seq
+TGFB2,Leading Edge,LE,TGF-beta 2 / EMT inducer,Ivy GAP / scRNA-seq
+TGFBI,Leading Edge,LE,TGF-beta induced / Migration,Ivy GAP / scRNA-seq
+SMAD3,Leading Edge,LE,TGF-beta signaling / Invasion,Ivy GAP / scRNA-seq
+CTNND1,Leading Edge,LE,p120-catenin / Migration,Ivy GAP / scRNA-seq
+CDH2,Leading Edge,LE,N-cadherin / EMT,Ivy GAP / scRNA-seq
+SNAI1,Leading Edge,LE,Snail / EMT regulator,Ivy GAP / scRNA-seq
+SNAI2,Leading Edge,LE,Slug / EMT regulator,Ivy GAP / scRNA-seq
+TWIST1,Leading Edge,LE,Twist / EMT regulator,Ivy GAP / scRNA-seq
+ZEB1,Leading Edge,LE,ZEB1 / EMT regulator,Ivy GAP / scRNA-seq
+ZEB2,Leading Edge,LE,ZEB2 / EMT regulator,Ivy GAP / scRNA-seq
+MGP,Leading Edge,LE,Matrix Gla protein / Invasion,Ivy GAP / scRNA-seq
+CST3,Leading Edge,LE,Cystatin C / Infiltration,Ivy GAP / scRNA-seq
+CSTB,Leading Edge,LE,Cystatin B / Infiltration,Ivy GAP / scRNA-seq
+CDKN1A,Leading Edge,LE,p21 / Cell cycle arrest (migration),Ivy GAP / scRNA-seq
+CDKN2A,Leading Edge,LE,p16 / Cell cycle arrest (migration),Ivy GAP / scRNA-seq
+TAGLN,Leading Edge,LE,Transgelin / Actin binding,Ivy GAP / scRNA-seq
+TAGLN2,Leading Edge,LE,Transgelin-2 / Actin binding,Ivy GAP / scRNA-seq
+CALD1,Leading Edge,LE,Caldesmon / Migration,Ivy GAP / scRNA-seq
+CNN3,Leading Edge,LE,Calponin-3 / Migration,Ivy GAP / scRNA-seq
+FLNA,Leading Edge,LE,Filamin A / Migration,Ivy GAP / scRNA-seq
+FLNB,Leading Edge,LE,Filamin B / Migration,Ivy GAP / scRNA-seq
+MYL9,Leading Edge,LE,Myosin light chain / Contractility,Ivy GAP / scRNA-seq
+ACTA2,Leading Edge,LE,Alpha-smooth muscle actin / EMT,Ivy GAP / scRNA-seq
+ACTG1,Leading Edge,LE,Gamma-actin / Migration,Ivy GAP / scRNA-seq
+GJA1,Leading Edge,LE,Connexin 43 / Communication,Ivy GAP / scRNA-seq
+GJB2,Leading Edge,LE,Connexin 26 / Communication,Ivy GAP / scRNA-seq
+SYNE1,Leading Edge,LE,Nesprin-1 / Migration,Ivy GAP / scRNA-seq
+DST,Leading Edge,LE,Dystonin / Migration,Ivy GAP / scRNA-seq
+MACF1,Leading Edge,LE,Microtubule-actin crosslinking,Ivy GAP / scRNA-seq
+PTK2,Leading Edge,LE,FAK / Adhesion signaling,Ivy GAP / scRNA-seq
+SRC,Leading Edge,LE,Src kinase / Migration,Ivy GAP / scRNA-seq
+PXN,Leading Edge,LE,Paxillin / Adhesion signaling,Ivy GAP / scRNA-seq
+WASL,Leading Edge,LE,N-WASP / Actin polymerization,Ivy GAP / scRNA-seq
+MKI67,Cellular Core,CT/PAN/MVP,Proliferation marker / Ki-67,Ivy GAP / scRNA-seq
+TOP2A,Cellular Core,CT,DNA topoisomerase II alpha / Mitosis,Ivy GAP / scRNA-seq
+PCNA,Cellular Core,CT,Proliferating cell nuclear antigen,Ivy GAP / scRNA-seq
+AURKA,Cellular Core,CT,Aurora kinase A / Mitosis,Ivy GAP / scRNA-seq
+AURKB,Cellular Core,CT,Aurora kinase B / Mitosis,Ivy GAP / scRNA-seq
+BUB1,Cellular Core,CT,Mitotic checkpoint / Spindle,Ivy GAP / scRNA-seq
+BUB1B,Cellular Core,CT,Mitotic checkpoint / Spindle,Ivy GAP / scRNA-seq
+CCNA2,Cellular Core,CT,Cyclin A2 / Cell cycle,Ivy GAP / scRNA-seq
+CCNB1,Cellular Core,CT,Cyclin B1 / Cell cycle,Ivy GAP / scRNA-seq
+CCNB2,Cellular Core,CT,Cyclin B2 / Cell cycle,Ivy GAP / scRNA-seq
+CCND1,Cellular Core,CT,Cyclin D1 / Cell cycle,Ivy GAP / scRNA-seq
+CCNE1,Cellular Core,CT,Cyclin E1 / Cell cycle,Ivy GAP / scRNA-seq
+CCNE2,Cellular Core,CT,Cyclin E2 / Cell cycle,Ivy GAP / scRNA-seq
+CDK1,Cellular Core,CT,Cyclin dependent kinase 1 / Mitosis,Ivy GAP / scRNA-seq
+CDK2,Cellular Core,CT,Cyclin dependent kinase 2 / Cell cycle,Ivy GAP / scRNA-seq
+CDK4,Cellular Core,CT,Cyclin dependent kinase 4 / Cell cycle,Ivy GAP / scRNA-seq
+CDK6,Cellular Core,CT,Cyclin dependent kinase 6 / Cell cycle,Ivy GAP / scRNA-seq
+CDC20,Cellular Core,CT,Anaphase promoting complex / Mitosis,Ivy GAP / scRNA-seq
+CDC25A,Cellular Core,CT,Cell cycle phosphatase / Mitosis,Ivy GAP / scRNA-seq
+CDC25B,Cellular Core,CT,Cell cycle phosphatase / Mitosis,Ivy GAP / scRNA-seq
+CDC25C,Cellular Core,CT,Cell cycle phosphatase / Mitosis,Ivy GAP / scRNA-seq
+FOXM1,Cellular Core,CT,Forkhead box M1 / Proliferation TF,Ivy GAP / scRNA-seq
+PLK1,Cellular Core,CT,Polo-like kinase 1 / Mitosis,Ivy GAP / scRNA-seq
+PLK4,Cellular Core,CT,Polo-like kinase 4 / Centriole,Ivy GAP / scRNA-seq
+CENPE,Cellular Core,CT,Centromere protein E / Mitosis,Ivy GAP / scRNA-seq
+CENPF,Cellular Core,CT,Centromere protein F / Mitosis,Ivy GAP / scRNA-seq
+KIF2C,Cellular Core,CT,Kinesin family member 2C / Mitosis,Ivy GAP / scRNA-seq
+KIF11,Cellular Core,CT,Kinesin family member 11 / Mitosis,Ivy GAP / scRNA-seq
+KIF23,Cellular Core,CT,Kinesin family member 23 / Mitosis,Ivy GAP / scRNA-seq
+KIF20A,Cellular Core,CT,Kinesin family member 20A / Mitosis,Ivy GAP / scRNA-seq
+MCM2,Cellular Core,CT,DNA replication / Helicase,Ivy GAP / scRNA-seq
+MCM3,Cellular Core,CT,DNA replication / Helicase,Ivy GAP / scRNA-seq
+MCM4,Cellular Core,CT,DNA replication / Helicase,Ivy GAP / scRNA-seq
+MCM5,Cellular Core,CT,DNA replication / Helicase,Ivy GAP / scRNA-seq
+MCM6,Cellular Core,CT,DNA replication / Helicase,Ivy GAP / scRNA-seq
+MCM7,Cellular Core,CT,DNA replication / Helicase,Ivy GAP / scRNA-seq
+RAD51,Cellular Core,CT,DNA double-strand break repair,Ivy GAP / scRNA-seq
+BRCA1,Cellular Core,CT,DNA repair / Tumor suppressor,Ivy GAP / scRNA-seq
+BRCA2,Cellular Core,CT,DNA repair / Tumor suppressor,Ivy GAP / scRNA-seq
+CHEK1,Cellular Core,CT,DNA damage checkpoint,Ivy GAP / scRNA-seq
+CHEK2,Cellular Core,CT,DNA damage checkpoint,Ivy GAP / scRNA-seq
+TK1,Cellular Core,CT,Thymidine kinase / Nucleotide synthesis,Ivy GAP / scRNA-seq
+TYMS,Cellular Core,CT,Thymidylate synthase / Nucleotide synthesis,Ivy GAP / scRNA-seq
+RRM1,Cellular Core,CT,Ribonucleotide reductase / Nucleotide synthesis,Ivy GAP / scRNA-seq
+RRM2,Cellular Core,CT,Ribonucleotide reductase / Nucleotide synthesis,Ivy GAP / scRNA-seq
+FEN1,Cellular Core,CT,Flap endonuclease / DNA replication,Ivy GAP / scRNA-seq
+ZWINT,Cellular Core,CT,Kinetochore protein / Mitosis,Ivy GAP / scRNA-seq
+HIF1A,Cellular Core,PAN,Hypoxia inducible factor 1 alpha,Ivy GAP / scRNA-seq
+CA9,Cellular Core,PAN,Carbonic anhydrase 9 / Hypoxia,Ivy GAP / scRNA-seq
+VEGFA,Cellular Core,PAN/MVP,Angiogenesis / Hypoxia,Ivy GAP / scRNA-seq
+GLUT1,Cellular Core,PAN,Glucose transporter 1 / Metabolism,Ivy GAP / scRNA-seq
+SLC2A1,Cellular Core,PAN,Glucose transporter 1 / Metabolism,Ivy GAP / scRNA-seq
+LDHA,Cellular Core,PAN,Lactate dehydrogenase A / Metabolism,Ivy GAP / scRNA-seq
+HK2,Cellular Core,PAN,Hexokinase 2 / Metabolism,Ivy GAP / scRNA-seq
+PKM,Cellular Core,PAN,Pyruvate kinase / Metabolism,Ivy GAP / scRNA-seq
+ENO1,Cellular Core,PAN,Enolase 1 / Metabolism,Ivy GAP / scRNA-seq
+ALDOA,Cellular Core,PAN,Aldolase A / Metabolism,Ivy GAP / scRNA-seq
+GAPDH,Cellular Core,PAN,Glyceraldehyde-3-phosphate dehydrogenase,Ivy GAP / scRNA-seq
+PGK1,Cellular Core,PAN,Phosphoglycerate kinase 1 / Metabolism,Ivy GAP / scRNA-seq
+PFKFB3,Cellular Core,PAN,Fructose-2,6-biphosphatase 3,Ivy GAP / scRNA-seq
+PFKL,Cellular Core,PAN,Phosphofructokinase liver type,Ivy GAP / scRNA-seq
+PFKM,Cellular Core,PAN,Phosphofructokinase muscle type,Ivy GAP / scRNA-seq
+PFKP,Cellular Core,PAN,Phosphofructokinase platelet type,Ivy GAP / scRNA-seq
+BNIP3,Cellular Core,PAN,Hypoxia-induced autophagy,Ivy GAP / scRNA-seq
+BNIP3L,Cellular Core,PAN,Hypoxia-induced autophagy,Ivy GAP / scRNA-seq
+PFKFB4,Cellular Core,PAN,Fructose-2,6-biphosphatase 4,Ivy GAP / scRNA-seq
+SLC16A1,Cellular Core,PAN,MCT1 / Lactate transport,Ivy GAP / scRNA-seq
+SLC16A3,Cellular Core,PAN,MCT4 / Lactate transport,Ivy GAP / scRNA-seq
+ADM,Cellular Core,PAN,Adrenomedullin / Angiogenesis,Ivy GAP / scRNA-seq
+PDK1,Cellular Core,PAN,Pyruvate dehydrogenase kinase 1,Ivy GAP / scRNA-seq
+ANGPTL4,Cellular Core,PAN,Angiopoietin-like 4 / Angiogenesis,Ivy GAP / scRNA-seq
+STC1,Cellular Core,PAN,Stanniocalcin-1 / Hypoxia response,Ivy GAP / scRNA-seq
+STC2,Cellular Core,PAN,Stanniocalcin-2 / Hypoxia response,Ivy GAP / scRNA-seq
+DDIT4,Cellular Core,PAN,REDD1 / mTOR inhibition,Ivy GAP / scRNA-seq
+NDRG1,Cellular Core,PAN,Hypoxia-regulated / Differentiation,Ivy GAP / scRNA-seq
+EGLN1,Cellular Core,PAN,PHD2 / Hypoxia sensing,Ivy GAP / scRNA-seq
+EGLN3,Cellular Core,PAN,PHD3 / Hypoxia sensing,Ivy GAP / scRNA-seq
+VHL,Cellular Core,PAN,Von Hippel-Lindau / Hypoxia,Ivy GAP / scRNA-seq
+EPAS1,Cellular Core,PAN,HIF-2 alpha / Hypoxia,Ivy GAP / scRNA-seq
+MET,Cellular Core,MVP,c-MET / RTK signaling / Angiogenesis,Ivy GAP / scRNA-seq
+CXCR4,Cellular Core,MVP,Chemokine receptor / Angiogenesis,Ivy GAP / scRNA-seq
+SPP1,Cellular Core,MVP,Osteopontin / Angiogenesis,Ivy GAP / scRNA-seq
+TIMP2,Cellular Core,MVP,MMP inhibitor / Angiogenesis,Ivy GAP / scRNA-seq
+COL4A1,Cellular Core,MVP,Collagen type IV / Vascular,Ivy GAP / scRNA-seq
+COL4A2,Cellular Core,MVP,Collagen type IV / Vascular,Ivy GAP / scRNA-seq
+PECAM1,Cellular Core,MVP,CD31 / Endothelial marker,Ivy GAP / scRNA-seq
+VWF,Cellular Core,MVP,von Willebrand factor / Vascular,Ivy GAP / scRNA-seq
+CD34,Cellular Core,MVP,Endothelial marker / Vascular,Ivy GAP / scRNA-seq
+ENG,Cellular Core,MVP,Endoglin / Angiogenesis,Ivy GAP / scRNA-seq
+PLAU_core,Cellular Core,PAN,Proteolysis / Hypoxia (alternate set),Ivy GAP / scRNA-seq
+PLAUR_core,Cellular Core,PAN,Proteolysis / Hypoxia (alternate set),Ivy GAP / scRNA-seq
+MMP1,Cellular Core,MVP,Metalloproteinase / Vascular,Ivy GAP / scRNA-seq
+ADAMTS4,Cellular Core,MVP,Metalloproteinase / Vascular,Ivy GAP / scRNA-seq
+NOS3,Cellular Core,MVP,Nitric oxide synthase / Vascular,Ivy GAP / scRNA-seq
+KDR,Cellular Core,MVP,VEGFR2 / Angiogenesis,Ivy GAP / scRNA-seq
+FLT1,Cellular Core,MVP,VEGFR1 / Angiogenesis,Ivy GAP / scRNA-seq
+HIF3A,Cellular Core,PAN,HIF-3 alpha / Hypoxia,Ivy GAP / scRNA-seq
+P4HA1,Cellular Core,PAN,Prolyl 4-hydroxylase / Hypoxia,Ivy GAP / scRNA-seq
+P4HA2,Cellular Core,PAN,Prolyl 4-hydroxylase / Hypoxia,Ivy GAP / scRNA-seq

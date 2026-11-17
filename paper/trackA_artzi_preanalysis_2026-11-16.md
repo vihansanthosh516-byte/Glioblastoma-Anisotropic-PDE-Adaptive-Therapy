@@ -1,7 +1,8 @@
 # Track A Artzi region benchmark: pre-analysis plan
 
-Status: frozen before opening `large_sparse_matrices2.h5` or calculating any expression score.  
-Analysis date: 2026-11-16.  
+Status: amended and frozen before opening `large_sparse_matrices2.h5` or calculating any expression score. Amendment 1 adds direct gene-pair families found in the 2025 method review and the recent GBM MBMC classifier; it supersedes the comparator count, minimum-pair rule, and comparator specifications below. No Artzi expression matrix, gene count, or test score was inspected while making this amendment.
+
+Analysis date: 2026-11-16.
 Review: [full scoped prior-art inventory](trackA_prior_art_full_2026-11-16.md).
 
 ## Question and interpretation
@@ -20,7 +21,7 @@ Use primary P-CT and primary P-IT only. Pair by the study’s `Patient` code and
 
 Keep only patient codes that have one or more primary P-CT and one or more primary P-IT records and whose counts join unambiguously. Aggregate replicate records by patient and setting. Do not use recurrent samples, treatment history, inferred cell states, or outcome labels. The pre-access audit found ten shared primary patient codes; the complete-matrix eligibility count remains unknown until the post-lock matrix audit. [Source: metadata-only audit](trackA_artzi_zenodo_metadata_2026-11-16.md).
 
-Minimum eligible set: nine complete patient pairs. This minimum is fixed because the planned upper bound of twenty-five comparator arms requires at least nine discordant pairs for the best possible Holm-adjusted exact sign-test result to be no greater than 0.05: `25 / 2^9 = 0.0488`; with eight, the best possible value is `25 / 2^8 = 0.0977`. The calculation is implemented by `minimum_possible_adjusted_p()` in [the shared evaluator](../src/trackA_margin_evaluation.py). If fewer than nine pairs are eligible, report a data-gate failure and do not calculate model scores.
+Minimum eligible set: ten complete patient pairs. The frozen comparator upper bound is forty-one arms. Even if every pair is discordant and favors MP-RPV, nine pairs give a minimum Holm-adjusted exact sign-test value of `41 / 2^9 = 0.0801`; ten pairs give `41 / 2^10 = 0.0400`. The calculation is implemented by `minimum_possible_adjusted_p()` in [the shared evaluator](../src/trackA_margin_evaluation.py). If fewer than ten pairs are eligible, report a data-gate failure and do not calculate model scores. These are design calculations, not study outcomes.
 
 ## Candidate method: maximin patient-paired rank-pair vote (MP-RPV)
 
@@ -40,39 +41,55 @@ Use the same eligible patients and the same region labels for every arm. Methods
 
 ## Comparator arms
 
-The candidate must be compared against every portable predictor below. This is an upper bound of twenty-four method/signature arms plus an always-tie reference, for twenty-five comparator arms. Methods that use held-out labels to estimate effects, need unavailable modalities, or have no fixed score or prediction rule are documented as prior art but are not falsely described as out-of-sample classifiers; see the [prior-art review](trackA_prior_art_full_2026-11-16.md).
+Compare MP-RPV against every portable predictor below. The frozen upper bound is forty method/signature arms plus an always-tie reference, for forty-one comparator arms. C01–C05, C27, and C31, C35–C41 are explicit adaptations of published methods. Report each adaptation as such. Methods requiring multiple studies, unavailable spatial inputs, or a source-defined score that cannot be transferred to pathology-labeled P-CT/P-IT are documented as pre-score structurally ineligible. The machine-readable manifest records each decision and source. No arm may be excluded after outcome inspection.
 
 | ID | Comparator | Frozen application to this target |
 |---|---|---|
-| C01 | TSP | Select one gene pair by the largest training-only class ordering-proportion difference; use its source-defined vote and training-only direction. |
-| C02 | k-TSP | Greedily select five disjoint pairs by the published ordering-proportion procedure; equal-weight pair vote. |
-| C03 | AUCTSP | Select the single pair with maximum training-only AUC of its within-specimen ordering indicator. |
-| C04 | Top-scoring N/triplet ordering | Apply the source method with the gene prefilter and maximum feature count frozen from the source implementation; any computational cap must be set before matrix access and used inside training folds. |
-| C05 | Rank-pair tree ensemble | Reproduce the public ranktreeEnsemble method at a frozen revision, including training-only pair filtering and fixed seed. |
-| C06 | GBM rank-pair/Robencla | Reproduce the source procedure from its public code and frozen revision; if its required inputs cannot be represented without held-out data, record it as structurally ineligible before scoring. |
-| C07 | Penalized pair-order GLMM | Reproduce the Rashid et al. model using patient-grouped training folds; prediction for a held-out patient uses population-level fixed effects only. Freeze code, optimizer and failure rule before the matrix is opened; if the model cannot fit under its published specification, record a pre-score implementation failure, not a result-based exclusion. |
-| C08 | Conditional logistic regression | Fit a patient-stratified conditional logistic model on training-patient core/margin pairs; compare fixed-effect linear predictors for the held-out pair. |
-| C09 | Stability-selected conditional logistic regression | Resample training patients only, apply the published stable-CLR procedure with a frozen resample count and selection-frequency threshold, then score with the resulting fixed-effect model. |
-| C10 | Paired centroid | Fit the average P-IT minus P-CT log-expression vector on training patients and score each held-out sample by its dot product with that vector. |
-| C11 | Ridge logistic regression | Fit on the two regional samples per training patient; fixed `C=1`, balanced classes, and training-only feature standardization. |
-| C12 | Linear SVM | Fit on the two regional samples per training patient; fixed `C=1`, balanced classes, and training-only feature standardization. |
-| C13 | Random forest | Fixed 500 trees, square-root feature subsampling, balanced class weights, and fixed random seed; no test-driven tuning. |
+| C01 | TSP | Within each training fold, rank genes by paired absolute mean log-expression difference; retain the top 30 genes. Evaluate their pairs by the TSP class ordering-proportion difference, select the best pair, and orient its vote from training labels. |
+| C02 | k-TSP | Use the same training-only top-30 gene pool. Greedily select up to five gene-disjoint pairs by the TSP ordering-proportion criterion; combine votes equally. |
+| C03 | AUCTSP | Use the same training-only top-30 gene pool. Select the pair with largest training-only ROC AUC for its within-specimen order indicator; orient from training labels. |
+| C04 | Top-scoring triplet | Use the same training-only top-30 gene pool. Enumerate triplet orderings and select N from {2,3,4} by inner leave-one-patient-out concordance; ties choose smaller N. Equal-weight selected triplet votes. This is a grouped-CV adapter. |
+| C05 | Rank-pair tree ensemble | Build all pair-order indicators among the training-only top-30 genes; fit a random forest with 500 trees, square-root feature sampling, balanced class weights, and seed 0. This is a ranktree-style adapter, not a claim of exact reproduction of ranktreeEnsemble. |
+| C06 | GBM rank-pair/Robencla | Pre-score structurally ineligible: source method relies on cross-dataset cluster replication, while this benchmark has one study and one pathology endpoint. It remains in the scoped prior-art inventory. |
+| C07 | Penalized pair-order GLMM | Pre-score structurally ineligible: source method estimates between-study random effects; the Artzi benchmark supplies one study. Do not label a single-study fit as the published model. |
+| C08 | Paired conditional logistic regression | In each fold, keep the top 30 training-only paired-DE genes. Fit ridge-penalized conditional logistic likelihood on within-patient P-IT minus P-CT vectors, penalty 1; score regions by the fitted linear predictor. |
+| C09 | Stability-selected conditional logistic regression | In each fold, run 100 training-patient bootstrap resamples with seed 0. Refit an L1 conditional-logistic adapter at penalty 1; retain genes selected in at least 75% of resamples, then fit C08 on those genes. If no gene remains, assign tied scores. |
+| C10 | Paired centroid | Fit the average P-IT minus P-CT log-expression vector on training patients; score each region by its dot product with this vector. |
+| C11 | Ridge logistic regression | Fit on both regional samples from training patients; use all genes, `C=1`, balanced classes, and training-only standardization. |
+| C12 | Linear SVM | Fit on both regional samples from training patients; use all genes, `C=1`, balanced classes, and training-only standardization. |
+| C13 | Random forest | Fit on both regional samples from training patients; use all genes, 500 trees, square-root feature sampling, balanced class weights, and seed 0. |
 | C14 | Paired differential-expression score | Rank genes by absolute mean within-patient log-expression difference in the training fold; score the top 50 with equal signed weights from the training direction. |
-| C15 | Ivy GAP leading-edge versus cellular-tumor score | Apply the exact published gene list and direction as a fixed signed score. |
-| C16 | Darmanis infiltration score | Apply the exact published infiltrating-tumor gene list and direction as a fixed signed score. |
-| C17 | Kim regional score | Apply the exact published core/edge gene list and direction as a fixed signed score. |
-| C18 | 5-ALA invasive-cell score | Apply the exact published invasive-cell gene list and direction as a fixed signed score. |
-| C19 | Greenwald outer-layer score | Apply the exact published layer/state gene list and direction as a fixed signed score. |
-| C20 | Harwood region modules | Apply the exact published core-versus-infiltrated module gene lists and directions as one equal-weight signed score. |
-| C21 | Pai glioma-infiltration score | Apply the exact published infiltration gene list and direction as a fixed signed score. |
-| C22 | GBM matrisome region score | Apply the exact published region-associated gene list and direction as a fixed signed score. |
-| C23 | Petry iron/invasion score | Apply the exact published regional gene list and direction as a fixed signed score. |
-| C24 | Sonpatki spatial cell/niche score | Apply the exact published regional gene list and direction as a fixed signed score only if its source defines a region-directed score; otherwise record it as not a direct region predictor. |
-| C25 | Always-tie reference | Give both specimens the same score; its paired concordance is one-half for every patient. |
+| C15 | Ivy GAP regional admixture | Pre-score structurally ineligible: the source matrix models four anatomical compartments and does not define a fixed signed P-CT versus P-IT patient-level score. |
+| C16 | Darmanis infiltration programs | Pre-score structurally ineligible: source cell-state/infiltration programs do not define a fixed signed pathology P-CT versus P-IT prediction rule. |
+| C17 | Bastola edge/core markers | Apply the 13 source-defined markers in [C17 signature file](trackA_artzi_signatures/c17_bastola_edge_core_markers.tsv). Score as mean within-specimen percentile rank of edge genes minus mean rank of core genes. Require at least 70% gene coverage. |
+| C18 | 5-ALA-positive versus core leading edge | Apply the source-defined positive leading-edge set in [C18 signature file](trackA_artzi_signatures/c18_5ala_positive_vs_core_leading_edge.tsv). Score as mean within-specimen percentile rank of listed genes. Require at least 70% gene coverage. |
+| C19 | Greenwald outer-layer programs | Pre-score structurally ineligible: source tests spatial layer/state associations and does not define a fixed signed pathology P-CT versus P-IT predictor. |
+| C20 | Harwood regional modules | Pre-score structurally ineligible: source module/neighborhood analysis has no frozen transferable P-CT versus P-IT scalar rule in the inspected report. |
+| C21 | Pai infiltration programs | Pre-score structurally ineligible: source establishes invasion biology without a fixed pathology-directed patient-level score. |
+| C22 | GBM matrisome regional biology | Pre-score structurally ineligible: source reports region-associated matrix biology without a fixed signed P-CT versus P-IT classifier. |
+| C23 | Petry iron/invasion program | Pre-score structurally ineligible: source region/functional analysis does not supply a fixed expression-only P-CT versus P-IT prediction rule. |
+| C24 | Sonpatki spatial niche programs | Pre-score structurally ineligible: source output depends on spatial niches and does not define a transferable patient-level region score from pseudobulk counts. |
+| C25 | Always-tie reference | Give both specimens the same score; paired concordance is 0.5 for every patient. |
+| C26 | Saadawy leading-edge versus cellular-core invasion index | Use exact genes from [the posted source table](trackA_artzi_signatures/c26_saadawy_2026_supplementary_table_s1.csv), also serialized in [the signed TSV](trackA_artzi_signatures/c26_saadawy_le_vs_cellular_core.tsv). Score as mean within-specimen percentile rank of the 100 LE genes minus the mean rank of the 99 posted CC genes. This rank-score adapter differs from the source ssGSEA implementation. Require 70% coverage in each set. The source text says 100 genes per set; its posted table has 99 CC rows. Preserve the posted table without filling the missing row. |
+| C27 | Kersch Ivy-structure L1 logistic classifier | Adapt source multiclass Ivy-structure classifier to binary P-CT/P-IT. Fit L1 logistic regression, `C=1`, `solver=liblinear`, balanced classes, on all training-fold log1p(CPM) genes with training-only standardization. |
+| C28 | Sum-zero gene-ratio logistic regression | In each fold, keep the top 30 training-only paired-DE genes. Fit ridge logistic regression on log1p(CPM) projected into a sum-to-zero coefficient basis, `C=1`; this is a binary adapter of constrained gene-ratio regression. |
+| C29 | Gaussian Naive Bayes | In each fold, keep the top 30 training-only paired-DE genes; fit on log1p(CPM) with `var_smoothing=1e-9`. |
+| C30 | Gradient-boosted stumps | In each fold, keep the top 30 training-only paired-DE genes; fit 100 depth-1 boosting stages, learning rate 0.1, seed 0. |
+| C31 | BMC/MBMC monotone gene-pair ensemble | Adapt the public MBMC binary case. Use the training-only top-30 paired-DE gene pool, fit its four monotonicity configurations for each pair, select up to five disjoint pairs by patient-grouped inner leave-one-out mean absolute error, and average their binary predictions. Pin source revision and adapter code before matrix access. |
+| C32 | Decision tree | Fit on both regional samples from training patients; use the top 30 training-only paired-DE genes, `max_depth=3`, and seed 0. |
+| C33 | Gaussian process classifier | Fit on both regional samples from training patients; use the top 30 training-only paired-DE genes, standardized within training folds, fixed RBF length scale 1, no kernel optimizer, and seed 0. |
+| C34 | RBF SVM | Fit on both regional samples from training patients; use the top 30 training-only paired-DE genes, `C=1`, `gamma=scale`, balanced classes, and training-only standardization. |
+| C35 | Pair t-score | Use the top 30 training-only paired-DE genes; project each gene pair onto its training-fold diagonal linear-discriminant axis, rank by absolute training t-statistic, keep up to five disjoint pairs, and average their standardized held-out projections. |
+| C36 | Gene expression ratios (GER) | Use the top 30 training-only paired-DE genes. For each gene pair, orient the CPM ratio using training labels; predict by whether the held-out ratio is above or below 1. Keep up to five gene-disjoint ratios ranked by training-only paired t-statistic; use majority vote. |
+| C37 | Pairwise SVM ensemble (PSVM) | In 50 seeded patient-grouped 80/20 training resamples, select the top 30 paired-DE genes and fit one linear SVM per gene pair. Retain pairs correct on at least 90% of inner-validation samples, then refit one linear SVM per retained pair on the full outer training fold and average their decision scores. |
+| C38 | Top-scoring pair of groups (TSPG) | In 1,000 seeded resamples of 90% of training patients, select up to 20 disjoint TSP pairs from the top 40 training-only paired-DE genes. Retain genes appearing in the same orientation in at least 80% of resamples; compare mean within-sample ranks of the two gene groups. |
+| C39 | k-TSP plus SVM | Select up to five disjoint TSP pairs in each training fold; choose odd pair count from 1, 3, or 5 by inner patient-held-out concordance, ties choosing the smaller count. Fit a linear SVM on pair-order indicators with `C=1`. |
+| C40 | REO plus machine learning | From the top 30 training-only paired-DE genes, retain gene pairs whose ordering reverses between classes in at least 95% of training samples. Rank reversal pairs by training-only mRMR; select feature count from 1 to 30 by inner patient-held-out concordance, ties choosing the smaller set. Fit a linear SVM with `C=1`. |
+| C41 | TSP plus machine learning | Rank non-overlapping gene-pair order indicators by training-only TSP score and chi-square feature importance; select pair count from 1 to 20 by inner patient-held-out concordance, ties choosing the smaller set. Fit a linear SVM, `C=1`. This is a fixed adapter of the review’s feature-selection pipeline, not a reproduction of its full multi-model search. |
 
-For C15–C24, freeze source supplement/table, exact genes, sign, and score code before opening the test matrix. Require at least 70% of a source signature’s genes in the assay. A signature below that threshold is structurally ineligible and is not replaced by another signature. If a source does not publish an unambiguous region direction or fixed gene set, record it as a regional biology precedent but not as an executable predictor. Potential overlap between an external signature’s source cohort and Artzi is unresolved for some studies; these signature comparisons and the full analysis remain exploratory.
+For C17, C18, and C26, the exact external source table, genes, direction, and score are committed before opening the test matrix. Require at least 70% coverage in each set; lower coverage makes that arm structurally ineligible. For C15–C16 and C19–C24, record the source-based reason before scoring; do not create gene lists from Artzi expression or pooled Artzi labels. Potential overlap between an external signature’s source cohort and Artzi remains unresolved. This full Artzi analysis and its fixed-signature comparisons are exploratory.
 
-Before matrix access, create and commit a machine-readable manifest with exact comparator gene lists, source file/table, direction, code revision/hash, package versions, and eligibility rule. Any direct method that is not defined by that manifest blocks expression access. This requirement does not permit choosing signatures based on Artzi expression, cell labels, predictions, or outcomes.
+Before matrix access, commit a machine-readable manifest with every arm, source, exact gene list where relevant, parameters, pre-score eligibility, software versions, analysis-code hash, and plan hash. A missing method definition blocks expression access. The manifest and code must be committed before downloading or opening the count matrix. No Artzi expression, test-patient annotations, predictions, or outcomes may determine eligibility or parameters.
 
 ## Primary score, inference, and pass rule
 
@@ -85,7 +102,7 @@ For every comparator arm `j`, calculate patient differences `q[i,j] = c[i,MP-RPV
 1. MP-RPV has strictly higher mean patient-level concordance than every eligible comparator.
 2. The one-sided exact paired sign test rejects against every eligible comparator after Holm correction at `alpha = 0.05`.
 
-No near-pass, trend, selected subgroup, alternate metric, or post hoc threshold will count as a pass. If the candidate fails, report the negative result and its per-patient comparisons. If an arm or patient is missing, do not silently remove it after score inspection. The conservative nine-patient floor and upper-bound comparator count are checked before scoring using [the shared evaluator](../src/trackA_margin_evaluation.py).
+No near-pass, trend, selected subgroup, alternate metric, or post hoc threshold will count as a pass. If the candidate fails, report the negative result and its per-patient comparisons. If an arm or patient is missing, do not silently remove it after score inspection. The ten-patient floor and upper-bound comparator count are checked before scoring using [the shared evaluator](../src/trackA_margin_evaluation.py).
 
 ## Labels for reporting
 
@@ -93,4 +110,4 @@ Label the benchmark **exploratory** because Artzi was selected after prior Track
 
 ## Seal state
 
-This plan fixes the question, data eligibility, split, candidate, comparator upper bound, shared score, multiplicity rule, and pass rule before any test-expression access. The parameter values above are prespecified design constants, not observed results. The matrix-to-metadata join, exact external signature gene tables, executable comparator manifest, code hash and software environment must still be verified and committed before opening the count matrix. If an implementation change alters the estimand, predictors, eligible patients, score, or pass rule, amend and commit the plan before proceeding.
+This plan fixes the question, data eligibility, split, candidate, comparator upper bound, shared score, multiplicity rule, and pass rule before any test-expression access. The parameter values above are prespecified design constants, not observed results. The matrix-to-metadata join, gene coverage, executable comparator manifest, code hash and software environment must still be verified and committed before opening the count matrix. If an implementation change alters the estimand, predictors, eligible patients, score, or pass rule, amend and commit the plan before proceeding.

@@ -1,0 +1,14 @@
+gene_symbol	direction	source_note
+CD44	-1	Bastola core marker
+MYC	-1	Bastola core marker
+HIF1A	-1	Bastola core marker; source prose uses HIF1alpha
+VIM	-1	Bastola core marker
+ANXA1	-1	Bastola core marker
+CDK6	-1	Bastola core marker
+JAG1	-1	Bastola core marker
+OLIG1	1	Bastola edge marker
+TC2	1	Bastola edge marker; exact source text retained
+SRRM2	1	Bastola edge marker
+ERBB3	1	Bastola edge marker
+PHGDH	1	Bastola edge marker
+RAP1GAP	1	Bastola edge marker
