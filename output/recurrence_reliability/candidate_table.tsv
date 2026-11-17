@@ -1,0 +1,55 @@
+table1_pair	stage	specimen	gsm	diagnosis	idh	primary_library	annotation_key	n_barcodes	n_tumor	n_normal	join_rate	other_libraries	pair_eligible	exclusion_reasons
+2	Primary	SF10099	GSM5319503	Glioblastoma	IDH wildtype	GSM5319503_SF10099	SF10099	568	449	119	1.0	GSM5319503_SF10099_batch2=same_capture_barcode_subset(1.0)	True	-
+2	Recurrent	SF10441	GSM5319536	Glioblastoma	IDH wildtype	GSM5319536_SF10441	SF10441	1107	467	640	1.0	-	True	-
+4	Primary	SF10432	GSM5319504	Glioblastoma	IDH wildtype	GSM5319504_SF10432	SF10432	994	877	117	1.0	-	True	-
+4	Recurrent	SF11248	GSM5319539	Glioblastoma	IDH wildtype	GSM5319539_SF11248	SF11248	1895	912	983	1.0	-	True	-
+5	Primary	SF10592	GSM5319541	Glioblastoma	IDH wildtype	GSM5319541_SF10592	SF10592	1335	296	1039	1.0	-	True	-
+5	Recurrent	SF11857	GSM5319561	Glioblastoma	IDH wildtype	GSM5319561_SF11857	SF11857	3396	157	3239	1.0	-	True	-
+6	Primary	SF11082	GSM5319506	Glioblastoma	IDH wildtype	GSM5319506_SF11082	SF11082	4134	4023	111	1.0	-	True	-
+6	Recurrent	SF11488	GSM5319562	Glioblastoma	IDH wildtype	GSM5319562_SF11488	SF11488	4458	4300	158	1.0	-	True	-
+7	Primary	SF11344	GSM5319507	Glioblastoma	IDH wildtype	GSM5319507_SF11344	SF11344	5783	589	5194	1.0	-	True	-
+7	Recurrent	SF12460	GSM5319545	Glioblastoma	IDH wildtype	GSM5319545_SF12460	SF12460	4257	1602	2655	1.0	-	True	-
+8	Primary	SF1199	GSM5319513	Glioblastoma	IDH wildtype	GSM5319513_SF1199	SF1199	634	566	68	1.0	-	True	-
+8	Recurrent	SF1343	GSM5319546	Glioblastoma	IDH wildtype	GSM5319546_SF1343	SF1343	2736	2039	697	1.0	-	True	-
+9	Primary	SF11780	GSM5319509	Glioblastoma	IDH wildtype	GSM5319509_SF11780	SF11780	6686	6470	216	1.0	-	True	-
+9	Recurrent	SF12243	GSM5319565	Glioblastoma	IDH wildtype	GSM5319565_SF12243	SF12243	2586	1021	1565	1.0	GSM5319565_SF12243_batch2=independent_capture(0.0015)	True	-
+10	Primary	SF2501	GSM5319517	Glioblastoma	IDH wildtype	GSM5319517_SF2501	SF2501	324	231	93	1.0	-	True	-
+10	Recurrent	SF2628	GSM5319547	Glioblastoma	IDH wildtype	GSM5319547_SF2628	SF2628	2536	1958	578	1.0	-	True	-
+11	Primary	SF2777	GSM5319518	Glioblastoma	IDH wildtype	GSM5319518_SF2777	SF2777	4183	3773	410	1.0	-	True	-
+11	Recurrent	SF2979	GSM5319548	Glioblastoma	IDH wildtype	GSM5319548_SF2979	SF2979	4278	3031	1247	1.0	-	True	-
+12	Primary	SF2990	GSM5319519	Glioblastoma	IDH wildtype	GSM5319519_SF2990	SF2990	1898	1471	427	1.0	-	True	-
+12	Recurrent	SF3073	GSM5319549	Glioblastoma	IDH wildtype	GSM5319549_SF3073	SF3073	3160	610	2550	1.0	-	True	-
+13	Primary	SF3076	GSM5319520	Glioblastoma	IDH wildtype	GSM5319520_SF3076	SF3076	3214	2332	882	1.0	-	True	-
+13	Recurrent	SF3243	GSM5319550	Glioblastoma	IDH wildtype	GSM5319550_SF3243	SF3243	2545	2133	412	1.0	-	True	-
+14	Primary	SF3391	GSM5319521	Glioblastoma	IDH wildtype	GSM5319521_SF3391	SF3391	6835	6162	673	1.0	-	True	-
+14	Recurrent	SF3448	GSM5319551	Glioblastoma	IDH wildtype	GSM5319551_SF3448	SF3448	4836	496	4340	1.0	-	True	-
+15	Primary	SF3996	GSM5319522	Glioblastoma	IDH wildtype	GSM5319522_SF3996	SF3996v2	463	348	115	1.0	-	False	SF4449: 22 author-labelled tumor nuclei < 50
+15	Recurrent	SF4449	GSM5319576	Glioblastoma	IDH wildtype	GSM5319576_SF4449	SF4449	4341	22	4319	1.0	GSM5319576_SF4449_batch2=same_capture_barcode_subset(1.0)	False	SF4449: 22 author-labelled tumor nuclei < 50
+18	Primary	SF4810	GSM5319524	Glioblastoma	IDH wildtype	GSM5319524_SF4810	SF4810	577	536	39	0.9965	GSM5319524_SF4810_batch2=same_capture_barcode_subset(0.9268)	True	-
+18	Recurrent	SF6098	GSM5319552	Glioblastoma	IDH wildtype	GSM5319552_SF6098	SF6098	1749	55	1694	1.0	-	True	-
+19	Primary	SF4849	GSM5319525	Glioblastoma	IDH wildtype	GSM5319525_SF4849	SF4849	606	526	80	1.0	-	True	-
+19	Recurrent	SF6118	GSM5319566	Glioblastoma	IDH wildtype	GSM5319566_SF6118	SF6118	568	78	490	1.0	-	True	-
+20	Primary	SF5581	GSM5319526	Glioblastoma	IDH wildtype	GSM5319526_SF5581	SF5581	4216	3910	306	1.0	-	True	-
+20	Recurrent	SF9715	GSM5319533	Glioblastoma	IDH wildtype	GSM5319533_SF9715	SF9715	1834	722	1112	1.0	-	True	-
+21	Primary	SF6809	GSM5319527	Glioblastoma	IDH wildtype	GSM5319527_SF6809	SF6809	191	133	58	1.0	-	True	-
+21	Recurrent	SF7025	GSM5319555	Glioblastoma	IDH wildtype	GSM5319555_SF7025	SF7025v2	348	176	172	1.0	-	True	-
+23	Primary	SF7307	GSM5319528	Glioblastoma	IDH wildtype	GSM5319528_SF7307	None	223	0	0	0.0	GSM5319528_SF7307_batch2=same_capture_barcode_subset(1.0)	False	SF7307: primary library has no unambiguous author annotation (no annotation key covers the library at the required join rate)
+23	Recurrent	SF7388	GSM5319557	Glioblastoma	IDH wildtype	GSM5319557_SF7388	SF7388v2	4777	3021	1756	1.0	-	False	SF7307: primary library has no unambiguous author annotation (no annotation key covers the library at the required join rate)
+26	Primary	SF9358	GSM5319530	Glioblastoma	IDH wildtype	GSM5319530_SF9358	SF9358	3147	499	2648	1.0	-	True	-
+26	Recurrent	SF9962	GSM5319568	Glioblastoma	IDH wildtype	GSM5319568_SF9962	SF9962	3468	2660	808	1.0	-	True	-
+28	Primary	SF9871	GSM5319575	Glioblastoma	IDH wildtype	GSM5319575_SF9871	SF9871	3602	6	3596	1.0	-	False	SF9871: 6 author-labelled tumor nuclei < 50
+28	Recurrent	SF10108	GSM5319534	Glioblastoma	IDH wildtype	GSM5319534_SF10108	SF10108	4446	2852	1594	1.0	-	False	SF9871: 6 author-labelled tumor nuclei < 50
+29	Primary	SF9372	GSM5319531	Glioblastoma	IDH wildtype	GSM5319531_SF9372	SF9372v2	4507	3641	866	1.0	-	True	-
+29	Recurrent	SF10433	GSM5319535	Glioblastoma	IDH wildtype	GSM5319535_SF10433	SF10433	1173	502	670	0.9991	GSM5319535_SF10433_batch2=independent_capture(0.0017)	True	-
+30	Primary	SF4209	GSM5319523	Glioblastoma	IDH wildtype	GSM5319523_SF4209	SF4209	784	670	114	1.0	GSM5319523_SF4209_batch2=independent_capture(0.0)	True	-
+30	Recurrent	SF4324	GSM5319572	Glioblastoma	IDH wildtype	GSM5319572_SF4324	SF4324v2	3688	893	2795	1.0	-	True	-
+31	Primary	SF11916	GSM5319511	Glioblastoma	IDH wildtype	GSM5319511_SF11916	SF11916v2	1332	1251	81	1.0	-	True	-
+31	Recurrent	SF12382	GSM5319543	Glioblastoma	IDH wildtype	GSM5319543_SF12382	SF12382	2062	1682	380	1.0	-	True	-
+32	Primary	SF11815	GSM5319510	Glioblastoma	IDH wildtype	GSM5319510_SF11815	SF11815v2	3705	3379	326	1.0	-	True	-
+32	Recurrent	SF12408	GSM5319560	Glioblastoma	IDH wildtype	GSM5319560_SF12408	SF12408	2923	2877	46	1.0	-	True	-
+33	Primary	SF10857	GSM5319505	Glioblastoma	IDH wildtype	GSM5319505_SF10857	SF10857v2	2624	2453	171	1.0	-	True	-
+33	Recurrent	SF12008	GSM5319542	Glioblastoma	IDH wildtype	GSM5319542_SF12008	SF12008	2732	1490	1242	1.0	-	True	-
+34	Primary	SF12115	GSM5319514	Glioblastoma	IDH wildtype	GSM5319514_SF12115	SF12115	253	59	194	1.0	-	True	-
+34	Recurrent	SF12751	GSM5319569	Glioblastoma	IDH wildtype	GSM5319569_SF12751	SF12751	4132	584	3548	1.0	-	True	-
+35	Primary	SF11587	GSM5319508	Glioblastoma	IDH wildtype	GSM5319508_SF11587	SF11587	1300	1253	47	1.0	-	False	SF11981: primary library has no unambiguous author annotation (no annotation sample for specimen)
+35	Recurrent	SF11981	GSM5319573	Glioblastoma	IDH wildtype	GSM5319573_SF11981	None	1359	0	0	0.0	-	False	SF11981: primary library has no unambiguous author annotation (no annotation sample for specimen)
