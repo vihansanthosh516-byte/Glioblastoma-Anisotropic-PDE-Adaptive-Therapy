@@ -39,8 +39,13 @@ def read_header(path: Path) -> str:
 def load_library(library_id: str, gsm_dir: Path = GSM_DIR) -> Library:
     from .metadata import norm_barcode
     feats = [l.split("\t") for l in _lines(gsm_dir / f"{library_id}_features.tsv.gz")]
-    if any(len(f) != 3 for f in feats):
-        raise ValueError(f"{library_id}: features file is not three columns")
+    widths = {len(f) for f in feats}
+    if widths == {1}:
+        # GSE174554 deposits symbol-only feature files (verified 2026-11-16): no Ensembl IDs or
+        # feature-type column. The symbol is the only gene identifier; row order is the matrix row order.
+        feats = [[f[0], f[0], "Gene Expression (assumed; symbol-only file)"] for f in feats]
+    elif widths != {3}:
+        raise ValueError(f"{library_id}: features file has {widths} columns")
     bcs = np.array([norm_barcode(b) for b in _lines(gsm_dir / f"{library_id}_barcodes.tsv.gz")])
     mpath = gsm_dir / f"{library_id}_matrix.mtx.gz"
     header = read_header(mpath)

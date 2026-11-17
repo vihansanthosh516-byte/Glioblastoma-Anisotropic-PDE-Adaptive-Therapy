@@ -120,8 +120,10 @@ def main() -> None:
         p = next(l for l in s["libraries"] if l["is_primary_library"])
         q = report["libraries"][p["library_id"]]
         problems = []
+        # Symbol-only feature files: duplicated symbols are allowed here and handled by the module
+        # mapping rule (a gene with several matching rows is dropped); feature type cannot be checked.
         if not (q["dims_match_files"] and q["all_values_positive_integers"] and q["duplicate_entries"] == 0
-                and q["unique_gene_ids"] and q["unique_barcodes"] and q["feature_types"] == ["Gene Expression"]):
+                and q["unique_barcodes"] and len(q["feature_types"]) == 1):
             problems.append("matrix/feature/barcode integrity check failed")
         if q["n_tumor_after_filters"] < MIN_MALIGNANT_NUCLEI:
             problems.append(f"{q['n_tumor_after_filters']} tumor nuclei after filters < {MIN_MALIGNANT_NUCLEI}")
