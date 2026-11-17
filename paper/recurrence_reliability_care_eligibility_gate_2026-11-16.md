@@ -6,7 +6,7 @@ Not opened in this work: any CARE expression file (GEO `*_umi_counts.RDS.gz`, `G
 
 ## Decision
 
-**Sample-level gates pass for 42 CARE patients. Cell-level gates (barcode-to-label join and malignant support) are unresolved. Confirmed eligible pairs: 0. Stop before scoring.** CARE can plausibly support an external replication, but only after the per-cell annotation file is shown to be safe to read and the per-specimen malignant support is counted.
+**Update after the blinded read (same day): 33 CARE pairs pass every gate that metadata can settle. Two checks remain and need the count files: the barcode match to GEO matrix columns and the malignant recount after the Wang filters. No CARE score has been computed.** Original decision (before the read): sample-level gates pass for 42 patients; confirmed eligible pairs 0. CARE can plausibly support an external replication, but only after the per-cell annotation file is shown to be safe to read and the per-specimen malignant support is counted.
 
 | Gate | State | Count or evidence |
 |---|---|---|
@@ -15,8 +15,8 @@ Not opened in this work: any CARE expression file (GEO `*_umi_counts.RDS.gz`, `G
 | C3 IDH-wildtype GBM | Pass for all | Table S1: "Glioblastoma, IDH-wildtype", IDH "wildtype" for 121 of 121 (author-reported) |
 | C4 Treatment context (Wang rule) | Pass for 42 | Untreated primary and first recurrence after radiotherapy + TMZ only; 10 of 52 fail |
 | C5 Access and terms per component | Pass for the needed public components, with caveats | See "Access and terms" |
-| C6 Barcode ↔ specimen ↔ malignant-label join | **Unresolved** | Join key known from author code; not verified on files |
-| C7 Malignant support ≥ 50 nuclei per specimen after Wang filters | **Unresolved** | Needs the per-cell table |
+| C6 Barcode ↔ specimen ↔ malignant-label join | **Specimen level: pass. Barcode ↔ GEO matrix columns: open** | Blinded read (below): 121 Sample codes, each mapped to exactly one P#T# ID present in Table S1/GEO; all 429,305 CellIDs unique and of the form `<Sample>-<16-base barcode>`. The match to GEO matrix column names needs the count files and is checked in the QC step after protocol lock |
+| C7 Malignant support ≥ 50 nuclei per specimen | **Pass for 33 pairs at author-QC level**; Wang-filter recount open | 9 of 42 pairs have a specimen with < 50 author-labelled malignant nuclei; the Wang filters (≥ 200 genes, MT ≤ 2.5%) can only remove nuclei, so the final count is ≤ 33 |
 | C8 Patient overlap with Wang and prior exposure | Pass at provenance level | No shared institution; no identity crosswalk exists; no prior project use of CARE expression |
 | C9 Scoring-reference choice | Resolved on estimand grounds (proposal) | Refit as primary; transport as secondary (see below) |
 
@@ -69,3 +69,15 @@ Proposal, made on estimand grounds before any CARE data: refit is primary (repli
 ## Precision at the sample-level ceiling
 
 If all 42 pairs pass C6/C7 (an upper bound, not a forecast): with 0 discordant patients the two-sided exact 95% upper bound is 0.084, still above the 5% tolerance; the lower bound exceeds 5% from 6 discordant patients. CARE alone therefore cannot confirm reliability below 5%; it can show non-trivial discordance or remain inconclusive.
+
+## Blinded read of the author cell-type table (user-authorised, 2026-11-16)
+
+Script: `src/recurrence_reliability/care_labels.py` with a standard-library RDS reader (`src/recurrence_reliability/rds_reader.py`; installing an R-file package was blocked in this environment). File: `celltype_meta_data_2025_01_08.RDS`, 2,344,381 bytes, SHA-256 `dc65ebe5…6bec` (GitHub tree `383b0a3`; Zenodo CC BY 4.0 archive). Output: `output/recurrence_reliability_care_metadata/care_label_extract_summary.json`; the 4-column extract stays local (`data/recurrence_reliability/raw/care/care_celltype_4col.tsv.gz`, git-ignored).
+
+- **Schema: a tibble with exactly 4 columns, `CellID` (character), `Sample` (character), `ID` (character), `CellType` (factor).** The file has no survival, MGMT, state, score or other clinical column, so it is metadata-only. Nothing was discarded unread because nothing else was there.
+- 429,305 rows (equal to the 10x cell count in Spitzer et al.); CellIDs unique; CellType labels: Astrocyte, Endothel, Excitatory neuron, Inhibitory neuron, Lymphocyte, Malignant, OPC, Oligodendrocyte, Other, Pericyte, TAM.
+- `Sample` is the processing lab's internal code, not the Table S1 Tumor ID. The first run wrongly compared the two and listed false mismatches; the check was fixed and rerun. Prefix by source and lab: TKU (Tokyo, Lab1, 30 specimens), N and P (Pitié-Salpêtrière: Lab1 12, Lab2 16), SN (Seoul, Lab3, 20), SMMG (St. Michael's, Lab1, 14), NL (NorLux, Lab3, 13), Duke (Duke, Lab1, 4), COLUMBIA (Duke tissue processed by Lab2, 8), MDA (MD Anderson, Lab1, 4). `COLUMBIA` names a processing lab for Duke tissue; it is not a new tissue source and does not change the Wang overlap assessment.
+- All 84 specimens of the 42 sample-level pairs are present. Pairs with a specimen below 50 malignant nuclei (9): P5, P23, P31, P32, P38, P58, P69 (first recurrence low) and P66, P72 (primary low). **33 pairs pass:** P2, P4, P6, P8, P9, P20, P21, P22, P24, P25, P26, P27, P28, P29, P30, P34, P36, P39, P40, P42, P45, P47, P48, P50, P52, P62, P63, P65, P67, P68, P70, P75, P78.
+- Incidental exposure: per-specimen counts of author-labelled malignant nuclei (composition), the same kind of exposure as the Wang Phase B. It relates to the published CARE finding of a lower malignant fraction at recurrence. No MES or other program value was seen.
+- Selection note: 7 of the 9 exclusions are recurrences with few malignant nuclei, so the analysed cohort over-represents recurrences that still contain many tumor cells. Report this as a limitation.
+- Precision at 33 pairs (ceiling; may fall after the Wang filters): zero discordant patients give a two-sided upper bound of 0.106; the lower bound exceeds 5% from 5 discordant patients.

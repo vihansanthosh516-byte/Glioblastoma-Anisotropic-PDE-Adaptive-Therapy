@@ -29,3 +29,7 @@ Before any CARE outcome analysis, a separate prospective protocol must resolve p
 ## CARE eligibility gate (Claude, 2026-11-16, later the same day)
 
 Sample-level: 121/121 Table S1 ↔ GEO identity matches; 52 patients have primary + first recurrence (the earlier audit's "primary and first-recurrence labels" for all 59 was wrong: 4 are primary + 2nd recurrence, 3 are 1st + 2nd recurrence); 42 pass the transported Wang treatment rule. Refit is the proposed primary reference (estimand: same algorithm in a new cohort); transport is a declared secondary. **Next action needs a user decision:** authorise a blinded, column-restricted extraction of `celltype_meta_data_2025_01_08.RDS` (print column names only; keep CellID, Sample, ID, CellType; discard other columns unprinted) to close gates C6/C7. Do not open `malignant_meta_data_2025_01_08.RDS` (cell states). Tests: 23 pass in a scratch copy (`tests/test_recurrence_reliability*.py`).
+
+## CARE blinded label read (Claude, 2026-11-16, user-authorised)
+
+The label file has 4 columns only (CellID, Sample, ID, CellType): metadata-only. 33 of 42 pairs have ≥ 50 author-labelled malignant nuclei per specimen. Protocol `paper/recurrence_reliability_care_protocol_PROPOSED.md` updated and ready to lock on the user's go-ahead. Next after lock: extend `rds_reader.py` for S4 sparse matrices (synthetic tests in scratch), download the 66 GEO count files, run the CARE QC (column-name join, Wang filters, recount), freeze the cohort, then run once. Tests: 25 pass in a scratch copy.

@@ -1,6 +1,6 @@
 # CARE external replication: PROPOSED protocol (not locked)
 
-Date: 2026-11-16. Status: **proposed; cannot be locked until gates C6 and C7 in `paper/recurrence_reliability_care_eligibility_gate_2026-11-16.md` pass.** No CARE expression, cell label, score, or outcome has been opened. This protocol does not change the locked Wang protocol, config, cohort, or result. If C6/C7 change a rule below, the change is made and dated before any CARE score is computed.
+Date: 2026-11-16. Status: **proposed; ready to lock on the user's go-ahead.** Metadata gates are settled (33 pairs after the blinded label read, `paper/recurrence_reliability_care_eligibility_gate_2026-11-16.md`). The barcode match to GEO matrix columns and the Wang-filter recount are QC steps in section 2 that run after locking and before scoring. No CARE expression, cell label, score, or outcome has been opened. This protocol does not change the locked Wang protocol, config, cohort, or result. If C6/C7 change a rule below, the change is made and dated before any CARE score is computed.
 
 ## 1. Question and type
 
@@ -10,8 +10,8 @@ This is a replication of the Wang endpoint with a refitted reference (section 4)
 
 ## 2. Cohort rules (frozen from metadata)
 
-1. Start: the 42 sample-level eligible pairs in `output/recurrence_reliability_care_metadata/care_eligibility_manifest.json` (untreated primary; first recurrence after radiotherapy + TMZ only; IDH-wildtype; Table S1 ↔ GEO identity agreement). Second-recurrence specimens are never used.
-2. Specimen label join: the author label file `celltype_meta_data_2025_01_08.RDS` (Zenodo 10.5281/zenodo.14966015, CC BY 4.0) joined to GEO matrix columns by `CellID` = `<Sample>-<barcode>`, after confirming the exact string form on the column names. A specimen passes if at least 95% of its label-file cells are found among its GEO matrix columns and every match is unique. Otherwise the pair is excluded.
+1. Start: the 33 pairs that pass the sample-level rules (`care_eligibility_manifest.json`: untreated primary; first recurrence after radiotherapy + TMZ only; IDH-wildtype; Table S1 ↔ GEO identity) and have ≥ 50 author-labelled malignant nuclei per specimen (`care_label_extract_summary.json`): P2, P4, P6, P8, P9, P20, P21, P22, P24, P25, P26, P27, P28, P29, P30, P34, P36, P39, P40, P42, P45, P47, P48, P50, P52, P62, P63, P65, P67, P68, P70, P75, P78. Second-recurrence specimens are never used.
+2. Specimen label join: the author label file `celltype_meta_data_2025_01_08.RDS` (SHA-256 `dc65ebe5…6bec`; 4 columns, verified metadata-only; Zenodo 10.5281/zenodo.14966015, CC BY 4.0) joined to GEO matrix columns by `CellID` = `<Sample>-<16-base barcode>`; the label `ID` (P#T#) selects the GEO file `GSM…_P#T#_umi_counts.RDS.gz`. If the GEO column names use another barcode form, only a GEM-suffix difference (`-1`) may be normalised; any other difference stops the study. A specimen passes if at least 95% of its label-file cells are found among its GEO matrix columns and every match is unique. Otherwise the pair is excluded.
 3. Analysis nuclei: nuclei present in the author label file (author QC and confidence filter) that also pass the Wang filters (≥ 200 detected genes, mitochondrial fraction ≤ 2.5%). Matrix barcodes absent from the label file are outside the author-QC population: they are not labelled, not analysed, and do not trigger the Wang amendment-1 stop rule (that rule concerned a labelled-by-design population). Their number is reported.
 4. Malignant nuclei: `CellType == "Malignant"`. No other label (for example cell states) is read.
 5. Support: each specimen needs ≥ 50 malignant analysis nuclei; otherwise its pair is excluded.
@@ -33,7 +33,7 @@ Same as Wang: delta = recurrence mean − primary mean over malignant nuclei; SE
 
 ## 6. Primary endpoint and interpretation
 
-Opposite-direction discordance between R (refit) and A over all patients in the final CARE cohort; exact two-sided 95% Clopper-Pearson interval; the Wang reading rule against the 5% tolerance (lower bound > 5%: unreliable beyond tolerance; upper bound < 5%: reliable within tolerance; otherwise inconclusive). Reported next to the Wang result (3/21; 3.0%–36.3%) without pooling. Precision at the 42-pair ceiling: zero events give an upper bound of 8.4%, so a "reliable within tolerance" reading is impossible; the lower bound exceeds 5% from 6 events.
+Opposite-direction discordance between R (refit) and A over all patients in the final CARE cohort; exact two-sided 95% Clopper-Pearson interval; the Wang reading rule against the 5% tolerance (lower bound > 5%: unreliable beyond tolerance; upper bound < 5%: reliable within tolerance; otherwise inconclusive). Reported next to the Wang result (3/21; 3.0%–36.3%) without pooling. Precision at the 33-pair ceiling: zero events give an upper bound of 10.6%, so a "reliable within tolerance" reading is impossible; the lower bound exceeds 5% from 5 events.
 
 The binomial interval assumes independent patient indicators, but the refit reference is shared. Section 7 S-D reports the size of this dependence; the primary interval is not adjusted.
 
@@ -53,7 +53,7 @@ Separate config `configs/recurrence_reliability_care.json` and output directory;
 
 ## 9. Open implementation points before locking
 
-1. Result of the blinded column-restricted extraction of the label file (gate C6/C7), including whether it carries survival columns (if so, they are discarded unread).
+1. Done: the blinded read showed the label file has 4 columns only (no survival or state columns); 33 pairs pass the author-level malignant floor.
 2. Exact `CellID` string form versus GEO RDS column names.
-3. A Python reader for the GEO `.RDS.gz` count objects (no R installation is assumed), tested on synthetic RDS files.
+3. A Python reader for the GEO `.RDS.gz` count objects: `src/recurrence_reliability/rds_reader.py` handles data frames; sparse `dgCMatrix` (S4) count objects need an extension, tested on synthetic files.
 4. Final cohort size and precision recomputed from the frozen QC report.
