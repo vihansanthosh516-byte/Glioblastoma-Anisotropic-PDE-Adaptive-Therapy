@@ -128,3 +128,6 @@ output/predictgbm/**/*.npz
 kaggle_run/**/*.pyc
 data/acrin6677/
 data/hgcc/
+
+# Recurrence reliability raw GEO downloads (local only)
+data/recurrence_reliability/raw/
