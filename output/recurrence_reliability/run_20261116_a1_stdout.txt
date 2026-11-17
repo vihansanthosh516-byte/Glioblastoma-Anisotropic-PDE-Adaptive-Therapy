@@ -1,0 +1,1 @@
+{"n": 21, "opposite": 3, "ci": [0.03048896762151556, 0.363423987016981], "indeterminate": {"R": 0.047619047619047616, "A": 0.14285714285714285}, "reading": "inconclusive relative to tolerance"}
