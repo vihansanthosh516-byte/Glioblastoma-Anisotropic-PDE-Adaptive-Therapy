@@ -1,0 +1,9 @@
+﻿# Track A tissue block voting simulation
+
+Simulation only. No patient data. Design follows the [research note](trackA_replicate_research_2026-11-17.md). Artzi, Yu and HGCC stay spent.
+
+Generate 100 independent replicates per regime with seed 20261118. Each has 24 training and 80 test patients, paired core and edge, each with four blocks and 24 genes. Log abundances combine independent standard normal patient-gene effects, region-gene effects shared across that region's blocks (SD 0.5), and independent block-gene noise (SD 0.6). Add 1 to edge genes 0 through 5 across all blocks for diffuse signal, or in one uniformly random edge block per patient for localized signal. Null adds zero. Convert log abundances to proportions by normalizing exponentials, then sample multinomial counts. Run diffuse and localized regimes at depths 500, 500, 500, 10000, a null at those depths, and a diffuse control at equal depths of 500.
+
+Use adjacent, disjoint gene pairs in the fixed gene order. Compare soft block votes (mean signed order across blocks), hard block majority (sign of the soft vote), and pooled count votes. For each, orient by mean training paired contrast and select up to five pairs with nonzero absolute contrasts, largest first, ties by pair index. Average oriented votes, or tie if empty. Also compare L2 paired logistic regressions with C=1 using log1p proportions scaled to 10000, either pooled or averaged across blocks. Train on core-to-edge differences and their negatives with opposite labels. Score every test patient on paired concordance with ties worth 0.5.
+
+Pass only if soft block voting beats every comparator by at least 0.02 mean concordance in unequal-depth diffuse signal, falls within 0.02 of 0.50 in the null, and trails the best comparator by at most 0.05 in each other regime. All constants are simulation design settings. A pass would justify further development on fresh simulation or eligible untouched cohorts.
