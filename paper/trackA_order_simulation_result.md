@@ -1,0 +1,5 @@
+﻿# Track A order reversal simulation result
+
+**Simulation. The equal-weight ensemble failed the frozen rule.** In diffuse order reversal, soft block votes reached 0.918 versus 0.826 for pooled votes. Block logistic reached 0.991 and the ensemble 0.985. In localized reversal the ensemble reached 0.630 versus 0.628 for block logistic, below the required 0.01 gain. With a shared abundance shift the ensemble scored 0.790 versus 0.978 for block logistic. The null check passed. [Results](../output/trackA_order_simulation/result.json) | [Plan](trackA_order_simulation_plan.md)
+
+The shared-shift result is consistent with an equal-weight vote injecting noise when within-pair order carries little signal. A next research route is to keep block logistic as the default and learn a regularized weight for the order score from out-of-fold training-patient margins. Before any new simulation draws, freeze the weight rule and compare with logistic alone and fixed averaging on separate shifted, reversed and mixed regimes. This benchmark used synthetic counts and fixed gene pairs. All previously spent patient cohorts remain closed.
