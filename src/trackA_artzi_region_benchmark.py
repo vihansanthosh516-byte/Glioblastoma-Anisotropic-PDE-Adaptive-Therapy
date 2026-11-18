@@ -458,6 +458,7 @@ def _preflight(matrix_path: Path, metadata_path: Path) -> dict[str, Any]:
     gene_set = set(genes)
     for key, source in signatures.items():
         coverage[key] = {"available": len(source & gene_set), "required": len(source), "fraction": len(source & gene_set) / max(1, len(source))}
+    eligible_comparators, comparator_eligibility = _eligible_comparators({"signature_coverage": coverage})
     matrix_layout = {
         "kind": "r_csc_blocks",
         "blocks": blocks,
@@ -494,6 +495,9 @@ def _preflight(matrix_path: Path, metadata_path: Path) -> dict[str, Any]:
         "duplicate_eligible_matrix_cell_count": len(duplicate_eligible),
         "incomplete_patient_region_counts": incomplete,
         "signature_coverage": coverage,
+        "comparator_eligibility": comparator_eligibility,
+        "eligible_comparator_count": len(eligible_comparators),
+        "eligible_comparators": eligible_comparators,
         "minimum_patient_gate_passed": count_gate,
         "score_gate_passed": bool(join_ok and count_gate),
         "status": "metadata_preflight_pass" if join_ok and count_gate else "metadata_gate_stop",
@@ -1463,9 +1467,26 @@ def _score_locked_benchmark(matrix_path: Path, metadata_path: Path, preflight_pa
 
     # Rescan only HDF5 structure and identifier arrays. No count dataset is touched here.
     fresh_preflight = _preflight(matrix_path, metadata_path)
-    for key in ("matrix_layout", "gene_id_path", "gene_count", "matrix_cell_count", "eligible_patient_codes", "eligible_cell_count", "signature_coverage"):
+    for key in (
+        "matrix_layout",
+        "gene_id_path",
+        "gene_count",
+        "matrix_cell_count",
+        "eligible_patient_codes",
+        "eligible_cell_count",
+        "signature_coverage",
+        "comparator_eligibility",
+        "eligible_comparator_count",
+        "eligible_comparators",
+    ):
         if fresh_preflight.get(key) != preflight.get(key):
             raise RuntimeError(f"Metadata-only preflight changed after lock: {key}")
+
+    comparators, decisions = _eligible_comparators(preflight)
+    if comparators != preflight.get("eligible_comparators") or decisions != preflight.get("comparator_eligibility"):
+        raise RuntimeError("Pre-score comparator eligibility differs from metadata-only preflight")
+    if len(comparators) > MAX_COMPARATORS:
+        raise RuntimeError("Eligible comparator count exceeds frozen upper bound")
 
     patients, sample_names, genes, counts = _read_counts_by_patient_region(matrix_path, metadata_path, preflight)
     if len(patients) < MINIMUM_PATIENTS:
@@ -1475,9 +1496,6 @@ def _score_locked_benchmark(matrix_path: Path, metadata_path: Path, preflight_pa
     if len(core) != len(patients) or len(edge) != len(patients):
         raise RuntimeError("Pseudobulk patient-region rows do not match patient list")
 
-    comparators, decisions = _eligible_comparators(preflight)
-    if len(comparators) > MAX_COMPARATORS:
-        raise RuntimeError("Eligible comparator count exceeds frozen upper bound")
     arm_scores: dict[str, dict[str, tuple[float, float]]] = {"MP-RPV": {}}
     for arm_id in comparators:
         arm_scores[arm_id] = {}
