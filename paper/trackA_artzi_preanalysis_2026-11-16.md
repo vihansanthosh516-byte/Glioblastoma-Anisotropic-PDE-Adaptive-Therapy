@@ -15,7 +15,7 @@ Artzi was selected after earlier negative Track A results. Therefore the evaluat
 
 ## Data and eligibility
 
-Use only the public Artzi Xenium release named in the metadata audit: `Final_meta.csv` for cell and sample metadata and `large_sparse_matrices2.h5` for the count matrix. Its license and metadata-only file checks are recorded in the [Artzi audit](trackA_artzi_zenodo_metadata_2026-11-16.md). No expression matrix, gene-level count, or score has been accessed for this plan.
+Use only the public Artzi Xenium release named in the metadata audit: `Final_meta.csv` for cell and sample metadata and `large_sparse_matrices2.h5` for the count matrix. Its license and metadata-only file checks are recorded in the [Artzi audit](trackA_artzi_zenodo_metadata_2026-11-16.md). No expression values, per-gene counts, predictions, or scores have been accessed. The metadata-only preflight may inspect HDF5 group names, dimensions, gene identifiers, cell identifiers, and metadata CSV, but must not read sparse payload values.
 
 Use primary P-CT and primary P-IT only. Pair by the study’s `Patient` code and `Setting`. Aggregate raw counts over all cells and all fields of view for each patient-setting into one regional pseudobulk. Include all cells; do not use study-derived malignancy, subtype, state, ecosystem, or pooled cluster calls to select or weight cells. This prevents those pooled expression-derived annotations from serving as independent test inputs. A matrix row must be joined to metadata through an exact released cell identifier. If the matrix cannot be joined unambiguously, stop. If a paired regional pseudobulk is empty or non-finite, record the metadata and stop before model scoring; do not drop the patient after seeing predictions.
 
@@ -111,3 +111,10 @@ Label the benchmark **exploratory** because Artzi was selected after prior Track
 ## Seal state
 
 This plan fixes the question, data eligibility, split, candidate, comparator upper bound, shared score, multiplicity rule, and pass rule before any test-expression access. The parameter values above are prespecified design constants, not observed results. Commit the manifest and code hash first; then run metadata-only preflight and record its join, gene coverage, and eligible-patient results before reading expression values. If an implementation change alters the estimand, predictors, eligible patients, score, or pass rule, amend and commit the plan before proceeding.
+
+
+## Amendment: source HDF layout adapter
+
+The first metadata-only preflight stopped because the locked loader did not recognize the released container layout ([failed attempt](../output/trackA_artzi_metadata_preflight_2026-11-16/metadata_preflight_attempt1_failed.json)). A separate metadata-only inventory found 126 sparse matrix blocks with `dims`, `i`, `p`, `x`, `rownames`, and `colnames`; they share one ordered gene-ID list and contain 5,131,084 distinct cell IDs ([inventory](../output/trackA_artzi_metadata_preflight_2026-11-16/hdf5_blocks_metadata.json)). The structural inventory read no sparse payload values.
+
+This amendment changes only the storage adapter. The question, primary-region eligibility, exact cell-ID join, patient-level aggregation, leave-one-patient-out split, MP-RPV definition, comparator set, score, multiplicity adjustment, and pass rule remain frozen as written above. The revised preflight must verify the exact eligible-cell join and patient floor from metadata and identifier arrays. Regenerate and commit the plan/code hashes before another preflight; commit the final metadata gate output before `--score`. No `x`, `i`, or `p` payload values may be read before those steps.

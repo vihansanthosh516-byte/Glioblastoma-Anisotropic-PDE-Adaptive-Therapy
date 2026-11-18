@@ -254,12 +254,20 @@ def _string_values(dataset: Any) -> list[str]:
     return out
 
 
+def _identifier_digest(values: list[str]) -> str:
+    digest = hashlib.sha256()
+    for value in values:
+        digest.update(value.encode("utf-8"))
+        digest.update(b"\0")
+    return digest.hexdigest().upper()
+
+
 def _identifier_kind(path: str) -> str | None:
     clean = path.casefold().rstrip("/")
     leaf = clean.split("/")[-1]
     parts = set(clean.replace("-", "_").split("/"))
-    gene_leaves = {"gene", "genes", "gene_name", "gene_names", "gene_symbol", "gene_symbols", "feature", "features", "feature_name", "feature_names", "var_names"}
-    cell_leaves = {"cell", "cells", "cell_id", "cell_ids", "cellid", "barcodes", "barcode", "obs_names"}
+    gene_leaves = {"gene", "genes", "gene_name", "gene_names", "gene_symbol", "gene_symbols", "feature", "features", "feature_name", "feature_names", "var_names", "rownames"}
+    cell_leaves = {"cell", "cells", "cell_id", "cell_ids", "cellid", "barcodes", "barcode", "obs_names", "colnames"}
     if leaf in gene_leaves or leaf == "_index" and "var" in parts:
         return "gene"
     if leaf in cell_leaves or leaf == "_index" and "obs" in parts:
@@ -267,40 +275,30 @@ def _identifier_kind(path: str) -> str | None:
     return None
 
 
-def _read_identifier_candidates(handle: Any) -> dict[str, list[tuple[str, list[str]]]]:
+def _read_identifier_candidates(handle: Any) -> dict[str, list[str]]:
     import h5py
 
-    found: dict[str, list[tuple[str, list[str]]]] = {"gene": [], "cell": []}
+    found: dict[str, list[str]] = {"gene": [], "cell": []}
 
     def visitor(_name: str, obj: Any) -> None:
         if not isinstance(obj, h5py.Dataset) or not _text_dataset(obj):
             return
         kind = _identifier_kind(obj.name)
         if kind:
-            found[kind].append((obj.name, _string_values(obj)))
+            found[kind].append(obj.name)
 
     handle.visititems(visitor)
     return found
 
 
-def _unique_identifier(candidates: list[tuple[str, list[str]]], kind: str, dimension: int) -> tuple[str, list[str]]:
-    matches = [(path, values) for path, values in candidates if len(values) == dimension]
-    unique: dict[str, tuple[str, list[str]]] = {}
-    for path, values in matches:
-        digest = hashlib.sha256()
-        for value in values:
-            digest.update(value.encode("utf-8"))
-            digest.update(b"\0")
-        unique.setdefault(digest.hexdigest(), (path, values))
-    if len(unique) != 1:
-        paths = [path for path, _ in matches]
-        raise ValueError(f"Expected one unambiguous {kind} identifier array of length {dimension}; found {paths}")
-    return next(iter(unique.values()))
-
-
 def _shape_from_sparse_group(group: Any) -> tuple[int, int] | None:
     if not all(key in group for key in ("data", "indices", "indptr")):
-        return None
+        if not all(key in group for key in ("dims", "i", "p", "x", "rownames", "colnames")):
+            return None
+        dims = group["dims"][...]
+        if getattr(dims, "ndim", 0) != 1 or len(dims) != 2:
+            return None
+        return tuple(int(value) for value in dims)
     shape = group.attrs.get("shape")
     if shape is None and "shape" in group and hasattr(group["shape"], "__getitem__"):
         shape = group["shape"][...]
@@ -319,7 +317,8 @@ def _hdf_inventory(handle: Any) -> tuple[list[dict[str, Any]], list[dict[str, An
         if isinstance(obj, h5py.Group):
             shape = _shape_from_sparse_group(obj)
             if shape is not None:
-                matrices.append({"path": obj.name, "kind": "sparse_group", "shape": list(shape), "keys": sorted(obj.keys())})
+                kind = "r_csc_block" if all(key in obj for key in ("dims", "i", "p", "x", "rownames", "colnames")) else "sparse_group"
+                matrices.append({"path": obj.name, "kind": kind, "shape": list(shape), "keys": sorted(obj.keys())})
             return
         entry = {"path": obj.name, "shape": list(obj.shape), "dtype": str(obj.dtype)}
         entries.append(entry)
@@ -328,23 +327,6 @@ def _hdf_inventory(handle: Any) -> tuple[list[dict[str, Any]], list[dict[str, An
 
     handle.visititems(visitor)
     return entries, matrices
-
-
-def _matrix_candidate(matrices: list[dict[str, Any]], gene_count: int, cell_count: int) -> dict[str, Any]:
-    matches = []
-    for item in matrices:
-        shape = tuple(item["shape"])
-        if shape in {(gene_count, cell_count), (cell_count, gene_count)}:
-            path = item["path"].casefold()
-            score = int("count" in path or "raw" in path) - int("norm" in path or "scale" in path or "log" in path)
-            matches.append((score, item))
-    if not matches:
-        raise ValueError("No numeric matrix matches gene and cell identifier dimensions")
-    best = max(score for score, _ in matches)
-    best_matches = [item for score, item in matches if score == best]
-    if len(best_matches) != 1:
-        raise ValueError(f"Ambiguous count matrix candidates: {[item['path'] for item in best_matches]}")
-    return best_matches[0]
 
 
 def _metadata_columns(header: list[str]) -> tuple[str, str, str]:
@@ -401,72 +383,90 @@ def _preflight(matrix_path: Path, metadata_path: Path) -> dict[str, Any]:
     manifest = _verify_frozen_files()
     if matrix_path.stat().st_size != EXPECTED_MATRIX_SIZE:
         raise ValueError("Matrix byte size differs from the Zenodo record")
-    with h5py.File(matrix_path, "r") as handle:
-        datasets, matrices = _hdf_inventory(handle)
-        ids = _read_identifier_candidates(handle)
-        candidate_shapes = sorted({tuple(item["shape"]) for item in matrices})
-        selected_pairs = []
-        for shape in candidate_shapes:
-            if not ids["gene"] or not ids["cell"]:
-                continue
-            try:
-                gene_path, genes = _unique_identifier(ids["gene"], "gene", shape[0])
-                cell_path, cells = _unique_identifier(ids["cell"], "cell", shape[1])
-                if shape[0] == len(genes) and shape[1] == len(cells):
-                    selected_pairs.append((shape, gene_path, genes, cell_path, cells))
-                if shape[1] == len(genes) and shape[0] == len(cells):
-                    selected_pairs.append((shape, gene_path, genes, cell_path, cells))
-            except ValueError:
-                continue
-        layouts = []
-        for shape, gene_path, genes, cell_path, cells in selected_pairs:
-            try:
-                matrix = _matrix_candidate(matrices, len(genes), len(cells))
-            except ValueError:
-                continue
-            layouts.append({
-                "matrix": matrix,
-                "gene_id_path": gene_path,
-                "cell_id_path": cell_path,
-                "gene_count": len(genes),
-                "cell_count": len(cells),
-                "gene_ids_sha256": hashlib.sha256("\n".join(genes).encode()).hexdigest().upper(),
-                "cell_ids_sha256": hashlib.sha256("\n".join(cells).encode()).hexdigest().upper(),
-                "genes": genes,
-                "cells": cells,
-            })
-    if len(layouts) != 1:
-        raise ValueError(f"Expected one matrix/gene/cell layout; found {len(layouts)} candidates")
-    layout = layouts[0]
-    genes, matrix_cells = layout.pop("genes"), layout.pop("cells")
-    if len(set(genes)) != len(genes):
-        raise ValueError("Duplicate gene identifiers; frozen exact-symbol mapping is ambiguous")
-    if len(set(matrix_cells)) != len(matrix_cells):
-        raise ValueError("Duplicate matrix cell identifiers; exact join is ambiguous")
-
     with metadata_path.open("r", encoding="utf-8-sig", newline="") as handle:
         header = next(csv.reader(handle))
     fields = _metadata_columns(header)
     patient_pairs, eligible_cells = _read_metadata_for_pairs(metadata_path, fields)
-    cell_index = {cell_id: index for index, cell_id in enumerate(matrix_cells)}
-    missing = sorted(set(eligible_cells) - set(cell_index))
-    if missing:
-        raise ValueError(f"{len(missing)} eligible metadata cells have no exact matrix-cell match")
+    eligible_cell_ids = set(eligible_cells)
+
+    with h5py.File(matrix_path, "r") as handle:
+        datasets, matrices = _hdf_inventory(handle)
+        id_paths = _read_identifier_candidates(handle)
+        gene_paths, cell_paths = set(id_paths["gene"]), set(id_paths["cell"])
+        matrix_blocks = sorted(
+            (item for item in matrices if item["kind"] == "r_csc_block"),
+            key=lambda item: item["path"],
+        )
+        if not matrix_blocks:
+            raise ValueError("No supported R CSC matrix blocks with dims/i/p/x/rownames/colnames were found")
+
+        blocks = []
+        genes_reference: list[str] | None = None
+        gene_digest: str | None = None
+        matrix_cell_count = 0
+        matched_eligible: set[str] = set()
+        duplicate_eligible: set[str] = set()
+        for matrix in matrix_blocks:
+            group_path = matrix["path"]
+            gene_path, cell_path = f"{group_path}/rownames", f"{group_path}/colnames"
+            if gene_path not in gene_paths or cell_path not in cell_paths:
+                raise ValueError(f"Sparse matrix block lacks text rownames/colnames: {group_path}")
+            genes = _string_values(handle[gene_path])
+            cells = _string_values(handle[cell_path])
+            shape = tuple(matrix["shape"])
+            if shape != (len(genes), len(cells)):
+                raise ValueError(f"R CSC dimensions do not match identifiers in {group_path}")
+            if len(set(genes)) != len(genes):
+                raise ValueError(f"Duplicate gene identifiers in {gene_path}")
+            block_gene_digest = _identifier_digest(genes)
+            if genes_reference is None:
+                genes_reference = genes
+                gene_digest = block_gene_digest
+            elif block_gene_digest != gene_digest:
+                raise ValueError("R CSC blocks do not share one ordered gene identifier list")
+
+            for cell_id in cells:
+                if cell_id in eligible_cell_ids:
+                    if cell_id in matched_eligible:
+                        duplicate_eligible.add(cell_id)
+                    else:
+                        matched_eligible.add(cell_id)
+            matrix_cell_count += len(cells)
+            blocks.append({
+                "path": group_path,
+                "kind": matrix["kind"],
+                "shape": list(shape),
+                "orientation": "genes_by_cells",
+                "gene_id_path": gene_path,
+                "cell_id_path": cell_path,
+                "gene_count": len(genes),
+                "cell_count": len(cells),
+                "gene_ids_sha256": block_gene_digest,
+                "cell_ids_sha256": _identifier_digest(cells),
+            })
+    if genes_reference is None or gene_digest is None:
+        raise ValueError("No gene identifiers were available in supported matrix blocks")
+    genes = genes_reference
+    missing_count = len(eligible_cell_ids - matched_eligible)
+
     donor_regions: dict[str, Counter[str]] = {patient: Counter() for patient in patient_pairs}
-    group_codes: dict[str, tuple[str, str]] = {}
     for cell_id, (patient, region) in eligible_cells.items():
         donor_regions[patient][region] += 1
-        group_codes[cell_id] = (patient, region)
     incomplete = {patient: dict(counts) for patient, counts in donor_regions.items() if not counts["P-CT"] or not counts["P-IT"]}
     signatures = _signature_genes()
     coverage = {}
     gene_set = set(genes)
     for key, source in signatures.items():
         coverage[key] = {"available": len(source & gene_set), "required": len(source), "fraction": len(source & gene_set) / max(1, len(source))}
-    matrix_path_norm = layout["matrix"]["path"]
-    matrix_shape = layout["matrix"]["shape"]
-    orientation = "genes_by_cells" if matrix_shape == [layout["gene_count"], layout["cell_count"]] else "cells_by_genes"
-    join_ok = not incomplete and len(eligible_cells) == sum(sum(counts.values()) for counts in donor_regions.values())
+    matrix_layout = {
+        "kind": "r_csc_blocks",
+        "blocks": blocks,
+        "block_count": len(blocks),
+        "shape": [len(genes), matrix_cell_count],
+        "orientation": "genes_by_cells",
+        "gene_ids_sha256": gene_digest,
+    }
+    join_ok = not incomplete and not missing_count and not duplicate_eligible
     count_gate = len(patient_pairs) >= MINIMUM_PATIENTS
     return {
         "analysis_label": "exploratory",
@@ -479,18 +479,20 @@ def _preflight(matrix_path: Path, metadata_path: Path) -> dict[str, Any]:
         "matrix_file": {"name": matrix_path.name, "size_bytes": matrix_path.stat().st_size, "expected_release_md5": EXPECTED_MATRIX_MD5},
         "metadata_file": {"name": metadata_path.name, "size_bytes": metadata_path.stat().st_size, "sha256": sha256_file(metadata_path)},
         "hdf5_inventory": datasets,
-        "matrix_layout": {"path": matrix_path_norm, "shape": matrix_shape, "kind": layout["matrix"]["kind"], "orientation": orientation},
-        "gene_id_path": layout["gene_id_path"],
-        "cell_id_path": layout["cell_id_path"],
-        "gene_count": layout["gene_count"],
-        "matrix_cell_count": layout["cell_count"],
+        "matrix_layout": matrix_layout,
+        "gene_id_path": blocks[0]["gene_id_path"],
+        "gene_count": len(genes),
+        "matrix_cell_count": matrix_cell_count,
         "metadata_columns": {"patient": fields[0], "setting": fields[1], "cell_id": fields[2]},
         "eligible_patient_codes": sorted(patient_pairs),
         "eligible_patient_count": len(patient_pairs),
         "eligible_cell_count": len(eligible_cells),
         "eligible_cells_per_patient_region": {patient: dict(counts) for patient, counts in sorted(donor_regions.items())},
         "exact_cell_join": join_ok,
-        "missing_metadata_cell_count": len(missing),
+        "matched_eligible_cell_count": len(matched_eligible),
+        "missing_metadata_cell_count": missing_count,
+        "duplicate_eligible_matrix_cell_count": len(duplicate_eligible),
+        "incomplete_patient_region_counts": incomplete,
         "signature_coverage": coverage,
         "minimum_patient_gate_passed": count_gate,
         "score_gate_passed": bool(join_ok and count_gate),
@@ -500,114 +502,80 @@ def _preflight(matrix_path: Path, metadata_path: Path) -> dict[str, Any]:
 
 
 def _read_counts_by_patient_region(matrix_path: Path, metadata_path: Path, preflight: dict[str, Any]):
-    """Read locked raw counts and aggregate them to patient-region pseudobulks."""
+    """Read selected raw-count cells from locked R CSC blocks into patient pseudobulks."""
     import h5py
     import numpy as np
-    from scipy.sparse import csr_matrix, csc_matrix
+    from scipy.sparse import csc_matrix
 
     layout = preflight["matrix_layout"]
-    matrix_path_in_h5 = layout["path"]
-    genes_path, cells_path = preflight["gene_id_path"], preflight["cell_id_path"]
+    if layout.get("kind") != "r_csc_blocks" or not layout.get("blocks"):
+        raise RuntimeError("Metadata-only preflight did not lock supported R CSC blocks")
     with h5py.File(matrix_path, "r") as handle:
-        genes = _string_values(handle[genes_path])
-        cells = _string_values(handle[cells_path])
-        if len(genes) != preflight["gene_count"] or len(cells) != preflight["matrix_cell_count"]:
-            raise RuntimeError("HDF5 identifiers changed after metadata-only preflight")
+        genes = _string_values(handle[preflight["gene_id_path"]])
+        if len(genes) != preflight["gene_count"] or _identifier_digest(genes) != layout["gene_ids_sha256"]:
+            raise RuntimeError("HDF5 gene identifiers changed after metadata-only preflight")
         fields = tuple(preflight["metadata_columns"][key] for key in ("patient", "setting", "cell_id"))
         patients, cell_rows = _read_metadata_for_pairs(metadata_path, fields)
         ordered_patients = sorted(patients)
+        if ordered_patients != preflight["eligible_patient_codes"]:
+            raise RuntimeError("Eligible patient codes changed after metadata-only preflight")
         patient_index = {patient: index for index, patient in enumerate(ordered_patients)}
-        group_codes = np.full(len(cells), -1, dtype=np.int16)
-        matrix_index = {cell_id: index for index, cell_id in enumerate(cells)}
-        for cell_id, (patient, region) in cell_rows.items():
-            if cell_id not in matrix_index:
-                raise RuntimeError(f"Metadata cell is absent from matrix after preflight: {cell_id}")
-            region_offset = 0 if region == "P-CT" else 1
-            group_codes[matrix_index[cell_id]] = patient_index[patient] * 2 + region_offset
-        group_count, gene_count, cell_count = len(ordered_patients) * 2, len(genes), len(cells)
+        group_count, gene_count = len(ordered_patients) * 2, len(genes)
         totals = np.zeros((group_count, gene_count), dtype=np.float64)
-        target = handle[matrix_path_in_h5]
+        matched_cells: set[str] = set()
+        for block_spec in layout["blocks"]:
+            target = handle[block_spec["path"]]
+            if not isinstance(target, h5py.Group) or not all(key in target for key in ("dims", "i", "p", "x", "rownames", "colnames")):
+                raise RuntimeError(f"R CSC block changed after metadata-only preflight: {block_spec['path']}")
+            cells = _string_values(handle[block_spec["cell_id_path"]])
+            shape = tuple(int(value) for value in target["dims"][...])
+            if shape != tuple(block_spec["shape"]) or len(cells) != block_spec["cell_count"]:
+                raise RuntimeError(f"R CSC dimensions or cell identifiers changed: {block_spec['path']}")
+            if _identifier_digest(cells) != block_spec["cell_ids_sha256"]:
+                raise RuntimeError(f"R CSC cell identifiers changed: {block_spec['path']}")
 
-        if isinstance(target, h5py.Group):
-            values_ds, indices_ds, indptr_ds = target["data"], target["indices"], target["indptr"]
-            shape = tuple(int(value) for value in target.attrs.get("shape", target["shape"][...] if "shape" in target else ()))
-            if len(shape) != 2:
-                raise RuntimeError("Sparse HDF5 matrix lacks a two-dimensional shape")
-            ptr_len = len(indptr_ds)
-            row_compressed = ptr_len == shape[0] + 1
-            col_compressed = ptr_len == shape[1] + 1
-            if row_compressed == col_compressed:
-                raise RuntimeError("Sparse HDF5 indptr does not identify one compressed matrix axis")
-            compressed_axis = 0 if row_compressed else 1
-            compressed_count = shape[compressed_axis]
-            cell_axis = 1 if preflight["matrix_layout"]["orientation"] == "genes_by_cells" else 0
-            if shape[cell_axis] != cell_count or shape[1 - cell_axis] != gene_count:
-                raise RuntimeError("Sparse HDF5 pointers do not match gene and cell dimensions")
-            compressed_is_cell = compressed_axis == cell_axis
-            for start in range(0, compressed_count, 20000):
-                stop = min(compressed_count, start + 20000)
+            group_codes = np.full(len(cells), -1, dtype=np.int32)
+            for cell_index, cell_id in enumerate(cells):
+                pair = cell_rows.get(cell_id)
+                if pair is None:
+                    continue
+                if cell_id in matched_cells:
+                    raise RuntimeError(f"Eligible metadata cell occurs more than once in matrix blocks: {cell_id}")
+                matched_cells.add(cell_id)
+                patient, region = pair
+                region_offset = 0 if region == "P-CT" else 1
+                group_codes[cell_index] = patient_index[patient] * 2 + region_offset
+
+            if shape != (gene_count, len(cells)):
+                raise RuntimeError(f"R CSC block is not genes-by-cells: {block_spec['path']}")
+            values_ds, indices_ds, indptr_ds = target["x"], target["i"], target["p"]
+            if len(indptr_ds) != len(cells) + 1 or len(values_ds) != len(indices_ds):
+                raise RuntimeError(f"R CSC pointer/value lengths are inconsistent: {block_spec['path']}")
+            if int(indptr_ds[-1]) != len(values_ds):
+                raise RuntimeError(f"R CSC final pointer differs from sparse payload length: {block_spec['path']}")
+            for start in range(0, len(cells), 20000):
+                stop = min(len(cells), start + 20000)
+                chunk_codes = group_codes[start:stop]
+                if not np.any(chunk_codes >= 0):
+                    continue
                 ptr = np.asarray(indptr_ds[start : stop + 1], dtype=np.int64)
+                if len(ptr) != stop - start + 1 or (np.diff(ptr) < 0).any():
+                    raise RuntimeError(f"R CSC pointers are invalid: {block_spec['path']}")
                 value_start, value_stop = int(ptr[0]), int(ptr[-1])
-                vals = np.asarray(values_ds[value_start:value_stop])
+                if value_start < 0 or value_stop > len(values_ds):
+                    raise RuntimeError(f"R CSC pointers exceed sparse payload length: {block_spec['path']}")
+                vals = np.asarray(values_ds[value_start:value_stop], dtype=np.float64)
                 indices = np.asarray(indices_ds[value_start:value_stop], dtype=np.int64)
                 local_ptr = ptr - value_start
+                if len(vals) != len(indices) or (indices < 0).any() or (indices >= gene_count).any():
+                    raise RuntimeError(f"R CSC indices do not match the gene dimension: {block_spec['path']}")
                 if not np.isfinite(vals).all() or (vals < 0).any() or not np.equal(vals, np.floor(vals)).all():
                     raise ValueError("Raw matrix contains non-finite, negative, or non-integer values")
-                if compressed_is_cell:
-                    chunk_codes = group_codes[start:stop]
-                    if compressed_axis == 0:
-                        block = csr_matrix((vals, indices, local_ptr), shape=(stop - start, shape[1]))
-                        if block.shape[1] != gene_count:
-                            raise RuntimeError("Cell-row sparse matrix does not match gene identifiers")
-                        for code in np.unique(chunk_codes[chunk_codes >= 0]):
-                            totals[code] += np.asarray(block[chunk_codes == code].sum(axis=0)).ravel()
-                    else:
-                        block = csc_matrix((vals, indices, local_ptr), shape=(shape[0], stop - start))
-                        if block.shape[0] != gene_count:
-                            raise RuntimeError("Cell-column sparse matrix does not match gene identifiers")
-                        for code in np.unique(chunk_codes[chunk_codes >= 0]):
-                            totals[code] += np.asarray(block[:, chunk_codes == code].sum(axis=1)).ravel()
-                else:
-                    ptr_rows = np.repeat(np.arange(stop - start, dtype=np.int64), np.diff(local_ptr))
-                    if compressed_axis == 0:
-                        cell_indices = indices
-                    else:
-                        cell_indices = indices
-                    if (cell_indices >= cell_count).any():
-                        raise RuntimeError("Sparse matrix cell indices exceed identifier array")
-                    nonzero_codes = group_codes[cell_indices]
-                    keep = nonzero_codes >= 0
-                    flat = ptr_rows[keep] * group_count + nonzero_codes[keep]
-                    sums = np.bincount(flat, weights=vals[keep], minlength=(stop - start) * group_count)
-                    gene_by_group = sums.reshape(stop - start, group_count)
-                    totals[:, start:stop] += gene_by_group.T
-        elif isinstance(target, h5py.Dataset) and target.ndim == 2:
-            shape = target.shape
-            cell_axis = 1 if preflight["matrix_layout"]["orientation"] == "genes_by_cells" else 0
-            if cell_axis == 0:
-                if shape != (cell_count, gene_count):
-                    raise RuntimeError("Dense cell-row matrix does not match identifiers")
-                for start in range(0, cell_count, 2048):
-                    stop = min(cell_count, start + 2048)
-                    block = np.asarray(target[start:stop, :], dtype=np.float64)
-                    chunk_codes = group_codes[start:stop]
-                    if not np.isfinite(block).all() or (block < 0).any() or not np.equal(block, np.floor(block)).all():
-                        raise ValueError("Raw matrix contains non-finite, negative, or non-integer values")
-                    for code in np.unique(chunk_codes[chunk_codes >= 0]):
-                        totals[code] += block[chunk_codes == code].sum(axis=0)
-            else:
-                if shape != (gene_count, cell_count):
-                    raise RuntimeError("Dense gene-row matrix does not match identifiers")
-                for start in range(0, cell_count, 2048):
-                    stop = min(cell_count, start + 2048)
-                    block = np.asarray(target[:, start:stop], dtype=np.float64)
-                    chunk_codes = group_codes[start:stop]
-                    if not np.isfinite(block).all() or (block < 0).any() or not np.equal(block, np.floor(block)).all():
-                        raise ValueError("Raw matrix contains non-finite, negative, or non-integer values")
-                    for code in np.unique(chunk_codes[chunk_codes >= 0]):
-                        totals[code] += block[:, chunk_codes == code].sum(axis=1)
-        else:
-            raise RuntimeError("Frozen matrix candidate is not a supported sparse group or dense matrix")
+                sparse_block = csc_matrix((vals, indices, local_ptr), shape=(gene_count, stop - start))
+                for code in np.unique(chunk_codes[chunk_codes >= 0]):
+                    totals[code] += np.asarray(sparse_block[:, chunk_codes == code].sum(axis=1)).ravel()
+        if matched_cells != set(cell_rows):
+            raise RuntimeError("Some eligible metadata cells were absent from matrix blocks after preflight")
 
     names = [(patient, region) for patient in ordered_patients for region in ("P-CT", "P-IT")]
     if not np.isfinite(totals).all() or (totals < 0).any():
@@ -1495,7 +1463,7 @@ def _score_locked_benchmark(matrix_path: Path, metadata_path: Path, preflight_pa
 
     # Rescan only HDF5 structure and identifier arrays. No count dataset is touched here.
     fresh_preflight = _preflight(matrix_path, metadata_path)
-    for key in ("matrix_layout", "gene_id_path", "cell_id_path", "gene_count", "matrix_cell_count", "eligible_patient_codes", "signature_coverage"):
+    for key in ("matrix_layout", "gene_id_path", "gene_count", "matrix_cell_count", "eligible_patient_codes", "eligible_cell_count", "signature_coverage"):
         if fresh_preflight.get(key) != preflight.get(key):
             raise RuntimeError(f"Metadata-only preflight changed after lock: {key}")
 
