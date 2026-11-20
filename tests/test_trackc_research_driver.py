@@ -101,8 +101,11 @@ def test_parallel_workers_match_serial(tmp_path):
         assert a["contrasts"] == b["contrasts"]
 
 
-def test_cli_refuses_evaluation_max_t_and_unconfirmed_pilot(tmp_path):
+def test_cli_refuses_evaluation_max_t_and_unconfirmed_pilot(tmp_path, monkeypatch):
     import trackc_integrated_driver as integrated
+    real = integrated.load_protocol()
+    opened = integrated.DriverProtocol(**{**real.__dict__, "open_gates": ("example open gate",)})
+    monkeypatch.setattr(integrated, "load_protocol", lambda *a, **k: opened)
     with pytest.raises(integrated.EvaluationBlocked):
         rd.main(["--phase", "evaluation", "--patients", "2", "--n-worlds", "1", "--out", str(tmp_path)])
     with pytest.raises(SystemExit, match="GE-betting"):

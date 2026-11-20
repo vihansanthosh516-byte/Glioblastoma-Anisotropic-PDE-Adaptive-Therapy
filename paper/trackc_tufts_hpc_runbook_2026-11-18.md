@@ -48,14 +48,14 @@ The job does, in order:
 2. Timing run (2 patients, 3 worlds).
 3. EARF timing run.
 4. Development pilot (12 patients, 20 worlds per family = 40 worlds).
-5. Writes `output/trackc_v2_research/dev_pilot/primary/design.json`.
+5. Writes `output/trackc_v2_research/dev_pilot/primary/m12/design.json`.
 
 If the job ends before the pilot prints `complete: 40 of 40 worlds`, run `sbatch hpc/tufts_pilot.sh` again. It resumes and skips finished worlds.
 
 ## Step 2: STOP and send results
 
 Send these to Vihan:
-- `output/trackc_v2_research/dev_pilot/primary/design.json`
+- `output/trackc_v2_research/dev_pilot/primary/m12/design.json`
 - the log files in `logs/`
 
 Vihan writes the freeze amendment (chosen cohort size `choice_m`, worlds `choice_n_per_family`, runtime cap) and pushes it. The evaluation phase is refused by the code until this is done. Then:
@@ -101,7 +101,7 @@ Vihan runs `--verify-only` and the frozen analysis on the PC (`src/trackc_v2_ana
 
 ## Time and size (estimates, not measured)
 
-From one PC world (1.13 h per world at 2 patients, `paper/trackc_local_timing_2026-11-12.md`): primary cell about 624 core-hours; all cells about 4,400+ core-hours. With 9 jobs x 30 workers, about 1 to 2 days of wall time if the queue is free. The pilot timing in Step 1 replaces these guesses.
+Pilot-based estimate (`paper/trackc_freeze_amendment_2026-11-19.md`): about 1.6 core-hours per world at m = 2 on a Tufts core, about 1,012 core-hours per cell, **about 9,400-9,600 core-hours in total** for the 9 jobs (the earlier 4,400 figure used PC timing and fewer worlds). With 9 jobs x 30 workers: about 34 hours per job, two 22-hour submissions each, if the queue starts them at once.
 
 ## If something goes wrong
 

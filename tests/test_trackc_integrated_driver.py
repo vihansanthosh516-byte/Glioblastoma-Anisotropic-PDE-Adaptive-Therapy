@@ -45,13 +45,14 @@ def test_protocol_loaded_from_config():
     assert p.precision_half_width_days == 14.0
     assert p.stop_endpoint == "observed_two_scan"
     assert p.scan_interval_days == 84 and p.scan_every_cycles == 3
-    assert p.open_gates, "config still lists open evaluation gates"
+    assert p.open_gates == (), "freeze amendment 2026-11-19 closed all evaluation gates"
 
 
 def test_evaluation_mode_refused_while_gates_open():
-    worlds = drv.build_world_schedule(2, scenario_base=100, policy_base=20100, prefix="w")
+    p = drv.load_protocol()
+    opened = drv.DriverProtocol(**{**p.__dict__, "open_gates": ("example open gate",)})
     with pytest.raises(drv.EvaluationBlocked, match="open gates"):
-        run(worlds, mode="evaluation")
+        drv.check_evaluation_gates(opened)
 
 
 def test_evaluation_refused_if_precision_target_changed():
