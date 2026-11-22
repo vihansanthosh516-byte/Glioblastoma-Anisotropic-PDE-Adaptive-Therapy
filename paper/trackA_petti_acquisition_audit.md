@@ -13,3 +13,19 @@ The [organoid study](https://ega-archive.org/studies/EGAS50000001221) has contro
 ## Completion status
 
 The original Artzi benchmark and the frozen simulations ran. Artzi, Yu and HGCC remain spent. This audit closes the public metadata screen for the inspected Petti files. A new real-data region or TMZ test has not been run. No new patient expression values or viability outputs were opened. Positive real-data validation remains open. [Artzi result](trackA_artzi_result_2026-11-17.md) | [Joint error simulation](trackA_joint_error_result.md) | [Recovery plan](trackA_recovery_plan.md)
+
+## Xenium cohort 3 specimen join
+
+The downloaded [GEO family index](https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE335275&targ=all&form=text&view=full) lists the following joins to the author table above. Normalize leading zeros in terminal specimen numbers only. GEO explicitly supplies the patient code for each specimen. Labels apply at specimen level; a cell-level pathology join remains unverified.
+
+| GEO patient | Edge accession | Core accession | Author specimen labels |
+|---|---|---|---|
+| B189 | GSM9809293 | GSM9809294 | ST073021-2 / ST073021-4 |
+| WU1220 | GSM9809295 | GSM9809296 | WU1220-1 / WU1220-3 |
+| WU1221 | GSM9809297 | GSM9809298 | WU1221-Edge1 / WU1221-Core2 |
+
+These are three candidate patients from this series. Even if every paired comparison favored a candidate with no ties, the smallest possible one-sided exact sign-test p-value would be 1 / 2^3 = 0.125 before correcting for multiple comparators. This is a design calculation. The series cannot independently meet the previous 0.05 superiority rule. Subdividing specimens into blocks or counting Visium duplicates as new patients would not fix this.
+
+## Specific data request for closure
+
+For the region endpoint, request a coded specimen-to-patient crosswalk covering the other Xenium cohorts and an independently annotated core/edge ROI export in Xenium coordinates (or masks plus registration transforms), with unit, section and assay identifiers. Request whether samples overlap the above series or prior Track A cohorts. For TMZ, request the deidentified baseline expression file or authorized access, assay AUC and endpoint definition, plus origin-to-culture-to-assay mapping and which cultures arose independently. No emails were sent.
