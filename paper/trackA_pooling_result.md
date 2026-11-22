@@ -1,0 +1,5 @@
+# Track A bounded pooling result
+
+**Simulation. Bounded pooling failed the overall frozen rule.** It passed the primary corrupted localized comparison (0.624375 versus 0.6085 for the best baseline, median block scores). Under clean localized reversal it scored 0.651 versus 0.673375 for max pooling. Under corrupted diffuse reversal it scored 0.792 versus 0.84725 for median pooling. Both shortfalls exceeded the 0.02 tolerance. Null passed. [Saved scores](../output/trackA_pooling_simulation/result.json) | [Frozen rule](trackA_pooling_plan.md)
+
+The simulated results suggest a tradeoff between sensitivity to a small patch and robustness when signal is spread across the tissue. The experiment used localized training signal and symmetric test-only corruption. It did not test correlated artifacts or depth and batch imbalance under the null, which remain in the recovery roadmap. A subsequent candidate can learn when to favor a median or a bounded upper tail using training patients and compare against each fixed method on fresh draws. Yu, HGCC, and Artzi remain spent.
