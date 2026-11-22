@@ -1,0 +1,7 @@
+# Track A spatial label error correction
+
+Simulation only. Reuse the graph, noise, baselines, replicate count and regime order of the [spatial stress plan](trackA_spatial_stress_plan.md), with fresh seed 20261125. Append a noisy null with correlated error: within each consecutive group of four positions, use a shared uniform draw for flips, preserving marginal error probabilities. Store independent per-regime results. Patient files remain closed.
+
+Map labels to signs and divide each sign by 1-2p, where p is the assumed flip probability for its depth. For each map compute half the difference between the average corrected sign product over all unordered position pairs and the average over graph edges. Conditional on independent symmetric errors with known probabilities this estimates the latent composition-adjusted bridge score. Keep all bridges. Check both correct rates and a fixed misspecification with p=0.16 at low depth and p=0.01 at high depth. In clean signal use zero for both assumptions. Error rates are simulation assumptions and must come from independent controls in a real study.
+
+Pass only if both correction variants score at least 0.98 under noisy signal and remain within 0.03 of chance in both noisy nulls. Also require both variants to match the clean globally adjusted baseline. Report same-draw paired concordance for every previous baseline, along with candidate minus depth-matched concordance. This is a joint robustness screen with a signal floor, not a test of superiority. Correlated label errors can break the product correction.
