@@ -29,3 +29,19 @@ These are three candidate patients from this series. Even if every paired compar
 ## Specific data request for closure
 
 For the region endpoint, request a coded specimen-to-patient crosswalk covering the other Xenium cohorts and an independently annotated core/edge ROI export in Xenium coordinates (or masks plus registration transforms), with unit, section and assay identifiers. Request whether samples overlap the above series or prior Track A cohorts. For TMZ, request the deidentified baseline expression file or authorized access, assay AUC and endpoint definition, plus origin-to-culture-to-assay mapping and which cultures arose independently. No emails were sent.
+
+## File-level qualification and download record
+
+GSM9809295 has an unresolved naming discrepancy. The GEO title says WU1220-01 and its cell file name says WU1220_2. Both candidate specimens are edge in the author table, but the exact identity is ambiguous. Treat the WU1220 row above as a provisional accession-level label only. There are two undisputed accession-to-specimen candidate pairs in this subset. The earlier three-pair design calculation is an optimistic upper bound.
+
+The following GEO coordinate archives downloaded successfully. SHA-256 fingerprints identify the local copies. Expression payloads were not opened.
+
+| File | Bytes | Local SHA-256 |
+|---|---:|---|
+| GSM9809293_ST073021_2_cells.parquet.gz | 1050562 | 3F556FCF7C6077B61E92026CF2362A0DF62DE4A8270814C749501821EEC66D3C |
+| GSM9809294_ST073021_4_cells.parquet.gz | 3546099 | 0DD9A5D29422D7B489F5BEF4213127F939C9467BAE647694EB55F14E9760636F |
+| GSM9809295_WU1220_2_cells.parquet.gz | 1095302 | 6D0E10CAFF4B4E2FB594ADE297832E8F407C57BEECFB56CD3DB7948AD2D82CCE |
+| GSM9809296_WU1220_3_cells.parquet.gz | 5495687 | 9E3A60688D5F418DE8A7A841B6AD4BE7EFD819A894821BF6F2E958D3CB3C042D |
+| GSM9809297_WU1221_Edge_cells.parquet.gz | 441961 | 52EFD1CE71DE3BA8C98338FB78AFFBA9DF7D26958AE7BDD62195ED9DA0E35014 |
+| GSM9809298_WU1221_Core2_cells.parquet.gz | 1997275 | 560A4C94B94BC80C98006F918BD943E810DAB8CA72B68FF68E4E25D25819ED6C |
+Annotated Zenodo RDS remains incomplete. The resume file held 440968892 bytes when this audit was written. Do not load it.
