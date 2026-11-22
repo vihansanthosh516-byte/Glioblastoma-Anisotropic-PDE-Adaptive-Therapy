@@ -1,0 +1,11 @@
+# Track A alternate spatial cohort and exact-test limits
+
+The [CosMx infiltration study](https://pmc.ncbi.nlm.nih.gov/articles/PMC12771808/) describes eight GBM patients. Its [newer Zenodo release](https://zenodo.org/records/22013127) lists a cell annotation object and four sample archives. Those archive names do not establish four patients or eight complete pairs. The public manifest does not establish a join between coded patients, independent pathology regions, and cell coordinates. Leave expression closed. Compare overlap with Petti, Artzi, and any development cohorts before counting a sample as fresh.
+
+The [Pai BioProject](https://www.ncbi.nlm.nih.gov/bioproject/1209108) describes six tumors and multiple assays. This is an upper bound for that dataset rather than a count of spatially eligible paired patients. It remains a lead for a training cohort or a separately designed benchmark, pending linkage and endpoint compatibility.
+
+For the earlier Artzi design, the [frozen protocol](trackA_artzi_preanalysis_2026-11-16.md) used an exact sign test with Holm correction and a ten-patient minimum. At eight informative discordant pairs, the smallest attainable raw p is 1/256. If all 28 Artzi-eligible comparisons were repeated, the smallest possible first Holm adjusted value would be 28/256 = 0.109375, before accounting for ties. These are design calculations, not patient results. Future candidate studies need a protocol sized for the planned comparator set and expected discordance before outcomes are read. [Artzi comparator count](../output/trackA_artzi_region_benchmark_20261116/result.json)
+
+## Draft author request
+
+Could you share the deidentified specimen-to-patient and histology-to-cell or field-of-view mapping for the core and infiltrating regions? We need the pathology labels assigned independently of expression, the coordinate transforms and units if masks are separate, and a list of sections or assays from the same patient. Will you also clarify which specimen GSM9809295 represents? Its GEO title and cell file use different terminal specimen numbers. No identifiers beyond the study's coded IDs are needed. [Petti discrepancy and accession audit](trackA_petti_acquisition_audit.md)
