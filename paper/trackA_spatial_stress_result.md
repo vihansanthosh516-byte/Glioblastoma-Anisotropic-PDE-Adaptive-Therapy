@@ -1,0 +1,5 @@
+# Track A spatial stress result
+
+**Simulation. Depth matching failed the frozen superiority gate.** Noisy signal concordance was 0.995 for depth matching and 1.000 for the globally adjusted baseline. Clean signal passed. Under the depth-only null, depth matching scored 0.5155 while globally adjusted and raw scoring reached 0.7995 and 0.7895, respectively. No high-depth bridge remained in 22.8% of edge maps in noisy signal, forcing the predefined zero score for those maps. [Saved results](../output/trackA_spatial_stress/result.json) | [Frozen plan](trackA_spatial_stress_plan.md)
+
+This generator uses exaggerated latent spatial differences, independently flipped labels, and identical geometry within a pair. The score is an opposite-state bridge fraction adjusted for composition. The run leaves the constrained disruption-budget method and real-tissue prediction untested. A fresh candidate could correct every bridge using independently estimated label error rates and compare against depth matching. It would need to retain null calibration when those rates are misspecified and error is spatially correlated. No spent cohort was opened.
