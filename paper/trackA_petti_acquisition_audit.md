@@ -45,3 +45,9 @@ The following GEO coordinate archives downloaded successfully. SHA-256 fingerpri
 | GSM9809297_WU1221_Edge_cells.parquet.gz | 441961 | 52EFD1CE71DE3BA8C98338FB78AFFBA9DF7D26958AE7BDD62195ED9DA0E35014 |
 | GSM9809298_WU1221_Core2_cells.parquet.gz | 1997275 | 560A4C94B94BC80C98006F918BD943E810DAB8CA72B68FF68E4E25D25819ED6C |
 Annotated Zenodo RDS remains incomplete. The resume file held 440968892 bytes when this audit was written. Do not load it.
+
+## Additional Xenium GEO metadata screen
+
+Downloaded the public [GSE316917 family metadata](https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE316917&targ=all&form=text&view=full) into the ignored data folder. It lists nine Xenium samples from five coded origins: GBM024, GBM025, GBM026, GBM030 and GBM034. The inspected sample records provide no core/edge field or separately named pathology ROI export. Their listed supplementary file categories are analysis, cell and nucleus boundaries, feature matrices, cell tables, morphology, and transcript files. A boundary file delineates cells and is insufficient to assign a pathology region.
+
+The earlier [GSE335275 family metadata](https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE335275&targ=all&form=text&view=full) lists six samples across three coded origins. Taken together, these two inspected releases provide at most eight distinct candidate origins before checking cross-series aliases and pairing. This count does not cover unreleased samples or certify eligible pairs. Even at that optimistic bound the cohort misses the [earlier frozen patient floor](trackA_artzi_preanalysis_2026-11-16.md). The remaining archive transfer cannot by itself increase the verified count or substitute for the pathology crosswalk.
