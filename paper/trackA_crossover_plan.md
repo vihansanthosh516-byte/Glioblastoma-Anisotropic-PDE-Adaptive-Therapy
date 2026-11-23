@@ -1,0 +1,7 @@
+# Track A crossover subtraction simulation
+
+Simulation only. Use the generator, training/test sizes, replicate count, logistic options and concordance from the [incremental plan](trackA_incremental_plan.md), with new seed 20261130. In all regimes use composition and expression shifts of 0.35 each, except null and pure artifact, where both are zero. Spatial shift equals biological effect plus assay offset. Prespecify (biology, training offset, test offset) as clean (0.8,0,0), mixed (0.8,0.8,-0.8), pure artifact (0,0.8,-0.8), null (0,0,0), and blind mixed (0.8,0.8,-0.8).
+
+For each replicate, collect 40 independent unit-normal control contrasts per condition, with mean equal to its offset in all arms except blind mixed, where controls read zero. Candidate subtracts the independent control mean from the spatial feature for each assay condition prior to model fit or scoring. Test-condition controls contain no patient data or region outcomes. Compare with always include spatial, always omit spatial, and the earlier train-control gate (omit when absolute training control mean exceeds 0.40), on the same draws.
+
+Primary gate: beat every baseline by at least 0.05 in mixed, lose no more than 0.02 to the best baseline in clean, and stay within 0.03 of chance in null and pure artifact. Report blind mixed separately as a predefined failure probe and require it to beat omission by at least 0.05 for a broad robustness claim. This tests a known additive nuisance under direct measurement and cannot establish novelty or patient performance.
