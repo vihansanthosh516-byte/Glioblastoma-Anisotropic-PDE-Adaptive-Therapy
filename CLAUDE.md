@@ -4,6 +4,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
+**Track B reporting and completion preference.** Keep working across failed attempts, with routine progress recorded in the repo. Reserve the user-facing completion report for a positive result under a frozen rule on eligible untouched data, a substantial research contribution supported by the evidence, and a specific distinction from the closest prior art. Preserve negative runs and do not retune on spent tests. Report a genuine blocker when continued work requires new data, access, or a user decision. Do not claim success on any criterion without evidence.
+
 **Read `START_HERE.md` first.** Current project is the three-track GBM project: Track A molecular/spatial prediction, Track B MRI growth and recurrence, and Track C treatment-policy simulation plus a separate MGMT association. The user has authorized coding work; the research-plan form is still editable and is not a code specification. Keep the tracks separate because no patient-level join is established. Treat previous outputs as historical; H-2/H-3 test sets are spent. Do not claim clinical benefit, patient-specific treatment effects, or a validated digital twin. Follow `START_HERE.md` for current code status and next steps.
 
 The probabilistic RANO work and four-track GBM platform below are preserved historical projects. Their old run commands and claims are not current instructions to execute experiments. Existing source, data, and generated outputs may be user work; inspect exact targets before changing them.
