@@ -1,0 +1,5 @@
+# Track A positive-control qualification result
+
+**Simulation. The higher-precision decision passed the new frozen tradeoff test.** With representative controls, it scored 0.818 in mixed signal versus 0.684 for omission and tied unconditional correction. When the control was blind it fell back to expression and composition, scoring 0.686 versus 0.554 for unconditional correction. All checks passed. In half-sensitive mixed data the fallback scored 0.682 versus 0.700 for unconditional correction, a cost of conservative qualification. [Tradeoff result](../output/trackA_probe_tradeoff/result.json) | [Frozen follow-up](trackA_probe_tradeoff_plan.md)
+
+The [original](../output/trackA_probe/result.json) and [precision](../output/trackA_probe_precision/result.json) runs remain failures under their own rules. The new rule distinguishes retaining the benefit of correction when qualified from improving on unconditional correction when blind. The positive-control challenge was simulated to probe the same artifact as the offset controls. It remains unverified whether a practical assay challenge measures the right shift, and there is no patient result or established novelty.
