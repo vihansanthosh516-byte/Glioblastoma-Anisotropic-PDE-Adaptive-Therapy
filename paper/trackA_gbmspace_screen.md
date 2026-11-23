@@ -1,0 +1,7 @@
+# Track A GBM-Space metadata screen
+
+The [GBM-Space portal](https://www.gbmspace.org/) advertises twelve tumors with multi-region nuclear profiling and ninety-seven histology-annotated Visium sections. These are totals, not counts of independently labeled complete core/infiltrating pairs. Its Xenium download was listed as coming soon at this screen.
+
+Downloaded the [CELLxGENE schema](https://www.gbmspace.org/cellxgene/api/v0.2/schema) into ignored local storage. The public nuclear schema lists donor_id, site_id, sample, cell_id and cell-status annotations. It does not list an explicit independent pathology region label. The [author code tree](https://github.com/BayraktarLab/GBM_space_paper/tree/75049439e7ee24ab4c10e5a807a3cadb5bddade0/metadata) did not expose a dedicated donor-site-pathology crosswalk in its metadata directory. A patient/site join may be feasible, but it cannot assign core and infiltrating labels by itself. Obtain the authoritative histopathology category definitions and specimen join separately, verify complete patient pairs and cohort overlap, and establish whether each modality supplies the same feature resolution.
+
+Consider the Visium data for a spot-level or expression-only Track A benchmark. Cell-level myeloid bridge geometry requires an independently qualified single-cell platform. Raw data controlled-access conditions are described in the [study](https://www.nature.com/articles/s41586-026-11234-8). No expression values or patient outcomes were accessed.
