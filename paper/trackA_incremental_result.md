@@ -1,0 +1,5 @@
+# Track A incremental evidence simulation result
+
+**Simulation. The nested feature benchmark detected a planted spatial gain and failed the frozen artifact condition.** Adding spatial information raised mean paired concordance from 0.6867 to 0.8208 when independent spatial signal was present. The expression-only and null checks passed. When a spurious spatial association reversed between training and testing, the full model dropped to 0.2105 while composition plus expression stayed at 0.4976. [Saved results](../output/trackA_incremental/result.json) | [Frozen plan](trackA_incremental_plan.md)
+
+This is a test of the comparison design with scalar synthetic features. It shows why patient separation alone cannot protect against a shift shared by an entire assay or cohort. The experiment does not distinguish actual sources of the Artzi regional signal. A real study needs independent pathology labels and assay or site holdout where feasible. A future development experiment can test whether independently randomized assay controls identify the spurious direction. Petti expression remains sealed pending the [linkage and cohort audit](trackA_petti_acquisition_audit.md).
