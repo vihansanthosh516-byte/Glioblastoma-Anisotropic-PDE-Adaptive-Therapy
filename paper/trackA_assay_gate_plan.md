@@ -1,0 +1,5 @@
+# Track A assay control gate simulation
+
+Use the [incremental design](trackA_incremental_plan.md) with fresh seed 20261128, identical train/test sizes and replicate count, and all four previous regimes. Add a mixed regime with true spatial shift 0.80 and assay shift +0.80 in training and -0.80 in test, yielding shifts (0.35,0.35,1.60) and (0.35,0.35,0). Add independent training assay controls: 40 same-material differences drawn from a unit normal with mean 0.80 in artifact and mixed regimes and mean zero otherwise. Fit the composition-plus-expression model if the absolute control mean exceeds 0.40, and the full model otherwise. No test controls enter training. Compare with both fixed models and composition alone on identical draws. Report inclusion frequency.
+
+Keep the prior spatial gain, expression tolerance, null and artifact checks, replacing the full model with the gated model. Also require mixed-regime concordance no more than 0.02 below composition plus expression. Simultaneous pass is a synthetic proof of concept under a measurable acquisition shift. Controls are simulated and may miss real assay effects. No real patient data.
