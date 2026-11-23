@@ -77,3 +77,4 @@ Artzi, Yu and HGCC remain spent. Their results and the development failures are 
 
 Spent cohorts: Artzi, Yu, HGCC. GSE232173 excluded for its own signature.
 | TMZ | dev3 origin-level confounding | Failed frozen rule (strong confound vs base); true links beat shuffled | trackA_dev3_tmz_plan_2026-11-23.md | ad34b03 / 70c2fead…756a | trackA_dev3_tmz_result_2026-11-23.md | Mechanism supported in generated data only; candidate form not best | freeze combined contrast + replication-fallback candidate; real sister-culture counts |
+| TMZ | dev4 gated one-slope contrast | Passed frozen rule 9/9 (development only; gate post hoc) | trackA_dev4_tmz_plan_2026-11-23.md | cb38cdf / df837f97…ae3f | trackA_dev4_tmz_result_2026-11-23.md | Current TMZ candidate | Park / Moniz Garcia sister-culture counts; full prior-art search; power; lock |
