@@ -1,0 +1,5 @@
+# Track A segmentation agreement stress test
+
+Simulation only. Derive an exact population result before running a deterministic numerical example. Each paired patient has baseline margin B and two spatial margins X and Y. Score one for a positive margin, half for a tie, zero for a negative margin. Compare B, B+X, B+Y, and a crossover rule that adds (X+Y)/2 only when X and Y are nonzero and have the same sign. Represent a simple population by two equally frequent baseline margins, +1 and -1. True spatial signal uses X=Y=+2. Divergent segmentation corruption uses X=+2 and Y=-2. Shared segmentation corruption uses X=Y=-2. Evaluate identical pairs for all arms.
+
+The crossover gate passes only if it improves by at least 0.10 over B under signal and loses at most 0.02 versus B in both artifact regimes. This is a constructive falsification screen, not cohort validation. The shared regime asks whether agreement alone protects when both reconstructions inherit the same contamination. No patient inputs or random draws. See [external design](trackA_external_design.md).
