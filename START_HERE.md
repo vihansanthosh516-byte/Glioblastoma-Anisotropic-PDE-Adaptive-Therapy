@@ -2,7 +2,7 @@
 
 ## Track navigation and integrated handoff
 
-**Track B reporting and completion preference.** Keep working across failed attempts, with routine progress recorded in the repo. Reserve the user-facing completion report for a positive result under a frozen rule on eligible untouched data, a substantial research contribution supported by the evidence, and a specific distinction from the closest prior art. Preserve negative runs and do not retune on spent tests. Report a genuine blocker when continued work requires new data, access, or a user decision. Do not claim success on any criterion without evidence.
+**Track A reporting and completion preference.** Keep working across failed attempts, with routine progress recorded in the repo. Reserve the user-facing completion report for a positive result under a frozen rule on eligible untouched data, a substantial research contribution supported by the evidence, and a specific distinction from the closest prior art. Preserve negative runs and do not retune on spent tests. Report a genuine blocker when continued work requires new data, access, or a user decision. Do not claim success on any criterion without evidence.
 
 **Track A: keep working after a failed test.** Record the outcome, diagnose the failure, and test a new explanation on fresh data. Keep the research question and frozen pass rules intact. See the [Track A recovery plan](paper/trackA_recovery_plan.md). The [Petti acquisition audit](paper/trackA_petti_acquisition_audit.md) records specimen linkage and the regional and TMZ validation gates.
 
