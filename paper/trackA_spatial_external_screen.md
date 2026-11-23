@@ -9,3 +9,11 @@ For the earlier Artzi design, the [frozen protocol](trackA_artzi_preanalysis_202
 ## Draft author request
 
 Could you share the deidentified specimen-to-patient and histology-to-cell or field-of-view mapping for the core and infiltrating regions? We need the pathology labels assigned independently of expression, the coordinate transforms and units if masks are separate, and a list of sections or assays from the same patient. Will you also clarify which specimen GSM9809295 represents? Its GEO title and cell file use different terminal specimen numbers. No identifiers beyond the study's coded IDs are needed. [Petti discrepancy and accession audit](trackA_petti_acquisition_audit.md)
+
+## Additional options screened
+
+- [Ivy GAP anatomic RNA-seq](https://www.ncbi.nlm.nih.gov/bioproject/PRJNA420740) includes histology-labeled cellular tumor and infiltrating tumor from a collection of ten tumors. Ten is an upper bound for paired tumors, not a verified count of independent complete pairs. Laser-microdissected RNA can support an expression-only benchmark. It cannot directly supply a cell adjacency graph. Ivy GAP also contributed to published regional signatures and project development, so trace downstream provenance before designating it an untouched test.
+- [EGA regionally sampled GBM](https://ega-archive.org/studies/EGAS50000000547) lists peritumoral, edge and core nuclear profiles. Verify whether the catalog's eleven regionally sampled tissues are from independent paired patients, and obtain authorized access and exact links. Dissociated expression is useful for the region endpoint but lacks the spatial coordinates needed for the graph score.
+- The [Pai article](https://pmc.ncbi.nlm.nih.gov/articles/PMC12603948/) clarifies that its four matched core and margin dissections used dissociated nuclei assays. The two additional tumors supplied the spatial data. The six-tumor project total therefore cannot be used as a spatial paired count. One of the four nuclei cases is IDH-mutant, which also limits use for a primary IDH-wildtype test.
+
+The next data action is to obtain sample-to-patient and pathology-to-region mappings before downloading additional expression matrices. Keep the graph and expression-only eligibility criteria separate. No new expression values were opened.
