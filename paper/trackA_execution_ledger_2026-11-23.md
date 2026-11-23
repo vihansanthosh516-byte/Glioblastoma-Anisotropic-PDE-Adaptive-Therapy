@@ -64,3 +64,15 @@ Metadata-only requests were sent to the GBM-Space, Petti, Park and Moniz Garcia 
 | Measured TMZ viability | Blocked on paired baseline and assay data from enough untouched origins | Blocked on independently derived cultures and the ablation | Blocked on independent assay or lab shift evidence |
 
 Artzi, Yu and HGCC remain spent. Their results and the development failures are retained in the linked records.
+
+## Run ledger (added 2026-11-23, Claude)
+
+| Endpoint | Experiment | Status | Protocol | Commit / output hash | Evidence | Decision | Next dependency |
+|---|---|---|---|---|---|---|---|
+| Both | Baseline reproduction | Done | handoff §1 | d4adbda / DDE30990…442C1 | scratch: 13/13 tests, byte-identical output | Baseline valid | none |
+| Both | Outreach check | Done | handoff §2.1 | — | no replies in author Gmail; sent requests not visible there | All four sources blocked | replies from GBM-Space, Petti, Park, Moniz Garcia |
+| Regional | dev2 override calibration | Failed | trackA_dev2_falsification_plan_2026-11-23.md | 37c565f / 85ea206b…fdad | trackA_dev2_falsification_result_2026-11-23.md | Do not advance | independent reference that observes shared error in evaluation condition (Petti or GBM-Space annotation export) |
+| TMZ | dev2 replicated direction | Mechanism unproven | same plan | 37c565f / 85ea206b…fdad | same result | Keep as candidate; redesign fixture where links are needed for gain | origin→culture→RNA→assay counts from Park / Moniz Garcia; ≥2 independent cultures per informative origin |
+| Both | External lock | Not started | handoff §5 | — | — | Sealed | eligible cohort counts for power |
+
+Spent cohorts: Artzi, Yu, HGCC. GSE232173 excluded for its own signature.
