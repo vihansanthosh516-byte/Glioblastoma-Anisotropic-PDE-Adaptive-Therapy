@@ -1,0 +1,5 @@
+# Track A crossover subtraction result
+
+**Simulation. Independent assay controls restored useful spatial signal when they measured the nuisance.** In the mixed regime, correction scored 0.809, versus 0.680 for the best baseline. All primary checks passed. The blind-control probe failed: correction scored 0.564 versus 0.686 for omitting spatial. Broad robustness failed. [Saved results](../output/trackA_crossover/result.json) | [Frozen plan](trackA_crossover_plan.md)
+
+The simulator supplied independent controls with the same additive offset as the synthetic specimens. The new assay requires its own controls, with no held-out patient labels. The result supports testing additive correction when coverage can be demonstrated. The design provides no evidence for non-additive errors or patient performance. The real-data gate remains verified pathology linkage, independent patients, and positive controls that demonstrate assay coverage. [Identification audit](trackA_assay_identifiability.md) | [Petti acquisition audit](trackA_petti_acquisition_audit.md)
