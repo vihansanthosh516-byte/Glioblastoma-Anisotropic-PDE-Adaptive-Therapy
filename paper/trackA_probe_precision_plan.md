@@ -1,0 +1,3 @@
+# Track A probe precision follow-up
+
+The [first run](../output/trackA_probe/result.json) rejected blind and half-sensitive controls but discarded useful spatial input too often under full sensitivity. Retain every regime, comparator, threshold and check in the [frozen plan](trackA_probe_plan.md). Change the independent positive-control count to 160 in each condition and use the corresponding normal standard error. Offset estimates still use 40 controls. Use fresh seed 20261202. This is a post hoc design response tested on fresh simulations. Probe sensitivity alignment remains a simulation assumption.
