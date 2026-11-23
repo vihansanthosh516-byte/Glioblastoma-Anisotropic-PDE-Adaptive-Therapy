@@ -1,0 +1,5 @@
+# Track A assay control stress result
+
+**Simulation. The gate passed only when the controls captured the full artifact.** With 40 controls, reversing-artifact concordance was 0.500 with full sensitivity, 0.357 with half sensitivity, and 0.218 with no sensitivity. With eight controls, the corresponding scores were 0.481, 0.379, and 0.298. The spatial-signal gains passed in all settings. Overall verdict: failed. [Saved results](../output/trackA_assay_transport/result.json) | [Frozen plan](trackA_assay_transport_plan.md)
+
+More controls improve precision about what they measure. They cannot expose an artifact to which they are blind. In this synthetic design, the half-strength control mean lies at the cutoff; larger sample size alone does not move it reliably above that cutoff. A practical release gate needs positive evidence that controls detect shifts of concern and a separate held-out assay condition. Retain paired composition and expression as the fallback when coverage cannot be verified. No real datasets were opened. The gate's novelty and real-patient performance remain open.
