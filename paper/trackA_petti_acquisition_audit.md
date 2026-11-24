@@ -51,3 +51,9 @@ Annotated Zenodo RDS remains incomplete. The resume file held 440968892 bytes wh
 Downloaded the public [GSE316917 family metadata](https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE316917&targ=all&form=text&view=full) into the ignored data folder. It lists nine Xenium samples from five coded origins: GBM024, GBM025, GBM026, GBM030 and GBM034. The inspected sample records provide no core/edge field or separately named pathology ROI export. Their listed supplementary file categories are analysis, cell and nucleus boundaries, feature matrices, cell tables, morphology, and transcript files. A boundary file delineates cells and is insufficient to assign a pathology region.
 
 The earlier [GSE335275 family metadata](https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE335275&targ=all&form=text&view=full) lists six samples across three coded origins. Taken together, these two inspected releases provide at most eight distinct candidate origins before checking cross-series aliases and pairing. This count does not cover unreleased samples or certify eligible pairs. Even at that optimistic bound the cohort misses the [earlier frozen patient floor](trackA_artzi_preanalysis_2026-11-16.md). The remaining archive transfer cannot by itself increase the verified count or substitute for the pathology crosswalk.
+
+## Author reply (2026-11-23)
+
+Dr. Petti and Saad Khan (Petti lab) replied by email. Saad Khan states that the lab has no pathologist annotations for its Xenium data. He will check for a discrepancy in the GEO Xenium metadata and reply. Dr. Petti notes that the Zenodo releases may be sufficient.
+
+Consequence: the Petti Xenium sections cannot supply an independent pathology core/edge label. The region endpoint on these data is closed unless a non-expression region label exists. The ROI boxes are figure annotations, not pathology ground truth. Do not use expression-derived labels as a substitute. Open item: the GEO metadata check from Saad Khan.
