@@ -52,3 +52,15 @@ Comparator 5 is the ablation of the new step (MGMT residual target).
 - RNA-seq for PDX was taken from untreated tumours at stated passages; mouse stroma reads may remain.
 - Novelty is modest. The new part is training on MGMT-residual in-vitro response and testing transfer to in-vivo survival under an MGMT-adjusted rule. Closest prior art: Zhao et al. 2019 (signatures built on these xenografts), Ju et al. 2025 (HGCC TMZ modelling), PERCEPTION and CaDRReS-Sc. A full prior-art check is needed before any novelty claim.
 - One run only. No retuning after the Mayo expression is opened.
+
+## Pre-lock design check (2026-11-24): NOT LOCKED, NOT RUN
+
+Code written (`src/trackA_tmz_mayo_transfer.py`) and checked on generated data only. Mayo expression was downloaded (SHA-256 48a69b40...283cc, ODbL) but not opened. Eligible Mayo models with cBioPortal RNA-seq and a TMZ ratio: 27.
+
+Findings that stop the lock:
+1. The new step does almost nothing. In HGCC, MGMT expression vs TMZ AUC has Spearman rho 0.108, so the MGMT-residual target is nearly the raw target. In the generated check the ablation (no residual) scored partial rho 0.435 vs candidate 0.398. The pass rule requires the candidate to beat its ablation, so it would fail by design, not by biology.
+2. Power. Generated data showed that ridge on 83 training lines and thousands of genes recovers spread signals poorly (correlation with the true signal about 0.2-0.3 at realistic signal levels). With 27 test models, only a large transfer effect could pass.
+
+Decision: do not lock or run. Running would spend the only untouched in-vivo TMZ cohort (27 models) on a test whose new component cannot be shown to matter. Mayo stays unspent.
+
+What a valid candidate needs: a new component that changes predictions materially relative to its ablation on the training data before the lock, checked on HGCC alone (development) without touching Mayo.
