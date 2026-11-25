@@ -23,3 +23,11 @@ Weak points:
 - No sister cultures, so the within-only estimator from dev5/dev6 does not apply; the method question changes.
 
 Next: read Table S7 and the SRA run table; count models with both RNA-seq and TMZ survival; check Zhao 2019 for which models it used.
+
+## Supplement check (2026-11-24)
+
+The user downloaded the 8 supplement files from PMC7056576 into `data/external/trackA_mayo_pdx_supp/` (git-ignored). Table S7 (supplement-8.docx) lists 37 PDX lines with standard-therapy survival; 30 have a TMZ survival ratio (median days TMZ / placebo, orthotopic). RNA-seq molecular group is called for 68 lines (Table S6A, supplement-7.xlsx). Lines with both a TMZ ratio and RNA-seq: **29** (MGMT methylated 13, unmethylated 16).
+
+Exposure disclosure: while counting, the median TMZ ratio by MGMT group was printed (methylated 3.53, unmethylated 1.50). No expression data were opened. This cohort is therefore not fully outcome-blind; MGMT-stratified response is known, and any protocol must treat MGMT as a known strong baseline.
+
+Assessment: n = 29 is small. With MGMT already separating response, a new expression method must add to MGMT on 29 models. Power for that is low. Treat as a development or limited test cohort, not a definitive test.
