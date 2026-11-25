@@ -56,3 +56,7 @@ Planted signal with section-specific per-gene scale shifts: candidate beat all c
 - PASTE2, the main published alignment comparator, was not run.
 - The rank normalization is a known technique; novelty rests on the task framing (one section to distant sites of the same tumor, scored against pathologist labels), which a prior-art search did not find but did not exhaustively rule out (`trackA_few_patient_designs_prior_art_2026-11-24.md`).
 - Ivy GAP categories may miss some structure (Greenwald 2024). Labels are spot-overlap percentages, so mixed spots are excluded at the 50% thresholds.
+
+## Deviation 1 (2026-11-24): memory fix, logic unchanged
+
+The first run (code SHA-256 1a193ccc...0c03) stopped with an out-of-memory error inside `evaluate()` before any score was computed or written; no result file exists. Cause: target and calibration matrices were rebuilt by copying the full section matrix once per gene. Fix: index the needed columns once. Logic, thresholds, comparators and pass rule are unchanged. Check: the generated-data self-test gives identical AUROC values to all printed digits before and after the fix (e.g., donor D0 candidate 0.6475169310958994, ablation 0.6045911969701185). Rerun once with the fixed code.

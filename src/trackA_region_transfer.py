@@ -153,7 +153,11 @@ def evaluate(sections, sigs):
                 mt = T["y"] >= 0
                 ti = {g: i for i, g in enumerate(T["genes"])}
                 cols = [ti.get(g, -1) for g in hvg]
-                Xt = np.column_stack([T["X"][mt][:, c] if c >= 0 else np.zeros(mt.sum()) for c in cols])
+                Tm = T["X"][mt]
+                Xt = np.zeros((Tm.shape[0], len(cols)), dtype=Tm.dtype)
+                ci_ok = [k for k, c in enumerate(cols) if c >= 0]
+                Xt[:, ci_ok] = Tm[:, [cols[k] for k in ci_ok]]
+                del Tm
                 yt = T["y"][mt]
                 sc = {
                     "candidate_rank_logit": predict(cand, Xt),
@@ -170,7 +174,11 @@ def evaluate(sections, sigs):
                     C = sections[cal[0]]
                     mc = C["y"] >= 0
                     ci = {g: i for i, g in enumerate(C["genes"])}
-                    Xc = np.column_stack([C["X"][mc][:, ci[g]] if g in ci else np.zeros(mc.sum()) for g in hvg])
+                    Cm = C["X"][mc]
+                    Xc = np.zeros((Cm.shape[0], len(hvg)), dtype=Cm.dtype)
+                    ok_c = [k for k, g in enumerate(hvg) if g in ci]
+                    Xc[:, ok_c] = Cm[:, [ci[hvg[k]] for k in ok_c]]
+                    del Cm
                     p_cal = predict(cand, Xc)
                     row["conformal_replicate_cal"] = conformal_cov(p_cal, C["y"][mc], sc["candidate_rank_logit"], yt)
                     row["conformal_insample_cal"] = conformal_cov(predict(cand, Xs), ys, sc["candidate_rank_logit"], yt)
