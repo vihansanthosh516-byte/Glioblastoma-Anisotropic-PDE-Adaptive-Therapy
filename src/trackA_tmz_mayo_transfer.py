@@ -1,4 +1,4 @@
-"""Track A TMZ: in-vitro (HGCC) to in-vivo (Mayo PDX) transfer beyond MGMT.
+"""Track A TMZ: repair-axis score (MGMT + mismatch repair) for in-vivo TMZ benefit beyond MGMT status (Mayo PDX).
 
 Protocol: paper/trackA_tmz_mayo_transfer_prereg_2026-11-24.md (locked before run).
 One run. Refuses to overwrite its result. `--selftest` runs on generated data only.
@@ -28,6 +28,7 @@ ALPHAS = [0.1, 1.0, 10.0, 100.0, 1000.0, 10000.0]
 N_PERM = 10000
 N_RAND = 1000
 SEED = 20261124
+MMR = ["MSH2", "MSH6", "MLH1", "PMS2"]
 
 
 def sha(p: Path) -> str:
@@ -116,29 +117,38 @@ def analyse(h_genes, h_expr, h_auc, m_genes, m_expr, y, mgmt, subtype, panel_pos
     c1, a1 = pipeline(h_r, target_res, m_r, top, rng)
     c5, a5 = pipeline(h_r, h_auc, m_r, top, rng)
     z = mgmt.astype(float)
-    p_c1_rho, p_c1 = perm_p(c1, y, z, rng)
+
+    # Primary candidate C2: fixed repair-axis score, no outcome training.
+    def zs(v):
+        s = v.std()
+        return (v - v.mean()) / (s if s > 0 else 1.0)
+
+    def repair(genes4):
+        mm = np.mean([zs(M[si[g]]) for g in genes4], axis=0)
+        return zs(-M[si["MGMT"]]) + zs(mm)  # low MGMT + intact MMR = more TMZ benefit
+
+    c2 = repair(MMR)
+    p_rho, p_val = perm_p(c2, y, z, rng)
 
     comp = {}
     comp["1_mgmt_status"] = partial_rho(z, y, z)
-    comp["2_mgmt_expression"] = partial_rho(-M[si["MGMT"]], y, z)  # MGMT expression = resistance
+    comp["2_mgmt_expression_ablation"] = partial_rho(-M[si["MGMT"]], y, z)
     comp["3_subtype_best_indicator"] = max(
         partial_rho((subtype == s).astype(float), y, z) for s in np.unique(subtype)
     )
     pp = [si[g] for g in panel_pos if g in si]
     pn = [si[g] for g in panel_neg if g in si]
     comp["4_ntafoulis_102"] = partial_rho(-(m_r[:, pp].mean(1) - m_r[:, pn].mean(1)), y, z)
-    comp["5_no_residual_ablation"] = partial_rho(c5, y, z)
+    comp["5_hgcc_transfer_ridge_mgmt_residual"] = partial_rho(c1, y, z)
+    comp["6_hgcc_transfer_ridge_raw"] = partial_rho(c5, y, z)
 
-    rand = []
-    for _ in range(N_RAND):
-        g = rng.choice(len(shared), N_TOP, replace=False)
-        s, _a = pipeline(h_r, target_res, m_r, g, rng)
-        rand.append(partial_rho(s, y, z))
-    rand = np.array(rand)
-    rand_pct = float((rand < p_c1_rho).mean())
+    pool = [g for g in shared if g not in set(MMR) | {"MGMT"}]
+    rand = np.array([partial_rho(repair(list(rng.choice(pool, 4, replace=False))), y, z)
+                     for _ in range(N_RAND)])
+    rand_pct = float((rand < p_rho).mean())
 
     pass_rule = bool(
-        p_c1_rho > 0 and p_c1 < 0.05 and all(p_c1_rho > v for v in comp.values()) and rand_pct >= 0.95
+        p_rho > 0 and p_val < 0.05 and all(p_rho > v for v in comp.values()) and rand_pct >= 0.95
     )
     return {
         "n_shared_genes": len(shared),
@@ -147,14 +157,14 @@ def analyse(h_genes, h_expr, h_auc, m_genes, m_expr, y, mgmt, subtype, panel_pos
         "mgmt_counts": {"M": int(z.sum()), "U": int((1 - z).sum())},
         "alpha_c1": a1,
         "alpha_c5": a5,
-        "c1_partial_rho": p_c1_rho,
-        "c1_perm_p_one_sided": p_c1,
-        "c1_raw_spearman": float(spearmanr(c1, y).statistic),
+        "c2_partial_rho": p_rho,
+        "c2_perm_p_one_sided": p_val,
+        "c2_raw_spearman": float(spearmanr(c2, y).statistic),
         "comparators_partial_rho": comp,
-        "comparator_7_zhao2019": "not run (gene list and weights not obtained before lock)",
-        "random_sets_partial_rho_median": float(np.median(rand)),
-        "random_sets_partial_rho_95pct": float(np.percentile(rand, 95)),
-        "c1_percentile_vs_random": rand_pct,
+        "comparator_zhao2019": "not run (gene list and weights not obtained before lock)",
+        "random_4gene_swap_partial_rho_median": float(np.median(rand)),
+        "random_4gene_swap_partial_rho_95pct": float(np.percentile(rand, 95)),
+        "c2_percentile_vs_random": rand_pct,
         "verdict": "PASS" if pass_rule else "FAIL",
     }
 
@@ -228,25 +238,26 @@ def panel_genes():
 
 def selftest():
     global N_PERM, N_RAND, N_TOP
-    N_PERM, N_RAND, N_TOP = 500, 30, 150
+    N_PERM, N_RAND, N_TOP = 500, 200, 150
     rng = np.random.default_rng(1)
-    genes = [f"G{i}" for i in range(300)] + ["MGMT"]
-    sig = rng.normal(size=(len(genes), 1))
+    genes = [f"G{i}" for i in range(300)] + ["MGMT"] + MMR
+    gi = {g: i for i, g in enumerate(genes)}
     h = rng.normal(size=(len(genes), 83))
     m = rng.normal(size=(len(genes), 27))
-    w = np.zeros(len(genes)); w[:40] = 1
-    h[:40] *= 3; m[:40] *= 3  # signal genes are high-variance, as in real data
-    w = w / 3 / np.sqrt(8)
-    h_auc = -(w @ h) / 7 + rng.normal(scale=0.5, size=83)
+    h_auc = rng.normal(size=83)
     mg = (rng.random(27) < 0.5).astype(int)
-    y = (w @ m) / 7 + mg + rng.normal(scale=0.5, size=27)
+    sig = -m[gi["MGMT"]] + m[[gi[g] for g in MMR]].mean(0) * 2
     sub = np.array(["Classical", "Proneural", "Mesenchymal"] * 9)
+    y = sig + mg + rng.normal(scale=0.5, size=27)
     r = analyse(genes, h, h_auc, genes, m, y, mg, sub, genes[50:60], genes[60:70])
-    print(json.dumps({k: r[k] for k in ("c1_partial_rho", "c1_perm_p_one_sided", "c1_percentile_vs_random", "comparators_partial_rho", "verdict")}))
-    y0 = mg + rng.normal(scale=0.5, size=27)
+    print(json.dumps({k: r[k] for k in ("c2_partial_rho", "c2_perm_p_one_sided", "c2_percentile_vs_random", "comparators_partial_rho", "verdict")}))
+    y0 = mg + np.random.default_rng(101).normal(scale=0.5, size=27)
     r0 = analyse(genes, h, h_auc, genes, m, y0, mg, sub, genes[50:60], genes[60:70])
-    print(json.dumps({k: r0[k] for k in ("c1_partial_rho", "c1_perm_p_one_sided", "verdict")}))
-    assert r["verdict"] == "PASS" and r0["verdict"] == "FAIL"
+    print(json.dumps({k: r0[k] for k in ("c2_partial_rho", "c2_perm_p_one_sided", "verdict")}))
+    y1 = -m[gi["MGMT"]] * 2 + mg + rng.normal(scale=0.5, size=27)  # MGMT-only truth: must fail vs ablation
+    r1 = analyse(genes, h, h_auc, genes, m, y1, mg, sub, genes[50:60], genes[60:70])
+    print(json.dumps({k: r1[k] for k in ("c2_partial_rho", "verdict")}))
+    assert r["verdict"] == "PASS" and r0["verdict"] == "FAIL" and r1["verdict"] == "FAIL"
     print("selftest ok")
     return 0
 
